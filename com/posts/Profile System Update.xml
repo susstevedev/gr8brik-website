@@ -1,0 +1,60 @@
+<table class='w3-table-all w3-card-4' style='color:black;'><td>By:sussteve</td><br /><td>Created:June 06 2024 09:26:09</td><br /></table><table class='w3-table-all w3-card-4' style='color:black;'><td>There is a new profile system. No migration needed, you&#039;re new profile will be at http://www.gr8brik.rf.gd/profile.php?&lt;YOUR USERNAME&gt;. Also, the old Report system will be phased out for a ban and appeal system, you can still Report people, it will just be sent to the admin&#039;s instead of public (for now, watchlist coming soon).</td></table><br /><hr /><table class='w3-table-all w3-card-4' style='color:black;'><td><a href='../profile.php?'></a> said on June 06 2024 09:26:09:<br><b>Update: Migration will be needed in the future for security reasons. http://youtube.com/@barbieslegos8885/community
+for more details.</b></td></table><br><table class='w3-table-all w3-card-4' style='color:black;'><td><a href='../profile.php?'></a> said on June 06 2024 09:58:31:<br><b>&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;
+    &lt;title&gt;(beta) Welcome to the new GR8BRIK community!&lt;/title&gt;
+
+    &lt;link rel=&quot;stylesheet&quot; href=&quot;../w3.css&quot;&gt;
+    &lt;link rel=&quot;stylesheet&quot; href=&quot;../theme.css&quot;&gt;
+    &lt;link rel=&quot;stylesheet&quot; href=&quot;https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css&quot;&gt;
+    &lt;meta charset=&quot;UTF-8&quot;&gt;
+    &lt;meta name=&quot;author&quot; content=&quot;sussteve226&quot;&gt;
+    &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1.0&quot;&gt;
+
+&lt;/head&gt;
+
+&lt;body class=&quot;w3-light-blue w3-container&quot;&gt;
+
+&lt;script&gt;
+if (localStorage.getItem(&quot;toggleDarkMode&quot;) === &quot;w3-dark-grey&quot;) {
+    var element = document.body;
+    element.classList.toggle(&quot;w3-dark-grey&quot;);
+}
+if (localStorage.getItem(&quot;toggleLightMode&quot;) === &quot;w3-light-blue&quot;) {
+    var element = document.body;
+    element.classList.toggle(&quot;w3-light-blue&quot;);
+}
+&lt;/script&gt;
+&lt;ul class=&quot;w3-navbar w3-black w3-card-8 w3-large w3-hide-small w3-top&quot;&gt;
+    &lt;li&gt;&lt;a href=&quot;/index.php&quot;&gt;&lt;img src=&quot;/img/logo.jpg&quot; width=&quot;25px&quot; height=&quot;25px&quot; class=&quot;w3-round&quot;&gt;&lt;b&gt;GR8BRIK&lt;/b&gt;&lt;/a&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;a href=&quot;/modeler.php&quot;&gt;MODELER&lt;/a&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;a href=&quot;/list.php&quot;&gt;CREATIONS&lt;/a&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;a href=&quot;/com&quot;&gt;COMMUNITY&lt;/a&gt;&lt;/li&gt;
+    &lt;br /&gt;
+&lt;b&gt;Warning&lt;/b&gt;:  Undefined array key &quot;username&quot; in &lt;b&gt;/home/vol1000_8/infinityfree.com/if0_36019408/gr8brik.rf.gd/htdocs/navbar.php&lt;/b&gt; on line &lt;b&gt;17&lt;/b&gt;&lt;br /&gt;
+&lt;li style=&#039;float:right&#039;&gt;&lt;a href=&#039;/acc/register.php&#039;&gt;REGISTER&lt;/a&gt;&lt;/li&gt;&lt;li style=&#039;float:right&#039;&gt;&lt;a href=&#039;/acc/login.php&#039;&gt;LOGIN&lt;/a&gt;&lt;/li&gt;&lt;/div&gt;
+&lt;/ul&gt;&lt;br /&gt;&lt;br /&gt;
+&lt;b&gt;You have to login to create, view, or post.&lt;/b&gt;&lt;hr /&gt;&lt;!--[if lt IE 9]&gt;
+        &lt;br /&gt;&lt;p class=&quot;w3-red w3-border&quot;&gt;You are using an &lt;b&gt;outdated&lt;/b&gt; browser. Please &lt;a href=&quot;http://www.browsehappy.com&quot; class=&quot;w3-btn&quot;&gt;upgrade your browser&lt;/a&gt; below, or &lt;a href=&quot;http://www.google.com/chromeframe&quot; class=&quot;w3-btn&quot;&gt;activate Google Chrome Frame&lt;/a&gt; to improve your experience.&lt;/p&gt;
+&lt;![endif]--&gt;
+        &lt;h1&gt;posts/Profile System Update.xml&lt;/h1&gt;
+        &lt;br /&gt;&lt;form method=&#039;post&#039; action=&#039;&#039;&gt;&lt;textarea name=&#039;commentbox&#039; placeholder=&#039;Add a comment...&#039; rows=&#039;4&#039; cols=&#039;50&#039;&gt;&lt;/textarea&gt;
+        &lt;br /&gt;&lt;input type=&#039;submit&#039; value=&#039;POST&#039; name=&#039;comment&#039; class=&#039;w3-btn&#039; /&gt;&lt;/form&gt;
+
+        &lt;table class=&#039;w3-table-all w3-card-4&#039; style=&#039;color:black;&#039;&gt;&lt;td&gt;By:sussteve&lt;/td&gt;&lt;br /&gt;&lt;td&gt;Created:June 06 2024 09:26:09&lt;/td&gt;&lt;br /&gt;&lt;/table&gt;&lt;table class=&#039;w3-table-all w3-card-4&#039; style=&#039;color:black;&#039;&gt;&lt;td&gt;There is a new profile system. No migration needed, you&amp;#039;re new profile will be at http://www.gr8brik.rf.gd/profile.php?&amp;lt;YOUR USERNAME&amp;gt;. Also, the old Report system will be phased out for a ban and appeal system, you can still Report people, it will just be sent to the admin&amp;#039;s instead of public (for now, watchlist coming soon).&lt;/td&gt;&lt;/table&gt;&lt;br /&gt;&lt;hr /&gt;&lt;table class=&#039;w3-table-all w3-card-4&#039; style=&#039;color:black;&#039;&gt;&lt;td&gt;&lt;a href=&#039;../profile.php?&#039;&gt;&lt;/a&gt; said on June 06 2024 09:26:09:&lt;br&gt;&lt;b&gt;Update: Migration will be needed in the future for security reasons. http://youtube.com/@barbieslegos8885/community
+for more details.&lt;/b&gt;&lt;/td&gt;&lt;/table&gt;&lt;br&gt;
+    &lt;/div&gt;&lt;br /&gt;&lt;br /&gt;
+
+    &lt;br /&gt;
+&lt;div class=&quot;w3-navbar w3-card-8 w3-bottom w3-black w3-hide-small&quot;&gt;
+    &lt;p class=&quot;w3-center&quot;&gt;2024 GR8BRIK app. All rights reserved. View on &lt;a href=&quot;https://www.github.com/evanrutledge1/gr8brik&quot; class=&quot;w3-btn w3-border&quot;&gt;GITHUB&lt;/a&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div class=&quot;w3-navbar w3-card-8 w3-bottom w3-black w3-hide-large w3-bar&quot;&gt;
+    &lt;p&gt;&lt;a href=&quot;/index.php&quot; class=&quot;fa fa-home w3-bar-item w3-xlarge w3-padding&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;/modeler.php&quot; class=&quot;fa fa-plus w3-bar-item w3-xlarge w3-padding&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;/cre&quot; class=&quot;fa fa-building w3-bar-item w3-xlarge w3-padding&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;/com&quot; class=&quot;fa fa-comments w3-bar-item w3-xlarge w3-padding&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;/acc&quot; class=&quot;fa fa-user w3-bar-item w3-xlarge w3-padding&quot;&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</b></td></table><br><table class='w3-table-all w3-card-4' style='color:black;'><td><a href='../profile.php?Anonymous User'>Anonymous User</a> said on June 06 2024 14:17:29:<br><b>...</b></td></table><br>

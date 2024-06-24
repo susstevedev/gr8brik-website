@@ -105,7 +105,7 @@ if(isset($_POST['upload'])){
             function toggleLightMode() {
                 var element = document.body;
                 element.classList.toggle("w3-light-blue");
-                localStorage.setItem("toggleDarkMode", "w3-light-blue");
+                localStorage.setItem("toggleLightMode", "w3-light-blue");
             }
         </script>
         </div>

@@ -39,11 +39,23 @@ if(isset($_POST['login'])){
 <body class="w3-light-blue w3-container">
     <?php include '../navbar.php'; ?>
     <br />
+    <script>
+        function showPass() {
+			var input = document.getElementById("password");
+			if (input.type === "password") {
+				input.type = "text";
+			} else {
+				input.type = "password";
+			}
+		}
+    </script>
     <center>
         <h1>Login</h1>
         <form method="post" action="">
             <p><input type="text" class="w3-input" placeholder="Username" name="username" style="width:30%" /></p>
-            <p><input type="password" class="w3-input" placeholder="Password" name="password" style="width:30%" /></p>
+            <p><input type="password" class="w3-input" placeholder="Password" name="password" id="password" style="width:30%" /></p>
+            <p><input type="checkbox" class="w3-check" onclick="showPass();">Show password</p>
+            <p><input type="checkbox" class="w3-check" onclick="rememberMe();">Remember me</p>
             <?php
             if($error) { 
                 echo '<b>Invalid username or password</b>';
