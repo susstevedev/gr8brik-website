@@ -70,9 +70,25 @@ $xml = new SimpleXMLElement('acc/users/' . urldecode($_SERVER['QUERY_STRING']) .
                 <b>@<?php echo $xml->username ?></b>
                 <br /><b>Email:<?php echo $xml->email ?></b>
                 <br /><b>Joined:<?php echo date ("F d Y H:i:s", filemtime($userfile)) ?></b>
+                <br /><b>Age:<?php echo $xml->age ?></b>
                 <br /><b>Description:<?php echo $xml->description ?></b>
                 <p><a href="report.php" class="w3-btn w3-red w3-round w3-hover-white">REPORT</a></p>
-            </div><br /><br />
+                <table>
+            <?php
+
+                $query = urldecode($_SERVER['QUERY_STRING']);
+                echo "<h2>" . $xml->username . "'s creations</h2>";
+                echo "<h5>and related</h5>";
+                foreach (glob("cre/*json") as $_FF) {
+                    if (strpos($_FF, $query) !== false) {
+                        echo "<a href='creation.php?" . $_FF . "'><img src='img/blured_model.jpg' width='320' height='240' ></a><br />";
+                        echo "<b>Name:" . $_FF . "</b><br />";
+                        echo "<b>Created:" . date("F d Y H:i:s", filemtime($_FF)) . "</b><br />";
+                    }
+                };
+
+            ?>
+        </table></div><br /><br />
 
     <?php include('linkbar.php') ?>
 

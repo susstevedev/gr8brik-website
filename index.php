@@ -32,9 +32,46 @@ if(file_exists('acc/users/' . $_SESSION['username'] . '.xml')){
 
     ?>
 
-    <img class="w3-left w3-card-8 w3-mobile" src="img/blured_model.jpg" width="50%" height="25%" alt="That square thingy"><br />
+    <div class="w3-content w3-card-8" style="max-width:800px;position:relative">
 
-    <div class="w3-container" id="main">
+        <a href="#feed"><img class="mySlides" src="img/feed.jpg" style="width:100%"></a>
+        <a href="#community"><img class="mySlides" src="img/com.jpg" style="width:100%"></a>
+        <a href="#creations"><img class="mySlides" src="img/creations.jpg" style="width:100%"></a>
+        <a href="#uploads"><img class="mySlides" src="img/upload.jpg" style="width:100%"></a>
+
+        <a class="w3-btn-floating" style="position:absolute;top:45%;left:0" onclick="plusDivs(-1)"><i class="fa fa-arrow-left" aria-hidden="true"></i></a>
+        <a class="w3-btn-floating" style="position:absolute;top:45%;right:0" onclick="plusDivs(1)"><i class="fa fa-arrow-right" aria-hidden="true"></i></a>
+
+    </div>
+
+    <script>
+
+        var slideIndex = 1;
+        showDivs(slideIndex);
+
+        function plusDivs(n) {
+            showDivs(slideIndex += n);
+        }
+
+        setInterval(function() {
+            plusDivs(1);
+        }, 3000);
+
+        function showDivs(n) {
+            var i;
+            var x = document.getElementsByClassName("mySlides");
+            if (n > x.length) {slideIndex = 1}
+            if (n < 1) {slideIndex = x.length}
+            for (i = 0; i < x.length; i++) {
+                x[i].style.display = "none";
+            }
+            x[slideIndex-1].style.display = "block";
+        }
+
+
+    </script>
+
+    <div class="w3-container w3-center" id="main">
 
         <h1>Welcome to GR8BRIK!</h1>
 
@@ -53,7 +90,7 @@ if(file_exists('acc/users/' . $_SESSION['username'] . '.xml')){
     </div><hr />
 
             <div id="feed">
-                <img class="w3-right w3-card-8 w3-mobile" src="img/com.jpg" width="25%" height="25%" alt="User PFP"><br />
+                <img class="w3-left w3-card-8 w3-mobile" src="img/feed.jpg" width="25%" height="25%" alt="User PFP"><br />
                 <h1>A feed just for you</h1>
                 <p>When you <a href="acc/register.php">Register</a> on GR8BRIK; there is now a personalised feed of the 6 newest models uploaded to GR8BRIK. You can view these models by clicking on them and enabling the WebGl window; or download it and import it into <a href="http://www.github.com/gr8brik-locallife">GR8BRIK desktop</a>.</p>
                 <a href="/acc/register.php" class="w3-btn w3-round">REGISTER</a><hr />

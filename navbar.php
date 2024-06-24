@@ -52,12 +52,16 @@ if (chromeVersion < 106) {
     <li><a href="/modeler">MODELER</a></li>
     <li><a href="/list">CREATIONS</a></li>
     <li><a href="/com">COMMUNITY</a></li>
+    <form method="get" action="/list.php?">
+        <input class="w3-input w3-animate-input w3-half w3-white w3-hover-green w3-large w3-border w3-round" type="text" placeholder="Search for..." name="q" style="width:30%">
+        <input class="w3-btn w3-hover-none w3-large w3-border w3-round" type="submit" value="&#128270;">
+    </form>
     <?php
-        if(file_exists($_SERVER['DOCUMENT_ROOT'] . '/acc/users/' . $_SESSION['username'] . '.xml')){
-            echo "<li style='float:right;'><a href='/acc'>" . $_SESSION['username'] . "</a></li>";
-        } else {
-            echo "<li style='float: right;'><a href='/acc/register.php'>REGISTER</a></li>";
+        if(!file_exists($_SERVER['DOCUMENT_ROOT'] . '/acc/users/' . $_SESSION['username'] . '.xml')){
+            echo "<li style='float:right;'><a href='/acc/register.php'>REGISTER</a></li>";
             echo "<li style='float:right;'><a href='/acc/login.php'>LOGIN</a></li>";
+        } else {
+            echo "<li style='float:right;'><a href='/acc'>" . $_SESSION['username'] . "</a></li>";
         }
     ?>
 </div>

@@ -29,12 +29,23 @@ session_start();
 
         <table>
             <?php
-
+            if (isset($_GET['q']) && $_GET['q']) {
+                $query = htmlspecialchars($_GET['q']);
+                echo "<p>Search results for <b>" . $query . "</b></p><br />";
+                foreach (glob("cre/*json") as $_FF) {
+                    if (strpos($_FF, $query) !== false) {
+                        echo "<a href='creation.php?" . $_FF . "'><img src='img/blured_model.jpg' width='320' height='240' ></a><br />";
+                        echo "<b>Name:" . $_FF . "</b><br />";
+                        echo "<b>Created:" . date("F d Y H:i:s", filemtime($_FF)) . "</b><br />";
+                    }
+                }
+            } else {
                 foreach (glob("cre/*json") as $_FF) {
                     echo "<a href='creation.php?" . $_FF . "'><img src='img/blured_model.jpg' width='320' height='240' ></a><br />";
                     echo "<b>Name:" . $_FF . "</b><br />";
                     echo "<b>Created:" . date ("F d Y H:i:s", filemtime($_FF)) . "</b><br />";
                 };
+            }
 
             ?>
         </table><br /><br />

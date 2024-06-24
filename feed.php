@@ -35,6 +35,7 @@ $xml = new SimpleXMLElement('acc/users/' . $_SESSION['username'] . '.xml', 0, tr
 
         <div class="w3-green w3-card-8 w3-center">
             <h1>Welcome to your feed, <?php echo $_SESSION['username']; ?></h1>
+            <img src=<?php echo 'acc/users/pfps/' . $_SESSION['username'] . '..jpg' ?> style='width: 250px; height: 250px; border-radius: 50%;cursor:zoom-in' class="w3-hover-shadow" onclick="document.getElementById('im').style.display='block'" />
             <h3>or @<?php echo $xml->username ?><a href="acc/index.php#handle"><i class="fa fa-pencil" aria-hidden="true"></i></a><br />
             <a href="/acc/index.php" class="w3-btn w3-large w3-white w3-hover-green">MANAGE <i class="fa fa-wrench" aria-hidden="true"></i>
 </a>

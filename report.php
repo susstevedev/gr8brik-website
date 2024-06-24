@@ -65,9 +65,9 @@ if(isset($_POST['report'])){
             <h1>Report</h1>
             <form method="post" action="">
                 <div class="w3-row-padding">
-                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="Username" name="username" /></p>
-                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="Handle" name="handle" /></p>
-                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="Email" name="email" /></p>
+                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="The username of user your reporting" name="username" /></p>
+                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="The handle of the user your reporting" name="handle" /></p>
+                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="The email of the user your reporting (optional)" name="email" /></p>
                 </div>
                 <p><textarea class="w3-border w3-hover-red" name="appealbox" placeholder="What did they do wrong and why should we suspend them?" rows="4" cols="50"></textarea></p>
                 <p><input type="submit" value="REPORT" name="report" class="w3-btn w3-round" /></p>

@@ -1,0 +1,4 @@
+#ELONS ROBOTS HAVE INVADED EARTH! This file will keep them from indexing this folder, or help them.
+
+User-agent: *
+Disallow: 

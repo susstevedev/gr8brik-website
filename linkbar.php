@@ -1,6 +1,6 @@
 <br />
 <div class="w3-navbar w3-card-8 w3-black w3-hide-small">
-    <p class="w3-center w3-large">2024 GR8BRIK app. All rights reserved. View on <a href="https://www.github.com/evanrutledge1/gr8brik" target="_blank" class="w3-hover-green w3-round">GITHUB</a></p><hr />
+    <p class="w3-center w3-large">2024 GR8BRIK app. All rights reserved by <a href="http://www.youtube.com/@barbieslegos8885">Barbies & Legos</a>. View on <a href="https://www.github.com/evanrutledge1/gr8brik" target="_blank" class="w3-hover-green w3-round">GITHUB</a></p><hr />
     <div class="w3-center w3-large">
         <p class="">LINKS</p><hr />
             <a href="/index.php">Homepage</a><br />

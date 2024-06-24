@@ -16,7 +16,7 @@ if(isset($_POST['appeal'])){
 
         $xml->addChild('handle', $handle);
 
-        $xml->addChild('type', appeal);
+        $xml->addChild('type', 'appeal');
 
         $xml->asXml('com/report/' . '(user)' . $username . '.xml');
 
@@ -61,9 +61,9 @@ if(isset($_POST['appeal'])){
             <h1>Appeal</h1>
             <form method="post" action="">
                 <div class="w3-row-padding">
-                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="Username" name="username" /></p>
-                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="Handle" name="handle" /></p>
-                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="Email" name="email" /></p>
+                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="Your username" name="username" /></p>
+                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="Your handle" name="handle" /></p>
+                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="Your email" name="email" /></p>
                 </div>
                 <p><textarea class="w3-border w3-hover-red" name="appealbox" placeholder="What did you do wrong and why should we reinstate you're account?" rows="4" cols="50"></textarea></p>
                 <p><input type="submit" value="APPEAL" name="appeal" class="w3-btn w3-round" /></p>
