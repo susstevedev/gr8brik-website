@@ -1,40 +1,64 @@
 <?php
 session_start();
+require_once $_SERVER['DOCUMENT_ROOT'] . '/newsite/acc/classes/constants.php';
+define('DB_NAME2', 'if0_36019408_creations');
 if(isset($_POST['report'])){
 
-        $username = $_POST['username'];
+        $username = $_POST['user'];
 
-        $email = $_POST['email'];
-
-        $handle = $_POST['handle'];
-
-        $msg = $_POST['appealbox'];
+        $msg = $_POST['other'];
+		
+		$type = $_POST['type'];
 
         $xml = new SimpleXMLElement ('<user></user>');
 
         $xml->addChild('username', $username);
 
-        $xml->addChild('email', $email);
-
-        $xml->addChild('handle', $handle);
-
         $xml->addChild('msg', $msg);
 
-        $xml->addChild('type', 'report');
+        $xml->addChild('type', $type);
 
-        $xml->asXml('com/report/' . $username . '.xml');
+        $xml->asXml('com/report/creation-' . $_POST['id'] . '.xml');
 
-        echo('Appealed!');
+        echo('Reported! We will check this in the next 72 hours!');
+		
+		die;
             
+}
+if(isset($_POST['delete'])){
+    $creation = "cre/" . basename($_SERVER['QUERY_STRING']);
+    //$file = fopen("test.txt","w");
+    //echo fwrite($file,"Hello World. Testing!");
+    //fclose($file);
+
+    unlink($creation);
+
+    // Create connection
+	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+			
+	if ($conn->connect_error) {
+		die("Connection failed: " . $conn->connect_error);
+	}
+			
+	// Query to get creation by it's own ID
+	$model = basename($_SERVER['QUERY_STRING']);
+
+	$sql = "DELETE FROM model WHERE model = ?";
+	$stmt = $conn->prepare($sql);
+	$stmt->bind_param("i", $model);
+	$stmt->execute();
+
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <title><?php echo basename($_SERVER['QUERY_STRING']) ?></title>
-    <link rel="stylesheet" href="../w3.css">
-    <link rel="stylesheet" href="../theme.css">
+    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
+    <link rel="stylesheet" href="lib/theme.css">
+    <script src="lib/main.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <meta charset="UTF-8">
     <meta name="description" content="Gr8brik is a block building browser game. No download required">
     <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
@@ -57,26 +81,7 @@ if(isset($_POST['report'])){
 
 <?php include('navbar.php') ?>
 
-        <div class='w3-container'>
-                <p>Want to build your own model? <a href='../modeler.php' class='w3-btn w3-round'>MODELER</a></p>
-        </div>
-        <br />
-        <center>
-            <h1>Report</h1>
-            <form method="post" action="">
-                <div class="w3-row-padding">
-                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="The username of user your reporting" name="username" /></p>
-                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="The handle of the user your reporting" name="handle" /></p>
-                    <p><input type="text" class="w3-input w3-border w3-hover-green w3-third" placeholder="The email of the user your reporting (optional)" name="email" /></p>
-                </div>
-                <p><textarea class="w3-border w3-hover-red" name="appealbox" placeholder="What did they do wrong and why should we suspend them?" rows="4" cols="50"></textarea></p>
-                <p><input type="submit" value="REPORT" name="report" class="w3-btn w3-round" /></p>
-            </form>
-            <a href="appeal">Appeal</a>
-        </center>
-        <br />
-        <br />
-        <br />
+        <b>Prosses(es) finished.</b><br />
 
     <?php include('linkbar.php') ?>
 

@@ -28,9 +28,11 @@ if(isset($_POST['appeal'])){
 <html lang="en">
 <head>
     <title><?php echo basename($_SERVER['QUERY_STRING']) ?></title>
-    <link rel="stylesheet" href="../w3.css">
-    <link rel="stylesheet" href="../theme.css">
+    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
+    <link rel="stylesheet" href="lib/theme.css">
+    <script src="lib/main.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <meta charset="UTF-8">
     <meta name="description" content="Gr8brik is a block building browser game. No download required">
     <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">

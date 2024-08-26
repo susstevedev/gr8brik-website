@@ -1,38 +1,51 @@
 <!DOCTYPE html>
 <html lang="en" uri="hidden">
 <head>
-    <title><?php echo urldecode(basename($_SERVER['QUERY_STRING'])) ?></title>
-    <link rel="stylesheet" href="../w3.css">
+    <title><?php echo $_GET['model'] . ' - GR8BRIK' ?></title>
+    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
+    <link rel="stylesheet" href="lib/theme.css">
+    <script src="lib/main.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body class="w3-light-grey">
+<body class="w3-light-grey w3-animate-right">
 
-<script> 
-    var $buoop = {required:{e:-4,f:-3,o:-3,s:-1,c:-3},insecure:true,api:2023.10 }; 
-    function $buo_f(){ 
-    var e = document.createElement("script"); 
-    e.src = "//browser-update.org/update.min.js"; 
-    document.body.appendChild(e);
-    };
-    try {document.addEventListener("DOMContentLoaded", $buo_f,false)}
-    catch(e){window.attachEvent("onload", $buo_f)}
+<style>
 
-    function darkMode() {
-        var element = document.body;
-        element.classList.toggle("w3-dark-grey");
-    }
-</script>
+body {
+	transition: all 1s ease-in-out;
+}
+
+.w3-btn {
+	transition: all 0.5s ease-in-out;
+	border-radius: 5%
+}
+
+.w3-btn:hover {
+	transform: translateY(10px);
+	border-radius: 15%; /* Border radius on hover */
+	color: black;
+	border: 1px solid;
+}
+
+
+
+</style>
 
 <center>
 
-    <?php $file = urldecode($_SERVER['QUERY_STRING']); ?>
+    <?php $file = $_GET['model']; ?>
 
-    <a href="../index.php" class='w3-btn w3-round w3-green w3-hover-white w3-card-8' title="GR8BRIK homepage" download><i class="fa fa-home" aria-hidden="true"></i></a>
-    <a href="<?PHP echo $file ?>" class='w3-btn w3-round w3-green w3-hover-white w3-card-8' title="Download model" download><i class="fa fa-download" aria-hidden="true"></i></a>
-    <button class="w3-btn w3-round w3-green w3-hover-white w3-card-8" onclick="toggleDarkMode()" title="Dark mode"><i class="fa fa-moon-o" aria-hidden="true"></i>
+    <a href="index.php" class='w3-btn w3-large w3-green w3-hover-white w3-card-24' title="GR8BRIK homepage"><i class="fa fa-home" aria-hidden="true"></i></a>
+    <a href="<?php echo "cre/" . $file ?>" class='w3-btn w3-large w3-green w3-hover-white w3-card-24' title="Download model" download><i class="fa fa-download" aria-hidden="true"></i></a>
+    <button class="w3-btn w3-large w3-green w3-hover-white w3-card-24" onclick="toggleDarkMode()" title="Dark mode"><i class="fa fa-moon-o" aria-hidden="true"></i>
 </button>
+
+<br />
+
+<br />
 
     <script>
         function toggleDarkMode() {
@@ -65,12 +78,12 @@
         " ?>
 
         <?php
-        if(file_exists(urldecode($_SERVER['QUERY_STRING']))){
+        if(file_exists('cre/' . $_GET['model'])){
             echo $code; 
         } else {
             echo '<center><h1>Error 404</h1><hr />';
             echo '<b>This model was not found</b><br />';
-            echo '<button onclick="window.history.go(-1);" class="w3-btn w3-round w3-green w3-hover-white w3-card-8">BACK</button></center>';
+            echo '<button onclick="window.history.go(-1);" class="w3-btn w3-large w3-green w3-hover-white w3-card-24">BACK</button></center>';
         }
     ?>
 
