@@ -1,116 +1,78 @@
 <?php
 session_start();
-if(file_exists('users/' . $_SESSION['username'] . '.xml')){
-    header('Location: index.php');
+require_once 'classes/membership.php';
+$Membership = new Membership();
+
+if ($_POST && !empty($_POST['username']) && !empty($_POST['pwd']) && !empty($_POST['email'])) {
+    $response = $Membership->register_User($_POST['username'], $_POST['pwd'], $_POST['email'], $_POST['day'], $_POST['month'], $_POST['year']);
 }
-$errors = array();
 
-if(isset($_POST['login'])){
-    $username = htmlspecialchars($_POST['username']);
+$words = ['Brick', 'Minifig', 'Stud', 'Build', 'Block', 'Stack', 'Baseplate', 'Roadplate', 'Fanatic', 'Craftsman'];
+$randomKeys = array_rand($words, 2); // Select two random keys
+$randomWord1 = $words[$randomKeys[0]];
+$randomWord2 = $words[$randomKeys[1]];
+$randomNumber = rand(100, 999);
 
-    $email = $_POST['email'];
-
-    $password = $_POST['password'];
-
-    $c_password = $_POST['c_password'];
-
-    $robot = $_POST['botbox'];
-
-    $day = $_POST['day'];
-
-    $month = $_POST['month'];
-
-    $year = $_POST['year'];
-
-    $birthday = mktime(0,0,0,$month,$day,$year);
-
-    $difference = time() - $birthday;
-
-    $age = floor($difference / 31556926);
-
-    echo $age;
-
-    if(!$age >= 13) {
-        $errors[] = 'You must be at least 13 to use GR8BRIK';
-    }
-
-    if(file_exists('users/' . $username . '.xml')){
-        $errors[] = 'Username already exists';
-        }
-
-    if($username == '') {
-        $errors[] = 'Username is blank';
-    }
-
-    if($email == ''){
-        $errors[] = 'Email is blank';
-        }
-
-    if($password == '' || $c_password == ''){
-        $errors[] = 'Passwords are blank';
-        }
-
-    if($password != $c_password){
-        $errors[] = 'Passwords do not match';
-        }
-
-    if($botbox != $notbot){
-        $errors[] = 'Please confim that your not a robot';
-        }
-
-        if(count($errors) == 0){
-            $xml = new SimpleXMLElement ('<user></user>');
-
-            $xml->addChild('userid', $notbotnumber);
-
-            $xml->addChild('password', md5($password));
-
-            $xml->addChild('email', $email);
-
-            $xml->addChild('age', $age);
-
-            $xml->addChild('username', $username);
-
-            $xml->asXml('users/' . $username . '.xml');
-
-            session_start();
-            error_reporting(0);
-            header('Location: index.php');
-        }
-            
-}
+$combinedString = $randomWord1 . $randomWord2 . $randomNumber;
 ?>
+
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <title>Register - Gr8brik</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="../w3.css">
-    <link rel="stylesheet" href="../theme.css">
+    <title>Register</title>
+    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
+    <link rel="stylesheet" href="../lib/theme.css">
+    <script src="../lib/main.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="description" content="Gr8brik is a block building browser game. No download required">
+    <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
+    <meta name="author" content="sussteve226">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body class="w3-light-blue w3-container">
-    <?php include '../navbar.php' ?>
-    <br />
+<body class="w3-container w3-light-blue">
+	<?php include '../navbar.php'; ?>
+	<script>
+		function showPass() {
+			var x = document.getElementById("pwd");
+			if (x.type === "password") {
+				x.type = "text";
+			} else {
+				x.type = "password";
+			}
+		}
+        $(document).ready(function() {
+			$("#alert").fadeOut(10000);
+			$("#close").click(function(){
+				$("#alert").hide();
+			});
+        });
+    </script>
     <center>
-        <h1>Register</h1>
-        <form method="post" action="">
-            <?php
-            if(count($errors) > 0) {
-                echo '<ul>';
-                foreach($errors as $e){
-                    echo '<li>' . $e . '</li>';
-                }
-                echo '<ul>';
-            }
-            ?>
-            <p><input type="text" name="username" class="w3-input" placeholder="Username (eg user1234)" style="width:30%" /></p>
-            <p><input type="text" name="email" class="w3-input" placeholder="Email (eg user1234@mail.com)" style="width:30%" /></p>
-            
-            <p><input type="password" class="w3-input" placeholder="Password (eg password1234)" name="password" style="width:30%" /></p>
-            <p><input type="password" class="w3-input" placeholder="Write your password again" name="c_password" style="width:30%" /></p>
-        <div class="w3-row-padding">
+        <div class="main w3-light-grey w3-card-24">
+            <form method="post" action="">
+				<b>Already have an account? <a href="login.php">Login</a></b><br />
+                <h1>Register</h1>
+                <small>Please fill in the details to create an account</small>
+                <p>
+                    <label for="username">Username:</label>
+                    <input type="text" value="<?php echo $combinedString; ?>" name="username" class="w3-input" required style="width:30%"/>
+					<small>Nick names suggested randomly</small>
+				</p>
+                <p>
+                    <label for="email">E-mail:</label>
+                    <input type="email" name="email" class="w3-input" required style="width:30%"/>
+                </p>
+                <p>
+                    <label for="pwd">Password:</label>
+                    <input type="password" name="pwd" id="pwd" class="w3-input" required style="width:30%"/>
+					<span class="w3-tag w3-light-grey w3-text-red">(!)</span><label class="w3-validate w3-text-blue">Show password</label>
+					<input type="checkbox" class="w3-check" class="w3-input" onclick="showPass();">
+				</p>
+				<p>
+					<div class="w3-row-padding">
             <select class="w3-select" name="day" style="width:30%">
                 <option value="" disabled selected>Day</option>
                 <option>01</option>
@@ -287,28 +249,31 @@ if(isset($_POST['login'])){
                 <option value="2025">2025</option>
             </select>
         </div>
-            <a onclick="document.getElementById('id02').style.display='block'" class="w3-btn w3-round">REGISTER</a>
-            
+				</p>
+                <p>
+					<span onclick="document.getElementById('id02').style.display='block'" class="w3-btn w3-blue w3-hover-opacity">CONTINUE</span>
+                </p>
+				
             <div id="id02" class="w3-modal">
                 <div class="w3-modal-content w3-card-4 w3-light-blue">
                     <div class="w3-container">
                         <span onclick="document.getElementById('id02').style.display='none'" class="w3-closebtn">&times;                            </span>
-                        <b>By using GR8BRIK, you confirm your over the age of 13 or have parental permission, and accept the <a href="../privacy.php">Privacy Policy</a> and <a href="../terms.php">Terms and Conditions</a>. You cannot change your username.</b>
+                        <b>By using GR8BRIK, you confirm your over the age of 13 or have parental permission, and accept the <a href="../rules.php">Rules</a>.</b>
                         <p>Confirm your not a robot by writing the number box to box. Then press "accept".</p>
                         <?php
                             $notbotnumber = rand (1, 10000);
                             echo '<input type="text" name="notbot" placeholder=' . $notbotnumber . ' size="10" readonly />';
                         ?>
                         <input type="text" name="botbox" placeholder="<?php $notbot ?>" size="20" />
-                        <p><input type="submit" value="ACCEPT" name="login" class="w3-btn w3-large w3-white w3-hover-green" /></p>
+                        <p><input class="w3-btn w3-blue w3-hover-blue" type="submit" id="submit" value="CREATE ACCOUNT" name="submit" /></p>
                     </div>
                 </div>
             </div>
-        </form>
-        <a class="w3-large" href="login.php">Login</a>
+			
+            </form>
+            <?php if (isset($response)) echo "<h4 class='alert'>" . $response . "</h4>"; ?>
+        </div>
     </center>
-    <br />
-    <br />
-    <?php include '../linkbar.php' ?>
+	<?php include '../linkbar.php'; ?>
 </body>
 </html>
