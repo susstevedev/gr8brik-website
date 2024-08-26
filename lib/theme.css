@@ -1,0 +1,114 @@
+	
+#loading {
+	position: fixed;
+	width: 100%;
+	height: 100%;
+	top: 0;
+	left: 0;
+	background: rgba(255, 255, 255, 0.8);
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	z-index: 9999;
+	border: 1px;
+	border-radius: 15px;
+}
+	
+body {
+	transition: all 1s ease-in-out;
+}
+
+a,p,h1,h2,h3,h4,h5,h6 {
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+a:hover {
+    color: #0000FF;
+}
+	
+#navbar {
+	position: fixed;
+	left: 0;
+	width: 20%;
+}
+
+.gr8-warning {
+	margin-left:20%;
+}
+	
+#overlay {
+	position: fixed; /* Sit on top of the page content */
+	display: none;   /* Hidden by default */
+	width: 100%;     /* Full width (cover the whole page) */
+	height: calc(100% - 100px); /* Full height minus the top space */
+	top: 150px;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: rgba(0,0,0,0.5); /* Black background with opacity */
+	z-index: 2;      /* Specify a stack order in case you're using a different order for other elements */
+	cursor: pointer; /* Add a pointer on hover */
+}
+	
+#offset {
+	margin-left:25%;
+}
+
+#banner {
+    width: 500px;
+    height: 250px;
+    border: 1px solid;
+    border-radius: 1px;
+    background-color: #fff;
+    position: relative; /* Change to relative */
+}
+    
+#pfp {
+    width: 100px;
+    height: 100px;
+    border: 1px solid;
+    border-radius: 1px;
+    background-color: #fff;
+}
+
+#handleIcon, input[type=file]::file-selector-button {
+    float: left;
+    font-size: 20px;
+    text-align: center;
+    background-color: #fff;
+    height: 40px;
+    border: 1px solid;
+    border-color: #d3d3d3;
+}
+
+.centered-item {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    width: 50%; /* Adjust the width as needed */
+}
+
+.w3-btn {
+    box-shadow: 5px 5px 7px rgba(0, 0, 0, 0.10);
+}
+
+/* Set margin-left to 0 for screens smaller than 768px (mobile devices) */
+@media only screen and (max-width: 768px) {
+    body {
+        margin: 0;
+        padding: 0;
+    }
+	#offset {
+		margin-left: 0px;
+	}
+	#handleIcon {
+		display: none;
+	}
+    #postTime {
+        float: right;
+    }
+    #banner {
+        width: 250px;
+        height: 100px;
+    }
+}
