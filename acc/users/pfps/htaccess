@@ -1,1 +1,2 @@
-ErrorDocument 404 /img/user.png
+RewriteEngine On
+ErrorDocument 404 /img/avatar.png

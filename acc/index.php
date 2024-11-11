@@ -1,17 +1,12 @@
 <?php
-session_start();
 
-require_once 'classes/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 
 if(!isset($_SESSION['username'])){
 
-    header('Location: acc/login.php');
+    header('Location: login.php');
 
 }
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Debug: Log the incoming data
-    error_log(print_r($_POST, true));
 
 define('DB_NAME2', 'if0_36019408_creations');
 
@@ -55,62 +50,55 @@ if (isset($_POST["upload"])) {
 }
 
 $conn->close();
-	
-	if(isset($_POST['picture'])){
-		$dir = "../acc/users/pfps/";
-		$target_file = $dir . basename($_FILES['fileToupload']['name']);
-		$filename = $dir . $id;
-		$extension = substr_replace($target_file , 'jpg', strrpos($filename, '.') +1);
-		$temp = explode(".", $_FILES["fileToupload"]["name"]);
-		$upload = $filename . $extension;
-		$okay = 1;
 
-		// Check file size
-		if ($_FILES["fileToupload"]["size"] > 5242880) {
-			echo "Sorry, your file is too large.";
-			$uploadOk = 0;
-		}
+/*if (isset($_POST['picture'])) {
+    $dir = "users/pfps/";
+    //$target_file = $dir . basename($_FILES['fileToupload']['name']);
+    $target_file = $dir . basename($_FILES['fileToupload']);
+    $upload = $dir . $id . '.jpg';
 
-		// Check if $uploadOk is set to 0 by an error
-		if ($okay == 0) {
-			echo "Sorry, your file was not uploaded.";
-		// if everything is ok, try to upload file
-		} else {
-			if (move_uploaded_file($_FILES["fileToupload"]["tmp_name"], $upload )) {
-			echo "Your Profile Pricture has been updated.";
-		} else {
-			echo "Sorry, there was an error uploading your file.";
-		}
+    if ($_FILES["fileToupload"]["size"] > 5242880) {
+        $uploadOk = 0;
     }
 
+    if ($uploadOk === 0) {
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => 'Sorry, there was an error uploading your file.']);
+        exit;
+    } else {
+        if (move_uploaded_file($_FILES["fileToupload"]["tmp_name"], $upload)) {
+            $uploadOk = 1;
+        } else {
+            $uploadOk = 0;
+        }
+    }
+}*/
+
+if (isset($_POST['picture'])) {
+    $id = $_SESSION['username'];
+    $upload = "users/pfps/" . $id . '.jpg';
+
+    if ($_FILES["fileToupload"]["size"] > 2621440) {
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => 'File size exceeds 2.5MB limit.']);
+        exit;
+    }
+
+    if (move_uploaded_file($_FILES["fileToupload"]["name"], $upload)) {
+        header('Location: index.php');
+        exit;
+    } else {
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => 'File did not upload.']);
+        exit;
+    }
 }
 
-if(isset($_POST['banner'])){
-    $dir = "../acc/users/banners/";
-	$target_file = $dir . basename($_FILES['fileToupload']['name']);
-	$filename = $dir . $id;
-	$extension = substr_replace($target_file , 'jpg', strrpos($filename, '.') +1);
-	$temp = explode(".", $_FILES["fileToupload"]["name"]);
-	$upload = $filename . $extension;
-	$okay = 1;
-
-	// Check file size
-	if ($_FILES["fileToupload"]["size"] > 5242880) {
-		echo "Sorry, your file is too large.";
-		$uploadOk = 0;
-	}
-
-	// Check if $uploadOk is set to 0 by an error
-	if ($okay == 0) {
-		echo "Sorry, your file was not uploaded.";
-	// if everything is ok, try to upload file
-	} else {
-		if (move_uploaded_file($_FILES["fileToupload"]["tmp_name"], $upload )) {
-		    echo "Your Profile Pricture has been updated.";
-	    } else {
-		    echo "Sorry, there was an error uploading your file.";
-	    }
-    }
+if(isset($_POST['deletePfp'])){
+    $pfp = "users/pfps/" . $id . ".jpg";
+    unlink($pfp);
+    header("Location: index.php");
+    exit;
 }
 
 $password_error = false;
@@ -148,101 +136,99 @@ if(isset($_POST['change'])){
         }
     $password_error = true;
 }
-if(isset($_POST['u_change'])){
+
+if(isset($_POST['username_change'])){
+    include $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
     $new = htmlspecialchars($_POST['username']);
-		// Fetch the current password from the database
-			$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-			$stmt = $conn->prepare("SELECT username FROM users WHERE username = ?");
-			$stmt->bind_param("s", $user);
-			$stmt->execute();
-			$stmt->bind_result($at);
-			$stmt->fetch();
-			$stmt->close();
-			$stmt_2 = $conn->prepare("update users SET username = ? WHERE username = ?");
-            $stmt_2->bind_param("ss", $new, $user);
-            if ($stmt_2->execute()) {
-                echo "Username successfully changed!";
-                header('Location: index.php');
-                die;
-            } else {
-                echo "Error updating username.";
-                header('Location: index.php');
-                die;
-            }
-            $stmt->close();
-            die;
+    $id = $_SESSION['username'];
+    $valid = array('-', '_', '.', '+');
+    if(empty($new)) {
+        $error_message = "Username cannot be blank.";
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => $error_message]);
+        exit;
+    }    
+    if(!ctype_alnum(str_replace($valid, '', $new))) {
+        $error_message = "Username has invalid characters.";
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => $error_message]);
+        exit;
     }
-if(isset($_POST['h_change'])){
-    $new = preg_replace('/[^A-Za-z]/', '', $_POST['handle']);
+    if(strlen($new) > 51) {
+        $error_message = "Username can only be 50 characters.";
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => $error_message]);
+        exit;
+    }
+
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-	$stmt = $conn->prepare("SELECT handle FROM users WHERE username = ?");
-	$stmt->bind_param("s", $user);
-	$stmt->execute();
-	$stmt->bind_result($at);
-	$stmt->fetch();
-	$stmt->close();
-	$stmt_2 = $conn->prepare("update users SET handle = ? WHERE username = ?");
-    $stmt_2->bind_param("ss", $new, $user);
+
+    $sql = "SELECT * FROM users WHERE username = '$new'";
+    $result = $conn->query($sql);
+    $row = $result->fetch_assoc();
+
+    if($result->num_rows != 0) {
+        $error_message = "Username is taken.";
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => $error_message]);
+        exit;
+    }
+
+	$stmt_2 = $conn->prepare("UPDATE users SET username = ? WHERE id = ?");
+    $stmt_2->bind_param("ss", $new, $id);
     if ($stmt_2->execute()) {
-        echo "Handle successfully changed!";
+        echo "Success!";
         header('Location: index.php');
-        die;
-    } else {
-        echo "Error updating handle.";
-        header('Location: index.php');
-        die;
+        exit;
     }
-    $stmt->close();
-    die;
-    }
-if(isset($_POST['a_change'])){
-    $new = $_POST['age'];
-	// Create connection
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-    // Check connection
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
-
-    $stmt = $conn->prepare("UPDATE users SET age = ? WHERE username = ?");
-    $stmt->bind_param("is", $new, $user);
-    if ($stmt->execute()) {
-        echo "Age successfully changed!";
-        header('Location: index.php');
-        die;
-    } else {
-         echo "Error updating age.";
-        header('Location: index.php');
-        die;
-    }
-        $stmt->close();
-        die;
-    }
-if(isset($_POST['about'])){
-    $new = $_POST['description'];
-	// Create connection
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-    // Check connection
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
-
-    $stmt = $conn->prepare("UPDATE users SET description = ? WHERE username = ?");
-    $stmt->bind_param("ss", $new, $user);
-    if ($stmt->execute()) {
-        echo "About successfully changed!";
-        header('Location: index.php');
-        die;
-    } else {
-        echo "Error updating about";
-        header('Location: index.php');
-        die;
-    }
-    $stmt->close();
-    die;
 }
+
+if(isset($_POST['twitter_change'])){
+    include $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
+    $new = htmlspecialchars($_POST['handle']);
+    $id = $_SESSION['username'];
+
+    if(strlen($new) > 16) {
+        $error_message = "X handle's can only be 15 characters.";
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => $error_message]);
+        exit;
+    }
+
+	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+	$stmt_2 = $conn->prepare("UPDATE users SET twitter = ? WHERE id = ?");
+    $stmt_2->bind_param("ss", $new, $id);
+    if ($stmt_2->execute()) {
+        echo "Success!";
+        header('Location: index.php');
+        exit;
+    }
+}
+
+if(isset($_POST['about_change'])){
+    include $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
+    $new = htmlspecialchars($_POST['description']);
+    $id = $_SESSION['username'];
+    if(strlen($new) > 201) {
+        $error_message = "Bio can only be 200 characters.";
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => $error_message]);
+        exit;
+    }
+
+	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+	$stmt_2 = $conn->prepare("UPDATE users SET description = ? WHERE id = ?");
+    $stmt_2->bind_param("ss", $new, $id);
+    if ($stmt_2->execute()) {
+        echo "Success!";
+        header('Location: index.php');
+        exit;
+    }
+    $stmt->close();
+    exit;
+}
+
 $email_error = false;
 if(isset($_POST['e_change'])){
     $old = $_POST['o_email'];
@@ -269,156 +255,223 @@ if(isset($_POST['e_change'])){
             }
             $stmt->close();
 }
-
-}
 ?>
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <title>Index / GR8BRIK</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings</title>
     <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
     <link rel="stylesheet" href="../lib/theme.css">
     <script src="../lib/main.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://code.jquery.com/jquery-migrate-1.4.1.min.js"></script>
     <meta charset="UTF-8">
     <meta name="description" content="Gr8brik is a block building browser game. No download required">
     <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
     <meta name="author" content="sussteve226">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><!-- ios support -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/img/logo.jpg" />
+    <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
+    <meta name="theme-color" content="#f1f1f1" />
 </head>
 <body class="w3-light-blue w3-container">
 
-    <?php include('../navbar.php') ?>
-    <div id="result" class="w3-center">
-        <div class="w3-light-grey w3-card-24 w3-center">
-            <?php 
-				if($alert != 0){
-					echo '<h1 style="color:red;">You have new notifications!</h1>';
-				}
-                echo "<h3>Welcome,</h3><img id='pfp' src='users/pfps/" . $id . "..jpg' class='w3-hover-opacity w3-border w3-card-24' onclick=document.getElementById('im').style.display='block' />";
-                echo '<h1>' . $user . '</h1><h3>@' . $handle . '</h3>';
-            ?>
-            <a href="<?php echo $handle ?>" class="w3-btn w3-large w3-white w3-hover-blue"><li class="fa fa-user" aria-hidden="true"></li><b>PROFILE</b></a>
-			<a href="new.php" class="w3-btn w3-large w3-white w3-hover-blue"><i class="fa fa-bell" aria-hidden="true"></i><b>NOTIFICATIONS</b></a>
-            <a href="creations.php" class="w3-btn w3-large w3-white w3-hover-blue"><i class="fa fa-building" aria-hidden="true"></i><b>MY CREATIONS</b></a>
-        </div>
+    <?php 
+        include('../navbar.php');
+        include('panel.php');
+        if(file_exists('../acc/users/pfps/' . $id . '.jpg')) {
+            $pfp = '../acc/users/pfps/' . $id . '.jpg';
+        } else {
+            $pfp = '../img/avatar.png';
+        }
+    ?>
 
-        <div id="im" class="w3-modal w3-center" onclick="this.style.display='none'">
+    <script>
+    $(document).ready(function() {
+        $(".success").hide();
+        $(".error").hide();
 
-            <span class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&#10006;</span>
+        $("#u_change").click(function(event) {
+            event.preventDefault();
 
-            <img class="w3-modal-content" src="<?php echo 'users/pfps/' . $id . '..jpg' ?>" style="width:75%;" loading="lazy">
+            var username = $("#username input[name='username']").val();
 
-        </div><br />
-		
-		<div>
+            $.ajax({
+                url: "",
+                method: "POST",
+                data: { username_change: true, username: username },
+                success: function(response) {
+                    $(".success").show();
+                    $(".success").text("Username updated!");
+                    $(".usertext").text("@" + username);      
+                },
 
-			<h2>QUICK SETTINGS</h2>
-
-			<a href="logout.php" class="w3-btn w3-blue w3-hover-opacity"><i class="fa fa-sign-out" aria-hidden="true"></i>LOGOUT</a>
-
-			<button onclick="toggleDarkMode();" class="w3-btn w3-blue w3-hover-opacity"><i class="fa fa-moon-o" aria-hidden="true"></i>NIGHT MODE</button>
-
-			<button onclick="toggleLightMode();" class="w3-btn w3-blue w3-hover-opacity"><i class="fa fa-lightbulb-o" aria-hidden="true"></i>DAY MODE</button>
-        
-        </div><br />
-        
-	<h2>PROFILE SETTINGS</h2>
-
-    <!--<script>
-        $(document).ready(function() {
-            $(".submit-btn").click(function(event) {
-                event.preventDefault(); // Prevent the default form submission
-
-                var form = $(this).closest("form"); // Get the form that triggered the event
-                var formData = form.serialize(); // Serialize the form data
-
-                console.log("Form Data:", formData); // Debug: Log the form data
-
-                $.ajax({
-                    url: "index.php",
-                    type: "POST",
-                    data: formData,
-                    success: function(response) {
-                        // Update the page content with the response
-                        $("#result").html(response);
-                        form[0].reset(); // Clear the form after submission
-                    },
-                    error: function(xhr, status, error) {
-                        console.error("Request failed:", status, error);
-                        console.log("XHR Object:", xhr); // Debug: Log the XHR object
+                error: function(jqXHR, textStatus, errorThrown) {
+                    if (jqXHR.status === 500) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        $(".error").show();
+                        $(".error").text(response.error);
+                    } else {
+                        console.error("AJAX Error:", textStatus, errorThrown);
+                        alert("An error occurred. Please try again later.");
                     }
-                });
+                }
             });
         });
-    </script>-->
 
-<div>
-    <img src="<?php echo '../acc/users/banners/' . $id . '..jpg' ?>" style="width:100%;height:25vh;border:1px #000;border-radius:15%;background-color:#fff;" />
-    <form action="" method="post" enctype="multipart/form-data">
-	    <input type="file" name="fileToupload" id="fileToupload">
-	    <input type="submit" value="UPLOAD" name="banner" class="w3-btn w3-large w3-white w3-hover-blue w3-mobile">
-    </form><br /><br />
+        $("#a_change").click(function(event) {
+            event.preventDefault();
 
-    <img src="<?php echo '../acc/users/pfps/' . $id . '..jpg' ?>" style="width: 250px; height: 250px; border-radius: 50%; float: left;" class="w3-card-24" />
-    <form action="" method="post" enctype="multipart/form-data">
-		<input type="file" name="fileToupload" id="fileToupload" style="float:left;">
-		<input type="submit" value="UPLOAD" name="picture" style="float:left;" class="w3-btn w3-blue w3-hover-opacity w3-mobile">
-    </form>
+            var description = $("#about textarea[name='description']").val();
+
+            $.ajax({
+                url: "",
+                method: "POST",
+                data: { about_change: true, description: description },
+                success: function(response) {
+                    $(".success").show();
+                    $(".success").text("Bio updated!");
+                },
+
+                error: function(jqXHR, textStatus, errorThrown) {
+                    if (jqXHR.status === 500) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        $(".error").show();
+                        $(".error").text(response.error);
+                    } else {
+                        console.error("AJAX Error:", textStatus, errorThrown);
+                        alert("An error occurred. Please try again later.");
+                    }
+                }
+            });
+        });
+        $("#twitter_change").click(function(event) {
+            event.preventDefault();
+
+            var handle = $("#twitter input[name='handle']").val();
+
+            $.ajax({
+                url: "",
+                method: "POST",
+                data: { twitter_change: true, handle: handle },
+                success: function(response) {
+                    $(".success").show();
+                    $(".success").text("X updated!");
+                },
+
+                error: function(jqXHR, textStatus, errorThrown) {
+                    if (jqXHR.status === 500) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        $(".error").show();
+                        $(".error").text(response.error);
+                    } else {
+                        console.error("AJAX Error:", textStatus, errorThrown);
+                        alert("An error occurred. Please try again later.");
+                    }
+                }
+            });
+        });
+
+        $("#picture").click(function(event) {
+            event.preventDefault();
+            $('#picture').attr('disabled','disabled');
+
+            var fileToUpload = $("#pictureForm input[name='fileToUpload']").val();
+
+            $.ajax({
+                url: "",
+                method: "POST",
+                data: { picture: true, fileToUpload: fileToUpload },
+                enctype: 'multipart/form-data',
+                success: function(response) {
+                    alert("Success!");
+                    $('#picture').removeAttr('disabled');
+                },
+
+                error: function(jqXHR, textStatus, errorThrown) {
+                    $('#picture').removeAttr('disabled');
+                    if (jqXHR.status === 500) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        alert(response.error);
+                    } else {
+                        console.error("AJAX Error:", textStatus, errorThrown);
+                        alert("AJAX Error:", textStatus, errorThrown);
+                    }
+                }
+            });
+        });
+
+    });
+    </script>
+
+    <style>
+        .file-pfp {
+            background-image: url('<?php echo $pfp ?>');
+            width: 250px;
+            height: 250px;
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: 50% 50%;
+            border-radius: 6px;
+            /* 
+            background-color: #06402B;
+            color: #fff;
+            cursor: pointer; 
+            */
+        }
+    </style>
+
+    <p class="success w3-light-grey w3-card-2 w3-padding-small"></p>
+    <p class="error w3-red w3-card-2 w3-padding-small"></p>
+
+<div class="w3-row"><div class="w3-quarter">
+
+    <div id="pictureForm" enctype="multipart/form-data">
+		<p><input type="file" name="fileToupload" id="fileToupload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
+		<!-- <input type="submit" value="Upload Picture" id="picture" name="picture" class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo w3-round"> -->
+        <button id="picture" name="picture" title="Any JPG, GIF, BMP or PNG" class="w3-btn w3-blue w3-hover-white w3-threequarter w3-mobile w3-border w3-border-indigo w3-round"><i class="fa fa-upload" aria-hidden="true"></i>Upload</button>
+        <?php 
+            /*if(file_exists('users/pfps/' . $id . '.jpg')){
+		        echo '<input type="submit" value="Delete" name="deletePfp" class="w3-btn w3-red w3-hover-white w3-mobile w3-border w3-border-pink w3-round">';
+            } */
+        ?>
+    </div>
 </div><br /><br />
   
-<div id="offset">
-    <form id="username" method="post" action="">
-        <input type="text" value="<?php echo htmlspecialchars($user) ?>" name="username" style="float:left;width:30%;" placeholder="New username" class="w3-input w3-border w3-mobile" />
-        <input type="submit" name="u_change" style="float:left;" value="CHANGE USERNAME" class="w3-btn w3-blue w3-hover-opacity w3-mobile submit-btn" />
-    </form><br /><br />
+<div class="w3-threequarter">
+    <div id="username">
+        <input class="w3-input w3-border w3-mobile w3-third" value="<?php echo $user ?>" type="text" name="username" title="Must be unique, 1-50 characters, Letters, Numbers, Undercores and dashes allowed" placeholder="Username">
+        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-mobile w3-border w3-border-indigo w3-round" id="u_change" name="u_change">Change Username</button>
+    </div><br /><br />
 
-    <form id="handle" method="post" action="">
-        <div id="handleIcon">gr8brik.rf.gd/</div>
-        <input type="text" value="<?php echo htmlspecialchars($handle) ?>" name="handle" style="float:left;width:30%;" placeholder="New handle" class="w3-input w3-border w3-mobile" />
-        <input type="submit" name="h_change" style="float:left;" value="CHANGE URL" class="w3-btn w3-blue w3-hover-opacity w3-mobile submit-btn" />
-    </form><br /><br />
+    <div id="twitter">
+        <input class="w3-input w3-border w3-mobile w3-third" placeholder="@your_x_handle" value="<?php echo $x ?>" type="text" name="handle">
+        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-mobile w3-border w3-border-indigo w3-round" id="twitter_change" name="twitter_change">Change X handle</button>
+    </div><br /><br />
 
-    <form id="about" method="post" action="">
-        <textarea name="description" value="<?php echo htmlspecialchars($about) ?>" placeholder="Enter a cool bio" class="w3-input w3-border w3-mobile" rows="4" cols="50"><?php echo htmlspecialchars($about) ?></textarea>
-        <input type="submit" name="about" value="CHANGE ABOUT" class="w3-btn w3-blue w3-hover-opacity w3-mobile submit-btn" />
-    </form>
-</div>
-
-    <h2>ACCOUNT SETTINGS</h2>
-
-    <div id="offset" class="w3-center"><center>
-        <form id="age" method="post" action="">
-            <input type="number" value="<?php echo $age ?>" name="age" style="float:left;width:30%;" placeholder="New age" class="w3-input w3-border w3-mobile" />
-            <input type="submit" name="a_change" style="float:left;" value="CHANGE AGE" class="w3-btn w3-blue w3-hover-opacity w3-mobile submit-btn" />
-        </form><br /><br />
+    <div id="about">
+        <textarea id="description" name="description" value="<?php echo htmlspecialchars($about) ?>" placeholder="New about section" class="w3-input w3-border w3-mobile" rows="4" cols="50"><?php echo htmlspecialchars($about) ?></textarea>
+        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-mobile w3-border w3-border-indigo w3-round" id="a_change" name="about">Change About</button>
+    </div><br /><br />
 
         <form id="password" method="post" action="">
-            <input type="password" name="o_password" style="float:left;width:30%;" placeholder="Old password" class="w3-input w3-border w3-mobile" />
-            <input type="password" name="n_password" style="float:left;width:30%;" placeholder="New password" class="w3-input w3-border w3-mobile" />
-            <input type="submit" name="password_change" style="float:left;" value="CHANGE PASSWORD" class="w3-btn w3-blue w3-hover-opacity w3-mobile submit-btn" />
+            <input type="password" name="o_password" placeholder="Old password" class="w3-input w3-border w3-mobile w3-third" />
+            <input type="password" name="n_password" placeholder="New password" class="w3-input w3-border w3-mobile w3-third" />
+            <input type="submit" name="password_change" value="Change Password" class="w3-btn w3-blue w3-hover-white w3-third w3-mobile w3-border w3-border-indigo w3-round" />
         </form><br /><br />
 
         <form id="email" method="post" action="">
-            <input type="email" value="<?php echo htmlspecialchars($email) ?>" name="o_email" style="float:left;width:30%;" placeholder="Old email" class="w3-input w3-border w3-mobile" />
-            <input type="email" name="n_email" style="float:left;width:30%;" placeholder="New email" class="w3-input w3-border w3-mobile" />
-            <input type="submit" name="e_change" style="float:left;" value="CHANGE EMAIL" class="w3-btn w3-blue w3-hover-opacity w3-mobile submit-btn" />
-        </form><br /><br />
+            <input type="email" value="<?php echo htmlspecialchars($email) ?>" name="o_email" style="float:left;width:30%;" placeholder="Old email" class="w3-input w3-border w3-mobile w3-third" />
+            <input type="email" name="n_email" xstyle="float:left;width:30%;" placeholder="New email" class="w3-input w3-border w3-mobile w3-third" />
+            <input type="submit" name="e_change" xstyle="float:left;" value="Change Email" class="w3-btn w3-blue w3-hover-white w3-third w3-mobile w3-border w3-border-indigo w3-round" /><br /><br />
+        </form>
+    </div></div><br /><br />
 
-        <form id="deactivate" method="post" action="">
-            <p>Account deactivation is permanate. Enter your password to continue</p>
-            <p><input type="email" value="" name="activate_pwd" style="float:left;width:60%;" placeholder="Password" class="w3-input w3-border w3-mobile" /></p>
-            <p>Deactivation is not avalable yet. Check the footer below for more information.</p>
-            <!--- <input type="submit" name="activate_btn" style="float:left;" value="DEACTIVATE" class="w3-btn w3-blue w3-hover-opacity w3-mobile submit-btn" /> -->
-        </form><br /><br />
-
-    </center></div>
-
-     <hr /><h5>If you wish us to remove any personal details we hold about you, please email us at <i class="fa fa-envelope"><a href="mailto:sse2cpu@gmail.com">sse2cpu[at]gmail[dot]com</a></i></h5>
+    <h5>If you wish us to remove any personal details we hold about you, please email us at <i class="fa fa-envelope"><a href="mailto:evanrutledge226@gmail.com">evanrutledge226[at]gmail[dot]com</a></i></h5>
     <br /><br />
 
     <?php include ('../linkbar.php') ?>

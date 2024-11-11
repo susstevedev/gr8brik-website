@@ -1,14 +1,12 @@
 <?php
 
-session_start();
+require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 
 if(!isset($_SESSION['username'])){
 
     header('Location: login.php');
 
 }
-
-require_once 'classes/user.php';
 
 if(isset($_POST['clear'])) {
 	// Create connection
@@ -45,7 +43,7 @@ if(isset($_POST['clear'])) {
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <title>Notifications - GR8BRIK</title>
+    <title>Notifications</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
     <link rel="stylesheet" href="../lib/theme.css">
@@ -56,56 +54,75 @@ if(isset($_POST['clear'])) {
     <meta name="description" content="Gr8brik is a block building browser game. No download required">
     <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
     <meta name="author" content="sussteve226">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><!-- ios support -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/img/logo.jpg" />
+    <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
+    <meta name="theme-color" content="#f1f1f1" />
 </head>
 <body class="w3-light-blue w3-container">
 
-    <?php include('../navbar.php') ?>
-	
-	<div class="w3-center">
-        <div class="w3-light-grey w3-card-24 w3-center">
-            <?php 
-				if($alert != 0){
-					echo '<h1 style="color:red;">You have new notifications!</h1>';
-				}
-                echo "<h3>Welcome,</h3><img id='pfp' src='users/pfps/" . $id . "..jpg' class='w3-hover-opacity w3-border w3-card-24' onclick=document.getElementById('im').style.display='block' />";
-                echo '<h1>' . $user . '</h1><h3>@' . $handle . '</h3>';
-            ?>
-            <a href="<?php echo $handle ?>" class="w3-btn w3-large w3-white w3-hover-blue"><li class="fa fa-user" aria-hidden="true"></li><b>PROFILE</b></a>
-			<a href="new.php" class="w3-btn w3-large w3-white w3-hover-blue"><i class="fa fa-bell" aria-hidden="true"></i><b>NOTIFICATIONS</b></a>
-            <a href="creations.php" class="w3-btn w3-large w3-white w3-hover-blue"><i class="fa fa-building" aria-hidden="true"></i><b>MY CREATIONS</b></a>
-        </div><br /><br />
+    <?php 
+        include('../navbar.php');
+        include('panel.php');
+    ?>
 
         <form id="clearForm" method="post" action="">
-            <input class="w3-btn w3-blue w3-hover-opacity" type="submit" value="CLEAR ALL" name="clear">
-        </form><br />
+            <input class="w3-btn w3-blue w3-hover-white" type="submit" value="Clear Inbox" name="clear">
+        </form>
 
 		<?php
-			// Create connection
-			$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-			// Check connection
-			if ($conn->connect_error) {
-				die("Connection failed: " . $conn->connect_error);
-			}
-			
-			$sql = "SELECT user, name, post, timestamp, url FROM notifications WHERE user = ? ORDER BY timestamp DESC";
-			$stmt = $conn->prepare($sql);
-			$stmt->bind_param("s", $id);
-			$stmt->execute();
-			$stmt->bind_result($user, $name, $post, $timestamp, $url);
-
-			while ($stmt->fetch()) {
-				echo "<article class='w3-card-24 w3-light-grey w3-padding'>";
-				echo "<header><h4><a href='../" . $url . "'>" . htmlspecialchars($name) . "</a></h4></header>";
-				echo "<b>" . htmlspecialchars($post) . "</b>";
-				echo "<br /><b>" . htmlspecialchars($timestamp) . "</b>";
-				echo "</article><br />";
+            $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+            if ($conn2->connect_error) {
+                exit($conn2->connect_error);
             }
+
+            $result3 = $conn2->query("SELECT COUNT(*) as num FROM notifications WHERE user = $id");
+            $row3 = $result3->fetch_assoc();
+            echo '<div class="w3-card-2 w3-light-grey w3-padding-tiny"><img src="../img/info.jpg" style="width:20px;height=20px;"><b>A new notifications system is rolling out now.</b></div>';
+            echo '<h2>' . $row3['num'] . ' total notifications sense ' . $age . '.</h2>';
+
+			$sql = "SELECT * FROM notifications WHERE user = $id ORDER BY timestamp DESC";
+            $result = $conn2->query($sql);
+
+			while ($row = $result->fetch_assoc()) {
+                $profile = $row['profile'];
+                $sql2 = "SELECT * FROM users WHERE id = $profile";
+                $result2 = $conn2->query($sql2);
+                $row2 = $result2->fetch_assoc();
+                if(empty($row2['username'])) {
+                    $row2['username'] = "[deleted]";
+                }
+
+                if ($row['category'] === "1") {
+                    $url = "/@" . urlencode($row2['username']);
+                    $post = " followed you";
+                } elseif ($row['category'] === "2") {
+                    $url = "/build/" . $row['content'];
+                    $post = " commented on your creation";
+                } elseif ($row['category'] === "3") {
+                    $url = "/topic/" . $row['content'];
+                    $post = " commented on your topic";
+                } else {
+                    $url = $row['url'];
+                    $post = "&nbsp;" . $row['post'] . "(sent via old api)";
+                }
+                if (is_numeric($row['timestamp'])) {
+                    $timestamp = gmdate("Y-m-d H:i:s", $row['timestamp']);
+                } else {
+                    $timestamp = "[unknown]";
+                }
+
+				echo "<article class='w3-card-2 w3-light-grey w3-padding w3-large'>";
+				echo "<a href='" . $url . "'>" . htmlspecialchars($row2['username']) . $post . "</a>";
+                echo "<time class='w3-right w3-text-grey' datetime=''>" . $timestamp . "</time>";
+				echo "</article><br />";
+                $result2->free();
+            }
+            $result->free();
+            $conn2->close();
 		
-		?>
-		
-	</div>
+		?><br /><br />
 		
     <?php include '../linkbar.php' ?>
 </body>
