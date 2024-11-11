@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+   <url>
+
+      <loc>https://gr8brik.rf.gd/index.php</loc>
+
+      <lastmod>2024-09-15</lastmod>
+
+      <changefreq>hourly</changefreq>
+
+      <priority>0.8</priority>
+
+   </url>
+
+   <url>
+
+      <loc>https://gr8brik.rf.gd/feed.php</loc>
+
+      <lastmod>2024-10-15</lastmod>
+
+      <changefreq>hourly</changefreq>
+
+      <priority>0.8</priority>
+
+   </url>
+
+   <url>
+
+      <loc>https://gr8brik.rf.gd/com/index.php</loc>
+
+      <lastmod>2024-10-15</lastmod>
+
+      <changefreq>hourly</changefreq>
+
+      <priority>0.8</priority>
+
+   </url>
+
+   <url>
+
+      <loc>https://gr8brik.rf.gd/list.php</loc>
+
+      <lastmod>2024-09-14</lastmod>
+
+      <changefreq>hourly</changefreq>
+
+      <priority>0.5</priority>
+
+   </url>
+
+   <url>
+
+      <loc>https://gr8brik.rf.gd/modeler.php</loc>
+
+      <lastmod>2024-08-25</lastmod>
+
+      <changefreq>hourly</changefreq>
+
+      <priority>0.5</priority>
+
+   </url>
+
+</urlset> 

@@ -1,9 +1,9 @@
 <!doctype html>
 <?php
-    session_start();
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 ?>
 <head>
-    <title>Rules / GR8BRIK</title>
+    <title>Rules</title>
     <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
     <link rel="stylesheet" href="lib/theme.css">
     <script src="lib/main.js"></script>
@@ -13,41 +13,15 @@
     <meta name="description" content="Gr8brik is a block building browser game. No download required">
     <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
     <meta name="author" content="sussteve226">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 </head>
 <body class="w3-light-blue w3-container">
-<?php include('navbar.php') ?>
-<br /><br /><center>
-
-<script>
-
-    $(document).ready(function() {
-
-        $(".message").hide();
-
-        $(".sendMessage").hide();
-        
-        $(".error").hide();
-
-        $(".messageBtn").click(function() {
-
-            $(".message").show();
-
-            $(".sendMessage").show();
-
-            $(".messageBtn").hide();
-
-             $(".sendMessage").click(function() {
-
-                $(".error").show();
-
-            });
-
-        });
-
-    });
-
-</script>
+<?php 
+    include('navbar.php');
+    require_once 'com/bbcode.php';
+    $bbcode = new BBCode;
+?>
+<center>
 
 <h1>Rules</h1>
 
@@ -59,62 +33,76 @@
 
 <b>Using your common sense is how (most of the time) avoid being banned.</b>
 
-<h3>3. Don't curse</h3>
+<h3>3. No spamming</h3>
 
-<b>Cursing will get you banned for 1-day, along with the message(s) with the curse being deleted.</b>
+<b>Spamming can cause server lag and can disrupt people. Spamming includes comment the same things on  multiple creations or posts, and not stopping when people ask you to. Spamming gets you banned for 1-day, aswell as the message(s) being deleted.</b>
 
-<h3>4. No NSFW</h3>
+<h3>4. Don't curse</h3>
 
-<b>Children use this site. This is an auto 7 day ban; and twice a month ban.</b>
+<b>Cursing includes saying words that are usally taboo in western culture (Eg. f**k or c*m). Cursing will get you banned for 1-day, along with the message(s) with the curse being deleted.</b>
 
-<h3>5. No conflict</h3>
+<h3>5. No NSFW</h3>
 
-<b>This includes trolling, or politics. You will be banned for 1 day; and 7 for politics.</b>
+<b>Anything that people may thing isn't for Children (18 years old or below) is NSFW. This is an auto 7 day ban; and if repeated it will be raised to a month.</b>
+
+<h3>6. No conflict</h3>
+
+<b>This includes trolling, or politics. We don't want to start a fire in the community. You will be banned for 1 day for trolling; and 7 for politics.</b>
 
 <hr /><h1>Site moderators</h1>
 
-<button class="messageBtn w3-btn w3-large w3-white w3-hover-blue">MESSAGE MODERATORS</button>
+<div class="w3-card-2 w3-light-grey w3-padding-small w3-center">
 
-<div class="message w3-bordered">
+    <h5>If you wish us to remove any personal details we hold about you, please email us at <i class="fa fa-envelope"><a href="mailto:evanrutledge226@gmail.com">evanrutledge226[at]gmail[dot]com</a></i></h5>
 
-    <textarea placeholder="Message" class="w3-input w3-border w3-mobile" rows="4" cols="50"></textarea>
+</div><br />
 
-    <button class="messageSend w3-btn w3-large w3-white w3-hover-blue">SEND</button>
+</center>
 
-    <div class="error w3-red">An error has happened</div>
+<div class="w3-container">
+    <ul class="w3-ul w3-card-2 w3-light-grey w3-padding-small">
+        <?php
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+            if ($conn->connect_error) {
+                exit($conn->connect_error);
+            }
 
-</div>
+            $sql = "SELECT * FROM users WHERE admin = '1' ORDER BY username ASC";
+            $result = $conn->query($sql);
 
-<?php
-    // Create connection
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+            if ($result->num_rows > 0) {
+                $users = $result->fetch_all(MYSQLI_ASSOC);
+            
+                foreach ($users as $user) {
+                    $userid = $user['id'];
+                    $sql = "SELECT * FROM bans WHERE user = $userid";
+                    $result2 = $conn->query($sql);
+                    $row2 = $result2->fetch_assoc();
 
-    // Check connection
-    if ($conn->connect_error) {
-        die("Connection failed: " . $conn->connect_error);
-    }
+                    if(empty($user['username']) || $result2->num_rows != 0 && $row2['end_date'] >= time()) {
+                        continue;
+                    }
 
-	$sql = "SELECT id, username, email, handle, age FROM users WHERE admin = 1";
-    $result = $conn->query($sql);
+                    echo "<br /><li class='w3-padding-small'><a href='/@" . urlencode($user['username']) . "'>";
+                    echo "<img id='pfp' style='width:100px;height:100px;border-radius:15px;border:1px solid skyblue;' src='/acc/users/pfps/" . $userid . ".jpg'>";
+                    echo "&nbsp;<b class='w3-xlarge'>" . htmlspecialchars($user['username']) . "</a></b>";
+                    if($user['verified'] != 0) {
+                        echo '&nbsp;<i class="fa fa-check w3-blue w3-padding-tiny w3-xlarge" title="Verified/Offical Account" aria-hidden="true"></i>';
+                    }
+                    if($user['admin'] != 0) {
+                        echo '&nbsp;<i class="fa fa-check w3-red w3-padding-tiny w3-xlarge" title="Admin/Mod" aria-hidden="true"></i>';
+                    }
+                    if(trim($_SESSION['username']) === trim($userid)) {
+                        echo '&nbsp;<a href="/acc/index"><i class="fa fa-pencil w3-green w3-padding-tiny w3-xlarge" aria-hidden="true"></i></a>';
+                    }
+                    echo "<br /><b class='w3-text-grey'>" . $bbcode->toHTML(htmlspecialchars($user['description'])) . "</b></li>";
+                }
+            } else {
+                echo "Please check your internet connection";
+            }
 
-    if ($result->num_rows > 0) {
-        // Fetch all results into an array
-        $moderators = $result->fetch_all(MYSQLI_ASSOC);
-    
-        // Loop through the array and display usernames
-        foreach ($moderators as $moderator) {
-            echo "<hr /><img id='pfp' src='acc/users/pfps/" . htmlspecialchars($moderator['id']) . "..jpg'><br />";
-            echo "<b><br /><a href='" . strtolower($moderator['handle']) . "'>" . htmlspecialchars($moderator['username']) . '</a></b>';
-        }
-    } else {
-        echo "Please check your internet connection";
-    }
-
-    $conn->close();
-
-?>
-
-</center><br /><br />
+        ?>
+    </ul>
 <?php include('linkbar.php') ?>
 </body>
 </html>

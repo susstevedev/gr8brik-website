@@ -1,6 +1,6 @@
 <?php
-session_start();
-require_once $_SERVER['DOCUMENT_ROOT'] . '/newsite/acc/classes/constants.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
+
 define('DB_NAME2', 'if0_36019408_creations');
 if(isset($_POST['report'])){
 
@@ -63,7 +63,11 @@ if(isset($_POST['delete'])){
     <meta name="description" content="Gr8brik is a block building browser game. No download required">
     <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
     <meta name="author" content="sussteve226">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><!-- ios support -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/img/logo.jpg" />
+    <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
+    <meta name="theme-color" content="#f1f1f1" />
     
 </head>
 <body class="w3-light-blue w3-container">

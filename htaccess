@@ -2,14 +2,21 @@ php_value display_errors On
 php_value mbstring.http_input auto
 php_value date.timezone America/New_York
 RewriteEngine On
-RewriteCond %{HTTP_HOST} !^www\. [NC]
-RewriteRule ^(.*)$ http://www.%{HTTP_HOST}/$1 [R=301,L]
+RewriteBase /
+# RewriteCond %{HTTPS} off
+# RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [R,L]
+RewriteCond %{HTTP_HOST} !^www. [NC]
+RewriteRule ^(.*)$ https://www.%{HTTP_HOST}/$1 [R=301,L]
 RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteRule !.*\.php$ %{REQUEST_FILENAME}.php [QSA,L]
-ErrorDocument 403 /index.php?dc
-ErrorDocument 404  /index.php?dc
-ErrorDocument 500 /index.php?dc
-Redirect /acc/users/pfps/..jpg /acc/users/pfps/Anonymous%20User..jpg
-Redirect /home /index.php
-Redirect /@/ /profile.php?
-Redirect /acc/view.php /profile.php?
+RewriteRule !.*.php$ %{REQUEST_FILENAME}.php [QSA,L]
+ErrorDocument 400 "Bad Request"
+ErrorDocument 401 "Unauthorized"
+ErrorDocument 403 "Forbidden"
+ErrorDocument 404 "Not Found"
+ErrorDocument 503 "Service Unavailable"
+RewriteRule ^@([a-zA-Z0-9+/=_.%&()-]+)$ /profile.php?user=$1 [QSA,L]
+RewriteRule ^user/([a-zA-Z0-9+/=_.%&()-]+)$ /profile.php?id=$1 [QSA,L]
+RewriteRule ^build/([a-zA-Z0-9+/=_.%&()-]+)$ /creation.php?id=$1 [QSA,L]
+RewriteRule ^topic/([a-zA-Z0-9+/=_.%&()-]+)$ /com/view.php?id=$1 [QSA,L]
+Redirect /home /feed.php
+Redirect /panel http://cpanel.infinityfree.com

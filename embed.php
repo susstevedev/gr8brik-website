@@ -20,12 +20,12 @@ body {
 
 .w3-btn {
 	transition: all 0.5s ease-in-out;
-	border-radius: 5%
+	border-radius: 1px;
 }
 
 .w3-btn:hover {
 	transform: translateY(10px);
-	border-radius: 15%; /* Border radius on hover */
+	border-radius: 10px;
 	color: black;
 	border: 1px solid;
 }
@@ -36,16 +36,16 @@ body {
 
 <center>
 
-    <?php $file = $_GET['model']; ?>
+    <br />
 
-    <a href="index.php" class='w3-btn w3-large w3-green w3-hover-white w3-card-24' title="GR8BRIK homepage"><i class="fa fa-home" aria-hidden="true"></i></a>
-    <a href="<?php echo "cre/" . $file ?>" class='w3-btn w3-large w3-green w3-hover-white w3-card-24' title="Download model" download><i class="fa fa-download" aria-hidden="true"></i></a>
-    <button class="w3-btn w3-large w3-green w3-hover-white w3-card-24" onclick="toggleDarkMode()" title="Dark mode"><i class="fa fa-moon-o" aria-hidden="true"></i>
+    <?php $file = $_GET['model'] . '.json'; ?>
+
+    <a href="/index.php" class='w3-btn w3-large w3-blue w3-hover-light-grey w3-card-2' title="Homepage"><i class="fa fa-home" aria-hidden="true"></i></a>
+    <a href="<?php echo "/cre/" . $file ?>" class='w3-btn w3-large w3-blue w3-hover-light-grey w3-card-2' title="Download" download><i class="fa fa-download" aria-hidden="true"></i></a>
+    <button class="w3-btn w3-large w3-blue w3-hover-light-grey w3-card-2" onclick="toggleDarkMode()" title="Dark/Light"><i class="fa fa-moon-o" aria-hidden="true"></i>
 </button>
 
-<br />
-
-<br />
+    <hr />
 
     <script>
         function toggleDarkMode() {
@@ -78,12 +78,12 @@ body {
         " ?>
 
         <?php
-        if(file_exists('cre/' . $_GET['model'])){
+        if(file_exists('cre/' . $_GET['model'] . '.json')){
             echo $code; 
         } else {
             echo '<center><h1>Error 404</h1><hr />';
-            echo '<b>This model was not found</b><br />';
-            echo '<button onclick="window.history.go(-1);" class="w3-btn w3-large w3-green w3-hover-white w3-card-24">BACK</button></center>';
+            echo '<b>The build "' . $file . '" was not found on this server.</b><br />';
+            echo '<button onclick="window.history.go(-1);" class="w3-btn w3-large w3-blue w3-hover-light-grey w3-card-2">Back</button></center>';
         }
     ?>
 
