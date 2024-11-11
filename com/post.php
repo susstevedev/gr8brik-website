@@ -1,58 +1,67 @@
 <?php
-session_start();
+require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 
-if(!file_exists('../acc/users/' . $_SESSION['username'] . '.xml')){
+    if($_POST) {
+        require_once '../acc/classes/user.php';
 
-    header('Location: /acc/login.php');
+        define('DB_NAME3', 'if0_36019408_forum');
+        $title = $conn->real_escape_string($_POST['title']);
+        $post = $conn->real_escape_string($_POST['description']);
+        $date = date("Y-m-d H:i:s");
+        $category = 'general';
 
-}
-
-if($_POST) {
-
-    $uname = $_SESSION['username'];
-
-    $description = htmlspecialchars($_POST['description']);
-
-    $title = htmlspecialchars($_POST['title']);
-
-    $time = date('F d Y H:i:s');
-
-    if($title != "") {
-
-        $handle = fopen("../com/posts/" . $title . '.xml', "a");
-
-        fwrite($handle, "<table class='w3-table-all w3-card-4' style='color:black;'><td>By:" . $uname . "</td><br /><td>Created:" . $time . "</td><br /></table><table class='w3-table-all w3-card-4' style='color:black;'><td>" . $description . "</td></table><br /><hr />");
-
-        fclose($handle);
-
-    } else {
-
-        echo "Title is blank!";
-
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+        $sql = "INSERT INTO posts (user, title, category, post, date) VALUES ('$id', '$title', '$category', '$post', '$date')";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            die($conn->error);
+        }
+        if (!$stmt->execute()) {
+            die($stmt->error);
+        }
+        $stmt->close();
+        echo "Done!";
     }
-
-}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <title>GR8BRIK community forums</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="../w3.css">
+    <title>Post Topic</title>
+    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
+    <link rel="stylesheet" href="../lib/theme.css">
+    <script src="../lib/main.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script async defer src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js" type="module"></script>
+    <meta charset="UTF-8">
+    <meta name="description" content="Gr8brik is a block building browser game. No download required">
+    <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
+    <meta name="author" content="sussteve226">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"> <!-- ios support -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/img/logo.jpg" />
+    <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
+    <meta name="theme-color" content="#f1f1f1" />
 </head>
 <body class="w3-light-blue w3-container">
     <?php include '../navbar.php' ?>
     <center>
         <h1>Post</h1>
         <form method="post" action="">
-            <p>Title:<input type="text" name="title" placeholder="Input a descriptive title" size="50" /></p>
-            <p>Description:<br /><textarea name="description" placeholder="The body of your post" rows="4" cols="50"></textarea></p>
-
-            <br/>
-
-            <p><input type="submit" value="POST" name="post" class="w3-btn" /></p>
+		
+			<p>
+				<label for="title">Title:</label>
+				<input type="text" class="w3-input" name="title" placeholder="Title your post" size="50" required style="width:30%"/>
+			</p>
+            <p>
+				<label for="description">Post:</label><br />
+				<textarea name="description" placeholder="Your post body" rows="4" cols="50" required></textarea>
+			</p>
+            <altcha-widget challengeurl='https://eu.altcha.org/api/v1/challenge?apiKey=ckey_01d9f4ad018c16287ca6f3938a0f'></altcha-widget>
+			<br/>
+			<p><input type="submit" value="POST TOPIC" name="post" class="w3-btn w3-blue w3-hover-opacity w3-border w3-mobile" /></p>
+			<p><button class="w3-btn w3-blue w3-hover-opacity w3-border w3-mobile" onclick="history.go(-1)">GO BACK</button></p>
 
         </form>
     </center><br /><br />
