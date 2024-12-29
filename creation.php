@@ -1,7 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 
-define('DB_NAME2', 'if0_36019408_creations');
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 			
 if ($conn->connect_error) {
@@ -12,7 +11,7 @@ $model_id = $conn->real_escape_string($_GET['id']);
 
 if (!is_numeric($model_id)){
     header('HTTP/1.0 403 Forbidden');
-    echo "Invalid creation ID";
+    echo "<b>Invalid creation ID!</b>";
     exit;
 }
 
@@ -26,24 +25,29 @@ $description = $row2['description'];
 $name = $row2['name'];
 $date = $row2['date'];
 $screenshot = $row2['screenshot'];
-if ($result->num_rows < 0) {
-    header('HTTP/1.0 404 Not Found');
-    echo 'Creation does not exist.';
-    exit;
-}
+$views = $row2['views'] + 1;
+$isRemoved = $row2['removed'];
 
 $decoded_description = htmlentities($description, ENT_QUOTES, 'UTF-8');
-		
+            
 $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 if ($conn2->connect_error) {
-	exit($conn2->connect_error);
+    exit($conn2->connect_error);
 }
-		
-$sql = "SELECT * FROM users WHERE id = $userid";
-$result = $conn2->query($sql);
-$row = $result->fetch_assoc();
-$username = $row['username'];
-$username_desc = htmlentities($row['description'], ENT_QUOTES, 'UTF-8');
+
+if($result->num_rows != 0 || !empty($row2['id'])) {
+    $sql = "SELECT * FROM users WHERE id = $userid";
+    $result = $conn2->query($sql);
+    $row = $result->fetch_assoc();
+    $username = $row['username'];
+    $model_admin = $row['admin'];
+    $model_verified = $row['verified'];
+
+    $result2 = $conn2->query("SELECT * FROM bans WHERE user = $userid");
+    $row2 = $result2->fetch_assoc();
+} else {
+    header('HTTP/1.0 404 Not Found');
+}
 
 if (isset($_POST['downvote'])) {
     $sql = "DELETE FROM votes WHERE user = $id AND creation = $model_id";
@@ -101,34 +105,36 @@ if(isset($_POST['comment'])){
 
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-    $time = time();
-    $content = $_GET['id'];
-    $category = 2;
-    $sql = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
+    if($user != $userid) {
+        $time = time();
+        $content = $_GET['id'];
+        $category = 2;
+        $sql = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
 
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("iisii", $userid, $id, $time, $content, $category);
-    $stmt->execute();
-    $stmt->close();
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("iisii", $userid, $id, $time, $content, $category);
+        $stmt->execute();
+        $stmt->close();
 
-    $date = time();
-    $sql = "SELECT alert FROM users WHERE id = ?";
-    $stmt3 = $conn->prepare($sql);
-    $stmt3->bind_param("i", $userid);
-    $stmt3->bind_result($alert);
-    $stmt3->execute();
-    $stmt3->close();
+        $date = time();
+        $sql = "SELECT alert FROM users WHERE id = ?";
+        $stmt3 = $conn->prepare($sql);
+        $stmt3->bind_param("i", $userid);
+        $stmt3->bind_result($alert);
+        $stmt3->execute();
+        $stmt3->close();
 
-    $alertnum = $alert + 1;
-    $stmt = $conn->prepare("UPDATE users SET alert = ? WHERE id = ?");
-    $stmt->bind_param("si", $alertnum, $userid);
+        $alertnum = $alert + 1;
+        $stmt = $conn->prepare("UPDATE users SET alert = ? WHERE id = ?");
+        $stmt->bind_param("si", $alertnum, $userid);
 
-    if ($stmt->execute()) {
-        echo "<script>alert('You commented!')</script>";
-    } else {
-        echo "<script>alert('An error has occurred')</script>";
+        if ($stmt->execute()) {
+            echo "<script>alert('You commented!')</script>";
+        } else {
+            echo "<script>alert('An error has occurred')</script>";
+        }
+        $stmt->close();
     }
-    $stmt->close();
     $conn->close();
 	
 }
@@ -146,29 +152,49 @@ if (isset($_POST['delete'])) {
     $conn->close();
 }
 
-include('com/bbcode.php');
+if(isset($_POST['saveComment'])){
+
+	$commentId = $_POST['commentId'];
+	$comment = htmlspecialchars($_POST['commentEditing' . $commentId]);
+    
+		
+	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+
+    if(!isset($_SESSION['username']) || empty($comment)) {
+        header("HTTP/1.0 500 Internal Server Error");
+        exit;
+    }
+		
+    $sql = "UPDATE comments SET comment = ? WHERE id = ?";
+    $stmt2 = $conn->prepare($sql);
+    $stmt2->bind_param("si", $comment, $commentId);
+    $stmt2->execute();
+
+    if ($stmt2->execute()) {
+        header('Location:' . $_SERVER["REQUEST_URI"]);
+    }
+	
+}
+
+if (isset($_POST['delete'])) {
+    $commentId = $_POST['deleteId'];
+	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+	if ($conn->connect_error) {
+		exit($conn->connect_error);
+	}
+    if($admin != 1) {
+        exit("You are not an admin");
+    }
+	$sql = "DELETE FROM comments WHERE id = $commentId";
+	$result = $conn->query($sql);
+    $conn->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <title><?php echo $name ?></title>
-    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
-    <link rel="stylesheet" href="/lib/theme.css">
-    <script src="/lib/main.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://code.jquery.com/jquery-migrate-1.4.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/altcha-org/altcha@main/dist_plugins/obfuscation.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/altcha-org/altcha@main/dist/altcha.min.js"></script>
-    <script async defer src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js" type="module"></script>
-    <link rel="canonical" href="https://www.gr8brik.rf.gd/build/" />
-    <meta charset="UTF-8">
-    <meta name="author" content="sussteve226">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><!-- ios support -->
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/img/logo.jpg" />
-    <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
-    <meta name="theme-color" content="#f1f1f1" />
+    <?php include 'header.php' ?>
 </head>
 
 <body class="w3-light-blue w3-container">
@@ -218,6 +244,13 @@ include('com/bbcode.php');
 
     $(document).ready(function() {
 
+        function checkCookieExists(n) {
+            if (document.cookie.split(';').some((item) => item.trim().startsWith(n + '='))) {
+                return true;
+            }
+            return false;
+        }
+
         $("#postComment").click(function(event) {
             event.preventDefault();
 
@@ -231,16 +264,12 @@ include('com/bbcode.php');
                     var goUrl = "/build/<?php echo $model_id ?>";
                     $("body").load(goUrl, function() {
 				        history.pushState(null, "", goUrl);
-                        function getCookie(name) {
-                            function escape(s) { return s.replace(/([.*+?\^$(){}|\[\]\/\\])/g, '\\$1'); }
-                            var match = document.cookie.match(RegExp('(?:^|;\\s*)' + escape(name) + '=([^;]*)'));
-                            return match ? match[1] : '';
+                        if (checkCookieExists('mode')) {
+                            $("body").removeClass("w3-light-blue");
+                            $("body").css({"background-color": "#121212", "color": "#FAF9F6"});
+                            $('#navbar').removeClass('w3-light-grey').addClass('w3-dark-grey'); 
+                            $('.gr8-theme').removeClass('w3-light-grey gr8-theme').addClass('w3-dark-grey w3-text-white'); 
                         }
-                        if (getCookie("theme") === "dark") {
-				            $("body").addClass("w3-dark-grey");
-                            $("#navbar").removeClass("w3-light-grey");
-                            $("#navbar").addClass("w3-black");   
-			            }
                         window.scrollTo(0, document.body.scrollHeight);
                     });
                 },
@@ -251,6 +280,7 @@ include('com/bbcode.php');
                 }
             });
         });
+
     });
 </script>
 
@@ -259,19 +289,32 @@ include('com/bbcode.php');
     require_once "com/bbcode.php";
     require_once "ajax/time.php";
     $bbcode = new BBCode;
-    $count_result = $conn->query("SELECT COUNT(*) as vote_count FROM votes WHERE creation = $model_id");
-    $count_row = $count_result->fetch_assoc();
 
-    $result2 = $conn2->query("SELECT * FROM bans WHERE user = $userid");
-    $row2 = $result2->fetch_assoc();
-		
+    if ($result->num_rows === 0 || $isRemoved === "1" || $result2->num_rows != 0 && $row2['end_date'] >= time()) {
+        echo '<h2>Error</h2><p>Creation does not exist.</p>';
+        exit;
+    } else {
+        $sql = "UPDATE model SET views = '$views' WHERE id = '$model_id'";
+        $result = $conn->query($sql);
+        $count_result = $conn->query("SELECT COUNT(*) as vote_count FROM votes WHERE creation = $model_id");
+        $count_row = $count_result->fetch_assoc();
+    }
+
 	echo "<h2>" . $name . "</h2>";
     echo '<h4><i class="fa fa-clock-o" aria-hidden="true"></i><time datetime="' . $date . '">Posted ' . $date . '</time></h4>';
-    echo '<h4><i class="fa fa-user-o" aria-hidden="true"></i>By <a href="/@' . urlencode($username) . '">' . $username . '</a></h4>';
-
+    echo '<h4><i class="fa fa-user-o" aria-hidden="true"></i>By <a href="/@' . urlencode(strtolower($username)) . '">' . $username . '</a>';
+    if($model_verified != 0) {
+        echo '&nbsp;<i class="fa fa-check w3-blue w3-large"></i>';
+    }
+    if($model_admin != 0) {
+        echo '&nbsp;<i class="fa fa-check w3-red w3-large"></i>';
+    }
+    echo '</h4>';
     echo '<h4><i class="fa fa-arrow-circle-o-up" aria-hidden="true"></i>' . $count_row['vote_count'] . ' likes</h4>';
+    echo '<h4><i class="fa fa-eye" aria-hidden="true"></i>' . $views . ' views</h4>';
+
     if(!empty($decoded_description)) {
-        echo '<pre class="w3-card-2 w3-light-grey w3-padding w3-large">' . $bbcode->toHTML($decoded_description) . '</pre><br />';
+        echo '<pre class="gr8-theme w3-card-2 w3-light-grey w3-padding w3-large">' . $bbcode->toHTML($decoded_description) . '</pre><br />';
     }
     echo '<form id="upvote" action="" method="post"></form>';
     echo '<form id="downvote" action="" method="post"></form>';
@@ -285,10 +328,13 @@ include('com/bbcode.php');
         
 		if(isset($_SESSION['username'])) {
             echo '<div class="w3-dropdown-click">
-                <button onclick="dropdown()" class="w3-btn w3-blue w3-hover-white"><i class="fa fa-download"></i>Download</button>
-                <div id="gr8-dropdown" class="w3-dropdown-content w3-bar-block w3-border">
-                    <a class="w3-bar-item w3-btn w3-hover-blue w3-border" href="' . "http://www.gr8brik.rf.gd/cre/" . $model . '" download>Creation</a>
-                    <a class="w3-bar-item w3-btn w3-hover-blue w3-border" href="' . "http://www.gr8brik.rf.gd/cre/" . $screenshot . '" download>Screenshot</a>
+                <div class="tooltip">
+                    <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Download a model to save it</span>
+                    <button onclick="dropdown()" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo">Download...</button>
+                </div>
+                <div id="gr8-dropdown" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 9999;">
+                    <a class="w3-bar-item w3-btn w3-hover-blue w3-border" href="' . "/cre/" . $model . '" download="build' . $model_id . '.gr8.json">creation</a>
+                    <a class="w3-bar-item w3-btn w3-hover-blue w3-border" href="' . "/cre/" . $screenshot . '" download="img' . $model_id . '.gr8.png">screenshot</a>
                 </div>
             </div>&nbsp;&nbsp';
 
@@ -297,25 +343,30 @@ include('com/bbcode.php');
             $result2 = $conn->query($sql2);
             $row2 = $result2->fetch_assoc();
             if ($result2->num_rows > 0) {
-                echo '<input form="downvote" class="w3-btn w3-orange w3-hover-white" type="submit" value="Unlike" name="downvote">&nbsp;&nbsp';
+                echo '<input form="downvote" class="w3-btn w3-orange w3-hover-white w3-border w3-border-pink" type="submit" value="Unlike" name="downvote">&nbsp;&nbsp';
             } else {
-                echo '<input form="upvote" class="w3-btn w3-blue w3-hover-white" type="submit" value="Like" name="upvote">&nbsp;&nbsp';
+                echo '<input form="upvote" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo" type="submit" value="Like" name="upvote">&nbsp;&nbsp';
             }
 
             if (trim($_SESSION['username']) === trim($userid)) {
-                echo "<button onclick=document.getElementById('delete').style.display='block' name='delete' class='w3-btn w3-red w3-hover-white' /><i class='fa fa-trash'></i>Delete</button>&nbsp;";
+                echo '<div class="tooltip">
+                    <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Delete not available right now</span>
+                    <button xonclick=document.getElementById("delete").style.display="block" name="delete" class="w3-btn w3-red w3-hover-white w3-border w3-border-pink" disabled/>Delete</button>&nbsp;
+                </div>';
             } else {
-                echo "<button onclick=document.getElementById('report').style.display='block' name='flag' class='w3-btn w3-red w3-hover-white' /><i class='fa fa-flag-o'></i>Flag</button>&nbsp;";
+                echo '<div class="tooltip">
+                    <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Report a model to Admins</span>
+                        <button onclick=document.getElementById("report").style.display="block" name="flag" class="w3-btn w3-red w3-hover-white w3-border w3-border-pink" />Flag</button>&nbsp;
+                    </div>';
             }
 
             echo "<br /><br /><div id='commentForm'>";
             echo "<div id='post'>";
-			echo "<textarea name='commentBox' id='commentBox' class='w3-mobile' placeholder='Add a comment...' rows='4' cols='40'></textarea></div>";
+			echo "<textarea name='commentBox' id='commentBox' class='w3-mobile' placeholder='Add a comment' rows='4' cols='40'></textarea></div>";
             echo "<altcha-widget challengeurl='https://eu.altcha.org/api/v1/challenge?apiKey=ckey_01d9f4ad018c16287ca6f3938a0f'></altcha-widget>";
-			echo "<button id='postComment' class='w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo w3-round'><i class='fa fa-commenting-o' aria-hidden='true'></i>Comment</button></div>";
+			echo "<button id='postComment' class='w3-btn w3-blue w3-hover-white w3-border w3-border-indigo'>Comment</button></div>";
 		} else {
-			echo "<br />Want to comment?";
-			echo "<a class='w3-btn w3-blue w3-hover-white' href='/acc/login.php'>Login</a>";
+			echo "<h4><a href='/acc/login.php'>Login</a> to comment</h4>";
 		}
 
             $model_id = $_GET['id'];
@@ -333,40 +384,70 @@ include('com/bbcode.php');
 
 			while ($row = $comResult->fetch_assoc()) {
 			
-				$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-				if ($conn->connect_error) {
-					exit($conn->connect_error);
-				}
-                
+                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+                if ($conn->connect_error) {
+                    exit($conn->connect_error);
+                }
+                    
                 $c_user = $row['user'];
-				$sql = "SELECT * FROM users WHERE id = $c_user";
-				$userResult = $conn->query($sql);
-				$userRow = $userResult->fetch_assoc();
-                $pfp = "../img/avatar.png";
-                $username = "[deleted]";
-                $timestamp = "[unknown]";
-                $comment = $bbcode->toHTML(htmlentities($row['comment'], ENT_QUOTES, 'UTF-8'));
+                $userResult = $conn->query("SELECT * FROM users WHERE id = $c_user");
+                $userRow = $userResult->fetch_assoc();
+                if($userResult->num_rows != 0 || !empty($userRow['username'])) {
 
-                if(!empty($userRow['username'])) {
-                    $username = $userRow['username'];
-                }
+                    $banResult = $conn->query("SELECT * FROM bans WHERE user = '$c_user'");
+                    $banRow = $banResult->fetch_assoc();
 
-                if(file_exists('acc/users/pfps/' . $c_user . '.jpg')) {
-                    $pfp = '../ajax/pfp.php?id=' . base64_encode($c_user) . '&method=image';
-                }
+                    if($banResult->num_rows === 0) {
 
-                if (is_numeric($row['date'])) {
-                    $timestamp = time_ago(date('Y-m-d H:i:s', $row['date']));
+                        if (!is_numeric($row['date'])) {
+                            $row['date'] = time();
+                        }
+
+                        $pfp = 'acc/users/pfps/' . $c_user . '.jpg';
+                        $letter = mb_substr($userRow['username'], 0, 1);
+                    
+                        echo "<script>
+                            $(document).on('click', '#editComment' + " .  $row['id'] . " , function(event) {
+                                $('#commentEditing' + " . $row['id'] . ").toggle();
+                                $('#comment' + " . $row['id'] . ").toggle();
+                            });
+
+                        </script>";
+
+                        echo '<div id="post">';
+                        if(!file_exists($pfp) && ctype_alpha($letter)) {
+                            echo '<span class="no-pfp-post pfp-post" class="' . $letter . '">' . $letter . '</span>';
+                        } else {
+                            echo '<img class="pfp-post" src="/' . $pfp . '">';
+                        }
+                        if(empty($userRow['username'])) {
+                            $userRow['username'] = "[deleted]";
+                        }
+                        
+                        echo '<article class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round" style="width:75%">';
+                        echo '<header><b><a href="/@' . urlencode(strtolower($userRow['username'])) . '" title="The user who wrote this comment">' . $userRow['username'] . '</a>';
+                        if($userRow['verified'] != 0) {
+                            echo '&nbsp;<i class="fa fa-check w3-blue w3-padding-tiny w3-large w3-circle" title="This profile is important" aria-hidden="true"></i>';
+                        }
+                        if($userRow['admin'] != 0) {
+                            echo '&nbsp;<i class="fa fa-check w3-red w3-padding-tiny w3-large w3-circle" title="This profile is a Moderator" aria-hidden="true"></i>';
+                        }
+                        echo '</b>';
+                        echo '<time class="w3-right" datetime="' . $row['date'] . '" title="Time that has passed sense this comment was posted">' . time_ago(date('Y-m-d H:i:s', $row['date'])) . '</time>';
+                        if(isset($_SESSION['username'])) {
+                            if (trim($_SESSION['username']) === trim($c_user)) {
+                                echo " - <button id='editComment" . $row['id'] . "' class='fa fa-pencil w3-large'></button>";
+                                echo " - <button form='editComment' type='submit' name='saveComment' class='fa fa-save w3-large'></button>";
+                                echo '<br /><textarea form="editComment" id="commentEditing' . $row['id'] . '" name="commentEditing' . $row['id'] . '" rows="2" cols="80" style="display:none;">' . $row['comment'] . '</textarea>';
+                                echo '<form action="" method="POST" id="editComment">';
+                                echo '<input type="hidden" name="commentId" value="' . $row['id'] . '"></form>';
+                            }
+                        }
+                        echo '</header><pre id="comment' . $row['id'] . '" value="' . $row['comment'] . '">' . $bbcode->toHTML(htmlentities($row['comment'], ENT_QUOTES, 'UTF-8')) . '</pre>';
+                        echo '</article></div><br />';
+                    }
                 }
-			
-                echo '<div id="post">';
-                echo '<img id="pfp-post" src="' . $pfp . '">';
-                echo '<article class="w3-card-2 w3-light-grey w3-padding-small" style="width:50%"><header><b>';
-                echo '<a href="/@' . urlencode($username) . '">' . $username . '</a> - ';
-                echo '<time datetime="' . $timestamp . '">' . $timestamp . '</time></b></header>';
-                echo '<pre>' . $comment . '</pre>';
-                echo '</article></div><br />';
-			}
+            }
 
             echo '<br /><br />';
 

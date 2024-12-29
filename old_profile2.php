@@ -14,16 +14,10 @@ if (isset($_GET['user']) && $_GET['user']) {
     $result = $conn->query($sql);
     $row = $result->fetch_assoc();
     $profile_id = $row['id'];
-    $error = false;
 
     $sql = "SELECT * FROM bans WHERE user = '$profile_id'";
     $result2 = $conn->query($sql);
-
-    while ($row2 = $result2->fetch_assoc()) {
-        if (empty($row['username']) || $result2->num_rows > 0 && $row2['end_date'] >= time()) {
-            $error = true;
-        }
-    }
+    $row2 = $result2->fetch_assoc();
 }
 
 if (isset($_GET['id']) && $_GET['id']) {
@@ -32,16 +26,10 @@ if (isset($_GET['id']) && $_GET['id']) {
     $result = $conn->query($sql);
     $row = $result->fetch_assoc();
     $profile_user = $row['username'];
-    $error = false;
 
     $sql = "SELECT * FROM bans WHERE user = '$profile_id'";
     $result2 = $conn->query($sql);
-
-    while ($row2 = $result2->fetch_assoc()) {
-        if (empty($row['username']) || $result2->num_rows > 0 && $row2['end_date'] >= time()) {
-            $error = true;
-        }
-    }
+    $row2 = $result2->fetch_assoc();
 }
 
 if (isset($_POST['follow'])) {
@@ -129,13 +117,13 @@ if(isset($_POST['ban'])) {
     $bbcode = new BBCode;
 	$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
     $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-
-    if($result->num_rows === 0) {
+    
+    if ($result->num_rows === 0 || $result2->num_rows != 0 && $row2['end_date'] >= time()) {
         echo "<h4>This profile does not exist.</h4>";
         echo "<button onclick='window.history.go(-1); return false;' class='w3-btn w3-blue w3-hover-white w3-border w3-border-indigo'>Back</button>";
         exit;
     }
-    
+
     $count_sql = "SELECT COUNT(*) as all_models FROM model WHERE user = $profile_id";
     $count_result = $conn2->query($count_sql);
     $count_row = $count_result->fetch_assoc();
@@ -149,50 +137,31 @@ if(isset($_POST['ban'])) {
     $count_row = $count_result->fetch_assoc();
     $following = $count_row['following'];
 
-    if($error === true) {
-        $model_count = " ";
-        $followers = " ";
-        $following = " ";
-        $pfp = '/img/no_image.png';
-    } else {
-        $pfp = '/ajax/pfp?method=image&id=' . base64_encode($profile_id);
-        $banner = '/acc/users/banners/' . $profile_id . '..jpg';
-    }
-
     echo "<div class='w3-light-grey w3-card-2 gr8-theme w3-padding-small'>";
-    if(file_exists('acc/users/banners/' . $profile_id . '..jpg') || $error === true) {
-        echo '<div style="background-image: url(' . $banner . '); height: 20%; background-repeat: no-repeat; background-size: cover; background-position: 50% 50%;">';
+    if(file_exists('acc/users/banners/' . $profile_id . '..jpg')){
+        echo '<div style="background-image: url(/acc/users/banners/' . $profile_id . '..jpg); height: 20%; background-repeat: no-repeat; background-size: cover; background-position: 50% 50%;">';
     } else {
         echo '<div>';
     }
-
-    if(file_exists('acc/users/pfps/' . $profile_id . '.jpg') || $error === true){
-        echo '<img style="width: 100px; height: 100px; border-radius: 50%;" src="' . $pfp .  '" />&nbsp;';
+    echo '<b style="font-size: 30px; text-shadow: 2px 2px 2px gray;">';
+    if(file_exists('acc/users/pfps/' . $profile_id . '.jpg')){
+        echo '<img style="width: 100px; height: 100px; border-radius: 50%;" src="' . '/acc/users/pfps/' . $profile_id . '.jpg' . '" />&nbsp;';
     }
-    echo "<span style='font-size: 30px; display: inline-block; vertical-align: top;'><b>" . $row['username'] . "</b>";
+    echo $row['username'];
     if($row['verified'] != 0) {
-        echo '&nbsp;<i class="fa fa-check w3-blue w3-xlarge"></i>';
+        echo '&nbsp;<i class="fa fa-check w3-blue w3-large"></i>';
     }
     if($row['admin'] != 0) {
-        echo '&nbsp;<i class="fa fa-check w3-red w3-xlarge"></i>';
+        echo '&nbsp;<i class="fa fa-check w3-red w3-large"></i>';
     }
     if(isset($_SESSION['username']) && trim($_SESSION['username']) === trim($profile_id)) {
-        echo '&nbsp;<a href="/acc/index" class="reload"><i class="fa fa-pencil" aria-hidden="true"></i></a>';
+        echo '&nbsp;<a href="/acc/index"><i class="fa fa-pencil" aria-hidden="true"></i></a>';
     }
-    
-    echo '&nbsp;<b style="font-size:20px;" class="w3-padding-tiny">
-    <span style="text-decoration: underline dotted;">' . $model_count . '</span> creations 
-    <span style="text-decoration: underline dotted;">' . $followers . '</span> followers 
-    <span style="text-decoration: underline dotted;">' . $following . '</span> following</div></b></span>';
-
-    echo "<span class='margin: 0px 0px 0px 75px; display: inline-block;'></span>";
-    if(!empty($row['description'])) {
-        echo '<pre>' . $bbcode->toHTML(htmlspecialchars($row['description'])) . '</pre>';
-    }
+    echo '</div></b><br /><b style="font-size:15px;">' . $model_count . ' creations - ' . $followers . ' followers - ' . $following . ' following';
     if(!empty($row['twitter'])) {
-        echo '<span style="font-size: 15px; text-shadow: 0px 0px 0px #fff;">
-        <a href="https://twitter.com/' . $row['twitter'] . '" target="_blank"><span class="w3-large w3-grey w3-round w3-padding-tiny">𝕏</span>/' . $row['twitter'] . '</a></span><br />';
+        echo '<br /><a href="https://x.com/' . $row['twitter'] . '" target="_blank" title="This user has linked there X page to their profile"><span class="w3-large w3-grey w3-circle w3-padding-tiny">𝕏</span>/' . $row['twitter'] . '</a>';
     }
+    echo '<pre>' . $bbcode->toHTML(htmlspecialchars($row['description'])) . '</pre></b>';
 
     if(isset($_SESSION['username'])) {
         $profileid = $row['id'];
@@ -205,27 +174,15 @@ if(isset($_POST['ban'])) {
             echo '<form id="followUser" action="" method="post"></form>';
             echo '<input form="followUser" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo" type="submit" value="Follow" name="follow">&nbsp;';
         }
-
+                        
         if (trim($_SESSION['username']) != trim($profile_id) && $admin === '1' && $row['admin'] != '1') {
             echo "<button onclick=document.getElementById('ban').style.display='block' name='ban' class='w3-btn w3-red w3-hover-white w3-border w3-border-pink' />Ban</button>";
         }
     }
-
-    echo "</div>";
-
-    if ($error === true) {
-        echo "<center>
-                <h4>An error has occured</h4>
-            </center>
-            <style>
-                #cookie-message {
-                    display: none;
-                }
-            </style>";
-        exit;
-    }
 								
-?>
+			?>
+        </div>
+
             <div id="unfollow" class="w3-modal">
 				<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
 					<div class="w3-container">

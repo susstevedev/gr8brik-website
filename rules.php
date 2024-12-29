@@ -4,16 +4,7 @@
 ?>
 <head>
     <title>Rules</title>
-    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
-    <link rel="stylesheet" href="lib/theme.css">
-    <script src="lib/main.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <meta charset="UTF-8">
-    <meta name="description" content="Gr8brik is a block building browser game. No download required">
-    <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
-    <meta name="author" content="sussteve226">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <?php include 'header.php' ?>
 </head>
 <body class="w3-light-blue w3-container">
 <?php 
@@ -27,23 +18,23 @@
 
 <h2>1. Disclaimer</h2>
 
-<b style="color:red;">These rules may be changed anytime, and you may be banned from GR8BRIK temperarily or permently for dismissing these.</b>
+<b style="color:red;">These rules may be changed anytime, and you may be banned from GR8BRIK temporarily or permanently for dismissing these guildlines.</b>
 
 <h3>2. Using you're brain</h3>
 
-<b>Using your common sense is how (most of the time) avoid being banned.</b>
+<b>Using your common sense is how to avoid being banned most of the time.</b>
 
 <h3>3. No spamming</h3>
 
-<b>Spamming can cause server lag and can disrupt people. Spamming includes comment the same things on  multiple creations or posts, and not stopping when people ask you to. Spamming gets you banned for 1-day, aswell as the message(s) being deleted.</b>
+<b>Spamming can cause web sever lag and can disrupt people. Spamming <i>includes</i> commenting the same things on multiple creations or posts, and not stopping when people ask you to. Spamming gets you banned for 1-day, aswell as the message(s) being deleted.</b>
 
 <h3>4. Don't curse</h3>
 
-<b>Cursing includes saying words that are usally taboo in western culture (Eg. f**k or c*m). Cursing will get you banned for 1-day, along with the message(s) with the curse being deleted.</b>
+<b>Cursing includes saying words that are usally taboo in western culture. Cursing will get you banned for 1-day, along with the message(s) with the curse being deleted.</b>
 
 <h3>5. No NSFW</h3>
 
-<b>Anything that people may thing isn't for Children (18 years old or below) is NSFW. This is an auto 7 day ban; and if repeated it will be raised to a month.</b>
+<b>Anything that people may thing isn't for Children is NSFW. This is an auto 7 day ban; and if repeated it will be raised to a month.</b>
 
 <h3>6. No conflict</h3>
 
@@ -51,7 +42,7 @@
 
 <hr /><h1>Site moderators</h1>
 
-<div class="w3-card-2 w3-light-grey w3-padding-small w3-center">
+<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-center">
 
     <h5>If you wish us to remove any personal details we hold about you, please email us at <i class="fa fa-envelope"><a href="mailto:evanrutledge226@gmail.com">evanrutledge226[at]gmail[dot]com</a></i></h5>
 
@@ -60,7 +51,7 @@
 </center>
 
 <div class="w3-container">
-    <ul class="w3-ul w3-card-2 w3-light-grey w3-padding-small">
+    <ul class="gr8-theme w3-ul w3-card-2 w3-light-grey w3-padding-small">
         <?php
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
             if ($conn->connect_error) {
