@@ -66,21 +66,7 @@ $conn->close();
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>My Creations</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
-    <link rel="stylesheet" href="../lib/theme.css">
-    <script src="../lib/main.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <meta charset="UTF-8">
-    <meta name="description" content="Gr8brik is a block building browser game. No download required">
-    <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
-    <meta name="author" content="sussteve226">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><!-- ios support -->
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/img/logo.jpg" />
-    <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
-    <meta name="theme-color" content="#f1f1f1" />
+    <?php include '../header.php' ?>
 </head>
 <body class="w3-light-blue w3-container">
 
@@ -93,72 +79,27 @@ $conn->close();
 
 		<center>
 
-			<h2 id="upload">Upload model</h2>
+                <h2 id="upload">Upload model</h2>
 
-                <script>
-                    $(document).ready(function() {
-                        $("#publish").click(function(event) {
-                            event.preventDefault();
-
-                            var fileToUpload = $("#postModel input[name='fileToUpload']").val();
-                            var model_name = $("#postModel input[name='model_name']").val();
-                            var description = $("#postModel input[name='description']").val();
-                            var screenshotToUpload = $("#postModel input[name='screenshotToUpload']").val();
-
-                            $.ajax({
-                                url: "",
-                                method: "POST",
-                                data: { upload: true, fileToUpload: fileToUpload, model_name: model_name, description: description, screenshotToUpload: screenshotToUpload },
-                                success: function(response) {
-                                    var goUrl = "/acc/creations";
-                                    $("body").load(goUrl, function() {
-                                        history.pushState(null, "", goUrl);
-                                        function getCookie(name) {
-                                            function escape(s) { return s.replace(/([.*+?\^$(){}|\[\]\/\\])/g, '\\$1'); }
-                                            var match = document.cookie.match(RegExp('(?:^|;\\s*)' + escape(name) + '=([^;]*)'));
-                                            return match ? match[1] : '';
-                                        }
-                                        if (getCookie("theme") === "dark") {
-                                            $("body").addClass("w3-dark-grey");
-                                            $("#navbar").removeClass("w3-light-grey");
-                                            $("#navbar").addClass("w3-black");   
-                                        }
-                                        window.scrollTo(0, document.body.scrollHeight);
-                                    });
-                                },
-
-                                error: function(jqXHR, textStatus, errorThrown) {
-                                    console.error("AJAX Error:", textStatus, errorThrown);
-                                    alert("An error occurred.");
-                                }
-                            });
-                        });
-                    });
-                </script>
-
-                <div id="postModel">
-
-                    <!-- <form action="" method="post" enctype="multipart/form-data"> -->
-
-                    <!--<img src='../img/blured_model.jpg' width='320' height='240' loading='lazy' class='w3-hover-opacity w3-round w3-border'><br />-->
-
-                    <div style="background-image:url('../img/blured_model.jpg');width:366px;height:188px;background-repeat:no-repeat;background-size: cover;" class="w3-hover-opacity w3-round-tiny w3-border">
-                    </div><br /><br />
-
-                    <p>Model screenshot (optional):</p><input type="file" name="screenshotToUpload" id="screenshotToUpload" style="width:30%"><br />
-
-                    <p>Model file:</p><input type="file" name="fileToUpload" id="fileToUpload" class="w3-input" style="width:30%" required><br />
-
-                    <input type="text" placeholder="Model name" name="model_name" id="model_name" class="w3-input" style="width:30%" required>
+                <form action="" method="post" enctype="multipart/form-data">
                 
-                    <input type="text" placeholder="Model description" name="description" id="description" class="w3-input" style="width:30%" required>
+                    <img src='../img/blured_model.jpg' width='320' height='240' loading='lazy'><br />
+
+                    <p>Model screenshot (optional):</p>
+
+                    <input type="file" name="screenshotToUpload" id="screenshotToUpload" style="width:30%">
+
+                    <p>Model file:</p>
+
+                    <input type="file" name="fileToUpload" id="fileToUpload" class="w3-input" style="width:30%">
+
+                    <input type="text" placeholder="Model name" name="model_name" id="model_name" class="w3-input" style="width:30%">
                 
-                    <!-- <input type="submit" name="upload" value="UPLOAD" class="w3-btn w3-blue w3-hover-opacity"> -->
+                    <input type="text" placeholder="Model description" name="description" id="description" class="w3-input" style="width:30%">
+                
+                    <input type="submit" name="upload" value="Upload" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo">
 
-                    <button id="publish" class="w3-btn w3-blue w3-hover-opacity w3-mobile w3-border">Upload</button>
-
-                    <!-- </form><hr /><div class="w3-row"><table class="w3-table-all" style="color:black;"> -->
-                </div><hr /><div class="w3-row"><table class="w3-table-all" style="color:black;">
+                </form><hr /><div class="w3-row"><table class="w3-table-all" style="color:black;">
             <?php
                 // Create connection
                 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
@@ -175,10 +116,6 @@ $conn->close();
                 $stmt->bind_result($model_id, $model_user, $model, $model_name, $model_screenshot);
             
                 while ($stmt->fetch()) {
-                    
-                    /* echo "<div class='w3-display-container w3-left'>";
-                    echo "<a href='../creation.php?id=" . $model_id . "'><img src='../img/blured_model.jpg' width='320' height='240' loading='lazy' class='w3-hover-opacity w3-round w3-border'></a>";
-                    echo "<b class='w3-display-middle'>" . $model_name . "</b></div>"; */
 
                     echo "<div class='w3-display-container w3-left w3-padding-small'>";
                     echo "<a href='../build/" . $model_id . "'><img src='../cre/" . $model_screenshot . "' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-border'></a>";

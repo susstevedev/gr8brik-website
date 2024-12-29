@@ -44,21 +44,7 @@ if(isset($_POST['clear'])) {
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>Notifications</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
-    <link rel="stylesheet" href="../lib/theme.css">
-    <script src="../lib/main.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <meta charset="UTF-8">
-    <meta name="description" content="Gr8brik is a block building browser game. No download required">
-    <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
-    <meta name="author" content="sussteve226">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><!-- ios support -->
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/img/logo.jpg" />
-    <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
-    <meta name="theme-color" content="#f1f1f1" />
+    <?php include '../header.php' ?>
 </head>
 <body class="w3-light-blue w3-container">
 
@@ -80,7 +66,7 @@ if(isset($_POST['clear'])) {
             $result3 = $conn2->query("SELECT COUNT(*) as num FROM notifications WHERE user = $id");
             $row3 = $result3->fetch_assoc();
             echo '<div class="w3-card-2 w3-light-grey w3-padding-tiny"><img src="../img/info.jpg" style="width:20px;height=20px;"><b>A new notifications system is rolling out now.</b></div>';
-            echo '<h2>' . $row3['num'] . ' total notifications sense ' . $age . '.</h2>';
+            echo '<h2>' . $row3['num'] . ' total notifications since ' . $age . '</h2>';
 
 			$sql = "SELECT * FROM notifications WHERE user = $id ORDER BY timestamp DESC";
             $result = $conn2->query($sql);
@@ -90,33 +76,71 @@ if(isset($_POST['clear'])) {
                 $sql2 = "SELECT * FROM users WHERE id = $profile";
                 $result2 = $conn2->query($sql2);
                 $row2 = $result2->fetch_assoc();
-                if(empty($row2['username'])) {
-                    $row2['username'] = "[deleted]";
-                }
 
                 if ($row['category'] === "1") {
-                    $url = "/@" . urlencode($row2['username']);
+                    $url = "/user/" . $profile;
                     $post = " followed you";
+                    $user = $row2['username'];
+                    $img = '/ajax/pfp?method=image&id=' . base64_encode($profile);
                 } elseif ($row['category'] === "2") {
-                    $url = "/build/" . $row['content'];
-                    $post = " commented on your creation";
+                    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+                    $content = $row['content'];
+                    $result3 = $conn3->query("SELECT * FROM model WHERE id = $content");
+                    $row3 = $result3->fetch_assoc();
+
+                    $img = '../cre/' . $row3['screenshot'];
+                    $url = "/build/" . $content;
+                    $post = " commented on " . $row3['name'];
+                    $user = $row2['username'];
+
+                    if($row2['verified'] != 0) {
+                        $user = $user . '&nbsp;<i class="fa fa-check w3-blue w3-large"></i>';
+                    }
+                    if($row2['admin'] != 0) {
+                        $user = $user . '&nbsp;<i class="fa fa-check w3-red w3-large"></i>';
+                    }
+
+                    $result3->free();
+                    $conn3->close();
                 } elseif ($row['category'] === "3") {
+                    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+                    $content = $row['content'];
+                    $result3 = $conn3->query("SELECT * FROM posts WHERE id = $content");
+                    $row3 = $result3->fetch_assoc();
+
+                    $img = '../img/com.jpg';
                     $url = "/topic/" . $row['content'];
-                    $post = " commented on your topic";
+                    $post = " replied to thread: " . $row3['title'];
+                    $user = $row2['username'];
+
+                    if($row2['verified'] != 0) {
+                        $user = $user . '&nbsp;<i class="fa fa-check w3-blue w3-large"></i>';
+                    }
+                    if($row2['admin'] != 0) {
+                        $user = $user . '&nbsp;<i class="fa fa-check w3-red w3-large"></i>';
+                    }
+                    $result3->free();
+                    $conn3->close();
                 } else {
                     $url = $row['url'];
-                    $post = "&nbsp;" . $row['post'] . "(sent via old api)";
+                    $post = $row['post'];
+                    $user = "";
+
+                    $img = '/img/no_image.png';
                 }
                 if (is_numeric($row['timestamp'])) {
-                    $timestamp = gmdate("Y-m-d H:i:s", $row['timestamp']);
+                    $time = gmdate("Y-m-d H:i:s", $row['timestamp']);
                 } else {
-                    $timestamp = "[unknown]";
+                    $time = "";
                 }
 
 				echo "<article class='w3-card-2 w3-light-grey w3-padding w3-large'>";
-				echo "<a href='" . $url . "'>" . htmlspecialchars($row2['username']) . $post . "</a>";
-                echo "<time class='w3-right w3-text-grey' datetime=''>" . $timestamp . "</time>";
+                echo "<img src='" . $img . "' width='150px' height='150px' alt='" . $img . "'>";
+				echo "<a href='" . $url . "' style='display: inline-block; vertical-align: top; padding: 5px 5px 5px 5px;'>" . $user . $post . "</a>";
+                echo "<time class='w3-right w3-text-grey' datetime=''>" . $time . "</time>";
 				echo "</article><br />";
+
+                $img = null;
                 $result2->free();
             }
             $result->free();

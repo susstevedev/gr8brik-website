@@ -478,7 +478,19 @@ if(isset($_POST['deactive'])) {
 
     <p class="success w3-light-grey w3-card-2 w3-padding-small"></p>
     <p class="error w3-red w3-card-2 w3-padding-small"></p>
-    
+
+    <center>
+        <h3>General</h3>
+
+        <input type="checkbox" class="w3-check" id="showPfps" name="showPfps" value="showPfps">
+        <label for="showPfps">Show profile pictures</label><br />
+
+        <input type="checkbox" class="w3-check" id="showBanners" name="showBanners" value="showBanners">
+        <label for="showBanners">Show banners</label><br />
+
+        <button id="generalSaveValues">Save</button>
+    </center>
+
     <form class="pictureForm w3-center" method="post" action="" enctype="multipart/form-data">
         <p>We recommend your banner be 250x500 pixels</p>
 		<p><input type="file" name="fileToupload" id="fileToupload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-banner"></p>
@@ -490,6 +502,8 @@ if(isset($_POST['deactive'])) {
         ?>
 		<input type="submit" value="Upload" id="banner" name="banner" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo"><br /><br />
     </form>
+
+    <center><h3>Profile</h3></center>
 
 <div class="w3-row"><div class="w3-quarter">
 
@@ -524,6 +538,8 @@ if(isset($_POST['deactive'])) {
         <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="a_change" name="about">Change About</button>
     </div><br /><br />
 
+    <center><h3>Account</h3></center>
+
         <form id="password" method="post" action="">
             <p>Your password to login to your account. Don't share this with anyone. Keep this saved somewhere, like a secure password manager.</p>
             <input type="password" name="o_password" placeholder="Old password" class="w3-input w3-border w3-mobile w3-third" />
@@ -539,7 +555,7 @@ if(isset($_POST['deactive'])) {
         </form>
     </div></div><br /><br />
 
-    <button onclick="document.getElementById('deactive').style.display='block'" name='deactive' class='w3-btn w3-red w3-hover-white w3-border w3-border-pink' />Deactivate Account</button><br /><br />
+    <button disabled onclick="document.getElementById('deactive').style.display='block'" name='deactive' class='w3-btn w3-red w3-hover-white w3-round w3-border w3-border-pink w3-disabled'/>Deactivate Account</button><br /><br />
 
     <?php include ('../linkbar.php') ?>
 </body>

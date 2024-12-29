@@ -66,30 +66,15 @@ if(isset($_POST['accept'])) {
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <title>Appeals</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
-    <link rel="stylesheet" href="../lib/theme.css">
-    <script src="../lib/main.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <meta charset="UTF-8">
-    <meta name="description" content="Gr8brik is a block building browser game. No download required">
-    <meta name="keywords" content="legos, online block builder, gr8brik, online lego modeler, barbies-legos8885 balteam, lego digital designer, churts, anti-coppa, anti-kosa, churtsontime, sussteve226, manofmenx">
-    <meta name="author" content="sussteve226">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><!-- ios support -->
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/img/logo.jpg" />
-    <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
-    <meta name="theme-color" content="#f1f1f1" />
+    <?php include '../header.php' ?>
 </head>
 <body class="w3-light-blue w3-container">
 
     <?php 
         include('../navbar.php');
         include('panel.php');
-    ?>
 
-        <?php
+        echo "<center>";
             // Create connection
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
@@ -108,6 +93,7 @@ if(isset($_POST['accept'])) {
             $sql2 = "SELECT username FROM users WHERE id = ?";
             $stmt2 = $conn->prepare($sql2);
 
+        if($stmt->num_rows < 0) {
             while ($stmt->fetch()) {
                 $stmt2->bind_param("i", $user);
                 $stmt2->execute();
@@ -128,16 +114,19 @@ if(isset($_POST['accept'])) {
                 echo "<input type='submit' value='ACCEPT' name='accept' class='w3-btn w3-large w3-white w3-hover-blue'>";
                 echo "</form></article><br />";
             }
+        } else {
+            echo "<b>Your all caught up!</b><br />";
+            echo "<img src='/img/empty.png' style='width:518px;height:288px;'>";
+        }
 
             // Close the statements and connection
             $stmt2->close();
             $stmt->free_result(); // Free the result set of the outer statement
             $stmt->close();
             $conn->close();
+            echo "</center>";
+
+            include '../linkbar.php' 
         ?>
-		
-	</div>
-		
-    <?php include '../linkbar.php' ?>
 </body>
 </html>
