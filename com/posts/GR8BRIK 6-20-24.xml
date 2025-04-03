@@ -1,5 +1,0 @@
-<table class='w3-table-all w3-card-4' style='color:black;'><td>By:sussteve</td><br /><td>Created:June 20 2024 11:16:05</td><br /></table><table class='w3-table-all w3-card-4' style='color:black;'><td>GR8BRIK 6-20-24 was released to fix some issues with older browsers, and to remove some animations that were breaking it.
-
-&lt;BUG FIXES&gt;
-
-GR8BRIK 6-20-24 fixed Chrome 46-61 not launching GR8BRIK because it had a syntax error- ignored by Firefox and newer Chrome versions (Chrome 100-126). Also it is faster on older hardware when switching modes (Eg paint mode to build mode) as well as changing &quot;utils&quot; to &quot;settings&quot;.</td></table><br /><hr />
