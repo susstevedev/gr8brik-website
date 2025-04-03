@@ -34,10 +34,12 @@
             <option value="username_a">A-Z</option>
             <option value="username_d">Z-A</option>
             <option value="age">Creation date</option>
+            <option value="verified">Important Accounts</option>
+            <option value="admin">Moderator Accounts</option>
         </select>
         <input class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo w3-round" type="submit" value="Apply">
     </form>
-    <h4>If a user has been banned or has deactivated their account, it will not show up here for privacy reasons.</h4>
+    <p>If a user de-activated, deleted, or was banned, their account will no longer show up down below for <a href="/privacy" class="reload">privacy</a> reasons.</p>
         <?php
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
             if ($conn->connect_error) {
@@ -57,6 +59,12 @@
                 if($_GET['sort'] === 'age') {
                     $sql = "SELECT * FROM users ORDER BY age DESC";
                 }
+                if($_GET['sort'] === 'verified') {
+                    $sql = "SELECT * FROM users WHERE verified = '1' ORDER BY age DESC";
+                }
+                if($_GET['sort'] === 'admin') {
+                    $sql = "SELECT * FROM users WHERE admin = '1' ORDER BY age DESC";
+                }
             } else {
                 $sql = "SELECT * FROM users ORDER BY id DESC";
             }
@@ -64,28 +72,39 @@
 
             if ($result->num_rows > 0) {
                 $users = $result->fetch_all(MYSQLI_ASSOC);
+                $count_result = $conn->query("SELECT COUNT(*) as total_users FROM users");
+                $count_row = $count_result->fetch_assoc();
+
+                echo '<h3>' . $count_row['total_users'] . ' total registered users. <a href="/chart" class="reload">View chart</a>.</h3>';
             
                 foreach ($users as $user) {
                     $userid = $user['id'];
-                    $sql = "SELECT * FROM bans WHERE user = $userid";
+                    $sql = "SELECT * FROM bans WHERE user = '$userid'";
                     $result2 = $conn->query($sql);
                     $row2 = $result2->fetch_assoc();
 
-                    if(empty($user['username']) || $user['username'] === "[deleted]" || $result2->num_rows != 0 && $row2['end_date'] >= time()) {
+                    if(empty($user['username']) || $result2->num_rows != 0 && $row2['end_date'] >= time()) {
                         continue;
                     }
 
-                    echo "<br /><li class='w3-padding-small w3-border'><a href='/@" . urlencode($user['username']) . "'>";
+                    echo "<br /><li class='w3-padding-small w3-border'><a href='/user/" . $userid . "'>";
                     echo "<img id='pfp' style='width:100px;height:100px;border-radius:15px;border:1px solid skyblue;' src='/acc/users/pfps/" . $userid . ".jpg'>";
                     echo "&nbsp;<b class='w3-xlarge'>" . htmlspecialchars($user['username']) . "</a></b>";
                     if($user['verified'] != 0) {
-                        echo '&nbsp;<i class="fa fa-check w3-blue w3-padding-tiny w3-xlarge" title="This profile is important" aria-hidden="true"></i>';
+                        echo '&nbsp;<i class="fa fa-check w3-blue w3-padding-tiny w3-xlarge" title="This profile is important." aria-hidden="true"></i>';
                     }
                     if($user['admin'] != 0) {
-                        echo '&nbsp;<i class="fa fa-check w3-red w3-padding-tiny w3-xlarge" title="This profile is a Moderator" aria-hidden="true"></i>';
+                        echo '&nbsp;<i class="fa fa-check w3-red w3-padding-tiny w3-xlarge" title="This user has volunteered to moderate Gr8brik." aria-hidden="true"></i>';
                     }
-                    if(trim($_SESSION['username']) === trim($userid)) {
-                        echo '&nbsp;<a href="/acc/index"><i class="fa fa-pencil w3-green w3-padding-tiny w3-xlarge" title="This is your profile" aria-hidden="true"></i></a>';
+                    if($userid === '1' || $userid === '5') {
+                        echo '&nbsp;<i class="w3-yellow w3-padding-small w3-large" title="This user helped us develop Gr8brik." aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" style="width: 18px; height: 18px;" viewBox="0 0 576 512">
+                            <path d="M309 106c11.4-7 19-19.7 19-34c0-22.1-17.9-40-40-40s-40 17.9-40 40c0 14.4 7.6 27 19 34L209.7 220.6c-9.1 18.2-32.7 23.4-48.6 10.7L72 160c5-6.7 8-15 8-24c0-22.1-17.9-40-40-40S0 113.9 0 136s17.9 40 40 40c.2 0 .5 0 .7 0L86.4 427.4c5.5 30.4 32 52.6 63 52.6l277.2 0c30.9 0 57.4-22.1 63-52.6L535.3 176c.2 0 .5 0 .7 0c22.1 0 40-17.9 40-40s-17.9-40-40-40s-40 17.9-40 40c0 9 3 17.3 8 24l-89.1 71.3c-15.9 12.7-39.5 7.5-48.6-10.7L309 106z"/>
+                        </svg>
+                        </i>';
+                    }
+                    if(trim($id) === trim($userid)) {
+                        echo '&nbsp;<a href="/acc"><i class="fa fa-pencil w3-green w3-padding-tiny w3-xlarge" title="This is your profile." aria-hidden="true"></i></a>';
                     }
                     echo "<br /><b class='w3-text-grey'>" . $bbcode->toHTML(htmlspecialchars($user['description'])) . "</b></li>";
                 }

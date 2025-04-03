@@ -1,88 +1,68 @@
-<nav id="navbar" class="w3-sidenav w3-top w3-bar-block w3-hide-small w3-hide-medium w3-large w3-card-2 w3-light-grey w3-padding-tiny">
+<nav id="navbar" class="w3-sidenav w3-top w3-bar-block w3-hide-small w3-hide-medium w3-large w3-card-2 w3-hover-shadow w3-light-grey w3-padding-tiny">
 
-    <a href="/"><img src="/img/logo.jpg" style="width:25px;height:25px;border-radius:50%;">GR8BRIK</a>
+    <a href="/"><img src="/img/logo.jpg" style="width:25px;height:25px;border-radius:50%;">GR8BRIK&nbsp;</b><span class="w3-tag w3-round w3-green">ALPHA</span></a>
 
-	<a href="/modeler"><i class="fa fa-cubes" aria-hidden="true"></i>MODELER</a>
+	<a href="/modeler"><i class="fa fa-cubes" aria-hidden="true"></i>Modeler</a>
 
-	<a href="/list"><i class="fa fa-building-o" aria-hidden="true"></i>CREATIONS</a>
+	<a href="/list"><i class="fa fa-building-o" aria-hidden="true"></i>Creations</a>
 
-	<a href="/com/"><i class="fa fa-commenting-o" aria-hidden="true"></i>COMMUNITY</a>
+	<a href="/com/"><i class="fa fa-commenting-o" aria-hidden="true"></i>Community</a>
 
-    <a href="http://blog.gr8brik.rf.gd/" target="_blank"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>BLOG</a>
+    <a href="http://blog.gr8brik.rf.gd/" target="_blank"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>Blog</a>
 
     <div style="color: #000; display: inline-flex; height: 32px; padding-right: 0px; padding-left: 10px; border-radius: 6px;">
-        <a class="fa fa-search" style="background-color: #fff; cursor: pointer; padding-right: 6px; padding-left: 6px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);" id="search-button"></a>
+        <a class="fa fa-search gr8-navbarsearch" style="background-color: #fff; cursor: pointer; padding-right: 6px; padding-left: 6px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);" id="search-button"></a>
         <input class="w3-input w3-border" type="text" id="search-input" placeholder="Search for...">
     </div><hr />
 
-	<?php
-		
-		if(!isset($_SESSION['username'])){
-
-			echo "<a href='/acc/login'><i class='fa fa-sign-in' aria-hidden='true'></i>LOGIN</a>";
-            echo "<a href='/acc/register'><i class='fa fa-user-plus' aria-hidden='true'></i>REGISTER</a>";
-
-        } else {
-
-            echo "<div class='w3-dropdown-hover'><button class='w3-button'><i class='fa fa-angle-down' aria-hidden='true'></i>" . strtoupper($user);
-            if($alert != 0) {
-                echo "&nbsp;<span class='w3-tag w3-circle w3-red'>" . $alert . "</span>";
-            }
-            echo "</button>";
-            echo "<div class='w3-dropdown-content w3-bar-block'><a href='/acc' class='w3-bar-item w3-button'><i class='fa fa-cog' aria-hidden='true'></i>SETTINGS</a>";
-            echo "<a href='/@" . urlencode($user) . "' class='w3-bar-item w3-button'><i class='fa fa-user-o' aria-hidden='true'></i>PROFILE</a>";
-            echo "<a href='/acc/new' class='w3-bar-item w3-button'><i class='fa fa-inbox' aria-hidden='true'></i>NOTIFICATIONS&nbsp;<span class='w3-tag w3-circle w3-red'>" . $alert . "</span></a>";
-            echo "<a href='/acc/creations' class='w3-bar-item w3-button'><i class='fa fa-building' aria-hidden='true'></i>MY CREATIONS</a>";
-            echo "<a href='/acc/following' class='w3-bar-item w3-button'><i class='fa fa-user-plus' aria-hidden='true'></i>PEOPLE</a>";
-            echo "<a href='/acc/login?status=logout' class='w3-bar-item w3-button'><i class='fa fa-sign-out' aria-hidden='true'></i>LOGOUT</a>";
-            echo "</div></div>";
-
-        }
-		
-    ?>
-</nav>
-
-    <nav id="sidebar" class="gr8-theme w3-sidenav w3-top w3-bar-block w3-hide-small w3-hide-medium w3-large w3-card-2 w3-light-grey w3-padding-tiny">
-        <p>Popular right now</p>
-        <p>Newest models with rising view counts.</p>
-            <?php
-                $connSidebar = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-                $connSidebar2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-                $resultSidebar = $connSidebar->query("SELECT * FROM model ORDER BY date DESC, views DESC");
-
-                $i = 0;
-                if(!isset($_SESSION['username'])) {
-                    echo "<b>Error</b>";
-                } else {
-                    while ($rowSidebar = $resultSidebar->fetch_assoc()) {
-                        $user_id = $rowSidebar['user'];
-                        $resultSidebar2 = $connSidebar2->query("SELECT * FROM users WHERE id = $user_id");
-                        $userResultSidebar = $resultSidebar2->fetch_assoc();
-
-                        if(empty($userResultSidebar['username'])) {
-                            continue;
+    <?php if(isset($_COOKIE['token'])) { ?>
+        <div class="user-menu">
+            <div class='w3-dropdown-hover'>
+                <button class='w3-button gr8-theme'>
+                    <i class='fa fa-angle-down' aria-hidden='true'></i>
+                    <span>
+                        <i>@</i><span id='gr8-user'><?php echo $users_row['username'] ?></span>
+                        <span class='gr8-notif-quick w3-tag w3-round w3-red'>
+                            <?php
+                                if (!empty($users_row['alert']) && $users_row['alert'] != 0) { 
+                                    echo (int)$users_row['alert'];
+                                }
+                            ?>
+                        </span>
+                    </span>
+                </button>
+                <div class='gr8-theme w3-border w3-card-2 w3-light-grey w3-dropdown-content w3-bar-block'>
+                    <a href='/acc' class='w3-bar-item w3-button'>
+                    <span class='fa fa-cog' aria-hidden='true'></span>Settings</a>
+                    <a id='gr8-profilelink' href="/user/<?php echo $token['user'] ?>" class='w3-bar-item w3-button'><i class='fa fa-user-o' aria-hidden='true'></i>Profile</a>
+                    <a href='/acc/new' class='w3-bar-item w3-button'><i class='fa fa-inbox' aria-hidden='true'></i>Notifications<span class='gr8-notif w3-tag w3-round w3-red'>
+                    <?php
+                        if (!empty($users_row['alert']) && $users_row['alert'] != 0) { 
+                            echo (int)$users_row['alert'];
                         }
+                    ?>
+                    </span></a>
+                    <a href='/acc/creations' class='w3-bar-item w3-button'><i class='fa fa-building' aria-hidden='true'></i>My Creations</a>
+                    <a href='/acc/following' class='w3-bar-item w3-button'><i class='fa fa-user-plus' aria-hidden='true'></i>People</a>
+                    <a href='/acc/logins' class='w3-bar-item w3-button'><i class='fa fa-lock' aria-hidden='true'></i>Sessions</a>
+                    <a href='/acc/login?status=logout' class='w3-bar-item w3-button'><i class='fa fa-sign-out' aria-hidden='true'></i>Logout</a>
+                </div>
+            </div>
+        </div>
+    <?php } else { ?>
+        <div class="login-menu">
+            <a href='/acc/login'><i class='fa fa-sign-in' aria-hidden='true'></i>Login</a>
+            <a href='/acc/register'><i class='fa fa-user-plus' aria-hidden='true'></i>Register</a>
+        </div>
+    <?php } ?>
 
-                        echo "<div class='w3-border w3-border-white'>";
-                        echo "<a href='/build/" . $rowSidebar['id'] . "'><img src='/cre/" . $rowSidebar['screenshot'] . "' width='200' height='100' loading='lazy' class='w3-hover-shadow w3-border w3-round'></a>";
-                        echo "<h4 style='text-overflow: ellipsis;' class=''>" . $rowSidebar['name'] . "</h4>";
-                        echo "<span class=''>" . $rowSidebar['views'] . " views</span>";
-                        echo "<a href='/@" . urlencode(strtolower($userResultSidebar['username'])) . "'>" . $userResultSidebar['username'] . "</a></div><br />";
-                        if (++$i == 6) break;
-                    }
-                }
-            ?>
+    <hr /><div class="featured-builds" style="display: none;">
+        <span class="w3-padding">Featured&nbsp;<span class="w3-blue w3-tag">NEW</span></span><br />
+    </div>            
     </nav>
 
     <script>
     $(document).ready(function() {
-        function checkCookieExists(n) {
-            if (document.cookie.split(';').some((item) => item.trim().startsWith(n + '='))) {
-                return true;
-            }
-            return false;
-        }
-
         function loadSearch() {
             var searchTerm = $('#search-input').val();
             if (searchTerm.length > 2) {
@@ -91,13 +71,7 @@
                     type: 'GET',
                     data: { q: searchTerm },
                     success: function(response) {
-                        window.location.href = "/list?q=" + encodeURIComponent(searchTerm);
-                        if (checkCookieExists('mode')) {
-                            $("body").removeClass("w3-light-blue");
-                            $("body").css({"background-color": "#121212", "color": "#FAF9F6"});
-                            $('#navbar').removeClass('w3-light-grey').addClass('w3-dark-grey'); 
-                            $('.gr8-theme').removeClass('w3-light-grey gr8-theme').addClass('w3-dark-grey w3-text-white'); 
-                        }
+                        window.location.href = "/list?q=" + encodeURIComponent(searchTerm).replace(/%20/g, "+");
                     }
                 });
             } else {
@@ -117,97 +91,91 @@
         $("#toggleModeMenu").click(function(event) {     
             $("#modeMenu").toggle();
 	    });
-
-        function getXMLHR(url, element) {
-            $.ajax({
-                url: url,
-                type: 'GET',
-                async: false,
-                success: function(data) {
-                    $(element).html(data);
-                    if (checkCookieExists('mode')) {
-                        $("body").removeClass("w3-light-blue");
-                        $("body").css({"background-color": "#121212", "color": "#FAF9F6"});
-                        $('#navbar').removeClass('w3-light-grey').addClass('w3-dark-grey'); 
-                        $('.gr8-theme').removeClass('w3-light-grey gr8-theme').addClass('w3-dark-grey w3-text-white'); 
-                    }
-                }
-            });
-        }
-
-        const pullToRefresh = $('.pull-to-refresh');
-        let touchstartY = 0;
-
-        $(document).on('touchstart', function(e) {
-            e.preventDefault();
-            touchstartY = e.touches[0].clientY;
-        });
-
-        $(document).on('touchmove', function(e) {
-            let touchY = e.touches[0].clientY;
-            let touchDiff = touchY - touchstartY;
-            if (touchDiff > 0 && $(window).scrollTop() === 0) {
-                pullToRefresh.addClass('visible');
-            }
-        });
-
-        $(document).on('touchend', function() {
-            if (pullToRefresh.hasClass('visible')) {
-                pullToRefresh.removeClass('visible');
-                getXMLHR(location.pathname + location.search, 'body');
-            }
-        });
-
-        $(window).on('error', function(error) {
-            getXMLHR('/oops.html', 'html');
-            console.error(error);
-        });
-
+        
+        window.loadFeaturedCreations();
     });
-    
     </script>
 
-    <div id="mobilenav" class="w3-padding-small w3-xlarge w3-navbar w3-hide-large w3-show-medium w3-card-2 w3-black w3-left" style="width: 100%; flex-direction: row; vertical-align: top; position: relative; z-index: 999;">
-        <a href="/" class="w3-padding-tiny"><img src="/img/logo.jpg" style="width:25px;height:25px;border-radius:50%;" alt="Home"></a>
-        <a href="/modeler" class="fa fa-cubes w3-padding-tiny" alt="Modeler"></a>
-        <a href="/list" class="fa fa-building-o w3-padding-tiny" alt="Creations"></a>
-        <a href="/com" class="fa fa-commenting-o w3-padding-tiny" alt="Community"></a>
-        <?php
-        if(isset($_SESSION['username'])){
-            echo '<a href="/acc/" class="fa fa-user-o" alt="You"></a>';
-            if($alert > 0) {
-                echo '<span class="fa fa-plus w3-red" alt="+">' . $alert . '</span>';
-            }
-        } else {
-            echo '<a href="/acc/" class="fa fa-sign-in" alt="Sign in or Register"></a>';
-        }
-        ?>
+    <div id="mobilenav" class="w3-hide-large w3-light-grey gr8-theme w3-card-2 w3-xlarge w3-show-medium w3-bottom w3-padding w3-center" style="width: 100%; z-index: 1000;">
+        <a href="/" class="fa fa-home w3-padding" alt="Homepage" title="Homepage"></a>
+        <a href="/modeler" class="fa fa-cubes w3-padding" alt="Modeler" title="Modeler"></a>
+        <a href="/list" class="fa fa-building-o w3-padding" alt="Creations" title="Creations"></a>
+        <a href="/com" class="fa fa-commenting-o w3-padding" alt="Community" title="Community"></a>
+        <a href="http://blog.gr8brik.rf.gd/index" class="fa fa-pencil-square-o w3-padding" alt="Gr8brik Blog" title="Gr8brik Blog"></a>
+    </div>
+
+    <!-- <div class="loading">
+        <img class="refresh-loading" src="/img/loading.gif" style="width: 25px; height: 25px;" />
+    </div> 
+    
+    <div class="consoleErrorBox w3-card-2 w3-red w3-padding-tiny" style="display: none;">
+        <i class="fa fa-times-circle-o" aria-hidden="true"></i><b class="consoleError"></b>
+    </div><br /> -->
+                    
+    <button id="toggleModeMenu" class="w3-right w3-btn w3-blue w3-hover-white w3-circle w3-border w3-border-indigo w3-bottom w3-hide-large w3-fixed w3-margin-bottom"
+        style="width: 50px; height: 50px; bottom: 60px; z-index: 1000;">
+        <span class="fa fa-lightbulb-o w3-xlarge" alt="Mode" aria-hidden="true"></span>
+    </button>
+
+    <div class="w3-hide-large w3-light-grey gr8-theme w3-card-2 w3-xlarge w3-show-medium w3-top w3-padding-small" style="width: 100%; max-width: 100%; z-index: 1000;">
+        <a href="/?src=mobile_home_button" alt="Gr8brik Logo" class="w3-left w3-padding">
+            <img src="/img/logo.jpg" style="width:35px;height:35px;border-radius:50%;">
+        </a>
+
+        <?php if(isset($_COOKIE['token'])) { ?>
+            <a href="/acc" alt="You" class="w3-right w3-padding">
+                <img src="/acc/users/pfps/<?php echo $id; ?>.jpg" style="width:35px;height:35px;border-radius:50%;">
+            </a>
+            <?php if($alert > 0) { ?>
+                <span class="fa fa-plus w3-red" alt="+"><?php echo $alert; ?></span>
+            <?php } ?>
+        <?php } else { ?>
+            <a href="/acc/" class="fa fa-sign-in" alt="Sign in or Register"></a>
+        <?php } ?>
     </div><br /><br />
 
-	<div class="w3-main">
+    <div id="modeMenu" class="w3-padding-small w3-card-2 gr8-theme w3-light-grey" style="display: none;">
+        <span class="w3-large">DISPLAY COLORS</span><br />
 
-        <div class="pull-to-refresh">
-            <center>
-                <img src="/img/loading.gif" width="15%" height="15%">
-            </center>
-        </div>
-
-        <div class="loading w3-top w3-padding-tiny w3-card-2 w3-blue" style="width: 0%; display: none;"></div>
-
-        <div class="w3-card-2 w3-red w3-padding-tiny w3-hide">
-            <img src="../img/warning.jpg" style="width:20px;height=20px;"><b>Error: </b>
-        </div><br />
-                    
-        <div id="cookie-message" class="w3-card-2 w3-light-grey w3-padding-tiny">
-            <img src="../img/info.jpg" style="width:20px;height=20px;"><b>Gr8brik uses cookies to ensure we give you the best experience on our website. <a href="/privacy" target="_blank">Learn more</a></b>
-        </div>
-
-        <button id="toggleModeMenu" class="w3-btn w3-blue w3-hover-white w3-circle w3-border w3-border-black w3-bottom w3-hide-large" style="width: 50px; height: 50px;">
-            <span class="fa fa-lightbulb-o w3-xlarge" alt="Mode" aria-hidden="true"></span>
+        <button id="toggleDark" class="w3-btn w3-large w3-light-blue w3-hover-dark-grey">
+            <span class="fa fa-moon-o" aria-hidden="true">Night</span>
         </button>
 
-        <div id="modeMenu" class="w3-padding w3-round w3-card-2 w3-border w3-border-white w3-black" style="display: none;">
-            <span class="w3-large">DISPLAY COLORS</span><br />
-            <button id="toggleDark" class="w3-btn w3-large w3-light-blue w3-hover-dark-grey"><i class="fa fa-moon-o" aria-hidden="true"></i>Night</button>
-            <button id="toggleLight" class="w3-btn w3-large w3-dark-grey w3-hover-light-blue"><i class="fa fa-lightbulb-o" aria-hidden="true"></i>Day</button>
+        <button id="toggleLight" class="w3-btn w3-large w3-dark-grey w3-hover-light-blue">
+            <span class="fa fa-lightbulb-o" aria-hidden="true">Day</span>
+        </button>
+
+        <button id="toggleAuto" class="w3-btn w3-large w3-black w3-hover-white">
+            <span class="fa fa-moon-o" aria-hidden="true">Auto</span>
+        </button>
+    </div>
+    
+	<div id="w3-main" class="w3-main">
+        <div class="w3-card-2 w3-light-grey w3-padding-tiny"><i class="fa fa-info-circle" aria-hidden="true"></i><b>A new modeler is out in Alpha now. You can use it <a href="/new-modeler.php">here</a>.</b></div><br />
+
+        <!-- <div id="logout-modal" class="w3-modal">
+            <div class="w3-modal-content w3-animate-top w3-card-24 w3-light-grey w3-center w3-round w3-padding">
+                <div class="w3-container">
+                    <span onclick="document.getElementById('logout-modal').style.display='none'" class="w3-closebtn w3-red w3-hover-white w3-padding-small w3-round-small w3-display-topright">&times;</span>
+                    <form method='post' action=''>
+                        <h2>Are you sure you want to logout?</h2>
+                        <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('logout-modal').style.display='none'">No</span>&nbsp;
+                        <a href="/acc/login?status=logout" class="w3-btn w3-large w3-white w3-hover-red">Yes</a>
+                    </form>
+                </div>
+            </div>
         </div>
+
+        <div id="very-important-modal" class="w3-modal" style="display: block;">
+            <div class="w3-modal-content w3-animate-zoom w3-card-2 w3-light-grey w3-center">
+                <div class="w3-container">
+                    <span onclick="document.getElementById('very-important-modal').style.display='none'" class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
+                    <form method='post' action=''>
+                        <h2>Important Notice</h2>
+                        <p>Gr8brik is being sold to XAI, a small company of only a billion dollars, made by Elon Musk.</p>
+                        <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('very-important-modal').style.display='none'">Okay/Close</span>&nbsp;
+                        <a href="/important" class="w3-btn w3-large w3-white w3-hover-blue">Read more</a>
+                    </form>
+                </div>
+            </div>
+        </div> -->

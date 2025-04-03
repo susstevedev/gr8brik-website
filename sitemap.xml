@@ -4,21 +4,9 @@
 
    <url>
 
-      <loc>https://gr8brik.rf.gd/index.php</loc>
+      <loc>http://www.gr8brik.rf.gd/com/index</loc>
 
-      <lastmod>2024-09-15</lastmod>
-
-      <changefreq>hourly</changefreq>
-
-      <priority>0.8</priority>
-
-   </url>
-
-   <url>
-
-      <loc>https://gr8brik.rf.gd/feed.php</loc>
-
-      <lastmod>2024-10-15</lastmod>
+      <lastmod>2025-1-16</lastmod>
 
       <changefreq>hourly</changefreq>
 
@@ -28,9 +16,9 @@
 
    <url>
 
-      <loc>https://gr8brik.rf.gd/com/index.php</loc>
+      <loc>http://www.gr8brik.rf.gd/feed</loc>
 
-      <lastmod>2024-10-15</lastmod>
+      <lastmod>2025-1-16</lastmod>
 
       <changefreq>hourly</changefreq>
 
@@ -40,25 +28,37 @@
 
    <url>
 
-      <loc>https://gr8brik.rf.gd/list.php</loc>
+      <loc>http://www.gr8brik.rf.gd/com/index</loc>
 
-      <lastmod>2024-09-14</lastmod>
+      <lastmod>2025-1-16</lastmod>
 
       <changefreq>hourly</changefreq>
 
-      <priority>0.5</priority>
+      <priority>0.8</priority>
 
    </url>
 
    <url>
 
-      <loc>https://gr8brik.rf.gd/modeler.php</loc>
+      <loc>http://www.gr8brik.rf.gd/list</loc>
 
-      <lastmod>2024-08-25</lastmod>
+      <lastmod>2025-1-16</lastmod>
 
       <changefreq>hourly</changefreq>
 
-      <priority>0.5</priority>
+      <priority>0.8</priority>
+
+   </url>
+
+   <url>
+
+      <loc>http://www.gr8brik.rf.gd/modeler</loc>
+
+      <lastmod>2025-1-16</lastmod>
+
+      <changefreq>hourly</changefreq>
+
+      <priority>0.8</priority>
 
    </url>
 

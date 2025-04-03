@@ -1,62 +1,131 @@
+<?php
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
+
+    if (isset($_GET['featured'])) {
+        header('Content-type: application/json');
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+        $i = 0;
+
+        if ($conn->connect_error || $conn2->connect_error) {
+            header('HTTP/1.0 500 Internal Server Error');
+            exit("fail  " . $conn->connect_error . " / " . $conn2->connect_error);
+        }
+
+        $unique = filter_input(INPUT_GET, 'unique', FILTER_SANITIZE_STRING);
+        if (!$unique) {
+            header('HTTP/1.0 403 Forbidden');
+            exit(json_encode(["error" => "unique id missing"]));
+        }
+
+        $stmt = $conn2->prepare("SELECT * FROM featured ORDER BY id DESC");
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if (!$result) {
+            header('HTTP/1.0 500 Internal Server Error');
+            exit("query error " . $conn2->error);
+        }
+
+        $builds = [];
+
+        while ($row = $result->fetch_assoc()) {
+            $model_id = $row['model_id'];
+
+            $stmt = $conn2->prepare("SELECT * FROM model WHERE id = ?");
+            $stmt->bind_param("s", $model_id);
+            $stmt->execute();
+            $result2 = $stmt->get_result();
+
+            if ($result2 && $row2 = $result2->fetch_assoc()) {
+                $truncated_name = substr($row2['name'], 0, 30);
+                if (strlen($row2['name']) >= 30) {
+                    $truncated_name .= "...";
+                }
+
+                $userid = $row2['user'];
+
+                $stmt2 = $conn->prepare("SELECT * FROM users WHERE id = ?");
+                $stmt2->bind_param("s", $userid);
+                $stmt2->execute();
+                $result3 = $stmt2->get_result();
+
+                if ($result3 && $user = $result3->fetch_assoc()) {
+                    $truncated_username = substr($user['username'], 0, 15);
+                    if (strlen($user['username']) >= 15) {
+                        $truncated_username .= "...";
+                    }
+
+                    $builds[] = [
+                        'fetched_at' => $_SERVER['REQUEST_TIME'],
+                        'model_id' => $row2['id'],
+                        'user' => $user['id'],
+                        'username' => $truncated_username,
+                        'title' => $truncated_name,
+                        'views' => $row2['views'],
+                    ];
+                }
+            }
+            if (++$i == 6) break;
+        }
+
+        echo json_encode($builds);
+        exit;
+    }
+
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>List</title>
+    <title>Creations</title>
     <?php include 'header.php' ?>
 </head>
-<body class="w3-light-blue w3-container">
+<body class="w3-light-blue w3-container radial-gradient">
 
-        <?php 
-            require_once 'ajax/user.php';
-            require_once 'ajax/bbcode.php';
-            $bbcode = new BBCode;
-
-            if(isset($_SESSION['username'])) {
-                $id = $_SESSION['username'];
-                $row = fetchUser($id);
-
-                $user = $row['username'];
-                $pwd = $row['password'];
-                $email = $row['email'];
-                $about = $row['description'];
-                $x = $row['twitter'];
-                $admin = $row['admin'];
-                $alert = $row['alert'];
-                $age = $row['age'];
-                $pic = $row['image'];
-            }
-            
+        <?php
+            include 'com/bbcode.php';
             include 'navbar.php';
+            $bbcode = new BBCode;
         ?>
 
-        <h2>Creations</h2>
-        <div class="w3-container w3-border">
-            <p>Want to build your own model? <a href="modeler" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo">Open Modeler</a></p>
-        </div><br />
+        <?php if(isset($_GET['invalid_login'])) { ?>
+            <span id='error' class='w3-padding w3-round w3-red w3-top'>You've been logged out 
+                <?php echo isset($_GET['reason']) ? htmlspecialchars(rawurldecode($_GET['reason']), ENT_QUOTES, 'UTF-8') : "(unknown reason)"; ?>!
+            </span>
+        <?php } ?>
+
+
+        <div class="w3-container">
+            <span class="w3-left">
+                <h2>Creations</h2>
+            </span>
+            <span class="w3-right">
+                <a href="/modeler" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Start Building</a>
+                &nbsp;|&nbsp;
+                <a href="/acc/creations" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Upload</a>
+            </span>
+        </div>
 
         <input class="w3-input w3-border w3-threequarter" type="text" value="<?php if (isset($_GET['q'])) { echo $_GET['q']; } ?>" id="search-input-2" placeholder="Search for...">
         <button class="w3-btn w3-large w3-white w3-hover-blue w3-mobile w3-border w3-quarter" id="search-button-2"><i class="fa fa-search" aria-hidden="true"></i></button><br /><br />
 
         <script>
+            function checkCookieExists(n) {
+                if (document.cookie.split(';').some((item) => item.trim().startsWith(n + '='))) {
+                    return true;
+                }
+                return false;
+            }
+
             $(document).ready(function() {
                 function loadSearch() {
-                    document.title = "";
-                    var searchTerm = $('#search-input-2').val();
+                    var search = $('#search-input-2').val();
                         $.ajax({
                             url: '/list.php',
                             type: 'GET',
-                            data: { q: searchTerm },
+                            data: { q: search },
                             success: function(response) {
-                                var goUrl = "/list?q=" + encodeURIComponent(searchTerm);
-                                $("body").load(goUrl, function() {
-                                    history.pushState(null, "", goUrl);
-                                    if (localStorage.getItem('mode')) {
-                                        $("body").addClass("w3-dark-grey");
-                                        $('#navbar').removeClass('w3-light-grey').addClass('w3-black'); 
-                                    }
-                                    document.title = $('title').text();
-                                    window.scrollTo(0, 0);
-                                });
+                                window.location.href = "/list?q=" + encodeURIComponent(search);
                             }
                         });
                 }
@@ -70,96 +139,176 @@
                     loadSearch();
                 });
             });
+
         </script>
 
         <form method="get">
-            <label for="sort"><b>Sort options:</b></label>
+            <label for="sort"><span>Sort by&nbsp;</span></label>
             <select name="sort" id="sort">
-                <option value="views" selected>Most viewed</option>
-                <option value="az" selected>Alphabetical A-Z</option>
-                <option value="za" selected>Alphabetical Z-A</option>
-                <option value="oldest" selected>Oldest creations</option>
+                <option selected>Following</option>
+                <option value="all">All creations</option>
+                <option value="views">Most viewed</option>
+                <option value="likes">Most liked</option>
+                <option value="az">Alphabetical A-Z</option>
+                <option value="za">Alphabetical Z-A</option>
+                <option value="oldest">Oldest creations</option>
+                <option value="newest">Newest creations</option>
             </select>
-            <input class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo" type="submit" value="Apply Filters">
+            <input class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Apply Filters">
         </form><br />
-
-        <table class="w3-table-all" style="color:black;">
         
         <?php
-							
-			$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-            $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-            $sql = "SELECT * FROM model ORDER BY date DESC";
-			
-			if (isset($_GET['q']) && $_GET['q']) {
-                $query = htmlspecialchars($_GET['q']);
-                $searchPattern = "%" . $query . "%";
-				$sql = "SELECT * FROM model WHERE name LIKE '$searchPattern'";
-                echo "<p>Search results for <b>" . $query . "</b></p><br />";
+
+        $conn  = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+        $is_search = false;
+
+        $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
+        $offset = ($page - 1) * 10;
+
+        if (isset($_COOKIE['token']) && $tokendata->num_rows != 0) {
+            $stmt = $conn->prepare('SELECT * FROM follow WHERE userid = ?');
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $followed_users = [];
+            while ($row = $result->fetch_assoc()) {
+                $followed_users[] = $row['profileid'];
             }
 
-            if (isset($_GET['sort']) && $_GET['sort']) {
-                if($_GET['sort'] === 'views') {
-                    $sql = "SELECT * FROM model ORDER BY views DESC";
-                    $sort = "Most viewed";
-                }
-                if($_GET['sort'] === 'az') {
-                    $sql = "SELECT * FROM model ORDER BY name ASC";
-                    $sort = "Alphabetical A-Z";
-                }
-                if($_GET['sort'] === 'za') {
-                    $sql = "SELECT * FROM model ORDER BY name DESC";
-                    $sort = "Alphabetical Z-A";
-                }
-                if($_GET['sort'] === 'oldest') {
-                    $sql = "SELECT * FROM model ORDER BY date ASC";
-                    $sort = "Oldest creations";
-                }
-                if(!empty($sort)) {
-                    echo "<p>Sorting by <b>" . $sort . "</b></p><br />";
-                }
-            }
+            if ($result->num_rows != 0) {
+                $sql = 'SELECT * FROM model WHERE user IN (' . implode(',', $followed_users) . ') ORDER BY date DESC LIMIT 10 OFFSET ' .  $offset;
 
-            $result2 = $conn2->query($sql);
+                echo '<span>The old feed page is <a href="/feed">here</a>.</span>';
+                echo '<p>You can get a better feed by following more people at <a href="/users" class="reload">www.gr8brik.rf.gd/users</a>.</p>';
+            } else {
+                $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 10 OFFSET' .  $offset;
+
+                echo '<h4>Your not following anyone</h4>';
+                echo '<p>Start following people to engage with people and get a custom feed.</p>';
+                echo '<a href="/users" class="w3-btn w3-large w3-white w3-hover-blue">Users Page</a><br /><b>Or...</b><br />';
+                echo '<a href="/rules">Rules Page</a>&nbsp;<a href="/terms">Terms and Conditions</a>&nbsp;<a href="/privacy">Privacy Policy</a>';
+            }
+        } else {
+            $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 10 OFFSET ' .  $offset;
+        }
+
+        $stmt = $conn2->prepare('SELECT COUNT(*) as count FROM model');
+        $stmt->execute();
+        $model_count_sql = $stmt->get_result();
+
+        $model_count = $model_count_sql->fetch_assoc();
+        echo '<h4>' . $model_count['count'] . ' models.</h4>';
+
+        if (isset($_GET['q']) && $_GET['q']) {
+            $is_search = true;
+
+            $query = isset($_GET['q']) ? trim($_GET['q']) : '';
+            $search = "%" . $conn2->real_escape_string(htmlspecialchars($query)) . "%";
+
+            $stmt = $conn2->prepare('SELECT * FROM model WHERE name LIKE ? LIMIT 10 OFFSET ' .  $offset);
+            $stmt->bind_param('s', $search);
+            $stmt->execute();
+            $result2 = $stmt->get_result();
+
+            echo '<p>Search results for <b>' . htmlspecialchars($query) . '</b></p><br />';
+        }
+
+        if (isset($_GET['sort']) && $_GET['sort']) {
+            if ($_GET['sort'] === 'views') {
+                $sql  = 'SELECT * FROM model ORDER BY views DESC LIMIT 10 OFFSET ' .  $offset;
+                $sort = 'Most viewed';
+            }
+            if ($_GET['sort'] === 'likes') {
+                $sql = 'SELECT model.*, COUNT(*) AS vote_count FROM model LEFT JOIN votes ON model.id = votes.creation WHERE model.removed = 0 GROUP BY model.id ORDER BY vote_count DESC LIMIT 10 OFFSET ' .  $offset;
+                $sort = 'Most liked';
+            }
+            if ($_GET['sort'] === 'az') {
+                $sql  = 'SELECT * FROM model ORDER BY name ASC LIMIT 10 OFFSET ' .  $offset;
+                $sort = 'Alphabetical A-Z';
+            }
+            if ($_GET['sort'] === 'za') {
+                $sql  = 'SELECT * FROM model ORDER BY name DESC LIMIT 10 OFFSET ' .  $offset;
+                $sort = 'Alphabetical Z-A';
+            }
+            if ($_GET['sort'] === 'oldest') {
+                $sql  = 'SELECT * FROM model ORDER BY date ASC LIMIT 10 OFFSET ' .  $offset;
+                $sort = 'Oldest creations';
+            }
+            if ($_GET['sort'] === 'newest') {
+                $sql  = 'SELECT * FROM model ORDER BY date DESC LIMIT 10 OFFSET ' .  $offset;
+                $sort = 'Newest creations';
+            }
+            if ($_GET['sort'] === 'all') {
+                $sql  = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 10 OFFSET ' .  $offset;
+                $sort = 'All creations';
+            }
+            if (!empty($sort)) {
+                echo '<p>Sorting by <b>' . $sort . '</b></p><br />';
+            }
+        }
+
+        if(!$is_search && $page > 0) {
+            $stmt = $conn2->prepare($sql);
+            $stmt->execute();
+            $result2 = $stmt->get_result();
+        }
+
+        if ($result2->num_rows > 0) {
+            echo "<table class='w3-table-all' style='color:black;'>";
             while ($row = $result2->fetch_assoc()) {
                 $model_id = $row['id'];
                 $userid = $row['user'];
-                $result3 = $conn->query("SELECT * FROM users WHERE id = $userid");
+
+                $stmt = $conn->prepare('SELECT * FROM users WHERE id = ?');
+                $stmt->bind_param('i', $userid);
+                $stmt->execute();
+                $result3 = $stmt->get_result();
                 $user = $result3->fetch_assoc();
                 $username = isset($user['username']) ? $user['username'] : '';
 
-                $result4 = $conn2->query("SELECT COUNT(*) as count FROM votes WHERE creation = $model_id");
+                $stmt = $conn2->prepare('SELECT COUNT(*) as count FROM votes WHERE creation = ?');
+                $stmt->bind_param('i', $model_id);
+                $stmt->execute();
+                $result4 = $stmt->get_result();
                 $likes = $result4->fetch_assoc();
 
-                $banResult = $conn->query("SELECT * FROM bans WHERE user = $userid");
+                $stmt = $conn->prepare('SELECT * FROM bans WHERE user = ?');
+                $stmt->bind_param('i', $userid);
+                $stmt->execute();
+                $banResult = $stmt->get_result();
                 $banRow = $banResult->fetch_assoc();
 
-                if(empty($row['name'])) {
+                if (empty($row['name'])) {
                     $row['name'] = $username . "'s creation";
                 }
 
-                if(empty($user['username']) || $banRow['end_date'] >= time() || !file_exists('cre/' . $row['screenshot'])) {
-                    $row['screenshot'] = "../img/no_image.png";
+                if ($result3->num_rows <= 0 || $banResult->num_rows > 0 && $banRow['end_date'] >= time()) {
+                    continue;
                 }
 
-                $truncatedName = substr($row['name'], 0, 20);
-                if (strlen($row['name']) > 20) {
-                    $truncatedName .= "...";
+                $truncatedName = htmlspecialchars(substr($row['name'], 0, 30));
+                if (strlen($row['name']) >= 30) {
+                    $truncatedName .= '...';
                 }
 
                 echo "<div class='w3-display-container w3-left w3-padding'>";
-                echo "<a href='/build/" . $row['id'] . "'><img src='/cre/" . $row['screenshot'] . "' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-border w3-border-white'></a>";
-                echo "<span class='gr8-theme w3-large w3-display-middle w3-card-2 w3-light-grey w3-padding-small'>" . $truncatedName . "</span>";
-                echo "<span class='gr8-theme w3-display-bottommiddle w3-card-2 w3-light-grey w3-padding-small'>" . $row['views'] . " views - " . $likes['count'] . " likes - By "; 
+                echo "<a href='/build/" . $row['id'] . "'><img src='/cre/" . $row['screenshot'] . "' width='320' height='240' loading='lazy' class='gr8-theme w3-card-2 w3-hover-shadow w3-border w3-border-white'></a>";
+                echo "<span class='gr8-theme w3-large w3-display-middle w3-card-2 w3-light-grey w3-padding-small'>" . $truncatedName . '</span>';
+                echo "<span class='gr8-theme w3-display-bottommiddle w3-card-2 w3-light-grey w3-padding-small'>" . $row['views'] . ' views - ' . $likes['count'] . " likes - By ";
                 echo "<a href='/user/" . $row['user'] . "'>" . $username . "</a></span></div>";
             }
-
-        ?>
+            echo "</table><br /><br />";
+        } else {
+            echo "<b>No creations found.</b><br />";
+        }
+        $sorting = isset($_GET['sort']) ? $_GET['sort'] : "following";
+        $searching = isset($_GET['q']) ? $_GET['q'] : "";
+        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" href="?p=' . ($page - 1) . '&sort=' . $sorting . '&q=' . $searching . '">Back</a>&nbsp;';
+        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" href="?p=' . ($page + 1) . '&sort=' . $sorting . '&q=' . $searching . '">Forward</a>';
+    ?>
 			
-        </table><br /><br />
-
     <?php include('linkbar.php'); ?>
-
-
 </body>
 </html>

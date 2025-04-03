@@ -1,3 +1,7 @@
+<?php
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
+    isLoggedin();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,16 +11,16 @@
 <body class="w3-light-blue w3-container">
 
         <?php 
-            require_once 'ajax/user.php';
+            /*require_once 'ajax/user.php';
             require_once 'ajax/bbcode.php';
             $bbcode = new BBCode;
 
-            if(!isset($_SESSION['username'])) {
+            if(!isset($_COOKIE['token'])) {
                 echo '<meta http-equiv="refresh" content="0;url=/acc/login.php">';
                 exit;
             }
 
-            $id = $_SESSION['username'];
+            $id = $token['user'];
             $row = fetchUser($id);
 
             $user = $row['username'];
@@ -27,16 +31,22 @@
             $admin = $row['admin'];
             $alert = $row['alert'];
             $age = $row['age'];
-            $pic = $row['image'];
+            $pic = $row['image']; */
             
+            include 'com/bbcode.php';
             include 'navbar.php';
             include 'acc/panel.php';
+            $bbcode = new BBCode;
         ?>
 
         <div class="w3-center">
 
+        <h4 class="w3-padding w3-red">The feed page will be discontinued in April.<br />&nbsp;The creation's page in the side navigation now shows models from who your following by default.</h4>
+
         <script>
         function openTab(tab) {
+            document.title = "";
+
             var amount;
             var tabGroup = document.getElementsByClassName("tab");
             for (amount = 0; amount < tabGroup.length; amount++) {
@@ -44,25 +54,36 @@
             }
             var tabElement = document.getElementById(tab);
             var recElement = document.getElementById("recommended");
+            var text = document.getElementById("text");
+            var user = document.getElementById("gr8-user").innerText;
+            let path = window.location.href.split('feed')[0].split('.php')[0].split('?')[0];
+
+            let tabText = tab.replace("tab", "");
+            text.innerText = tabText;
+
             tabElement.classList.remove("w3-hide");
             recElement.classList.add("w3-hide");
+
+            history.pushState({}, null, path);
+            document.title = tabText + " on your feed - Gr8brik";
         }
         $(document).ready(function() {
             openTab('creationstab');
         });
         </script>
 
-        <div class="w3-navbar" style="flex-direction:row;">
-            <a class='w3-btn w3-light-grey w3-third w3-hover-white' onclick="openTab('creationstab')">Creations</a>
-            <a class='w3-btn w3-light-grey w3-third w3-hover-white' onclick="openTab('poststab')">Posts</a>
-            <a class='w3-btn w3-light-grey w3-third w3-hover-white' onclick="openTab('commentstab')">Comments</a>
+        <div class="w3-navbar w3-half w3-center" style="flex-direction:row;">
+            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey' onclick="openTab('creationstab')">Creations</a>
+            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey' onclick="openTab('poststab')">Posts</a>
+            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey' onclick="openTab('commentstab')">Comments</a>
+            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey w3-padding-small' onclick="openTab('likestab')">Likes <span class="w3-blue w3-tag w3-padding-tiny">NEW</span></a>
         </div>
+        <h2 id="text" style="text-transform: capitalize;"></h2>
         
         <h4 id="recommended" class="">An error has occurred</h4>
 
-        <div id="creationstab" class="tab w3-hide">
-        <a id="creations"><h2>Creations</h2></a><hr />
         <table class="w3-table-all" style="color:black;">
+        <div id="creationstab" class="tab w3-hide">
         
         <?php
 							
@@ -79,6 +100,7 @@
                 $followed_users[] = $row['profileid'];
             }
             if ($result->num_rows > 0) {
+                echo "<h4>Follow more people to get a better feed. <a href='/users'>Lets go</a>.</h4>";
                 $followed_user_ids = implode(',', $followed_users);
                 $sql = "SELECT * FROM model WHERE user IN ($followed_user_ids) ORDER BY date DESC";
                 $result2 = $conn->query($sql);
@@ -98,16 +120,14 @@
             } else {
                 echo "<h2>Your not following anyone</h2>";
                 echo "<p>Start following people to engage with people and get a custom feed.</p>";
-                echo "<a href='/users' class='w3-btn w3-blue w3-hover-white w3-border w3-border-indigo'>Get Started</a><br /><b>Or...</b><br />";
+                echo "<a href='/users' class='w3-btn w3-blue w3-hover-white w3-border w3-border-indigo'>Lets go</a><br /><b>Or...</b><br />";
                 echo "<a href='/rules' class='w3-btn w3-blue w3-hover-white w3-border w3-border-indigo'>Read The Rules</a>";
             }
 			
-        echo "</table></div><br /><br />";
+        echo "</div>";
         ?>
 
         <div id="poststab" class="tab w3-hide">
-        <a id="posts"><h2>Posts</h2></a><hr />
-        <table class="w3-table-all" style="color:black;">
         
             <?php
 							
@@ -142,11 +162,9 @@
 
             ?>
 			
-        </table></div><br /><br />
+        </div>
 
         <div id="commentstab" class="tab w3-hide">
-        <a id="comments"><h2>Comments and replies</h2></a><hr />
-        <table class="w3-table-all" style="color:black;">
         
             <?php
                     $conn1 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
@@ -226,8 +244,45 @@
 			        }
 
             ?>
+
+            </div>
+
+            <div id="likestab" class="tab w3-hide">
+
+            <?php
+							
+			$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+            $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+			if ($conn->connect_error || $conn2->connect_error) {
+				exit($conn->connect_error . ", " . $conn2->connect_error);
+			}
+
+                $yourid = $token['user'];
+                $sql = "SELECT * FROM votes WHERE user = '$yourid' ORDER BY id DESC";
+                $result = $conn->query($sql);
+                
+                $i = 0;
+                while ($row = $result->fetch_assoc()) {
+
+                    $modelid = $row['creation'];
+                    $sql3 = "SELECT * FROM model WHERE id = $modelid";
+                    $result3 = $conn->query($sql3);
+                    $model = $result3->fetch_assoc();
+
+                    $userid = $model['user'];
+                    $sql2 = "SELECT * FROM users WHERE id = $userid";
+                    $result2 = $conn2->query($sql2);
+                    $user = $result2->fetch_assoc();
+
+                    echo "<div class='w3-display-container w3-left w3-padding-tiny'>";
+                    echo "<a href='/build/" . $modelid . "'><img src='cre/" . $model['screenshot'] . "' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-border'></a>";
+                    echo "<h4 class='w3-display-bottommiddle w3-padding-tiny w3-card-2 w3-black w3-text-white'>" . $model['name'] . "</h4>";
+                    echo "<b class='w3-display-topright w3-padding-tiny w3-card-2 w3-black w3-text-white'>By <a href='/user/" . $model['user'] . "'>" . $user['username'] . "</a></b></div>";
+                }
 			
-        </table></div><br /><br />
+        ?>
+			
+        </div></table><br /><br />
 
 
     <?php include('linkbar.php'); ?>

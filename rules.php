@@ -74,7 +74,7 @@
                         continue;
                     }
 
-                    echo "<br /><li class='w3-padding-small'><a href='/@" . urlencode($user['username']) . "'>";
+                    echo "<br /><li class='w3-padding-small'><a href='/user/" . $userid . "'>";
                     echo "<img id='pfp' style='width:100px;height:100px;border-radius:15px;border:1px solid skyblue;' src='/acc/users/pfps/" . $userid . ".jpg'>";
                     echo "&nbsp;<b class='w3-xlarge'>" . htmlspecialchars($user['username']) . "</a></b>";
                     if($user['verified'] != 0) {
@@ -83,7 +83,7 @@
                     if($user['admin'] != 0) {
                         echo '&nbsp;<i class="fa fa-check w3-red w3-padding-tiny w3-xlarge" title="Admin/Mod" aria-hidden="true"></i>';
                     }
-                    if(trim($_SESSION['username']) === trim($userid)) {
+                    if(trim($token['user']) === trim($userid)) {
                         echo '&nbsp;<a href="/acc/index"><i class="fa fa-pencil w3-green w3-padding-tiny w3-xlarge" aria-hidden="true"></i></a>';
                     }
                     echo "<br /><b class='w3-text-grey'>" . $bbcode->toHTML(htmlspecialchars($user['description'])) . "</b></li>";

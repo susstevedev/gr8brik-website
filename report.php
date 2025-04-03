@@ -1,7 +1,36 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 
-define('DB_NAME2', 'if0_36019408_creations');
+if(isset($_POST['report_1'])) {
+    if($_SESSION['csrf'] === $_POST['csrf_token']) {
+        if(isset($_COOKIE['token']) && $tokendata) {
+            $id = $token['user'];
+            $date = date("Y-m-d H:i:s");
+            $model_id = (int)htmlspecialchars($_POST['model_id']);
+            $reason = htmlspecialchars($_POST['reason']);
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+
+            if($_POST['other'] != null) {
+                $reason = htmlspecialchars($_POST['other']);
+            }
+
+            $stmt = $conn->prepare("INSERT INTO reported (build, date, reason, user) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("issi", $model_id, $date, $reason, $id);
+            if ($stmt->execute()) {
+                echo json_encode(['success' => 'Creation reported! Thanks for making our platform a safe space for everyone!']);
+            } else {
+                echo json_encode(['error' => 'Oops! We could\'/t report the submitted creation at this moment. Please try again later.']);
+            }
+            $stmt->close();
+        } else {
+            echo json_encode(['error' => 'Oops! Please login to report a creation.']);
+        }
+    } else {
+        echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
+    }
+    exit;
+}
+
 if(isset($_POST['report'])){
 
         $username = $_POST['user'];
@@ -26,36 +55,25 @@ if(isset($_POST['report'])){
             
 }
 if(isset($_POST['delete'])){
-    $creation = "cre/" . basename($_SERVER['QUERY_STRING']);
-    //$file = fopen("test.txt","w");
-    //echo fwrite($file,"Hello World. Testing!");
-    //fclose($file);
+    exit("Error");
 
+    /*$creation = "cre/" . basename($_SERVER['QUERY_STRING']);
     unlink($creation);
-
-    // Create connection
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-			
-	if ($conn->connect_error) {
-		die("Connection failed: " . $conn->connect_error);
-	}
-			
-	// Query to get creation by it's own ID
 	$model = basename($_SERVER['QUERY_STRING']);
 
 	$sql = "DELETE FROM model WHERE model = ?";
 	$stmt = $conn->prepare($sql);
 	$stmt->bind_param("i", $model);
-	$stmt->execute();
+	$stmt->execute();*/
 
 }
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title><?php echo basename($_SERVER['QUERY_STRING']) ?></title>
+    <title>Creation reported</title>
     <?php include 'header.php' ?>
-    
 </head>
 <body class="w3-light-blue w3-container">
 
@@ -72,10 +90,18 @@ if(isset($_POST['delete'])){
 
 <?php include('navbar.php') ?>
 
-        <b>Prosses(es) finished.</b><br />
+        <b>
+            Creation reported. We will check it out in the next 72 hours. If you'd like to reach out to us directly, join the discord server at 
+            <div class="tooltip">
+                <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>discord.gg/4a7pmTatfZ</span>
+                <a href="https://discord.gg/4a7pmTatfZ">
+                    <i class="fa fa-external-link" aria-hidden="true"></i>
+                    discord.gg/4a7pmTatfZ
+                </a>.
+            </div>
+        </b><br />
 
     <?php include('linkbar.php') ?>
-
 
 </body>
 </html>

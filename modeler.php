@@ -10,26 +10,46 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 </head>
 <body class="w3-light-blue w3-container">
 
-	<?php include('navbar.php') ?>
+    <style>
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+
+	<?php include 'navbar.php' ?>
 
     <script>
-        function fullScreenModeler() {
-            document.getElementById('fullscreenBtn').style.zIndex = 9999;
-            document.getElementsByTagName('iframe')[0].className = 'fullScreen'; 
-            document.getElementById('navbar').style.display = 'none';
-            document.getElementById('mobilenav').style.display = 'none';
-            document.getElementById('sidebar').style.display = 'none';
+        function fullscreen() {
+            const iframe = document.getElementsByTagName('iframe')[0];
+
+            if (iframe.requestFullscreen) {
+                iframe.requestFullscreen();
+            } else if (iframe.mozRequestFullScreen) {
+                iframe.mozRequestFullScreen();
+            } else if (iframe.webkitRequestFullscreen) {
+                iframe.webkitRequestFullscreen();
+            } else if (iframe.msRequestFullscreen) {
+                iframe.msRequestFullscreen();
+            } else {
+                alert('Could not full screen.')
+            }
         }
     </script>
+
+    <input id="easteregg" type="text" style="display:none;" />
 	
 	<div class="w3-container">
         <p>Want to build your creations offline, and upload them later?</p> 
-		<p><button onclick="window.open('https://github.com/evanrutledge1/gr8brik-locallife/releases/latest', '_blank')" class="w3-btn w3-white w3-large  w3-hover-blue">Desktop app</button></p>
+		<p><a href="https://github.com/susstevedev/gr8brik-locallife/releases/latest" target="_blank" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Desktop App</a></p>
     </div>
 
-    <p><button id="fullscreenBtn" onclick="fullScreenModeler();" class="w3-btn w3-white w3-large w3-hover-blue">Fullscreen</button></p>
+    <p><button id="fullscreenBtn" onclick="fullscreen();" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Fullscreen</button></p>
 
-	<iframe class="modeler" src="/mod/index.html?utm_source=newsite&import=false" title="GR8BRIK modeler window"></iframe></div>
+    <p><a href="/new-modeler.php" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">New Modeler</a></p>
+
+	<iframe class="modeler" src="/mod/index.html?utm_source=newsite&import=false" title="GR8BRIK modeler window" allowfullscreen></iframe>
 	
 	<?php include 'linkbar.php' ?>
 

@@ -1,25 +1,17 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
-if(isset($_SESSION['username'])){
-    header('Location: feed.php');
-}
+isLoggedin();
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-
     <title>About</title>
     <?php include 'header.php' ?>
 </head>
 
 <body class="w3-light-blue w3-container">
 
-    <?php 
-
-        include('navbar.php');
-
-    ?>
+    <?php include('navbar.php') ?>
 
     <style>
         .main-text {
@@ -59,8 +51,6 @@ if(isset($_SESSION['username'])){
             if (n < 1) {
                 slideIndex = x.length;
             }
-            // Remove unnecessary line
-            // slideIndex = 1;
             x.hide();
             x.eq(slideIndex - 1).show();
         }
@@ -127,7 +117,7 @@ if(isset($_SESSION['username'])){
                 <a href="/acc/index#upload" class="w3-btn w3-blue w3-hover-white">Upload</a><hr />
             </div>
 
-            <div id="tweet-container" class="w3-container w3-left">
+            <!-- <div id="tweet-container" class="w3-container w3-left">
 
                 <a class="twitter-timeline" data-lang="en" data-width="800" data-height="400" data-dnt="true" data-theme="dark" href="https://twitter.com/Evan85908317?ref_src=twsrc%5Etfw">Tweets by Evan85908317</a> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
 
@@ -138,7 +128,7 @@ if(isset($_SESSION['username'])){
                 <iframe src="https://discord.com/widget?id=1307420772377165884&theme=dark" width="350" height="500" allowtransparency="true" frameborder="0" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>
 
             </div>
-        </div> 
+        </div> -->
 
 <?php include('linkbar.php'); ?>
 
