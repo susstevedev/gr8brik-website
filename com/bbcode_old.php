@@ -41,7 +41,7 @@ class BBCode {
             $matchResult = $conn->query("SELECT * FROM users WHERE username = '$username' LIMIT 1");
             $matchRow = $matchResult->fetch_assoc();
 
-            $user = isset($matchRow['id']) ?: '0';
+            $user = $matchRow['id'] ?: time();
             return "<a href=\"/user/{$user}\" title='@<USERNAME> mentions someone.'><b>@{$username}</b></a>";
 
         } elseif ($match[1] === '#') {

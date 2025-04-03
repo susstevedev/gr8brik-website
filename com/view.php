@@ -27,13 +27,10 @@ if ($result->num_rows === 0) {
     exit;
 }
 		
-$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);	
-if ($conn->connect_error) {
-	die("Error: " . $conn->connect_error);
-}
+$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);	
 		
 $sql = "SELECT * FROM users WHERE id = $userid";
-$result = $conn->query($sql);
+$result = $conn2->query($sql);
 $row = $result->fetch_assoc();
 $username = $row['username'];
 
@@ -41,9 +38,7 @@ if(isset($_POST['comment'])){
 	
 	$comment = $_POST['commentbox'];
 		
-		// Create connection
 		$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-			
 		if ($conn->connect_error) {
 			die("Connection failed: " . $conn->connect_error);
 		}
@@ -56,35 +51,39 @@ if(isset($_POST['comment'])){
         $stmt2->close();
         $conn->close();
 
-        // Create connection
-		$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-			
-		if ($conn->connect_error) {
-			die("Connection failed: " . $conn->connect_error);
-		}
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-        $notifName = " commented on your post!";
-        $notifPost = "Click to view your post!";
-        $notifTime = time();
-        $notifUrl = "/com/view.php?id=" . $post_id;
-        $sql = "INSERT INTO notifications (user, name, profile, post, timestamp, url) VALUES (?, ?, ?, ?, ?, ?)";
+        if($user != $userid) {
+            $time = time();
+            $content = $post_id;
+            $category = 3;
+            $sql = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
 
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssssss", $userid, $notifName, $id, $notifPost, $notifTime, $notifUrl);
-        $stmt->execute();
-        $stmt->close();
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("iisii", $userid, $id, $time, $content, $category);
+            $stmt->execute();
+            $stmt->close();
 
-        $alertnum = '1';
-        $stmt = $conn->prepare("UPDATE users SET alert = ? WHERE id = ?");
-        $stmt->bind_param("si", $alertnum, $userid);
+            $date = time();
+            $sql = "SELECT alert FROM users WHERE id = ?";
+            $stmt3 = $conn->prepare($sql);
+            $stmt3->bind_param("i", $userid);
+            $stmt3->bind_result($alert);
+            $stmt3->execute();
+            $stmt3->close();
 
-        if ($stmt->execute()) {
-            $goto = $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING'];
-            header('Location: ' . $goto);
-        } else {
-            echo "An error has occurred";
+            $alertnum = $alert + 1;
+            $stmt = $conn->prepare("UPDATE users SET alert = ? WHERE id = ?");
+            $stmt->bind_param("si", $alertnum, $userid);
+
+            if ($stmt->execute()) {
+                $goto = $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING'];
+                header('Location: ' . $goto);
+            } else {
+                echo "<script>alert('An error has occurred')</script>";
+            }
+            $stmt->close();
         }
-        $stmt->close();
         $conn->close();
 	
 }
@@ -94,19 +93,7 @@ if(isset($_POST['comment'])){
 <html lang="en">
 <head>
     <title><?php echo $title ?></title>
-    <link rel="stylesheet" href="https://www.w3schools.com/lib/w3.css">
-    <link rel="stylesheet" href="../lib/theme.css">
-    <script src="../lib/main.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script async defer src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js" type="module"></script>
-    <meta charset="UTF-8">
-    <meta name="author" content="sussteve226">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"><!-- ios support -->
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/img/logo.jpg" />
-    <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
-    <meta name="theme-color" content="#f1f1f1" />
+    <?php include '../header.php' ?>
 </head>
 
 <body class="w3-light-blue w3-container">
@@ -114,20 +101,15 @@ if(isset($_POST['comment'])){
 <?php 
 	include('../navbar.php');
     require_once "bbcode.php";
+    require_once "../ajax/time.php";
     $bbcode = new BBCode;	
-	echo "<h2 class='w3-container w3-light-grey w3-card-2 w3-text-grey'>Community -> " . $title . "</h2>";
 
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-    if ($conn->connect_error) {
-        die("Error: " . $conn->connect_error);
-    }
-
-    $post_id = $_GET['id'];
+    $post_id = htmlspecialchars($_GET['id']);
     $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
     $limit = 10;
     $offset = ($page - 1) * $limit;
 
-    $count_sql = "SELECT COUNT(*) as reply_count FROM replies WHERE reply = $post_id";
+    $count_sql = "SELECT COUNT(*) as reply_count FROM replies WHERE reply = '$post_id'";
     $count_result = $conn->query($count_sql);
     if (!$count_result) {
         die("Failed: " . $conn->error);
@@ -137,24 +119,35 @@ if(isset($_POST['comment'])){
 
     $total_pages = ceil($reply_count / $limit);
 
-    $sql_category = "SELECT category FROM posts WHERE id = $post_id";
+    $sql_category = "SELECT category FROM posts WHERE id = '$post_id'";
     $category_result = $conn->query($sql_category);
     $category_row = $category_result->fetch_assoc();
     $category = $category_row['category'];
 
     if ($category === "deleted") {
-        echo "<b id='commentboxcontainer'>This conversation has been deleted.</b><br />";
+        echo "<b id='commentboxcontainer'>This conversation has been removed because it violated our <a href='/rules'>rules</a>.</b><br />";
         exit;
     }
 
-    echo '<h3>' . $reply_count . ' replies, ' . $total_pages . ' pages. Showing page ' . $page . '.</h3>';
+    $username = htmlspecialchars($row['username']) ?: "Unknown User";
 
-    echo '<div class="w3-row" style="display:flex;width:100%">';
-    echo '<div class="w3-card-2 w3-light-grey w3-padding-tiny w3-margin-right" style="flex-shrink:0;width:15%;">';
-    echo '<img id="pfp" src="../acc/users/pfps/' . $userid . '.jpg">';
-    echo '<br /><a href="../@' . urlencode($username) . '">' . urlencode($username) . '</a>';
-    echo '<br /><time class="w3-text-grey" datetime="' . $date . '">' . $date . '</time></div>';
-    echo '<h4 class="w3-card-2 w3-light-grey w3-padding-tiny" style="flex-shrink:0;width:85%;"><pre>';
+    echo "<div class='gr8-theme w3-container w3-light-grey w3-card-4'>";
+    echo "<h2>" . $title . "</h2>";
+    echo "<h4>By <a href='/user/" . $userid . "'>@" . $username . "</a> on " . $date . "</h4>";
+    echo '<h4>' . $reply_count . ' replies, ' . $total_pages . ' pages, on page ' . $page . '</h4></div><br />';
+
+    echo '<div class="w3-row" style="display:flex;width:100%;">';
+    echo '<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny w3-margin-right" style="flex-shrink: 1; width: 20%;">';
+    echo '<img id="pfp" src="/acc/users/pfps/' . $userid . '.jpg">';
+    echo '<br /><a href="../user/' . $userid . '"><span style="text-overflow: ellipsis;">' . $username . '</span></a>';
+    if($row['verified'] != 0) {
+        echo '&nbsp;<i class="fa fa-check w3-blue w3-large"></i>';
+    }
+    if($row['admin'] != 0) {
+        echo '&nbsp;<i class="fa fa-check w3-red w3-large"></i>';
+    }
+    echo '<br /><time class="w3-text-grey" title="' . $date . '" datetime="' . $date . '">' . time_ago($date) . '</time></div>';
+    echo '<h4 class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny" style="flex-shrink: 1; width: 80%;"><pre>';
     echo $bbcode->toHTML($decoded_post) . '</pre></h4></div><hr />';
 
     $sql = "SELECT * FROM replies WHERE reply = $post_id ORDER BY date ASC LIMIT $limit OFFSET $offset";
@@ -177,23 +170,34 @@ if(isset($_POST['comment'])){
             $stmt2->execute();
             $userResult = $stmt2->get_result();
             $userRow = $userResult->fetch_assoc();
-            $c_username = $userRow['username'];
+
+            $c_username =  htmlspecialchars($userRow['username']) ?: "Unknown User";
 
             echo '<div class="w3-row" style="display:flex;width:100%;">';
-            echo '<div class="w3-card-2 w3-light-grey w3-padding-tiny w3-margin-right" style="flex-shrink:0;width:15%;">';
-            echo '<img id="pfp" src="../acc/users/pfps/' . $c_user . '.jpg">';
-            echo '<br /><a href="../@' . urlencode($c_username) . '">' . urlencode($c_username) . '</a>';
-            echo '<br /><time class="w3-text-grey" datetime="' . $c_date . '">' . $c_date . '</time></div>';
-            echo '<h4 class="w3-card-2 w3-light-grey w3-padding-tiny" style="width:85%;"><pre>';
+            echo '<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny w3-margin-right" style="flex-shrink: 1; width: 20%;">';
+            echo '<img id="pfp" src="/acc/users/pfps/' . $c_user . '.jpg">';
+            echo '<br /><a href="../user/' . $c_user . '"><span style="text-overflow: ellipsis;">' . $c_username . '</span></a>';
+            if($userRow['verified'] != 0) {
+                echo '&nbsp;<i class="fa fa-check w3-blue w3-large"></i>';
+            }
+            if($userRow['admin'] != 0) {
+                echo '&nbsp;<i class="fa fa-check w3-red w3-large"></i>';
+            }
+            echo '<br /><time class="w3-text-grey" title="' . $c_date . '" datetime="' . $c_date . '">' . time_ago($c_date) . '</time></div>';
+            echo '<h4 class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny" style="flex-shrink: 1; width:80%;"><pre>';
             echo $bbcode->toHTML($decoded_comment) . '</pre></h4></div><br />';
         }
 
-        echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo w3-round" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>';
-        echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo w3-round" href="?id=' . $post_id . '&p=' . ($page + 1) . '">Next</a>';
+        echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>&nbsp;';
+        echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page + 1) . '">Next</a>';
     } else {
-        echo "<b>Nothing here yet</b><br />";
-        echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo w3-round" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>';
+        echo "<b>nothing here yet</b><br />";
+        echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>';
     }
+
+    $words = ['Spark something about flying cows', 'Start a MOC contest', 'Pigs! Its all about pigs!', 'Undefined!' , 'Dont use Javascript on the server side!', 'Oops I think I changed the padding on that button by ~1 megagiga pixel!'];
+    $randomKeys = array_rand($words);
+    $randomWord = $words[$randomKeys];
 
     echo "<br /><hr />";
 
@@ -204,21 +208,21 @@ if(isset($_POST['comment'])){
                 }
             </style>
             <div class="unsupported">
-                <b>Please enable Javascript to comment.</b><br />
+                <b>Enable javascript to reply.</b><br />
             </div>
         </noscript>';
 
     if ($category === "pinnedLocked" || $category === "locked") {
-        echo "<b id='commentboxcontainer'>This conversation is locked.</b><br />";
+        echo "<b id='commentboxcontainer'>This conversation is locked</b><br />";
 	} else {
-        if(isset($_SESSION['username'])) {
+        if(isset($_SESSION['username']) || isset($token['user'])) {
             echo "<br /><form id='commentboxcontainer' method='post' action=''>";
-            echo "<textarea name='commentbox' placeholder='Post body' rows='4' cols='50'></textarea><br />";
+            echo "<textarea name='commentbox' placeholder='" . $randomWord . "' rows='4' cols='50'></textarea><br />";
             echo "<altcha-widget challengeurl='https://eu.altcha.org/api/v1/challenge?apiKey=ckey_01d9f4ad018c16287ca6f3938a0f'></altcha-widget>";
-            echo "<input type='submit' value='Post' name='comment' class='w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo w3-round' />";
+            echo "<input type='submit' value='Reply' name='comment' class='w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo' />";
             echo "</form><br />";
         } else {
-            echo "<b id='commentboxcontainer'>Please <a href='../acc/login'>Login</a> to join the conversation.</b><br />";
+            echo "<b id='commentboxcontainer'>Please <a href='../acc/login'>Login</a> to reply</b><br />";
         }
     }
 
