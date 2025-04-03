@@ -20,10 +20,30 @@ class BBCode {
         return "<pre style='background-color:grey;color:white'><code>$escapedCode</code><h6> Code is user-generated via &#91;code&#93;content&#91;/code&#93;</h6></pre>";
     };
 
+
+     // Replace [email]...[/email] with <a href="mailto:...">...</a>
+    $this->bbcode_table["/\[email\](.*?)\[\/email\]/is"] = function ($match) {
+      return "<a href=\"mailto:$match[1]\">htmlspecialchars($match[1])</a>"; 
+    };
+
+
+    // Replace [email=someone@somewhere.com]An e-mail link[/email] with <a href="mailto:someone@somewhere.com">An e-mail link</a>
+    $this->bbcode_table["/\[email=(.*?)\](.*?)\[\/email\]/is"] = function ($match) {
+      return "<a href=\"mailto:$match[1]\">htmlspecialchars($match[2])</a>"; 
+    };
+
     
     $this->bbcode_table["/(?<!\[url\])(?<!\[img\])(?<!\[)(?<!&)(@|#)([a-zA-Z0-9_]+)(?!\])(?!;)(?!<)(?!>)(?!:)/"] = function ($match) {
         if ($match[1] === '@') {
-            return "<a href=\"/@{$match[2]}\"><b>@{$match[2]}</b></a>";
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+            $username = $conn->real_escape_string($match[2]);
+            $matchResult = $conn->query("SELECT * FROM users WHERE username = '$username' LIMIT 1");
+            $matchRow = $matchResult->fetch_assoc();
+
+            $user = $matchRow['id'] ?: '404-not-found';
+            return "<a href=\"/user/{$user}\" title='@<USERNAME> mentions someone.'><b>@{$username}</b></a>";
+
         } elseif ($match[1] === '#') {
             return "<a href=\"/list.php?q={$match[2]}\"><b>#{$match[2]}</b></a>";
         } else {
@@ -85,19 +105,6 @@ class BBCode {
     $this->bbcode_table["/\[color=([#a-z0-9]+)\](.*?)\[\/color\]/is"] = function ($match) {
       return '<span style="color:'. $match[1] . ';">' . $match[2] . '</span>';
     };
-
-
-    // Replace [email]...[/email] with <a href="mailto:...">...</a>
-    $this->bbcode_table["/\[email\](.*?)\[\/email\]/is"] = function ($match) {
-      return "<a href=\"mailto:$match[1]\">$match[1]</a>"; 
-    };
-
-
-    // Replace [email=someone@somewhere.com]An e-mail link[/email] with <a href="mailto:someone@somewhere.com">An e-mail link</a>
-    $this->bbcode_table["/\[email=(.*?)\](.*?)\[\/email\]/is"] = function ($match) {
-      return "<a href=\"mailto:$match[1]\">$match[2]</a>"; 
-    };
-
 
     // Replace [url]...[/url] with <a href="...">...</a>
     $this->bbcode_table["/\[url\](.*?)\[\/url\]/is"] = function ($match) {
