@@ -1,43 +1,6 @@
 <?php
-
-require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
-
-if(!isset($_SESSION['username'])){
-
-    header('Location: login.php');
-
-}
-
-if(isset($_POST['clear'])) {
-	// Create connection
-	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-	// Check connection
-	if ($conn->connect_error) {
-		die("Connection failed: " . $conn->connect_error);
-	}
-
-	// Fetch the current password from the database
-	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-	$stmt = $conn->prepare("SELECT alert FROM users WHERE id = ?");
-	$username = $_SESSION['username'];
-	$stmt->bind_param("i", $username);
-	$stmt->execute();
-	$stmt->bind_result($db_alert);
-	$stmt->fetch();
-	$stmt->close();
-	$alertnum = '0';
-	$stmt_2 = $conn->prepare("update users SET alert = ? WHERE id = ?");
-	$stmt_2->bind_param("ss", $alertnum, $username);
-	if ($stmt_2->execute()) {
-		header("Location: new.php");
-	} else {
-		echo "An error has occurred";
-	}
-	$stmt->close();
-	die;
-}
-
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+isLoggedIn();
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -53,9 +16,33 @@ if(isset($_POST['clear'])) {
         include('panel.php');
     ?>
 
-        <form id="clearForm" method="post" action="">
-            <input class="w3-btn w3-blue w3-hover-white" type="submit" value="Clear Inbox" name="clear">
-        </form>
+        <script>
+        $(document).ready(function() {
+            $("#clearBtn").click(function(event) {
+                event.preventDefault();
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    method: "GET",
+                    data: { clear_notifications: true },
+                    success: function(response) {
+                        if(confirm(response.success)){
+                            window.location.reload();  
+                        }
+                        $("#gr8-notif").hide();
+                    },
+
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        console.error('Server status code: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
+                        alert(response.error);
+                    }
+                });
+            });
+        });
+        </script>
+
+        <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="clearBtn" name="clearBtn">Clear Inbox Notifications</button>
 
 		<?php
             $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -65,7 +52,6 @@ if(isset($_POST['clear'])) {
 
             $result3 = $conn2->query("SELECT COUNT(*) as num FROM notifications WHERE user = $id");
             $row3 = $result3->fetch_assoc();
-            echo '<div class="w3-card-2 w3-light-grey w3-padding-tiny"><img src="../img/info.jpg" style="width:20px;height=20px;"><b>A new notifications system is rolling out now.</b></div>';
             echo '<h2>' . $row3['num'] . ' total notifications since ' . $age . '</h2>';
 
 			$sql = "SELECT * FROM notifications WHERE user = $id ORDER BY timestamp DESC";
@@ -79,9 +65,9 @@ if(isset($_POST['clear'])) {
 
                 if ($row['category'] === "1") {
                     $url = "/user/" . $profile;
-                    $post = " followed you";
+                    $post = "followed you";
                     $user = $row2['username'];
-                    $img = '/ajax/pfp?method=image&id=' . base64_encode($profile);
+                    $img = '../acc/users/pfps/' . $profile;
                 } elseif ($row['category'] === "2") {
                     $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
                     $content = $row['content'];
@@ -90,15 +76,8 @@ if(isset($_POST['clear'])) {
 
                     $img = '../cre/' . $row3['screenshot'];
                     $url = "/build/" . $content;
-                    $post = " commented on " . $row3['name'];
+                    $post = "commented on " . $row3['name'];
                     $user = $row2['username'];
-
-                    if($row2['verified'] != 0) {
-                        $user = $user . '&nbsp;<i class="fa fa-check w3-blue w3-large"></i>';
-                    }
-                    if($row2['admin'] != 0) {
-                        $user = $user . '&nbsp;<i class="fa fa-check w3-red w3-large"></i>';
-                    }
 
                     $result3->free();
                     $conn3->close();
@@ -110,33 +89,27 @@ if(isset($_POST['clear'])) {
 
                     $img = '../img/com.jpg';
                     $url = "/topic/" . $row['content'];
-                    $post = " replied to thread: " . $row3['title'];
+                    $post = "replied to " . $row3['title'];
                     $user = $row2['username'];
 
-                    if($row2['verified'] != 0) {
-                        $user = $user . '&nbsp;<i class="fa fa-check w3-blue w3-large"></i>';
-                    }
-                    if($row2['admin'] != 0) {
-                        $user = $user . '&nbsp;<i class="fa fa-check w3-red w3-large"></i>';
-                    }
                     $result3->free();
                     $conn3->close();
                 } else {
-                    $url = $row['url'];
-                    $post = $row['post'];
-                    $user = "";
-
-                    $img = '/img/no_image.png';
+                    $url = null;
+                    $post = 'New notification';
+                    $user = null;
+                    $img = '../img/info.jpg';
                 }
                 if (is_numeric($row['timestamp'])) {
                     $time = gmdate("Y-m-d H:i:s", $row['timestamp']);
                 } else {
-                    $time = "";
+                    $time = "Time";
                 }
 
-				echo "<article class='w3-card-2 w3-light-grey w3-padding w3-large'>";
-                echo "<img src='" . $img . "' width='150px' height='150px' alt='" . $img . "'>";
-				echo "<a href='" . $url . "' style='display: inline-block; vertical-align: top; padding: 5px 5px 5px 5px;'>" . $user . $post . "</a>";
+				echo "<article class='w3-card-2 w3-hover-shadow gr8-theme w3-light-grey w3-padding w3-large'>";
+                echo "<a href='" . $url . "'><img src='" . $img . "' style='width: 150px; height: 150px; border-radius: 2px;' alt='" . $img . "' title='" . $img . "'>";
+				echo "<span style='display: inline-block; vertical-align: top; padding: 5px 5px 5px 5px;'>";
+                echo $user . "&nbsp;" . htmlspecialchars($post) . "!</span></a>";
                 echo "<time class='w3-right w3-text-grey' datetime=''>" . $time . "</time>";
 				echo "</article><br />";
 

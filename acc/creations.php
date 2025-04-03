@@ -1,10 +1,6 @@
 <?php
-require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
-
-
-if(!isset($_SESSION['username'])){
-    header('Location: acc/login.php');
-}
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+isLoggedIn();
 
 define('DB_NAME2', 'if0_36019408_creations');
 
@@ -93,9 +89,11 @@ $conn->close();
 
                     <input type="file" name="fileToUpload" id="fileToUpload" class="w3-input" style="width:30%">
 
-                    <input type="text" placeholder="Model name" name="model_name" id="model_name" class="w3-input" style="width:30%">
+                    <input type="text" placeholder="Model name" name="model_name" id="model_name" class="w3-input" style="width:30%"><br />
                 
-                    <input type="text" placeholder="Model description" name="description" id="description" class="w3-input" style="width:30%">
+                    <!-- <input type="text" placeholder="Model description" name="description" id="description" class="w3-input" style="width:30%"> -->
+
+                    <textarea placeholder="Model description" id="description" name="description" rows="4" cols="40"></textarea><br />
                 
                     <input type="submit" name="upload" value="Upload" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo">
 

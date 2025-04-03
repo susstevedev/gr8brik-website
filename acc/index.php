@@ -1,19 +1,28 @@
 <?php
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
+if(isset($_GET['reactive'])) {
+    $token = $_GET['token'];
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    $varfalse = "";
 
-if(!isset($_SESSION['username'])){
-
-    header('Location: login.php');
-
+    $tokendata = $conn->query("SELECT * FROM sessions WHERE id = '$token' LIMIT 1");
+    $tokenrow = $tokendata->fetch_assoc();
+    $user = $tokenrow['user'];
+    
+    $stmt_2 = $conn->prepare("UPDATE users SET deactive = ? WHERE id = ? LIMIT 1");
+    $stmt_2->bind_param("ss", $varfalse, $user);
+    if ($stmt_2->execute()) {
+        setcookie('token', $token, time() + (10 * 365 * 24 * 60 * 60), "/");
+        $_SESSION['username'] = $user;
+        header('Location: index.php');
+        exit;
+    }
 }
 
-define('DB_NAME2', 'if0_36019408_creations');
+isLoggedin();
 
-// Create connection
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-
-// Check connection
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
@@ -122,7 +131,6 @@ if(isset($_POST['change'])){
     $new = md5($_POST['n_password']);
     $confirm = md5($_POST['c_password']);
     if($new == $confirm) {
-			// Fetch the current password from the database
 			$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 			$stmt = $conn->prepare("SELECT password FROM users WHERE username = ?");
 			$stmt->bind_param("s", $user);
@@ -185,7 +193,8 @@ if(isset($_POST['username_change'])){
     }
     if(!empty($changed)) {
         if (($changed - time()) < 86400) {
-            $error_message = "You can only change your username once every day.";
+            $change_when = $changed - time();
+            $error_message = "You can only change your username once every day (on " . date("M d, Y H:i", $change_when) . ".";
             header("HTTP/1.0 500 Internal Server Error");
             echo json_encode(['error' => $error_message]);
             exit;
@@ -228,7 +237,7 @@ if(isset($_POST['twitter_change'])){
     $id = $_SESSION['username'];
 
     if(strlen($new) > 15) {
-        $error_message = "X handle's can only be 15 characters.";
+        $error_message = "Twitter handle's can only be 15 characters.";
         header("HTTP/1.0 500 Internal Server Error");
         echo json_encode(['error' => $error_message]);
         exit;
@@ -246,9 +255,9 @@ if(isset($_POST['twitter_change'])){
 }
 
 if(isset($_POST['about_change'])){
-    include $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
+    //include $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
     $new = $_POST['description'];
-    $id = $_SESSION['username'];
+    $id = $token['user'];
     if(strlen($new) > 200) {
         $error_message = "Bio can only be 200 characters.";
         header("HTTP/1.0 500 Internal Server Error");
@@ -262,6 +271,11 @@ if(isset($_POST['about_change'])){
     if ($stmt_2->execute()) {
         echo "Success!";
         header('Location: index.php');
+        exit;
+    } else {
+        $error_message = "Error changing bio.";
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => $error_message]);
         exit;
     }
     $stmt->close();
@@ -295,21 +309,14 @@ if(isset($_POST['e_change'])){
             $stmt->close();
 }
 if(isset($_POST['deactive'])) {
-    include $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
-
-    $id = $_SESSION['username'];
-    $pfp = "../acc/users/pfps/" . $id . ".jpg";
-
+    $id = $conn->real_escape_string($token['user']);
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if(file_exists($pfp)) {
-        unlink($pfp);
-    }
-    $stmt_2 = $conn->prepare("UPDATE users SET username = ?, email = ? WHERE id = ?");
-    $stmt_2->bind_param("sss", "", "", $id);
+    $date = date("Y-m-d");
+    
+    $stmt_2 = $conn->prepare("UPDATE users SET deactive = ? WHERE id = ? LIMIT 1");
+    $stmt_2->bind_param("si", $date, $id);
     if ($stmt_2->execute()) {
-        session_destroy();
-        header('Location: ../index.php');
-        exit;
+        logout();
     }
 }
 ?>
@@ -348,9 +355,26 @@ if(isset($_POST['deactive'])) {
 				<form method='post' action=''>
 					<h2>Are you sure you want to deactivate your account?</h2>
                     <p><input type="password" name="password" placeholder="Password" class="w3-input w3-border w3-mobile" required /></p>
-                    <p>This is <b>final</b>. To restore any personal details, you will need to email us at <b><i class="fa fa-envelope"></i><a href="mailto:evanrutledge226@gmail.com">evanrutledge226[at]gmail[dot]com</a></b>.</p>
+                    <p>&nbsp;You can restore your account until 30 days after you deactivate.&nbsp;After 30 days, your account and data will be deleted. If you want to delete everything ASAP, try deleting it instead.</p>
+                    <p><b class="w3-red">Your data may not be recoverable after 30 days.</b></p>
 					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('deactive').style.display='none'">No</span>&nbsp;
 					<input type="submit" value="Yes" name="deactive" class="w3-btn w3-large w3-white w3-hover-red">
+				</form>
+			</div>
+		</div>
+	</div>
+
+    <div id="delete" class="w3-modal">
+		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
+			<div class="w3-container">
+				<span onclick="document.getElementById('delete').style.display='none'" class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
+				<form method='post' action=''>
+					<h2>Are you sure you want to permanently delete your account?</h2>
+                    <p><input type="password" name="password" placeholder="Password" class="w3-input w3-border w3-mobile" required /></p>
+                    <p>This will delete <b>almost everything</b> on your account* (not notifications, comment votes, or creations likes, and forum posts and replies will only be anonymized).</p>
+                    <p>If you only want to delete it for a certain time, deactivate it instead. This action <b>cannot</b> be undone by anyone.</p>
+					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span>&nbsp;
+                    <span id="delete-account-btn" name="delete-account-btn" class="w3-btn w3-large w3-white w3-hover-red">Yes</span>
 				</form>
 			</div>
 		</div>
@@ -361,18 +385,50 @@ if(isset($_POST['deactive'])) {
         $(".success").hide();
         $(".error").hide();
 
+        $("#username-input").on("input", function() {
+            var newUsername = $(this).val();
+            var token = $.cookie('token');
+            $("#u_change").attr('disabled', true).html('<img src="/img/loading.gif" style="width: 25px; height: 25px;" />');
+
+            $.ajax({
+                url: "../ajax/account_settings",
+                method: "GET",
+                data: { check_username_available: true, username: newUsername, token: $.cookie('token') },
+                success: function(response) {
+                    $("#data-username-available").hide();
+                    setTimeout(function() {
+                        if(response.available === "1") {
+                            $("#u_change").html('Change Username').attr('disabled', false);
+                            $("#data-username-available").show().css("background-color", "green").text('Username available.').delay(5000).fadeOut();
+                        } else if(response.available === "0") {
+                            $("#u_change").html('Change Username');
+                            $("#data-username-available").show().css("background-color", "red").text('Username taken.').delay(5000).fadeOut();
+                        }
+                    }, 2500);
+                },
+
+                error: function(jqXHR, textStatus, errorThrown) {
+                    var response = JSON.parse(jqXHR.responseText);
+                    console.error(jqXHR, textStatus, errorThrown);
+                    $(".error").show();
+                    $(".error").text(response.error);
+                }
+            });
+        });
+
         $("#u_change").click(function(event) {
             event.preventDefault();
 
             var username = $("#username input[name='username']").val();
+            var token = $.cookie('token');
             if ($("#username input[name='username']").val().trim() === '') {
                 var username = $("#username input[name='username']").attr('placeholder');
             }
 
             $.ajax({
-                url: "",
-                method: "POST",
-                data: { username_change: true, username: username },
+                url: "../ajax/account_settings",
+                method: "GET",
+                data: { username_change: true, username: username, token: token },
                 success: function(response) {
                     $(".success").show();
                     $(".success").text("Username updated!");
@@ -380,7 +436,9 @@ if(isset($_POST['deactive'])) {
                 },
 
                 error: function(jqXHR, textStatus, errorThrown) {
-                    if (jqXHR.status === 500) {
+                    if (jqXHR.status === 403) {
+                        appCrash('403', 'Invalid login');
+                    }else if (jqXHR.status === 500) {
                         var response = JSON.parse(jqXHR.responseText);
                         $(".error").show();
                         $(".error").text(response.error);
@@ -396,18 +454,21 @@ if(isset($_POST['deactive'])) {
             event.preventDefault();
 
             var description = $("#about textarea[name='description']").val();
+            var token = $.cookie('token');
 
             $.ajax({
-                url: "",
-                method: "POST",
-                data: { about_change: true, description: description },
+                url: "../ajax/account_settings",
+                method: "GET",
+                data: { about_change: true, description: encodeURIComponent(description), token: token },
                 success: function(response) {
                     $(".success").show();
-                    $(".success").text("Bio updated!");
+                    $(".success").text(response.success);
                 },
 
                 error: function(jqXHR, textStatus, errorThrown) {
-                    if (jqXHR.status === 500) {
+                    if (jqXHR.status === 403) {
+                        appCrash('403', 'Invalid login');
+                    }else if (jqXHR.status === 500) {
                         var response = JSON.parse(jqXHR.responseText);
                         $(".error").show();
                         $(".error").text(response.error);
@@ -422,18 +483,21 @@ if(isset($_POST['deactive'])) {
             event.preventDefault();
 
             var handle = $("#twitter input[name='handle']").val();
+            var token = $.cookie('token');
 
             $.ajax({
-                url: "",
-                method: "POST",
-                data: { twitter_change: true, handle: handle },
+                url: "../ajax/account_settings",
+                method: "GET",
+                data: { twitter_change: true, handle: handle, token: token },
                 success: function(response) {
                     $(".success").show();
-                    $(".success").text("X updated!");
+                    $(".success").text("Twitter updated!");
                 },
 
                 error: function(jqXHR, textStatus, errorThrown) {
-                    if (jqXHR.status === 500) {
+                    if (jqXHR.status === 403) {
+                        appCrash('403', 'Invalid login');
+                    }else if (jqXHR.status === 500) {
                         var response = JSON.parse(jqXHR.responseText);
                         $(".error").show();
                         $(".error").text(response.error);
@@ -443,6 +507,61 @@ if(isset($_POST['deactive'])) {
                     }
                 }
             });
+        });
+
+        $("#exportmydata-btn").click(function(event) {
+            $("#exportmydata-btn").attr('disabled', true).html('<img src="/img/loading.gif" style="width: 25px; height: 25px;" />');
+
+            $.ajax({
+                url: "../ajax/account_settings",
+                method: "POST",
+                data: { export_data: true },
+                success: function(response) {
+                    $(".w3-main").show().text(response.success);
+                },
+
+                error: function(jqXHR, textStatus, errorThrown) {
+                    var response = JSON.parse(jqXHR.responseText);
+                    console.error(jqXHR, textStatus, errorThrown);
+                    $(".w3-main").show().text(response.error);
+                }
+            });
+        });
+
+        $("#delete-account-btn").click(function(event) {
+            $("#delete-account-btn").attr('disabled', true).html('<img src="/img/loading.gif" style="width: 25px; height: 25px;" />');
+
+            $.ajax({
+                url: "../ajax/account_settings",
+                method: "POST",
+                data: { delete_account: true },
+                success: function(response) {
+                    $(".w3-main").show().text(response.success);
+                },
+
+                error: function(jqXHR, textStatus, errorThrown) {
+                    var response = JSON.parse(jqXHR.responseText);
+                    console.error(jqXHR, textStatus, errorThrown);
+                    $(".w3-main").show().text(response.error);
+                }
+            });
+        });
+
+        $("#dark_mode").click(function(event) {
+            $.cookie('mode', 'dark', { expires: 365 });
+            $("body").removeClass("w3-light-blue").css({"background-color": "#121212", "color": "#FAF9F6"});
+            $('#navbar').removeClass('w3-light-grey').addClass('w3-dark-grey'); 
+            $('.gr8-theme').removeClass('w3-light-grey gr8-theme').addClass('w3-dark-grey w3-text-white'); 
+            $('.gr8-theme-opposite').removeClass('w3-dark-grey w3-text-white gr8-theme').addClass('w3-light-grey w3-text-black'); 
+        });
+        $("#light_mode").click(function(event) {
+            if($.cookie('mode')) {
+                $.removeCookie('mode');
+                $("body").addClass("w3-light-blue").css("all","unset");
+                $('#navbar').addClass('w3-light-grey').removeClass('w3-dark-grey'); 
+                $('.gr8-theme').addClass('w3-light-grey').removeClass('w3-dark-grey w3-text-white'); 
+                $('.gr8-theme-opposite').addClass('w3-dark-grey w3-text-white').removeClass('w3-light-grey w3-text-black'); 
+            }
         });
 
     });
@@ -462,7 +581,7 @@ if(isset($_POST['deactive'])) {
             cursor: pointer; 
         }
         .file-banner {
-            background-image: url('<?php echo '../acc/users/banners/' . $id . '..jpg' ?>');
+            background-image: url('<?php echo "../acc/users/banners/" . $id . ".jpg?t=" . time() ?>');
             width: 50%;
             height: 25%;
             height: 25vh;
@@ -476,8 +595,19 @@ if(isset($_POST['deactive'])) {
         }
     </style>
 
+    <h1>Settings</h1>
+
     <p class="success w3-light-grey w3-card-2 w3-padding-small"></p>
     <p class="error w3-red w3-card-2 w3-padding-small"></p>
+
+    <h2>General</h2>
+
+    <div class="theme">
+        <button class="w3-btn w3-light-blue w3-hover-dark-grey" id="dark_mode">Dark mode</button>
+        <button class="w3-btn w3-dark-grey w3-hover-light-blue" id="light_mode">Light mode</button>
+    </div>
+
+    <h2>Account</h2>
     
     <form class="pictureForm w3-center" method="post" action="" enctype="multipart/form-data">
         <p>We recommend your banner be 250x500 pixels</p>
@@ -496,10 +626,10 @@ if(isset($_POST['deactive'])) {
     <form id="pictureForm" method="post" action="" enctype="multipart/form-data">
         <p>We recommend your profile picture be 50x50 pixels</p>
 		<p><input type="file" name="fileToupload" id="fileToupload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
-		<input type="submit" value="Upload" id="picture" name="picture" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo w3-threequarter"><br /><br />
+		<input type="submit" value="Upload" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-quarter">
         <?php 
             if(file_exists('users/pfps/' . $id . '.jpg')){
-                echo '<input type="checkbox" class="w3-check" id="deletePfp" name="deletePfp" value="1">';
+                echo '&nbsp;&nbsp;<input type="checkbox" class="w3-check" id="deletePfp" name="deletePfp" value="1">';
                 echo '<label for="deletePfp">Remove</label>';
             }
         ?>
@@ -508,27 +638,30 @@ if(isset($_POST['deactive'])) {
   
 <div class="w3-threequarter">
     <div id="username">
-        <p>Your username can only be 2-50 numbers, letters, underscore, dash, or dot. Make sure it <b>doesn't</b> violate our <a href="http://www.gr8brik.rf.gd/rules" target="_blank" rel="noopener noreferrer">Rules</a>.</p>
-        <input class="w3-input w3-border w3-mobile w3-third" value="<?php echo $user ?>" type="text" name="username" placeholder="<?php echo $combinedString ?>">
+        <p>Your username can only be 2-50 numbers, letters, underscore, dash, or dot. Make sure it follows the <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.</p>
+        <p class="gr8-child"><span id="data-username-available" style="display: none; padding: 5px 5px 5px 5px;"></span></p>
+        <input class="w3-input w3-border w3-mobile w3-third" value="<?php echo $user ?>" type="text" id="username-input" name="username" placeholder="<?php echo $combinedString ?>">
         <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="u_change" name="u_change">Change Username</button>
+        <!-- <br /><br />&nbsp;&nbsp;<small>Your account link will be <a href="/@<?php echo $user ?>" target="_blank" rel="noopener noreferrer">http://www.gr8brik.rf.gd/@<span id="username-url"><?php echo $user ?></span></a></small> -->
     </div><br /><br />
 
     <div id="twitter">
-        <input class="w3-input w3-border w3-mobile w3-third" placeholder="@your_x_handle" value="<?php echo $x ?>" type="text" name="handle">
-        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="twitter_change" name="twitter_change">Change Twitter/X handle</button>
+        <input class="w3-input w3-border w3-mobile w3-third" placeholder="@handle" value="<?php echo $x ?>" type="text" name="handle">
+        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="twitter_change" name="twitter_change">Change Linked Twitter</button>
     </div><br /><br />
 
     <div id="about">
-        <p>Your description can be 1-200 characters of anything. Make sure it <b>doesn't</b> violate our <a href="http://www.gr8brik.rf.gd/rules" target="_blank" rel="noopener noreferrer">Rules</a>.</p>
+        <p>Your description can be 1-200 characters of anything. Keep it clean and make sure it doesn't violate our <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.</p>
         <textarea id="description" name="description" value="<?php echo htmlspecialchars($about) ?>" placeholder="New about section" class="w3-input w3-border w3-mobile" rows="4" cols="50"><?php echo htmlspecialchars($about) ?></textarea>
         <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="a_change" name="about">Change About</button>
     </div><br /><br />
 
-        <form id="password" method="post" action="">
+        <form id="password" method="post" action="/ajax/account_settings">
             <p>Your password to login to your account. Don't share this with anyone. Keep this saved somewhere, like a secure password manager.</p>
             <input type="password" name="o_password" placeholder="Old password" class="w3-input w3-border w3-mobile w3-third" />
             <input type="password" name="n_password" placeholder="New password" class="w3-input w3-border w3-mobile w3-third" />
-            <input type="submit" name="password_change" value="Change Password" class="w3-btn w3-blue w3-hover-white w3-third w3-border w3-border-indigo" />
+            <input type="password" name="c_password" placeholder="Confirm new password" class="w3-input w3-border w3-mobile w3-third" />
+            <input type="submit" name="change" value="Change Password" class="w3-btn w3-blue w3-hover-white w3-third w3-border w3-border-indigo" />
         </form><br /><br />
 
         <form id="email" method="post" action="">
@@ -539,7 +672,19 @@ if(isset($_POST['deactive'])) {
         </form>
     </div></div><br /><br />
 
-    <button onclick="document.getElementById('deactive').style.display='block'" name='deactive' class='w3-btn w3-red w3-hover-white w3-border w3-border-pink' />Deactivate Account</button><br /><br />
+    <a href="/acc/login?status=logout" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink">Logout</a><br /><br />
+
+    <h2>Danger zone</h2>
+    
+    <div class="tooltip">
+    <button onclick="document.getElementById('deactive').style.display='block'" name='deactive' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink' />Deactivate Account</button>
+        <span class="w3-tag w3-round w3-blue w3-padding-small tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Deactivate your GR8BRIK account.</span>
+    </div>
+
+    <div class="tooltip">
+        <button onclick="document.getElementById('delete').style.display='block'" name='delete' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink' />Delete Account</button>
+        <span class="w3-tag w3-round w3-blue w3-padding-small tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Delete your GR8BRIK account forever, ASAP.</span>
+    </div>
 
     <?php include ('../linkbar.php') ?>
 </body>

@@ -1,38 +1,25 @@
 <?php
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+isLoggedIn();
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
-
-
-if(!isset($_SESSION['username'])){
-
-    header('Location: login.php');
-
-} else {
-
+if(isset($_SESSION['username'])){
     if($admin != '1'){
-
         header('Location: index.php');
-
     }
-
 }
 
 if(isset($_POST['deny'])) {
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
     if ($conn->connect_error) {
-	    die("Error:" . $conn->connect_error);
+	    exit($conn->connect_error);
     }
 
-    $user = $_GET['user'];
-    $username = $_GET['name'];
+    $user = $conn->real_escape_string($_GET['user']);
 
-	$sql = "DELETE FROM appeals WHERE user = $user"; 
+	$sql = "DELETE FROM appeals WHERE user = '$user' LIMIT 1"; 
     $result = $conn->query($sql);
     if ($result) {
-        echo "Deleted all appeals from @" . urldecode($username) . ".";
-        exit;
-    } else {
-        echo "Error:" . $conn->error;
         exit;
     }
 }
@@ -40,24 +27,21 @@ if(isset($_POST['deny'])) {
 if(isset($_POST['accept'])) {
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
     if ($conn->connect_error) {
-	    die("Error:" . $conn->connect_error);
+	    exit($conn->connect_error);
     }
 
-    $user = $_GET['user'];
-    $username = $_GET['name'];
+    $user = $conn->real_escape_string($_GET['user']);
 
-	$sql = "DELETE FROM bans WHERE user = $user"; 
+	$sql = "DELETE FROM bans WHERE user = '$user' LIMIT 1"; 
     $result = $conn->query($sql);
 
-	$sql2 = "DELETE FROM appeals WHERE user = $user"; 
+	$sql2 = "DELETE FROM appeals WHERE user = '$user' LIMIT 1"; 
     $result2 = $conn->query($sql2);
 
     if ($result && $result2) {
-        echo "Deleted all bans from @" . urldecode($username) . ".";
-        exit;
+        exit("Unbanned user");
     } else {
-        echo "Error:" . $conn->error;
-        exit;
+        exit($conn->error);
     }
 }
 ?>
@@ -75,54 +59,41 @@ if(isset($_POST['accept'])) {
         include('panel.php');
 
         echo "<center>";
-            // Create connection
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-            // Check connection
-            if ($conn->connect_error) {
-                die("Connection failed: " . $conn->connect_error);
-            }
+            $query = $conn->prepare("SELECT user, reason, end_date FROM appeals");
+            $query->execute();
+            $query->store_result();
+            $query->bind_result($user, $reason, $date);
 
-            $sql = "SELECT user, reason, end_date FROM appeals";
-            $stmt = $conn->prepare($sql);
-            $stmt->execute();
-            $stmt->store_result();
-            $stmt->bind_result($user, $reason, $date);
+            if($query->num_rows != 0) {
+                while ($query->fetch()) {
+                    $query2 = $conn->prepare("SELECT username FROM users WHERE id = ?");
+                    $query2->bind_param("i", $user);
+                    $query2->execute();
+                    $result = $query2->get_result();
+                    $row = $result->fetch_assoc();
 
-            // Prepare the second statement outside the loop
-            $sql2 = "SELECT username FROM users WHERE id = ?";
-            $stmt2 = $conn->prepare($sql2);
+                    $username = htmlspecialchars($row['username']) ?: "Unknown User";
+                    $query2->free_result();
 
-        if($stmt->num_rows < 0) {
-            while ($stmt->fetch()) {
-                $stmt2->bind_param("i", $user);
-                $stmt2->execute();
-                $stmt2->store_result();
-                $stmt2->bind_result($username);
-                $stmt2->fetch();
-                if ($stmt2->num_rows === 0 || $username == "") {
-                    $username = "[unknown profile]";
+                    echo "<article class='w3-card-2 w3-light-grey w3-padding-small'>";
+                    echo "<header><img src='/ajax/pfp?method=image&id=" . base64_encode($user) . "' id='pfp' style='border-radius: 50%;'><br />";
+                    echo "<h4><a href='/user/" . $user . "'>" . htmlspecialchars($username) . "</a></h4></header>";
+                    echo "<b>" . $reason . "</b><br />";
+                    echo "<b>Appeal valid until " . date('F j, Y, g:i a', (int)$date) . " (" . time_ago(date('Y-m-d H:i:s', (int)$date)) . ").</b>";
+                    echo "<form method='post' action='appeals.php?user=" . $user . "&name=" . $username . "'>";
+                    echo "<input type='submit' value='Keep user banned' name='deny' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>&nbsp;";
+                    echo "<input type='submit' value='Unban user' name='accept' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo'>";
+                    echo "</form></article><br />";
+                    $query2->close();
                 }
-                $stmt2->free_result(); // Free the result set
-
-                echo "<article class='w3-card-24 w3-light-grey w3-padding'>";
-                echo "<header><img src='users/pfps/" . $user . "..jpg' id='pfp'><br />";
-                echo "<h4><a href='../@" . urlencode($username) . "'>" . htmlspecialchars($username) . "</a></h4></header>";
-                echo "<b>" . $reason . "</b><br />";
-                echo "<form method='post' action='appeals.php?user=" . $user . "&name=" . $username . "'>";
-                echo "<input type='submit' value='DENY' name='deny' class='w3-btn w3-large w3-white w3-hover-red'>&nbsp;";
-                echo "<input type='submit' value='ACCEPT' name='accept' class='w3-btn w3-large w3-white w3-hover-blue'>";
-                echo "</form></article><br />";
+                $query->free_result();
+                $query->close();
+            } else {
+                echo "<b>No ban appeals. Your all caught up!</b><br />";
+                //echo "<img src='/img/empty.png' style='width:518px;height:288px;'>";
             }
-        } else {
-            echo "<b>Your all caught up!</b><br />";
-            echo "<img src='/img/empty.png' style='width:518px;height:288px;'>";
-        }
-
-            // Close the statements and connection
-            $stmt2->close();
-            $stmt->free_result(); // Free the result set of the outer statement
-            $stmt->close();
             $conn->close();
             echo "</center>";
 

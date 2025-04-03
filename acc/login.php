@@ -1,23 +1,17 @@
 <?php
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
-require_once 'classes/constants.php';
-
-if(isset($_GET['status']) && $_GET['status'] === 'resume') {
-	$_SESSION['username'] = $_COOKIE['userid'];
-    $_SESSION['auth'] = true;
-}
 if(isset($_GET['status']) && $_GET['status'] === 'logout') {
     $tokenid = $_COOKIE['token'];
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     $conn->query("DELETE FROM sessions WHERE id = '$tokenid'");
 	session_destroy();
-    header('../index.php');
-} else {
-    if(isset($_SESSION['username'])) {
-        header('Location: index.php');
-    }
+    header('login.php');
 }
+isLoggedin();
+
+/*
 
 if(isset($_POST['login'])) {
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -39,16 +33,38 @@ if(isset($_POST['login'])) {
     $result = $conn->query($sql);
     $row = $result->fetch_assoc();
 
-    if($pwd === $row['password']) {
+    if($pwd === $row['password'] && !empty($row['username'])) {
         $username = $row['username'];
         $userid = $row['id'];
         $tokenid = uniqid('', true);
+        $time = time();
 
-        $sql = "INSERT INTO sessions (id, user, username, password) VALUES ('$tokenid', '$userid', '$username', '$pwd')";
+        if(!empty($row['deactive'])) {
+            $sql = "INSERT INTO sessions (id, user, username, password, timestamp) VALUES ('$tokenid', '$userid', '$username', '$pwd', '$time')";
+            if ($conn->query($sql) === TRUE) {
+                header('HTTP/1.0 500 Internal Server Error');
+                echo json_encode(['popup' => "Do you want to reactivate your account?", 'error' => "See modal for more info", 'goto' => "http://www.gr8brik.rf.gd/acc/index?reactive=1&token=" . $tokenid ]);
+                exit;
+            }
+        }
+
+        $sql = "SELECT * FROM bans WHERE user = '$userid'";
+        $result2 = $conn->query($sql);
+
+        while ($row2 = $result2->fetch_assoc()) {
+            if ($result2->num_rows > 0 && $row2['end_date'] >= time()) {
+                header('HTTP/1.0 500 Internal Server Error');
+                echo json_encode(['error' => $row['username'] . " has been banned until " . gmdate("M d, Y H:i", $row2['end_date']) . " for " . $row2['reason']]);
+                exit;
+            }
+        }
+
+        $sql = "INSERT INTO sessions (id, user, username, password, timestamp) VALUES ('$tokenid', '$userid', '$username', '$pwd', '$time')";
 		if ($conn->query($sql) === TRUE) {
-            setcookie('token', $tokenid, time() + (10 * 365 * 24 * 60 * 60), "/");
+            setcookie('token', $tokenid, $time + (10 * 365 * 24 * 60 * 60), "/", ".gr8brik.rf.gd");
             $_SESSION['username'] = $userid;
             $_SESSION['auth'] = true;
+            exit;
         }
     } else {
 		header('HTTP/1.0 500 Internal Server Error');
@@ -56,6 +72,8 @@ if(isset($_POST['login'])) {
         exit;
     }
 }
+
+*/
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -70,12 +88,18 @@ if(isset($_POST['login'])) {
         #welcome-mobile {
             display: none;
         }
+        .w3-input {
+            width: 50%;
+        }
         @media only screen and (max-width: 768px) {
             #linkbar, #mobilenav, #toggleModeMenu, #toggleLight, #toggleDark, #welcome-large, #loginForm {
                 display: none;
             }
             #welcome-mobile {
                 display: block;
+            }
+            .w3-input {
+                width: 100%;
             }
         }
     </style>
@@ -89,19 +113,34 @@ if(isset($_POST['login'])) {
                 var pwd = $("#loginForm input[name='pwd']").val();
 
                 $.ajax({
-                    url: "",
+                    url: '/ajax/auth',
                     method: "POST",
                     data: { login: true, mail: mail, pwd: pwd },
                     success: function(response) {
-                        window.location.href = "index.php";
+                        if(response.success === true) {
+                            window.location.href = "/";
+                        } else {
+                            $("#error").show()
+                            $("#error-text").text(response.error);
+                            $("#error").delay(5000).fadeOut(2500);
+                        }
                     },
 
                     error: function(jqXHR, textStatus, errorThrown) {
                         var response = JSON.parse(jqXHR.responseText);
                         console.error('Server status code: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
+                        if(response.popup) {
+                            $("#popup").show();
+                            $("#popup-text").text(response.popup);
+                            $("#popup-btn").attr("href", response.goto)
+                        }
                         $("#error").show()
-                        $("#error-text").text(response.error);
-                        $("#error").fadeOut(5000);
+                        if(!response.error) {
+                            $("#error-text").text("An error occured. Please try again later.");
+                        } else if(response.error) {
+                            $("#error-text").text(response.error);
+                        }
+                        $("#error").delay(5000).fadeOut(2500);
                     }
                 });
             });
@@ -111,6 +150,21 @@ if(isset($_POST['login'])) {
             });
         });
     </script>
+
+    <div id="popup" class="w3-modal w3-card-2">
+        <div class="w3-modal-content">
+            <header class="w3-container w3-teal"> 
+                <span onclick="document.getElementById('popup').style.display='none'" 
+                class="w3-button w3-display-topright">&times;</span>
+                <h2>Important Modal</h2>
+            </header>
+            <div class="w3-container">
+                <p id="popup-text"></p>
+                <a href="" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo" id="popup-btn">Yes</a>
+            </div>
+        </div>
+    </div>
+
     <div id="error" style="display: none;" class="w3-red w3-card-2 w3-padding-tiny"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span>&nbsp;<span id="error-text"></span></div>
     <div id="welcome-large">
         <h2>Login</h2>
@@ -126,9 +180,11 @@ if(isset($_POST['login'])) {
         </div>
     </center>
     <div id="loginForm" class="w3-container">
-        <b>Don't have an account? <a href="register">Register</a></b><br />
-        <input class="w3-input w3-border" type="email" name="mail" placeholder="Email"><br />
+        <span>Don't have an account? <a href="register">Register</a></span><br />
+        <input class="w3-input w3-border" type="email" name="mail" placeholder="Email or username"><br />
         <input class="w3-input w3-border" type="password" name="pwd" placeholder="Password"><br />
+        <!-- <span>You'll be logged in for 30 days.</span><br /> -->
+        <span><small>Your session will be remembered, so you don't need to re-login everytime you visit our services</small></span><br />
         <button class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" id="loginBtn" name="login">Login</button>
     </div>
     <?php include '../linkbar.php' ?>

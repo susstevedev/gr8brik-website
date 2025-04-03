@@ -1,11 +1,6 @@
 <?php
-
-require_once 'classes/constants.php';
-
-if(isset($_SESSION['username'])){
-    session_start();
-    header('Location: index.php');
-}
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+isLoggedIn();
 
 if(isset($_POST['login'])) {
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -41,10 +36,11 @@ if(isset($_POST['login'])) {
 
             $userid = $row2['id'];
             $tokenid = uniqid('', true);
+            $time = time();
 
-            $sql = "INSERT INTO sessions (id, user, username, password) VALUES ('$tokenid', '$userid', '$username', '$password')";
+            $sql = "INSERT INTO sessions (id, user, username, password, timestamp) VALUES ('$tokenid', '$userid', '$username', '$pwd', '$time')";
             if ($conn->query($sql) === TRUE) {
-                setcookie('token', $tokenid, time() + (10 * 365 * 24 * 60 * 60), "/");
+                setcookie('token', $tokenid, $time + (10 * 365 * 24 * 60 * 60), "/", ".gr8brik.rf.gd");
                 $_SESSION['username'] = $userid;
                 $_SESSION['auth'] = true;
             }
@@ -81,7 +77,6 @@ $combinedString = $randomWord1 . $randomWord2 . $randomNumber;
         }
     </style>
     <script>
-    document.addEventListener("DOMContentLoaded", function() {
         $(document).ready(function() {
             $("#loginBtn").click(function(event) {
                 event.preventDefault();
@@ -91,11 +86,11 @@ $combinedString = $randomWord1 . $randomWord2 . $randomNumber;
                 var pwd = $("#loginForm input[name='pwd']").val();
 
                 $.ajax({
-                    url: "",
+                    url: "../ajax/auth",
                     method: "POST",
-                    data: { login: true, name: name, mail: mail, pwd: pwd },
+                    data: { register: true, name: name, mail: mail, pwd: pwd },
                     success: function(response) {
-                        window.location.href = "index.php?status=auth";
+                        window.location.reload();
                     },
 
                     error: function(jqXHR, textStatus, errorThrown) {
@@ -110,15 +105,16 @@ $combinedString = $randomWord1 . $randomWord2 . $randomNumber;
                 });
             });
         });
-    });
     </script>
     <h2>Create Account</h2>
     <div id="loginForm" class="w3-container">
         <b>Already have an account? <a href="login">Login</a></b><br />
         <input class="w3-input w3-border" value="<?php echo $combinedString; ?>" type="text" name="name" placeholder="Username"><br />
         <input class="w3-input w3-border" type="email" name="mail" placeholder="Email"><br />
-        <input class="w3-input w3-border" type="password" name="pwd" placeholder="Password"><br />
-        <button class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" id="loginBtn" name="login">Create Account</button>
+        <input class="w3-input w3-border" type="password" name="pwd" placeholder="Password">
+        <br /><b>By registering you are agreeing to our <a href="/terms.php" class="reload">Terms and Conditions</a> and <a href="/privacy.php" class="reload">Privacy Policy</a>.</b>
+        <br /><button class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" id="loginBtn" name="login">Create Account</button>
+        
     </div>
     <?php include '../linkbar.php' ?>
 </body>
