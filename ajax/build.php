@@ -285,6 +285,20 @@ function fetch_build($model_id, $csrf) {
     if(isset($token['user'])) {
         $id = $token['user'];
 
+        $sql = "SELECT * FROM user_blocks WHERE userid = ? AND profileid = ? LIMIT 1";
+        $stmt = $conn2->prepare($sql);
+        $stmt->bind_param("ii", $userid, $id);
+        $stmt->execute();
+        $result4 = $stmt->get_result();
+        $stmt->close();
+
+        if ($result4->num_rows > 0) {
+            header("HTTP/1.0 403 Forbidden");
+            return json_encode([
+                "message" => htmlspecialchars($row['username']) . " has blocked you.",
+            ]);
+        }
+
         $find_votes = $conn->query("SELECT * FROM votes WHERE user = '$id' AND creation = '$model_id' LIMIT 1");
         $vote_results = $find_votes->fetch_assoc();
         if ($find_votes->num_rows > 0) {
@@ -459,11 +473,32 @@ function fetch_comments($model_id, $csrf) {
         $banResult = $conn2->query("SELECT * FROM bans WHERE user = '$c_user' LIMIT 1");
         $banRow = $banResult->fetch_assoc();
 
+        $youBlocked = false;
+        $theyBlocked = false;
+        $blockResult = $conn2->query("SELECT * FROM user_blocks WHERE (userid = '$c_user' AND profileid = '$id') OR (userid = '$id' AND profileid = '$c_user')");
+        if ($blockResult && $blockResult->num_rows > 0) {
+            while ($row = $blockResult->fetch_assoc()) {
+                if ($row['userid'] == $id && $row['profileid'] == $c_user) {
+                    $youBlocked = true;
+                } elseif ($row['userid'] == $c_user && $row['profileid'] == $id) {
+                    $theyBlocked = true;
+                }
+            }
+            if ($youBlocked && $theyBlocked) {
+                $message = "You blocked @" . $userRow['username'] . ", and they blocked you.";
+            } elseif ($youBlocked) {
+                $message = "You blocked @" . $userRow['username'];
+            } elseif ($theyBlocked) {
+                $message = "You're blocked from @" . $userRow['username'];
+            }
+            continue;
+        }
+
         if ($banResult->num_rows > 0 && $banRow['end_date'] >= time()) {
             continue;
         }
 
-        if (!empty($userRow['deactive'] || empty($userRow['username']) || $userResult->num_rows < 0)) {
+        if (!empty($userRow['deactive'] || $userResult->num_rows < 0)) {
             continue;
         }
 
@@ -477,12 +512,17 @@ function fetch_comments($model_id, $csrf) {
         $comments[] = [
             'id' => $comment_id,
             'userid' => $c_user,
+            'user_admin' => htmlspecialchars($userRow['admin']),
+            // if you want me to add this code snippet that does nothing ask me
+            // 'username' => empty(htmlspecialchars($userRow['username'])) ? 'Deleted User' : htmlspecialchars($userRow['username']),
             'username' => htmlspecialchars($userRow['username']),
+            'user_about' => empty(htmlspecialchars($userRow['description'])) ? 'No description for this user.' : htmlspecialchars($userRow['description']),
             'comment' => $bbcode->toHTML(nl2br(htmlspecialchars($row['comment']))),
             'date' => time_ago(date('Y-m-d H:i:s', $row['date'])),
             'votes' => $comment_votes,
             'voted' => $is_voted,
             'loggedin' => $loggedin,
+            'message' => $message
         ];
     }
     $comResult->free();

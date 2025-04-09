@@ -53,7 +53,7 @@ if (isset($_GET['sessions'])) {
     exit;
 }
 
-if (isset($_GET['revoke']) && isset($_GET['tokenid'])) {
+if (isset($_GET['revoke']) && isset($_GET['tokenId'])) {
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     if ($conn->connect_error) {
@@ -62,23 +62,27 @@ if (isset($_GET['revoke']) && isset($_GET['tokenid'])) {
         exit;
     }
 
-    $session = $_GET['tokenid'];
+    $session = $_GET['tokenId'];
 
-    if (!filter_var($session, FILTER_VALIDATE_INT)) {
-        header('HTTP/1.0 400 Bad Request');
-        echo json_encode(['error' => "invalid tokenid"]);
+    $check = $conn->prepare("SELECT id FROM sessions WHERE id = ?");
+    $check->bind_param("s", $session);
+    $check->execute();
+    $check->store_result();
+    if ($check->num_rows === 0) {
+        echo json_encode(['error' => "session not found"]);
         exit;
     }
 
     $stmt = $conn->prepare("DELETE FROM sessions WHERE id = ? LIMIT 1");
     $stmt->bind_param("s", $session);
-    $stmt->execute();
 
-    if ($stmt->affected_rows > 0) {
+    if ($stmt->execute()) {
         echo json_encode(['success' => true, 'message' => "session deleted"]);
+        exit;
     } else {
         header('HTTP/1.0 404 Not Found');
-        echo json_encode(['error' => "session not found"]);
+        echo json_encode(['error' => "couldn't delete session"]);
+        exit;
     }
 
     $stmt->close();
@@ -166,6 +170,7 @@ if(isset($_POST['login'])) {
         exit;
     }
     echo json_encode(['error' => 'An error occured. Please try again later.']);
+    exit;
 }
 
 if(isset($_POST['register'])) {
@@ -223,5 +228,8 @@ if(isset($_POST['register'])) {
 		}
 	}   
 }
+
+header('HTTP/1.0 500 Internal Server Error');
+exit(json_encode(["error" => "An unknown error has occured"]));
 
 ?>

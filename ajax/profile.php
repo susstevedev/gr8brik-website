@@ -1,5 +1,5 @@
 <?php
-error_reporting(0);
+//error_reporting(0);
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
@@ -323,6 +323,34 @@ if(isset($_GET['who_follows_you'])) {
     exit;
 } */
 
+function user_blocks($profileid, $userid, $username) {
+    $you = false;
+    $them = false;
+    $message = "OK";
+
+    $block_result = $conn2->query("SELECT * FROM user_blocks WHERE (userid = '$userid' AND profileid = '$profileid') OR (userid = '$profileid' AND profileid = '$userid')");
+
+    if ($block_result && $block_result->num_rows > 0) {
+        while ($row = $block_result->fetch_assoc()) {
+            if ($row['userid'] == $id && $row['profileid'] == $c_user) {
+                $you = true;
+            } elseif ($row['userid'] == $c_user && $row['profileid'] == $id) {
+                $them = true;
+            }
+        }
+
+        if ($youBlocked && $theyBlocked) {
+            $message = "You blocked @" . $username . ", and they blocked you.";
+        } elseif ($you) {
+            $message = "You blocked @" . $username;
+        } elseif ($them) {
+            $message = "You're blocked from @" . $username;
+        }
+
+        return $message;
+    }
+}
+
 function fetch_profile($profile_id, $id, $users_row, $csrf) {
     require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
     $bbcode = new BBCode();
@@ -385,6 +413,33 @@ function fetch_profile($profile_id, $id, $users_row, $csrf) {
                 "error" => 'ACC_BAN'
             ]);
         }
+    }
+
+    $blockedUser = false;
+    $sql = "SELECT * FROM user_blocks WHERE userid = ? AND profileid = ? LIMIT 1";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ii", $id, $profile_id);
+    $stmt->execute();
+    $result3 = $stmt->get_result();
+    $stmt->close();
+
+    if ($result3->num_rows > 0) {
+        $blockedUser = true;
+    }
+
+    $sql = "SELECT * FROM user_blocks WHERE userid = ? AND profileid = ? LIMIT 1";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ii", $profile_id, $id);
+    $stmt->execute();
+    $result3 = $stmt->get_result();
+    $stmt->close();
+
+    if ($result3->num_rows > 0) {
+        header("HTTP/1.0 403 Forbidden");
+        return json_encode([
+            "message" => htmlspecialchars($row['username']) . " has blocked you.",
+            "error" => 'ACC_BLOCKED_LOGIN_USER'
+        ]);
     }
     
     if (!isset($_COOKIE['token']) && !isset($tokendata)) {
@@ -456,6 +511,7 @@ function fetch_profile($profile_id, $id, $users_row, $csrf) {
         'model_count' => htmlspecialchars($model_count),
         'followers' => htmlspecialchars($followers),
         'following' => htmlspecialchars($following),
+        'blockedUser' => (bool)$blockedUser,
         'hasBanner' => $hasBanner,
         'isFollowing' => (bool)$isFollowing,
         'canBan' => $canBan,

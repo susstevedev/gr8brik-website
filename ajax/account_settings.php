@@ -9,43 +9,42 @@ $response = ['error' => 'Unknown error occurred.'];
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-if (!isset($_SERVER['HTTPS']) || $_SERVER['HTTPS'] != 'on') {
+if($loggedin === false) {
     header("HTTP/1.0 403 Forbidden");
-    echo json_encode(['error' => 'Encryption is required for this action']);
+    echo json_encode(['error' => 'Invalid sign in token provided', 'code' => '403']);
     exit;
 }
 
-    $sessionid = $_COOKIE['token'];
-    $sql = "SELECT * FROM sessions WHERE id = '$sessionid'";
-    $tokendata = $conn->query($sql);
-    $token = $tokendata->fetch_assoc();
+function check_username_available($new) {
+    global $users_row;
+    global $conn;
+    $id = $users_row['id'];
+    $available = '1';
+    $reason = '0';
 
-    if(!isset($_COOKIE['token']) || $tokendata->num_rows === 0) {
-        http_response_code(403);
-        echo json_encode(['error' => 'Invalid sign in token provided', 'code' => '403']);
-        exit;
+    if(empty($new) || $new === null) {
+        $available = '0';
+        $reason = 'Please provide a username.';
     }
 
-if(isset($_GET['check_username_available'])) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $new = urldecode(htmlspecialchars($_GET['username']));
-    $id = $token['user'];
-    $available = '1';
-
-    if(empty($new)) {
+    if(trim($new) === trim($users_row['username'])) {
         $available = '0';
+        $reason = 'This is your current username.';
     }
 
     if(!ctype_alnum(str_replace(array('-', '_', '.'), '', $new))) {
         $available = '0';
+        $reason = 'Username cannot contain anything other than A-Z, any number, or dash underscore and dot.';
     }
 
     if(strlen($new) > 15) {
         $available = '0';
+        $reason = 'Username must be under 15 characters.';
     }
 
     if(strlen($new) < 2) {
         $available = '0';
+        $reason = 'Username must be more than 2 characters.';
     }
 
     $result = $conn->query("SELECT * FROM users WHERE username = '$new'");
@@ -53,75 +52,45 @@ if(isset($_GET['check_username_available'])) {
 
     if($result->num_rows != 0) {
         $available = '0';
+        $reason = 'Username has been taken. Please choose another.';
     }
 
+    if(!empty($users_row['changed'])) {
+        $changed = $users_row['changed'];
+        if (($changed - time()) < 86400) {
+            $change_when = $changed - time();
+            $reason = "You can change your username in " . date("H", $change_when) . " hours";
+            $available = '0';
+        }
+    }
+
+    return ['available' => $available, 'reason' => $reason];
+}
+
+if(isset($_GET['check_username_available'])) {
+    $username = urldecode(htmlspecialchars($_GET['username']));
+    $result = check_username_available($username);
     header("HTTP/1.0 200 OK");
-    echo json_encode(['available' => $available]);
+    echo json_encode($result);
     exit;
 }
 
 if(isset($_GET['username_change'])) {
     $new = urldecode(htmlspecialchars($_GET['username']));
-    $id = $token['user'];
-
-    if(empty($new)) {
-        $error_message = "Username cannot be blank";
+    $id = $users_row['id'];
+    
+    $result = check_username_available($new);
+    if ($result['available'] === '0') {
         header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => $error_message]);
-        exit;
-    }    
-    if(!ctype_alnum(str_replace(array('-', '_', '.'), '', $new))) {
-        $error_message = "Username has invalid characters";
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => $error_message]);
-        exit;
-    }
-    if(strlen($new) > 15) {
-        $error_message = "Username can only be 15 characters";
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => $error_message]);
-        exit;
-    }
-    if(strlen($new) < 2) {
-        $error_message = "Username must be more than 2 characters";
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => $error_message]);
-        exit;
-    }
-    if(!empty($changed)) {
-        if (($changed - time()) < 86400) {
-            $change_when = $changed - time();
-            $error_message = "You can change your username in " . date("H", $change_when) . " hours";
-            header("HTTP/1.0 500 Internal Server Error");
-            echo json_encode(['error' => $error_message]);
-            exit;
-        }
-    }
-
-	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-    $sql = "SELECT * FROM users WHERE username = '$new'";
-    $result = $conn->query($sql);
-    $row = $result->fetch_assoc();
-
-    if($result->num_rows != 0) {
-        if($row['id'] === $id) {
-            $error_message = "This is your current username";
-            header("HTTP/1.0 500 Internal Server Error");
-            echo json_encode(['error' => $error_message]);
-            exit;
-        }
-        $error_message = "Username is taken";
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => $error_message]);
+        echo json_encode(['error' => $result['reason']]);
         exit;
     }
 
     $changed = time();
 
-	$stmt_2 = $conn->prepare("UPDATE users SET username = ?, changed = ? WHERE id = ?");
-    $stmt_2->bind_param("sss", $new, $changed, $id);
-    if ($stmt_2->execute()) {
+	$stmt = $conn->prepare("UPDATE users SET username = ?, changed = ? WHERE id = ?");
+    $stmt->bind_param("sss", $new, $changed, $id);
+    if ($stmt->execute()) {
         header("HTTP/1.0 200 OK");
         echo json_encode(['success' => 'Username updated']);
         exit;
@@ -178,7 +147,7 @@ if(isset($_GET['about_change'])){
     exit;
 }
 
-if(isset($_GET['change'])){
+if(isset($_GET['change'])) {
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     $old = md5($_GET['o_password']);
@@ -232,7 +201,7 @@ if (isset($_POST['change'])) {
 
     if ($storedHash) {
         if ($storedHash === md5($oldPassword . $salt)) {
-            $newSalt = bin2hex(random_bytes(32));
+            $newSalt = bin2hex(random_bytes(16));
             $newHashedPassword = md5($newPassword . $newSalt);
 
             $stmt = $conn->prepare("UPDATE users SET password = ?, salt = ? WHERE id = ?");

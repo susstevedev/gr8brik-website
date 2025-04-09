@@ -31,14 +31,10 @@ if(isset($_COOKIE['token'])) {
             exit;
         }
     } else {
-        /*if(!isset($_SESSION['username'])) {
-            $_SESSION['username'] = $conn->real_escape_string($token['user']);
-            header("Refresh:0");
-        }*/
         $token = $tokendata->fetch_assoc();
         $id = $token['user'];
 
-        $users_statement = $conn->prepare("SELECT username, password, email, description, twitter, admin, alert, age, changed FROM users WHERE id = ?");
+        $users_statement = $conn->prepare("SELECT * FROM users WHERE id = ?");
         $users_statement->bind_param("i", $id);
         $users_statement->execute();
         $users_result = $users_statement->get_result();
