@@ -2,7 +2,7 @@
 /**
  * BBCode to HTML converter
  *
- * Created by Kai Mallea (kmallea@gmail.com)
+ * Created by Kai Mallea (kmallea@gmail.com), modified by susstevedev (evanrutledge226@gmail.com) for Gr8brik.rf.gd
  *
  * Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
  */
@@ -33,22 +33,26 @@ class BBCode {
     };
 
     
-    $this->bbcode_table["/(?<!\[url\])(?<!\[img\])(?<!\[)(?<!&)(@|#)([a-zA-Z0-9_]+)(?!\])(?!;)(?!<)(?!>)(?!:)/"] = function ($match) {
+    $this->bbcode_table["/(?<!\[url\])(?<!\[img\])(?<!\[)(?<!&)(@|#)([\p{L}\p{N}_\-.]+)(?!\])(?!;)(?!<)(?!>)(?!:)/ui"] = function ($match) {
         if ($match[1] === '@') {
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+            
+            if ($conn->connect_error) {
+                return "@{$match[2]}";
+            }
 
             $username = $conn->real_escape_string($match[2]);
             $matchResult = $conn->query("SELECT * FROM users WHERE username = '$username' LIMIT 1");
-            $matchRow = $matchResult->fetch_assoc();
 
-            $user = isset($matchRow['id']) ?: '0';
-            return "<a href=\"/user/{$user}\" title='@<USERNAME> mentions someone.'><b>@{$username}</b></a>";
-
+            if ($matchResult && $matchRow = $matchResult->fetch_assoc()) {
+                return "<a href=\"/user/{$matchRow['id']}\"><b>@{$username}</b></a>";
+            } else {
+                return "@{$username}";
+            }
         } elseif ($match[1] === '#') {
             return "<a href=\"/list.php?q={$match[2]}\"><b>#{$match[2]}</b></a>";
         } else {
-            //return "<a href=\"{$match[1]}\"><b>{$match[1]}</b></a>";
-            return "[url]{$match[1]}[/url]";
+            return "<a href=\"{$match[1]}\" target=\"_blank\">$match[1]</a>";
         }
     };
 
