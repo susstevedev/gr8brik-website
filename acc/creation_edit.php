@@ -1,8 +1,7 @@
 <?php
-require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
-if(!isset($_SESSION['username'])){
-    header('Location: acc/login.php');
-}
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+isLoggedIn();
+
 define('DB_NAME2', 'if0_36019408_creations');
 $model_id = $_GET['id'];
 ?>

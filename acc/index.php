@@ -41,11 +41,9 @@ if (isset($_POST["upload"])) {
     if (move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) {
         echo "The file ". htmlspecialchars($original_file_name). " has been uploaded as " . $new_file_name;
 
-        // Prepare and bind
         $stmt = $conn->prepare("INSERT INTO model (user, model, description, name) VALUES (?, ?, ?, ?)");
         $stmt->bind_param("isss", $userid, $new_file_name, $description, $name);
 
-        // Execute the statement
         if ($stmt->execute()) {
             echo "File details have been added to the database.";
         } else {
@@ -255,7 +253,6 @@ if(isset($_POST['twitter_change'])){
 }
 
 if(isset($_POST['about_change'])){
-    //include $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
     $new = $_POST['description'];
     $id = $token['user'];
     if(strlen($new) > 200) {
@@ -287,7 +284,6 @@ if(isset($_POST['e_change'])){
     $old = $_POST['o_email'];
     $new = $_POST['n_email'];
     $confirm = $_POST['c_email'];
-    // Fetch the current email from the database
 			$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 			$stmt = $conn->prepare("SELECT email FROM users WHERE username = ?");
 			$stmt->bind_param("s", $user);
@@ -333,11 +329,6 @@ if(isset($_POST['deactive'])) {
     <?php 
         include('../navbar.php');
         include('panel.php');
-        if(file_exists('../acc/users/pfps/' . $id . '.jpg')) {
-            $pfp = '../acc/users/pfps/' . $id . '.jpg';
-        } else {
-            $pfp = '../img/avatar.png';
-        }
 
         $words = ['Brick', 'Minifig', 'Stud', 'Build', 'Block', 'Stack', 'Baseplate', 'Roadplate', 'Fanatic', 'Craftsman', 'Awesome', 'Great'];
         $randomKeys = array_rand($words, 2);
@@ -370,9 +361,8 @@ if(isset($_POST['deactive'])) {
 				<span onclick="document.getElementById('delete').style.display='none'" class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
 				<form method='post' action=''>
 					<h2>Are you sure you want to permanently delete your account?</h2>
-                    <p><input type="password" name="password" placeholder="Password" class="w3-input w3-border w3-mobile" required /></p>
-                    <p>This will delete <b>almost everything</b> on your account* (not notifications, comment votes, or creations likes, and forum posts and replies will only be anonymized).</p>
-                    <p>If you only want to delete it for a certain time, deactivate it instead. This action <b>cannot</b> be undone by anyone.</p>
+                    <p>This will delete <b>everything</b> on your account* (forum posts and replies will only be anonymized).</p>
+                    <p class="w3-text-red">This action <b>cannot</b> be undone!</p>
 					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span>&nbsp;
                     <span id="delete-account-btn" name="delete-account-btn" class="w3-btn w3-large w3-white w3-hover-red">Yes</span>
 				</form>
@@ -399,10 +389,10 @@ if(isset($_POST['deactive'])) {
                     setTimeout(function() {
                         if(response.available === "1") {
                             $("#u_change").html('Change Username').attr('disabled', false);
-                            $("#data-username-available").show().css("background-color", "green").text('Username available.').delay(5000).fadeOut();
+                            $("#data-username-available").show().css("background-color", "green").text('Username available.').delay(10000).fadeOut();
                         } else if(response.available === "0") {
                             $("#u_change").html('Change Username');
-                            $("#data-username-available").show().css("background-color", "red").text('Username taken.').delay(5000).fadeOut();
+                            $("#data-username-available").show().css("background-color", "red").text(response.reason).delay(10000).fadeOut();
                         }
                     }, 2500);
                 },
@@ -546,30 +536,12 @@ if(isset($_POST['deactive'])) {
                 }
             });
         });
-
-        $("#dark_mode").click(function(event) {
-            $.cookie('mode', 'dark', { expires: 365 });
-            $("body").removeClass("w3-light-blue").css({"background-color": "#121212", "color": "#FAF9F6"});
-            $('#navbar').removeClass('w3-light-grey').addClass('w3-dark-grey'); 
-            $('.gr8-theme').removeClass('w3-light-grey gr8-theme').addClass('w3-dark-grey w3-text-white'); 
-            $('.gr8-theme-opposite').removeClass('w3-dark-grey w3-text-white gr8-theme').addClass('w3-light-grey w3-text-black'); 
-        });
-        $("#light_mode").click(function(event) {
-            if($.cookie('mode')) {
-                $.removeCookie('mode');
-                $("body").addClass("w3-light-blue").css("all","unset");
-                $('#navbar').addClass('w3-light-grey').removeClass('w3-dark-grey'); 
-                $('.gr8-theme').addClass('w3-light-grey').removeClass('w3-dark-grey w3-text-white'); 
-                $('.gr8-theme-opposite').addClass('w3-dark-grey w3-text-white').removeClass('w3-light-grey w3-text-black'); 
-            }
-        });
-
     });
     </script>
 
     <style>
         .file-pfp {
-            background-image: url('<?php echo $pfp ?>');
+            background-image: url('<?php echo "../acc/users/pfps/" . $id . ".jpg?t=" . time() ?>');
             width: 250px;
             height: 250px;
             background-repeat: no-repeat;
@@ -599,13 +571,6 @@ if(isset($_POST['deactive'])) {
 
     <p class="success w3-light-grey w3-card-2 w3-padding-small"></p>
     <p class="error w3-red w3-card-2 w3-padding-small"></p>
-
-    <h2>General</h2>
-
-    <div class="theme">
-        <button class="w3-btn w3-light-blue w3-hover-dark-grey" id="dark_mode">Dark mode</button>
-        <button class="w3-btn w3-dark-grey w3-hover-light-blue" id="light_mode">Light mode</button>
-    </div>
 
     <h2>Account</h2>
     
@@ -642,7 +607,6 @@ if(isset($_POST['deactive'])) {
         <p class="gr8-child"><span id="data-username-available" style="display: none; padding: 5px 5px 5px 5px;"></span></p>
         <input class="w3-input w3-border w3-mobile w3-third" value="<?php echo $user ?>" type="text" id="username-input" name="username" placeholder="<?php echo $combinedString ?>">
         <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="u_change" name="u_change">Change Username</button>
-        <!-- <br /><br />&nbsp;&nbsp;<small>Your account link will be <a href="/@<?php echo $user ?>" target="_blank" rel="noopener noreferrer">http://www.gr8brik.rf.gd/@<span id="username-url"><?php echo $user ?></span></a></small> -->
     </div><br /><br />
 
     <div id="twitter">

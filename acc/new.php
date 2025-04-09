@@ -57,6 +57,11 @@ isLoggedIn();
 			$sql = "SELECT * FROM notifications WHERE user = $id ORDER BY timestamp DESC";
             $result = $conn2->query($sql);
 
+            $url = null;
+            $post = 'New notification';
+            $user = null;
+            $img = '../img/info.jpg';
+
 			while ($row = $result->fetch_assoc()) {
                 $profile = $row['profile'];
                 $sql2 = "SELECT * FROM users WHERE id = $profile";
@@ -94,12 +99,8 @@ isLoggedIn();
 
                     $result3->free();
                     $conn3->close();
-                } else {
-                    $url = null;
-                    $post = 'New notification';
-                    $user = null;
-                    $img = '../img/info.jpg';
                 }
+                
                 if (is_numeric($row['timestamp'])) {
                     $time = gmdate("Y-m-d H:i:s", $row['timestamp']);
                 } else {
