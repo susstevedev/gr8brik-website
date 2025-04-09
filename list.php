@@ -77,7 +77,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Creations</title>
+    <?php if(isset($_COOKIE['token'])) { ?>
+        <title>The second web based online LEGO® modeler in over a decade</title>
+    <?php } else { ?>
+        <title>Creations</title>
+    <?php } ?>
+
     <?php include 'header.php' ?>
 </head>
 <body class="w3-light-blue w3-container radial-gradient">
@@ -101,8 +106,6 @@
             </span>
             <span class="w3-right">
                 <a href="/modeler" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Start Building</a>
-                &nbsp;|&nbsp;
-                <a href="/acc/creations" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Upload</a>
             </span>
         </div>
 
@@ -180,8 +183,7 @@
             if ($result->num_rows != 0) {
                 $sql = 'SELECT * FROM model WHERE user IN (' . implode(',', $followed_users) . ') ORDER BY date DESC LIMIT 10 OFFSET ' .  $offset;
 
-                echo '<span>The old feed page is <a href="/feed">here</a>.</span>';
-                echo '<p>You can get a better feed by following more people at <a href="/users" class="reload">www.gr8brik.rf.gd/users</a>.</p>';
+                echo '<p>You can get a better feed by following more people. <a href="/users">Users page</a>.</p>';
             } else {
                 $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 10 OFFSET' .  $offset;
 

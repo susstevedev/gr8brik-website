@@ -18,17 +18,17 @@ if($data['message'] != "OK") {
     $data['username'] = 'User';
 }
 
-if (isset($_GET['follow'])) {
-    $profile_id = $_GET['user'];
+if (isset($_POST['follow'])) {
+    $profile_id = $_GET['id'];
+    $time = time();
 
-    $sql_follow = "INSERT INTO follow (userid, profileid) VALUES (?, ?)";
+    $sql_follow = "INSERT INTO follow (userid, profileid, date) VALUES (?, ?, ?)";
     $stmt_follow = $conn->prepare($sql_follow);
-    $stmt_follow->bind_param("ii", $id, $profile_id);
+    $stmt_follow->bind_param("iii", $id, $profile_id, $time);
     $result = $stmt_follow->execute();
     $stmt_follow->close();
 
     if ($id != $profile_id) {
-        $time = time();
         $content = $profile_id;
         $category = 1;
 
@@ -37,8 +37,6 @@ if (isset($_GET['follow'])) {
         $stmt_notification->bind_param("iisii", $profile_id, $id, $time, $content, $category);
         $stmt_notification->execute();
         $stmt_notification->close();
-
-        $date = time();
 
         $sql_alert_select = "SELECT alert FROM users WHERE id = ?";
         $stmt_alert_select = $conn->prepare($sql_alert_select);
@@ -71,7 +69,7 @@ if (isset($_GET['follow'])) {
 }
 
 if(isset($_POST['unfollow'])) {
-    $profile_id = $_GET['user'];
+    $profile_id = $_GET['id'];
     $sql = "DELETE FROM follow WHERE userid = '$id' AND profileid = '$profile_id'";
     $result = $conn->query($sql);
     if ($result) {
@@ -80,6 +78,38 @@ if(isset($_POST['unfollow'])) {
     } else {
         header("HTTP/1.0 500 Internal Server Error");
         $error = "An error has happened while unfollowing this user.";
+    }
+}
+
+if (isset($_POST['block'])) {
+    $profile_id = $_GET['id'];
+    $time = time();
+
+    $sql_block = "INSERT INTO user_blocks (userid, profileid, date) VALUES (?, ?, ?)";
+    $stmt_block = $conn->prepare($sql_block);
+    $stmt_block->bind_param("iii", $id, $profile_id, $time);
+    $result = $stmt_block->execute();
+    $stmt_block->close();
+
+    if ($result) {
+        header("HTTP/1.0 200 OK");
+        $message = "Blocked this user with success!";
+    } else {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "An error has happened while blocking this user.";
+    }
+}
+
+if(isset($_POST['unblock'])) {
+    $profile_id = $_GET['id'];
+    $sql = "DELETE FROM user_blocks WHERE userid = '$id' AND profileid = '$profile_id'";
+    $result = $conn->query($sql);
+    if ($result) {
+        header("HTTP/1.0 200 OK");
+        $message = "Unblocked this user with success!";
+    } else {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "An error has happened while unblocking this user.";
     }
 }
 
@@ -182,16 +212,17 @@ if(isset($_POST['ban'])) {
         
         <span style="font-size: 30px; display: inline-block; vertical-align: top; max-width: 100%;">
             <img id="picture" style="width: 50px; height: 50px; border-radius: 50px;" src="/acc/users/pfps/<?php echo htmlspecialchars($_GET['id']) ?>.jpg" />
-            <span id="username"><?php echo $data['username'] ?></span>
-            <?php if(!empty($data['verified'])) { ?>
-                <span id="data-verified"><span class="fa fa-check w3-blue w3-padding-tiny w3-xlarge" title="This profile is important." aria-hidden="true"></span></span>
-            <?php } ?>
+
             <?php if(!empty($data['admin'])) { ?>
-                <span id="data-admin"><span class="fa fa-check w3-red w3-padding-tiny w3-xlarge" title="This user has volunteered to moderate Gr8brik." aria-hidden="true"></span></span>
+                <span id="username" class="w3-text-red"><?php echo $data['username'] ?></span>
+            <?php } else { ?>
+                <span id="username"><?php echo $data['username'] ?></span>
             <?php } ?>
+            
             <?php if(trim($token['user']) === trim($_GET['id'])) { ?>
-                <span id="data-edit-profile"><a href="/acc/"><i class="fa fa-pencil w3-xlarge" aria-hidden="true"></i></a></span>
+                <span><a href="/acc/index"><i class="fa fa-pencil w3-xlarge" aria-hidden="true"></i></a></span>
             <?php } ?>
+
             <span style="font-size:20px;">
                 <span><b id="data-model-count" style="text-decoration: underline dotted;"><?php echo $data['model_count'] ?></b>&nbsp;creations</span>
                 <span><b id="data-follower-count" style="text-decoration: underline dotted;"><?php echo $data['followers'] ?></b>&nbsp;followers</span>
@@ -233,8 +264,17 @@ if(isset($_POST['ban'])) {
                         Ban
                     </button>&nbsp;
                 <?php } ?>
+                
+                <?php if($data['blockedUser'] === false) { ?>
+                <button onclick='document.getElementById("block").style.display="block"' name="block" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />
+                    Block
+                </button>&nbsp;
+                <?php } elseif($data['blockedUser'] === true) { ?>
+                    <input id="button-unblock" form="unblockUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Unblock" name="unblock">&nbsp;
+                <?php } ?>
 
                 <form id="followUser" action="" method="post"></form>
+                <form id="unblockUser" action="" method="post"></form>
             </span>
             <?php } ?>
         <?php } ?>
@@ -250,6 +290,19 @@ if(isset($_POST['ban'])) {
 					<h2>Are you sure you want to unfollow this user?</h2>
 					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('unfollow').style.display='none'">No</span> 
 					<input type="submit" value="Yes" name="unfollow" class="w3-btn w3-large w3-white w3-hover-red">
+				</form>
+			</div>
+		</div>
+	</div>
+
+    <div id="block" class="w3-modal">
+		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
+			<div class="w3-container">
+				<span onclick="document.getElementById('block').style.display='none'" class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
+				    <form method='post' action=''>
+					<h2>Are you sure you want to block this user?</h2>
+					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('block').style.display='none'">No</span> 
+					<input type="submit" value="Yes" name="block" class="w3-btn w3-large w3-white w3-hover-red">
 				</form>
 			</div>
 		</div>

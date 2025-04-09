@@ -302,12 +302,18 @@ document.addEventListener("DOMContentLoaded", function () {
 <?php } ?>
 
 <main id="wrapper">
-    <center><header class="loader" xstyle="display: none;"></header></center>
+    <center><header class="loader"></header></center>
     <header>
         <h2 id="data-name"><?php echo $data['name'] ?></h2>
         <h4 id="data-stats">
             <i class="fa fa-clock-o" aria-hidden="true"></i>Posted&nbsp;<?php echo $data['date'] ?><br />
-            <i class="fa fa-user-o" aria-hidden="true"></i>By&nbsp;<a id="data-user-link" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?></a><br />
+            <i class="fa fa-user-o" aria-hidden="true"></i>By
+                <?php if($data['model_admin'] === '1') { ?>
+                <a id="data-user-link" class="w3-text-red w3-hover-text-yellow" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?>
+                <?php } else { ?>
+                <a id="data-user-link" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?>
+                <?php } ?>
+            </a><br />
             <i class="fa fa-arrow-circle-o-up" aria-hidden="true"></i><?php echo $data['likes'] ?>&nbsp;likes<br />
             <i class="fa fa-eye" aria-hidden="true"></i><?php echo $data['views'] ?>&nbsp;views<br />
         </h4>
@@ -355,10 +361,14 @@ document.addEventListener("DOMContentLoaded", function () {
     <?php } ?>
         
     <p>Share:</p>
-    <p><input name='share' id='share' class="w3-input w3-card-2 w3-hover-shadow w3-mobile w3-quarter w3-round" value="http://www.gr8brik.rf.gd/build/<?php echo $_GET['id'] ?>" readonly></input></p><br /><br /><hr />
+    <p><textarea class="w3-input w3-card-2 w3-hover-shadow w3-mobile w3-round" rows='2' cols='60' readonly>http://www.gr8brik.rf.gd/build/<?php echo htmlspecialchars($_GET['id']) ?></textarea></p>
+    <p>Or...</p>
+    <p><textarea class="w3-input w3-card-2 w3-hover-shadow w3-mobile w3-round" rows='2' cols='60' readonly>http://www.gr8brik.rf.gd/ajax/build.php?fetch=true&buildId=<?php echo htmlspecialchars($_GET['id']) ?></textarea></p><hr />
 
     <div class="w3-container">
-        <?php if($loggedin === true) { ?>
+        <?php if($data['message'] != "OK") { ?>
+            <p><div class="gr8-theme w3-light-grey w3-round w3-padding"><?php echo $data['message'] ?></div></p>
+        <?php } elseif($loggedin === true) { ?>
             <div id='comment-form'>
                 <div id='post'>
                     <textarea name='comment-box' id='comment-box' class='w3-input w3-card-2 w3-hover-shadow w3-mobile w3-half w3-round' placeholder='add a comment... (type @username to mention someone)' rows='4' cols='40'></textarea>
@@ -366,6 +376,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 <button id='post-comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo'>
                     <span id="comment-btn-text">Comment</span>
                 </button>
+            </div>
+        <?php } else { ?>
+            <div>
+                <a href="/acc/login" class="w3-btn w3-padding-small w3-white w3-hover-blue">LOGIN TO COMMENT</a>
             </div>
         <?php } ?>
     </div>
@@ -379,45 +393,73 @@ document.addEventListener("DOMContentLoaded", function () {
         if ($comment_data && is_array($comment_data)) {
             $comments = count($comment_data);
             echo '<h4><span class="fa fa-comments-o" aria-hidden="true"></span>&nbsp;<span id="data-comment-count-wrapper">' . $comments . '</span> comments</h4><hr />';
+
             foreach ($comment_data as $comment) {
-                $comments++;
-                echo '
-                <div id="comment' . $comment['id'] . '" class="w3-row w3-margin-bottom">
-                    <div class="w3-col" style="width: 50px;">
-                        <img class="w3-card-2 w3-hover-shadow w3-light-grey w3-circle" width="50px" height="50px" src="/acc/users/pfps/' . $comment['userid'] . '.jpg">
+    ?>
+        <?php if(!empty($comment['message'])) { ?>
+            <p><div class="gr8-theme w3-light-grey w3-round w3-padding"><?php echo $comment['message'] ?></div></p>
+        <?php } ?>
+        <div id="comment<?php echo $comment['id'] ?>" class="w3-row w3-margin-bottom">
+            <div class="w3-col" style="width: 50px;">
+                <div class='w3-dropdown-hover w3-bar-block' style="background-color: transparent;">
+                    <a href="/user/<?php echo $comment['userid'] ?>" class="w3-bar-item">
+                        <img class="w3-card-2 w3-hover-shadow w3-light-grey w3-circle" width="50px" height="50px" src="/acc/users/pfps/<?php echo $comment['userid'] ?>.jpg">
+                    </a>
+                    <div class='gr8-theme w3-light-grey w3-card-2 w3-padding w3-round w3-dropdown-content'>
+                        <img class="w3-card-2 w3-circle" width="50px" height="50px" src="/acc/users/pfps/<?php echo $comment['userid'] ?>.jpg"><br />
+                        <b class="<?php echo $comment['user_admin'] === '1' ? 'w3-text-red' : '' ?>"><?php echo $comment['username'] ?></b><br />
+                        <span><?php echo $comment['user_about'] ?></span>
                     </div>
-                    <div class="w3-hide-small w3-col w3-margin" style="width: 1px;">
-                        <i class="fa fa-play fa-rotate-180" style="font-size: 15px;"></i>
-                    </div>
-                    <div class="w3-col w3-card-2 w3-hover-shadow" style="width: 75%;">
-                        <article class="gr8-theme w3-light-grey w3-padding" style="min-height: 75px;">
-                            <header class="w3-padding-bottom">
-                                <b><a href="/user/' . $comment['userid'] . '">' . $comment['username'] . '</a></b>
-                                <span class="w3-mobile w3-right"><time datetime="' . $comment['date'] . '">' . $comment['date'] . '</time> - 
-                                <span id="votes">' . $comment['votes'] . ' votes</span></span>
-                            </header>
-                            <span class="w3-padding-bottom" style="word-wrap: break-word; white-space: normal;">' . $comment['comment'] . '</span><br />';
-                            if ($loggedin === true) {
-                                    if($comment['voted'] === false) {
-                                        echo '<div class="tooltip">
-                                        <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>&nbsp;Upvote Comment</span>
-                                        <button data-id="' . $comment['id'] . '" class="upvote-btn fa fa-arrow-up w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"></button>';
-                                    }
-                                    if($comment['voted'] === true) {
-                                        echo '<div class="tooltip">
-                                        <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>&nbsp;Downvote Comment</span>
-                                        <button data-id="' . $comment['id'] . '" class="downvote-btn fa fa-arrow-down w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"></button>';
-                                    }
-                                } else {
-                                    echo '<span><b>Please login to upvote.</b></span>';
-                                }
-                        echo '</article>
-                    </div>
-                </div>';
-            }
-        } else {
-            echo "<h4>No comments yet.</h4>";
+                </div>
+            </div>
+            <div class="w3-hide-small w3-col w3-margin" style="width: 1px;">
+                <i class="fa fa-play fa-rotate-180" style="font-size: 15px;"></i>
+            </div>
+            <div class="w3-col w3-card-2 w3-hover-shadow" style="width: 75%;">
+                <article class="gr8-theme w3-light-grey w3-padding" style="min-height: 75px;">
+                    <header class="w3-padding-bottom">
+                        <b>
+                            <a href="/user/<?php echo $comment['userid'] ?>" 
+                               class="<?php echo $comment['user_admin'] === '1' ? 'w3-text-red w3-hover-text-yellow' : '' ?>">
+                                <?php echo $comment['username'] ?>
+                            </a>
+                        </b>
+                        <span class="w3-mobile w3-right">
+                            <time datetime="<?php echo $comment['date'] ?>"><?php echo $comment['date'] ?></time> -
+                            <span id="votes"><?php echo $comment['votes'] ?> votes</span>
+                        </span>
+                    </header>
+                    <span class="w3-padding-bottom" style="word-wrap: break-word; white-space: normal;">
+                        <?php echo $comment['comment'] ?>
+                    </span><br />
+
+                    <?php if ($loggedin === true) { ?>
+                        <?php if ($comment['voted'] === false) { ?>
+                            <div class="tooltip">
+                                <span class="w3-tag w3-round w3-blue tooltiptext">
+                                    <i class="fa fa-info-circle" aria-hidden="true"></i>&nbsp;Upvote Comment
+                                </span>
+                                <button data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-arrow-up w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"></button>
+                            </div>
+                        <?php } elseif ($comment['voted'] === true) { ?>
+                            <div class="tooltip">
+                                <span class="w3-tag w3-round w3-blue tooltiptext">
+                                    <i class="fa fa-info-circle" aria-hidden="true"></i>&nbsp;Downvote Comment
+                                </span>
+                                <button data-id="<?php echo $comment['id'] ?>" class="downvote-btn fa fa-arrow-down w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"></button>
+                            </div>
+                        <?php } ?>
+                    <?php } else { ?>
+                        <span><b>Please login to upvote.</b></span>
+                    <?php } ?>
+                </article>
+            </div>
+        </div>
+    <?php
         }
+    } else {
+        echo "<h4>No comments yet.</h4>";
+    }
     ?>
 </div>
     <?php

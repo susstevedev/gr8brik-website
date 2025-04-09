@@ -34,7 +34,7 @@
 
 <h3>5. No NSFW</h3>
 
-<b>Anything that people may thing isn't for Children is NSFW. This is an auto 7 day ban; and if repeated it will be raised to a month.</b>
+<b>Anything that people may think isn't for Children is NSFW. This is an auto 7 day ban; and if repeated it will be raised to a month.</b>
 
 <h3>6. No conflict</h3>
 
@@ -44,7 +44,7 @@
 
 <div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-center">
 
-    <h5>If you wish us to remove any personal details we hold about you, please email us at <i class="fa fa-envelope"><a href="mailto:evanrutledge226@gmail.com">evanrutledge226[at]gmail[dot]com</a></i></h5>
+    <!-- <h5>If you wish us to remove any personal details we hold about you, please email us at <i class="fa fa-envelope"><a href="mailto:evanrutledge226@gmail.com">evanrutledge226[at]gmail[dot]com</a></i></h5> -->
 
 </div><br />
 
@@ -76,15 +76,13 @@
 
                     echo "<br /><li class='w3-padding-small'><a href='/user/" . $userid . "'>";
                     echo "<img id='pfp' style='width:100px;height:100px;border-radius:15px;border:1px solid skyblue;' src='/acc/users/pfps/" . $userid . ".jpg'>";
-                    echo "&nbsp;<b class='w3-xlarge'>" . htmlspecialchars($user['username']) . "</a></b>";
-                    if($user['verified'] != 0) {
-                        echo '&nbsp;<i class="fa fa-check w3-blue w3-padding-tiny w3-xlarge" title="Verified/Offical Account" aria-hidden="true"></i>';
+                    if($user['admin'] === '1') {
+                        echo "&nbsp;<b class='w3-xlarge w3-text-red'>" . htmlspecialchars($user['username']) . "</a></b>";
+                    } else {
+                        echo "&nbsp;<b class='w3-xlarge'>" . htmlspecialchars($user['username']) . "</a></b>";
                     }
-                    if($user['admin'] != 0) {
-                        echo '&nbsp;<i class="fa fa-check w3-red w3-padding-tiny w3-xlarge" title="Admin/Mod" aria-hidden="true"></i>';
-                    }
-                    if(trim($token['user']) === trim($userid)) {
-                        echo '&nbsp;<a href="/acc/index"><i class="fa fa-pencil w3-green w3-padding-tiny w3-xlarge" aria-hidden="true"></i></a>';
+                    if(trim($id) === trim($userid)) {
+                        echo '&nbsp;<a href="/acc"><i class="fa fa-pencil w3-xlarge" aria-hidden="true"></i></a>';
                     }
                     echo "<br /><b class='w3-text-grey'>" . $bbcode->toHTML(htmlspecialchars($user['description'])) . "</b></li>";
                 }
