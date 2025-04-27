@@ -245,7 +245,7 @@ function fetch_build($model_id, $csrf) {
     $name = $row2['name'];
     $date = $row2['date'];
     $screenshot = $row2['screenshot'];
-    $views = $row2['views'] + 1;
+    $views = $row2['views'];
     $isRemoved = $row2['removed'];
     $decoded_description = htmlentities($description, ENT_QUOTES, 'UTF-8');
        
@@ -308,10 +308,16 @@ function fetch_build($model_id, $csrf) {
         }
     }
 
-    $count_result = $conn->query("SELECT COUNT(*) as vote_count FROM votes WHERE creation = $model_id");
-    $count_row = $count_result->fetch_assoc();
-    $sql = "UPDATE model SET views = '$views' WHERE id = '$model_id'";
-    $result = $conn->query($sql);
+    if (!isset($_SESSION['viewed_creation_ids'])) {
+        $_SESSION['viewed_creation_ids'] = [];
+    }
+
+    if (!in_array($model_id, $_SESSION['viewed_creation_ids'])) {
+        $view_stmt = $conn->prepare("UPDATE model SET views = views + 1 WHERE id = ?");
+        $view_stmt->bind_param("i", $model_id);
+        $view_stmt->execute();
+        $_SESSION['viewed_creation_ids'][] = $model_id;
+    }
 
     header("HTTP/1.0 200 OK");
     $message = "OK";
@@ -604,6 +610,48 @@ if(isset($_POST['comment'])){
         exit;
     }
     $stmt2->close();
+}
+
+function delete_build($model_id) {
+    global $conn, $loggedin, $users_row;
+
+    $sql = "SELECT * FROM model WHERE id = ? AND removed = 0";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $model_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $build_row = $result->fetch_assoc();
+
+    if ($result->num_rows === 0) {
+        return 'Error: Creation not found';
+    }
+
+    if (!$loggedin || $users_row['id'] !== $build_row['user']) {
+        return 'Error: Unauthorized';
+    }
+
+    $model_path = '../cre/' . $build_row['model'];
+    if (file_exists($model_path)) {
+        unlink($model_path);
+    }
+
+    $screenshot_path = $build_row['screenshot'];
+    if (file_exists($screenshot_path)) {
+        unlink($screenshot_path);
+    }
+
+    $sql = "DELETE FROM model WHERE id = ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $model_id);
+    $stmt->execute();
+
+    return 'Success';
+}
+
+if(isset($_GET['delete_build'])) {
+    $model_id = $_GET['model_id'];
+    $delete = delete_build($model_id);
+    return $delete;
 }
 
 if(isset($_GET['picture'])) {

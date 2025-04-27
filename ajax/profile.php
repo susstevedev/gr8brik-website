@@ -404,7 +404,7 @@ function fetch_profile($profile_id, $id, $users_row, $csrf) {
     $result2 = $stmt->get_result();
     $stmt->close();
 
-    if ($result2->num_rows > 0) {
+    if ($result2->num_rows != 0) {
         $ban_data = $result2->fetch_assoc();
         if ($ban_data['end_date'] >= time()) {
             header("HTTP/1.0 403 Forbidden");
@@ -499,9 +499,12 @@ function fetch_profile($profile_id, $id, $users_row, $csrf) {
         $canBan = false;
     }
 
-    header("HTTP/1.0 200 OK");
+    if(isset($_GET['user'])) {
+        header("HTTP/1.0 200 OK");
+    }
     $message = "OK";
     $data = [
+        'userid' => $row['id'],
         'username' => htmlspecialchars($row['username']),
         'admin' => (string)$row['admin'],
         'verified' => (string)$row['verified'],

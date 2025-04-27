@@ -18,7 +18,8 @@ if($loggedin === false) {
 function check_username_available($new) {
     global $users_row;
     global $conn;
-    $id = $users_row['id'];
+    global $id;
+
     $available = '1';
     $reason = '0';
 
@@ -75,9 +76,10 @@ if(isset($_GET['check_username_available'])) {
     exit;
 }
 
-if(isset($_GET['username_change'])) {
-    $new = urldecode(htmlspecialchars($_GET['username']));
-    $id = $users_row['id'];
+function username_change($new) {
+    global $users_row;
+    global $conn;
+    global $id;
     
     $result = check_username_available($new);
     if ($result['available'] === '0') {
@@ -91,10 +93,16 @@ if(isset($_GET['username_change'])) {
 	$stmt = $conn->prepare("UPDATE users SET username = ?, changed = ? WHERE id = ?");
     $stmt->bind_param("sss", $new, $changed, $id);
     if ($stmt->execute()) {
-        header("HTTP/1.0 200 OK");
-        echo json_encode(['success' => 'Username updated']);
-        exit;
+        return ['success' => 'Username updated'];
     }
+}
+
+if(isset($_GET['username_change'])) {
+    $username = urldecode(htmlspecialchars($_GET['username']));
+    $result = username_change($username);
+    header("HTTP/1.0 200 OK");
+    echo json_encode($result);
+    exit;
 }
 
 
@@ -134,7 +142,7 @@ if(isset($_GET['about_change'])){
 	$stmt_2 = $conn->prepare("UPDATE users SET description = ? WHERE id = ?");
     $stmt_2->bind_param("si", $new, $id);
     if ($stmt_2->execute()) {
-        echo json_encode(['success' => 'success']);
+        echo json_encode(['success' => 'About section was changed successfully!']);
         exit;
     } else {
         header("HTTP/1.0 500 Internal Server Error");
@@ -279,6 +287,34 @@ if(isset($_GET['clear_notifications'])) {
 	exit;
 }
 
+if (isset($_POST['logout']) && isset($_POST['token'])) {
+    header('Content-Type: application/json');
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    $sessionid = $_COOKIE['token'];
+    
+    $stmt = $conn->prepare("SELECT * FROM sessions WHERE id = ?");
+    $stmt->bind_param("s", $sessionid);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if($result->num_rows != 0 && $sessionid === $_POST['token']) {
+        $stmt2 = $conn->prepare("DELETE FROM sessions WHERE id = ? LIMIT 1");
+        $stmt2->bind_param("s", $sessionid);
+        $stmt2->execute();
+        $stmt2->close();
+
+        $_SESSION = [];
+        setcookie('token', '', time() - 3600, "/", ".gr8brik.rf.gd");
+
+        header('Location:/list.php?invalid_login=true');
+        exit;
+    } else {
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => 'Invalid session token']);
+        exit;
+    }
+}
+
 if (isset($_POST['delete_account'])) {
     header('Content-Type: application/json');
     $id = $token['user'];
@@ -319,6 +355,11 @@ if (isset($_POST['delete_account'])) {
         $stmt_follows->bind_param("ii", $id, $id);
         $stmt_follows->execute();
         $stmt_follows->close();
+
+        $stmt_blocks = $conn->prepare("DELETE FROM user_blocks WHERE userid = ? OR profileid = ?");
+        $stmt_blocks->bind_param("ii", $id, $id);
+        $stmt_blocks->execute();
+        $stmt_blocks->close();
 
         $stmt_notif = $conn->prepare("DELETE FROM notifications WHERE user = ? OR profile = ?");
         $stmt_notif->bind_param("ii", $id, $id);
