@@ -24,18 +24,22 @@
 }
 	
 body {
-    font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
-    font-size: 16px;
+    /* font-family: 'Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
+    font-size: 16px; */
+    font-family: sans-serif;
+    font-size: 100%;
+    font-display: swap;
     text-shadow: 1.5px 1.5px 1.5px rgba(0, 0, 0, 0.1);
 }
 
+/* treat pre tags as normal text */
 pre {
-    font-family: Verdana, sans-serif;
+    font-family: sans-serif;
+    font-size: 100%;
     max-width: 100%;
     white-space: pre-line;
-    font-size: 15px;
-    line-height: 1.5;
-    text-shadow: 0px 0px 0px #fff;
+    line-height: normal;
+    text-shadow: none;
 }
 
 a:hover {
@@ -43,8 +47,22 @@ a:hover {
     transition: all 0.2s ease-in;
 }
 
+button, input:hover {
+    transition: all 0.2s ease-in-out;
+}
+
+input {
+    padding-bottom: 5px;
+    border: none;
+    outline: none;
+}
+
 .w3-main, .linkbar, .consoleErrorBox {
     margin-left: 18%;
+}
+
+.altcha-footer, .altcha-logo {
+    display: none !important;
 }
 
 #gdpr-cookie-message {
@@ -54,9 +72,10 @@ a:hover {
     display: inline-block;
     z-index: 9999;
     top: 0;
+    color: #fff;
     background-color: #808080;
     padding: 5px 5px 5px 5px;
-    border-radius: 5px;
+    border-radius: 0px;
     width: 50%;
     height: fit-content;
 }
@@ -65,8 +84,8 @@ a:hover {
     transition: all 0.2s ease-in-out;
     background-color: #0096FF;
     color: #fff;
-    border: 2px solid #808080;
-    border-radius: 0px;
+    border: 1px solid #0000FF;
+    border-radius: 3px;
     padding: 6px 6px 6px 6px;
     cursor: pointer;
 }
@@ -82,7 +101,7 @@ a:hover {
     line-height: 175%;
 }
 
-.gr8-navbarsearch:focus, .gr8-navbarsearch:active { 
+.gr8-navbarsearch-input:focus, .gr8-navbarsearch-input:active { 
     outline: blue !important; 
 }
 	
@@ -121,6 +140,12 @@ a:hover {
     height: 60vh;
     border-color: black;
     transition: all 0.2s ease-in-out;
+}
+
+img.emoji {
+    height: 1.2em;
+    width: 1.2em;
+    margin: 0;
 }
 
 @media only screen and (max-width: 700px) {
