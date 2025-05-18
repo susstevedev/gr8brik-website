@@ -1,33 +1,31 @@
 <?php
-require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
     if($_POST) {
-        require_once '../acc/classes/user.php';
-
-        define('DB_NAME3', 'if0_36019408_forum');
+        $id = $users_row['id'];
         $title = $conn->real_escape_string($_POST['title']) ?: "Unnamed Topic";
         $post = $conn->real_escape_string($_POST['description']);
         $date = date("Y-m-d H:i:s");
         $category = 'general';
 
-        if(isset($_SESSION['username'])) {
+        if(isset($users_row['id'])) {
             if(isset($post)) {
                 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-                $sql = "INSERT INTO posts (user, title, category, post, date) VALUES ('$id', '$title', '$category', '$post', '$date')";
+                $sql = "INSERT INTO messages (userid, title, status, content, timestamp) VALUES ('$id', '$title', '$category', '$post', '$date')";
                 $stmt = $conn->prepare($sql);
                 if (!$stmt) {
-                    die($conn->error);
+                    $msg = $conn->error;
                 }
                 if (!$stmt->execute()) {
-                    die($stmt->error);
+                    $msg = $stmt->error;
                 }
                 $stmt->close();
-                $msg = "Done!";
+                $msg = "Topic posted.";
             } else {
-                $msg = "Topic body is empty!";
+                $msg = "Post body is empty.";
             }
         } else {
-            $msg = "Please login to post!";
+            $msg = "Please login to post.";
         }
     }
 ?>
@@ -35,7 +33,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <title>Post Topic</title>
+    <title>Post A New Topic</title>
     <?php include '../header.php' ?>
 </head>
 <body class="w3-light-blue w3-container">
@@ -98,7 +96,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
         </form>
     </center><br /><br />
     
-    <?php include('../linkbar.php'); ?>
+    <?php include '../linkbar.php' ?>
 
 </body>
 </html>

@@ -1,6 +1,5 @@
 <?php
-require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
-
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -10,7 +9,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 </head>
 
 <body class="w3-light-blue w3-container">
-    <?php include('../navbar.php'); ?>
+    <?php include '../navbar.php' ?>
 
         <div class="w3-center">
 		
@@ -74,10 +73,10 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
             <?php
 			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
 			
-				$sql = "SELECT id, user, title, post, date
-                        FROM posts
-                        WHERE category = 'pinned' OR category = 'pinnedLocked'
-                        ORDER BY date DESC LIMIT $limit OFFSET $offset;";
+				$sql = "SELECT id, userid, title, content, timestamp
+                        FROM messages
+                        WHERE status = 'pinned' OR status = 'pinnedLocked'
+                        ORDER BY timestamp DESC LIMIT $limit OFFSET $offset;";
 				$stmt = $conn->prepare($sql);
 				$stmt->execute();
 				$stmt->bind_result($id, $post_user, $title, $post, $date);
@@ -104,7 +103,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
                             $shortTitle = 'Untitled';
                         }
 
-                        echo "<tr><td><a href='/topic/" . $id . "'><i class='fa fa-map-pin w3-padding-small w3-text-grey' aria-hidden='true' title='Pinned Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
+                        echo "<tr><td><a href='view.php?id=" . $id . "'><i class='fa fa-map-pin w3-padding-small w3-text-grey' aria-hidden='true' title='Pinned Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                         echo "<td>" . $date . "</td>";
                         echo "<td><a href='../user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td></tr>";
                         $username = '';
@@ -112,7 +111,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 
 			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
 			
-				$sql = "SELECT id, user, title, post, date FROM posts WHERE category = 'general' OR category = 'locked' ORDER BY date DESC LIMIT $limit OFFSET $offset";
+				$sql = "SELECT id, userid, title, content, timestamp
+                        FROM messages
+                        WHERE (status = 'general' OR status = 'locked') AND parent IS NULL OR parent = 0
+                        ORDER BY timestamp DESC
+                        LIMIT $limit OFFSET $offset";
 				$stmt = $conn->prepare($sql);
 				$stmt->execute();
 				$stmt->bind_result($id, $post_user, $title, $post, $date);
@@ -139,7 +142,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
                         $shortTitle = 'Untitled';
                     }
 
-                    echo "<tr><td><a href='/topic/" . $id . "'><i class='fa fa-users w3-padding-small w3-text-grey' aria-hidden='true' title='General Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
+                    echo "<tr><td><a href='view.php?id=" . $id . "'><i class='fa fa-users w3-padding-small w3-text-grey' aria-hidden='true' title='General Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                     echo "<td>" . $date . "</td>";
                     echo "<td><a href='../user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td></tr>";
                     $username = '';
@@ -189,7 +192,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 
     </div>
         
-    <?php include('../linkbar.php'); ?>
+    <?php include '../linkbar.php' ?>
 
 </body>
 </html>

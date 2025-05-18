@@ -1,6 +1,6 @@
 <?php
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
 
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
@@ -11,13 +11,13 @@ if ($conn->connect_error) {
 	die("Error: " . $conn->connect_error);
 }
 		
-$sql = "SELECT * FROM posts WHERE id = $post_id";
+$sql = "SELECT * FROM messages WHERE id = $post_id AND (parent IS NULL OR parent = 0)";
 $result = $conn->query($sql);
 $row = $result->fetch_assoc();
-$userid = $row['user'];
+$userid = $row['userid'];
 $title = $row['title'];
-$post = $row['post'];
-$date = $row['date'];
+$post = $row['content'];
+$date = $row['timestamp'];
 
 $decoded_post = htmlentities($post, ENT_QUOTES, 'UTF-8');
 
@@ -44,16 +44,16 @@ if(isset($_POST['comment'])){
 		}
 		
 		$date = date("Y-m-d H:i:s");
-        $sql = "INSERT INTO replies (user, reply, post, date) VALUES (?, ?, ?, ?)";
+        $sql = "INSERT INTO messages (userid, parent, content, timestamp) VALUES (?, ?, ?, ?)";
         $stmt2 = $conn->prepare($sql);
-        $stmt2->bind_param("iiss", $id, $post_id, $comment, $date); // Assuming 'user' and 'model' are strings
+        $stmt2->bind_param("iiss", $id, $post_id, $comment, $date);
         $stmt2->execute();
         $stmt2->close();
         $conn->close();
 
         $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-        if($user != $userid) {
+        if($users_row['id'] != $userid) {
             $time = time();
             $content = $post_id;
             $category = 3;
@@ -73,8 +73,8 @@ if(isset($_POST['comment'])){
             $stmt3->close();
 
             $alertnum = $alert + 1;
-            $stmt = $conn->prepare("UPDATE users SET alert = ? WHERE id = ?");
-            $stmt->bind_param("si", $alertnum, $userid);
+            $stmt4 = $conn->prepare("UPDATE users SET alert = ? WHERE id = ?");
+            $stmt4->bind_param("si", $alertnum, $userid);
 
             if ($stmt->execute()) {
                 $goto = $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING'];
@@ -93,23 +93,23 @@ if(isset($_POST['comment'])){
 <html lang="en">
 <head>
     <title><?php echo $title ?></title>
-    <?php include '../header.php' ?>
+    <?php include $_SERVER['DOCUMENT_ROOT'] . '/header.php' ?>
 </head>
 
 <body class="w3-light-blue w3-container">
 
 <?php 
-	include('../navbar.php');
-    require_once "bbcode.php";
-    require_once "../ajax/time.php";
-    $bbcode = new BBCode;	
+	include $_SERVER['DOCUMENT_ROOT'] . '/navbar.php';
+    require_once $_SERVER['DOCUMENT_ROOT'] . "/com/bbcode.php";
+    require_once $_SERVER['DOCUMENT_ROOT'] . "/ajax/time.php";
+    $bbcode = new BBCode;
 
     $post_id = htmlspecialchars($_GET['id']);
     $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
     $limit = 10;
     $offset = ($page - 1) * $limit;
 
-    $count_sql = "SELECT COUNT(*) as reply_count FROM replies WHERE reply = '$post_id'";
+    $count_sql = "SELECT COUNT(*) as reply_count FROM messages WHERE parent = '$post_id'";
     $count_result = $conn->query($count_sql);
     if (!$count_result) {
         die("Failed: " . $conn->error);
@@ -119,51 +119,52 @@ if(isset($_POST['comment'])){
 
     $total_pages = ceil($reply_count / $limit);
 
-    $sql_category = "SELECT category FROM posts WHERE id = '$post_id'";
+    $sql_category = "SELECT status FROM messages WHERE id = '$post_id'";
     $category_result = $conn->query($sql_category);
     $category_row = $category_result->fetch_assoc();
-    $category = $category_row['category'];
+    $category = $category_row['status'];
 
     if ($category === "deleted") {
         echo "<b id='commentboxcontainer'>This conversation has been removed because it violated our <a href='/rules'>rules</a>.</b><br />";
         exit;
     }
 
-    $username = htmlspecialchars($row['username']) ?: "Unknown User";
+    $username = htmlspecialchars($row['username']);
+    $isAdmin = $row['admin'] === '1' ? "color: red;" : "";
 
     echo "<div class='gr8-theme w3-container w3-light-grey w3-card-4'>";
     echo "<h2>" . $title . "</h2>";
     echo "<h4>By <a href='/user/" . $userid . "'>@" . $username . "</a> on " . $date . "</h4>";
-    echo '<h4>' . $reply_count . ' replies, ' . $total_pages . ' pages, on page ' . $page . '</h4></div><br />';
+    echo '<h4>' . $reply_count . ' replies, ' . $total_pages . ' pages, on page ' . $page . ', in ' . $category_row['status'] . '</h4></div><br />';
+
+    $post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$userid'");
+    $post_count_row = $post_count_result->fetch_assoc();
+    $post_count = $post_count_row['reply_count'];
 
     echo '<div class="w3-row" style="display:flex;width:100%;">';
     echo '<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny w3-margin-right" style="flex-shrink: 1; width: 20%;">';
     echo '<img id="pfp" src="/acc/users/pfps/' . $userid . '.jpg">';
-    echo '<br /><a href="../user/' . $userid . '"><span style="text-overflow: ellipsis;">' . $username . '</span></a>';
-    if($row['verified'] != 0) {
-        echo '&nbsp;<i class="fa fa-check w3-blue w3-large"></i>';
-    }
-    if($row['admin'] != 0) {
-        echo '&nbsp;<i class="fa fa-check w3-red w3-large"></i>';
-    }
-    echo '<br /><time class="w3-text-grey" title="' . $date . '" datetime="' . $date . '">' . time_ago($date) . '</time></div>';
-    echo '<h4 class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny" style="flex-shrink: 1; width: 80%;"><pre>';
-    echo $bbcode->toHTML($decoded_post) . '</pre></h4></div><hr />';
+    echo '<br /><a href="../user/' . $userid . '"><span style="text-overflow: ellipsis; ' . $isAdmin . '">' . $username . '</span></a>';
+    echo '<br /><time title="' . $date . '" datetime="' . $date . '">Posted ' . time_ago($date) . '</time>';
+    echo '<br /><span>' . $post_count . ' total posts</span></div>';
+    echo '<span class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny" style="flex-shrink: 1; width: 80%;"><pre>';
+    echo $bbcode->toHTML($decoded_post) . '</pre></span></div><br />';
 
-    $sql = "SELECT * FROM replies WHERE reply = $post_id ORDER BY date ASC LIMIT $limit OFFSET $offset";
+    $sql = "SELECT * FROM messages WHERE parent = $post_id ORDER BY timestamp ASC LIMIT $limit OFFSET $offset";
     $comResult = $conn->query($sql);
 
     if ($comResult->num_rows > 0) {
         while ($row = $comResult->fetch_assoc()) {
-            $c_user = $row['user'];
-            $c_comment = $row['post'];
-            $c_date = $row['date'];
+            $c_user = $row['userid'];
+            $c_comment = $row['content'];
+            $c_date = $row['timestamp'];
             $decoded_comment = htmlentities($c_comment, ENT_QUOTES, 'UTF-8');
 
             $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
             if ($conn2->connect_error) {
-                die("Error: " . $conn2->connect_error);
+                exit("Error: " . $conn2->connect_error);
             }
+
             $sql2 = "SELECT * FROM users WHERE id = ?";
             $stmt2 = $conn2->prepare($sql2);
             $stmt2->bind_param("i", $c_user);
@@ -171,27 +172,27 @@ if(isset($_POST['comment'])){
             $userResult = $stmt2->get_result();
             $userRow = $userResult->fetch_assoc();
 
-            $c_username =  htmlspecialchars($userRow['username']) ?: "Unknown User";
+            $c_username = htmlspecialchars($userRow['username']);
+            $isAdmin = $userRow['admin'] === 1 ? "color: red;" : "";
+
+            $user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user'");
+            $user_post_count_row = $user_post_count_result->fetch_assoc();
+            $user_post_count = $user_post_count_row['reply_count'];
 
             echo '<div class="w3-row" style="display:flex;width:100%;">';
             echo '<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny w3-margin-right" style="flex-shrink: 1; width: 20%;">';
             echo '<img id="pfp" src="/acc/users/pfps/' . $c_user . '.jpg">';
-            echo '<br /><a href="../user/' . $c_user . '"><span style="text-overflow: ellipsis;">' . $c_username . '</span></a>';
-            if($userRow['verified'] != 0) {
-                echo '&nbsp;<i class="fa fa-check w3-blue w3-large"></i>';
-            }
-            if($userRow['admin'] != 0) {
-                echo '&nbsp;<i class="fa fa-check w3-red w3-large"></i>';
-            }
-            echo '<br /><time class="w3-text-grey" title="' . $c_date . '" datetime="' . $c_date . '">' . time_ago($c_date) . '</time></div>';
-            echo '<h4 class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny" style="flex-shrink: 1; width:80%;"><pre>';
-            echo $bbcode->toHTML($decoded_comment) . '</pre></h4></div><br />';
+            echo '<br /><a href="../user/' . $c_user . '"><span style="text-overflow: ellipsis; ' . $isAdmin . '">' . $c_username . '</span></a>';
+            echo '<br /><time title="' . $c_date . '" datetime="' . $c_date . '">Posted ' . time_ago($c_date) . '</time>';
+            echo '<br /><span>' . $user_post_count . ' total posts</span></div>';
+            echo '<span class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny" style="flex-shrink: 1; width:80%;"><pre>';
+            echo $bbcode->toHTML($decoded_comment) . '</pre></span></div><br />';
         }
 
         echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>&nbsp;';
         echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page + 1) . '">Next</a>';
     } else {
-        echo "<b>nothing here yet</b><br />";
+        echo "<b>No replies yet.</b><br />";
         echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>';
     }
 
@@ -208,12 +209,12 @@ if(isset($_POST['comment'])){
                 }
             </style>
             <div class="unsupported">
-                <b>Enable javascript to reply.</b><br />
+                <b>Please enable Javascript in your web browser to post a reply.</b><br />
             </div>
         </noscript>';
 
     if ($category === "pinnedLocked" || $category === "locked") {
-        echo "<b id='commentboxcontainer'>This conversation is locked</b><br />";
+        echo "<b id='commentboxcontainer'>This conversation is locked. New replies cannot be posted.</b><br />";
 	} else {
         if(isset($_SESSION['username']) || isset($token['user'])) {
             echo "<br /><form id='commentboxcontainer' method='post' action=''>";
@@ -222,11 +223,11 @@ if(isset($_POST['comment'])){
             echo "<input type='submit' value='Reply' name='comment' class='w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo' />";
             echo "</form><br />";
         } else {
-            echo "<b id='commentboxcontainer'>Please <a href='../acc/login'>Login</a> to reply</b><br />";
+            echo "<b id='commentboxcontainer'>Please <a href='../acc/login'>login</a> to post a reply.</b><br />";
         }
     }
 
-    include('../linkbar.php');
+    include $_SERVER['DOCUMENT_ROOT'] . '/linkbar.php';
 
 ?>
 

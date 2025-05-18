@@ -10,7 +10,12 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 </head>
 
 <body class="w3-light-blue w3-container">
-    <?php include('../navbar.php'); ?>
+    <?php
+        include '../navbar.php' ;
+        require_once "bbcode.php";
+        require_once "../ajax/time.php";
+        $bbcode = new BBCode;
+    ?>
 
         <div class="w3-center">
 					
@@ -19,9 +24,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
 				<input class="w3-btn w3-large w3-white w3-hover-blue w3-mobile w3-border w3-quarter" type="submit" value="&#128270;">
 			</form><br /><br />
 
-            <div class="w3-card-2 w3-light-grey w3-padding-small"><i class="fa fa-search" aria-hidden="true"></i><b>Searched</b></div>
-
-            <table class="w3-table-all w3-card-2 w3-light-grey" style="color:black;">
+            <table class="gr8-theme w3-table w3-card-2 w3-light-grey w3-text-black">
             <thead>
                 <tr>
                     <th>Post</th>
@@ -31,36 +34,44 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
             </thead>
         <tbody>
             <?php
+                // Last refactor @4-11-25 9:10pm
+                // Hopefully this doesn't need any more
                 if (isset($_GET['q']) && $_GET['q']) {
-				
-			        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-				    $query = htmlspecialchars($_GET['q']);
-                    echo "<tr><td>Search results for <b>" . $query . "</b></td></tr><br />?";
+                    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+                    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+                    $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+                    $query = $conn->real_escape_string($_GET['q']);
+
+                    $limit = 8;
+                    $offset = ($page - 1) * $limit;
+                    $pDown = $page - 1;
+                    $pUp = $page + 1;
+
+                    $count_result = $conn->query("SELECT COUNT(*) as post_count FROM posts WHERE title LIKE '%" . $query . "%' AND category != 'deleted'");
+                    $count_row = $count_result->fetch_assoc();
+                    $post_count = $count_row['post_count'];
+                    $total_pages = ceil($post_count / $limit);
+
+                    echo '<h3>' . $post_count . ' posts, ' . $total_pages . ' pages, on page ' . $page . '</h3>';
+                    echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" href="?page=' . $pDown . '">Back</a>&nbsp;';
+                    echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" href="?page=' . $pUp . '">Next</a>&nbsp;';
+
+                    echo "<br />Search results for <b>" . htmlspecialchars($query) . "</b><br />";
 			
-				    $sql = "SELECT id, user, title, post, date FROM posts WHERE title LIKE ?";
-				    $stmt = $conn->prepare($sql);
-				    $stmt->bind_param("s", $searchPattern);
-				    // Adjust the search pattern to include wildcards
-				    $searchPattern = "%" . $query . "%";
-				    $stmt->execute();
-                    $stmt->bind_result($id, $post_user, $title, $post, $date);
+				    $result = $conn->query("SELECT id, user, title, post, date FROM posts WHERE title LIKE '%$query%' AND category != 'deleted' ORDER BY date DESC LIMIT $limit OFFSET $offset");
 				
-				    while ($stmt->fetch()) {
-					    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+				    while ($row = $result->fetch_assoc()) {
+                        $topic_user_id = $row['user'];
 
-                        $sql = "SELECT username FROM users WHERE id = ?";
-                        $stmt2 = $conn2->prepare($sql);
-                        $stmt2->bind_param("i", $post_user);
-                        $stmt2->execute();
-                        $stmt2->bind_result($username);
-                        $stmt2->fetch();
-                        $stmt2->close();
+                        $result2 = $conn2->query("SELECT id, username FROM users WHERE id = $topic_user_id");
+                        while ($row2 = $result2->fetch_assoc()) {
+                            $username = $conn->real_escape_string($row2['username']);
+                        }
 
-                        $conn2->close(); // Close the second connection
-
-                        echo "<tr><td><a href='/topic/" . $id . "'>" . htmlspecialchars($title) . "</a></td>";
-                        echo "<td>" . $date . "</td>";
-                        echo "<td><a href='../user/" . $post_user . "'>" . htmlspecialchars($username) . "</a></td></tr>";
+                        echo "<tr><td><a href='/topic/" . $row['id'] . "'>" . htmlspecialchars($row['title']) . "</a></td>";
+                        echo "<td>" . time_ago($row['date']) . "</td>";
+                        echo "<td><a href='../user/" . $row['user'] . "'>" . htmlspecialchars($username) . "</a></td></tr>";
                     }
                 }
 
