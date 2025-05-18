@@ -1,0 +1,1493 @@
+<!-- GR8BRIK VERSION 5-11-2025 (SUBOBJECT AND TEXTURES BETA 2.7) -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Gr8brik Modeler</title>
+  <meta charset="utf-8">
+  <base href="/mod/new/">
+  <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+  <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/7/Stats.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@latest/dist/jszip.min.js" integrity="sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=" crossorigin="anonymous"></script>
+  <link rel="stylesheet" type="text/css" href="index.css?v=5112025_test1">
+</head>
+
+<body>
+  <div id="top-container">
+    <span id="link-home"><img src="/img/logo.jpg" id="logo-img" /><a href="/"><span>&nbsp;Gr8brik&nbsp;</span></a><span class="tag">BETA</span></span>
+    <!-- <a href="https://www.gr8brik.rf.gd/acc/login" id="username-field">Login</a> -->
+
+    <span class="username-container">
+      <span id="username-field">Login</span>
+      <div id="username-content">
+        <a href="#" class="username-link" onclick="">Option 1</a>
+        <a href="#" class="username-link" onclick="">Option 2</a>
+        <a href="#" class="username-link" onclick="">Option 3</a>
+      </div>
+    </span>
+  </div>
+
+  <div id="info">
+    <p style="height: 1vh;"></p>
+    <p><a href="https://www.gr8brik.rf.gd/" target="_blank">Gr8brik beta</a> - Build May 11th, 2025</p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/LDrawLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dat.gui@latest/build/dat.gui.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/controls/TransformControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.1/spectrum.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.1/spectrum.min.css" />
+
+  <button id="toggleMenu" class="mobile-toggle">&#x2630;</button>
+  <a id="takeScreenshot" class="mobile-toggle" style="top: 155px; height: 25px; padding-right: 0px; padding-left: 0px;">&#x1F4F7;</a>
+  <div id="left-container">
+    <p style="height: 1vh;"></p>
+
+    <br /><button class="btn" title="Save creation to our database of LEGO(R) made by others." id="save-popup-open">Save Creation</button><br />
+    <button class="btn" title="Change controls to arrows to move blocks up and down, side-by-side." id="move-block-t">Drag</button>
+    <button class="btn" title="Change controls to rotate blocks, in all directions." id="move-block-r">Rotate</button><br />
+    <button id="duplicate-block" class="btn" title="Copy the block that was last added and paste it">Duplicate Block</button><br />
+	<button id="delete-block" class="btn" title="Remove a block from the scene, along with all records of it">Delete Block</button><br />
+    <button id="importBtn" class="btn">Import</button>
+    <a id="cre-export" title="Download creation data as a json file" class="btn">Export</a><br />
+	<a id="cre-export-ldd" title="Download creation data as a lxf file" class="btn">Export for Lego&copy; Digital Designer</a>
+    <input type="file" id="cre-import" accept=".json" style="display: none;">
+    <hr />
+
+    <label for="color-picker">Color</label>
+    <input type="text" id="color-picker" /><br />
+
+    <label for="part-type-filter">Filter by</label>
+
+    <select id="part-type-filter" style="display: inline-block;">
+        <option value="brick" selected>Bricks</option>
+        <option value="plate">Plates</option>
+        <option value="tile">Tiles</option>
+        <option value="slope">Slopes</option>
+        <option value="minifig">Minifigs</option>
+        <option value="duplo">Duplo</option>
+        <option value="animal">Animals</option>
+        <option value="technic">Technic</option>
+        <option value="wedge">Wedges</option>
+        <option value="hinge">Hinges</option>
+        <option value="clip_&_bar">Clips & Bars</option>
+        <option value="connector">Connectors</option>
+        <option value="wheel_&_tyre">Wheels & Tyres</option>
+        <option value="train">Train Parts</option>
+        <option value="panel">Panels</option>
+        <option value="round_&_curved">Round & Curved</option>
+        <option value="other">Miscellaneous</option>
+    </select><br />
+
+    <input type="text" id="search-parts" placeholder="search parts..." /><br />
+
+    <button id="tab1" class="tab-button">Add blocks</button>
+    <button id="tab2" class="tab-button">Scene blocks</button>
+    <hr />
+
+    <span id="select-block"></span>
+    <ul id="block-list">
+      <div class="warn">Gr8brik treats some items as groups</div>
+    </ul>
+  </div>
+
+  <div id="save-popup">
+    <button class="btn-alt" style="float: right; top: 0;">&#10006;</button>
+    <h3><span>Save Creation</span></h3>
+    <div id="save-popup-form">
+      <input class="w3-input w3-border" type="text" name="name" placeholder="Name"><br /><br />
+      <textarea name="desc" xrows="4" xcols="50" placeholder="Description"></textarea><br /><br />
+      <button class="btn" title="Finish saving" id="download-json">Save Creation</button>
+    </div>
+  </div>
+
+  <div id="preloaded-logo">
+    <div class="img"></div>
+  </div>
+
+  <script>
+    window.addEventListener('beforeunload', function (e) {
+        e.preventDefault();
+        e.returnValue = '';
+    });
+
+    var partColor = "#ff0000";
+    const start_url = 'https://gr8brik.rf.gd';
+
+    $(document).ready(function () {
+
+      $(document).on('click', 'a', function(event) { 
+          if ($(this).attr("download")) return;
+
+          event.preventDefault();           
+          let url = $(this).attr("href");
+
+          if (url && url.match("^http" || "^https")) {
+              window.location.href = url;
+          }
+      });
+
+      function login() {
+          $.ajax({
+            url: start_url + "/ajax/user.php",
+            method: "GET",
+            data: {
+                ajax: true
+            },
+            success: function (response) {
+                $("#username-field").show().text(response.user);
+                $("#username-field").attr("href", "/acc/creations");
+                tooltip('Logged in as ' + response.user);
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+            try {
+              var response = JSON.parse(jqXHR.responseText);
+              console.error('Error logging in: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
+              if (response && response.error) {
+                console.error('Error logging in: ' + response.error);
+                tooltip(response.error);
+              }
+            } catch (e) {
+              console.error('Failed to parse error: ', e);
+              console.error('Raw: ', jqXHR.responseText);
+              tooltip('An unknown error occured while logging in');
+            }
+          }
+          });
+      }
+      login();
+
+        let displayed_parts = [];
+        let current_type = '';
+
+      function loadParts(type) {
+        console.log(`loading ${type} category`);
+        current_type = type;
+
+        $.ajax({
+          url: `https://susstevedev.github.io/gr8brik-new/parts/${type}.json`,
+          method: 'GET',
+          dataType: 'json',
+          success: function (data) {
+            console.log(`${type} parts loaded`);
+            displayed_parts = data;
+            displayParts();
+          },
+          error: function (err) {
+            console.error('error loading parts ', err);
+            tooltip('Failed to load parts');
+          }
+        });
+      }
+
+      function displayParts() {
+        $('#select-block').html('');
+        displayed_parts.forEach(part => {
+          $('#select-block').append(
+            `<li id="${part.file}" value="${part.file}"><img src="https://library.ldraw.org/images/library/official/parts/${part.file.split(".")[0]}.png" loading="lazy" width="45px" height="45px" /><br /><small>${part.name}</small><br /><small class="part-list-number">${part.file.split(".")[0]}</small></li>`
+          );
+        });
+      }
+
+      $('#part-type-filter').on('change', function () {
+        let selectedType = $(this).val();
+        loadParts(selectedType);
+      });
+
+      loadParts('brick');
+
+      $(document).on("click", "#select-block li", function () {
+        let selectedPart = $(this).attr("value");
+        if (!selectedPart) {
+          console.error("selected part is not valid");
+          return;
+        }
+
+        part = 'parts/' + selectedPart;
+        partName = selectedPart;
+        console.log("selected peice: ", selectedPart);
+        addBlock();
+      });
+
+      $(document).on("click", "#save-popup .btn-alt", function () {
+        $("#save-popup").fadeOut();
+      });
+
+      $(document).on("click", "#save-popup-open", function () {
+        $("#save-popup").fadeIn();
+      });
+
+      $(document).on("click", "#download-json", function () {
+        let sceneJSON = generateSceneJSON();
+
+        if (sceneJSON) {
+          const jsonData = sceneJSON;
+          console.log(jsonData);
+
+          const date = new Date();
+          date.setTime(date.getTime() + (365 * 24 * 60 * 60 * 1000));
+          document.cookie = "localsave=" + btoa(jsonData) + "; expires=" + date
+            .toUTCString() + "";
+
+          let name = $("#save-popup input[name='name']").val().trim();
+          let desc = $("#save-popup textarea[name='desc']").val().trim();
+          let screenshot = capture();
+
+          $.ajax({
+            url: start_url + "/ajax/build.php",
+            type: "POST",
+            data: {
+              save_build: true,
+              creation: jsonData,
+              name: name,
+              desc: desc,
+              screenshot: screenshot
+            },
+            success: function (response) {
+              console.log(`OK: ${response.success}`);
+              tooltip(response.success);
+            },
+            error: function (xhr, status, error) {
+              try {
+                var response = JSON.parse(xhr.responseText);
+                console.error(`ERR: ${response.error} (${error}).`);
+                tooltip(response.error);
+              } catch (e) {
+                console.error("Invalid error response:", xhr.responseText);
+                tooltip("An unknown error occurred.");
+              }
+            }
+          });
+        }
+      });
+
+      $("#color-picker").spectrum({
+        color: "#ff0000",
+        showInput: true,
+        showPalette: true,
+        palette: [
+          ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF"],
+          ["#000000", "#FFFFFF", "#808080", "#FFA500", "#800080", "#FFC0CB"],
+          ["#A52A2A", "#FFD700", "#C0C0C0", "#8B0000", "#006400", "#00008B"],
+          ["#C91A09", "#A0BCAC", "#7789A5", "#958A73", "#A3A2A4", "#635F61"]
+        ],
+        change: function (color) {
+          console.log(`selected color is ${color.toHexString()}`);
+          partColor = color.toHexString();
+          if (color) {
+            changeBlockColor(color.toHexString());
+          }
+        }
+      });
+
+      $("#search-parts").on("keyup", function () {
+			if(event.which == 13) {
+			  let value = $(this).val().toLowerCase().replace(/\s+/g, " ").trim();
+			  let list = $("#select-block li");
+
+			  list.sort(function (a, b) {
+				  let textA = $(a).text().toLowerCase().replace(/\s+/g, " ").trim();
+				  let textB = $(b).text().toLowerCase().replace(/\s+/g, " ").trim();
+
+				  let matchA = textA.indexOf(value) > -1 ? 0 : 1;
+				  let matchB = textB.indexOf(value) > -1 ? 0 : 1;
+
+				  return matchA - matchB;
+			  });
+
+			  $("#select-block").html(list);
+			  list.each(function () {
+				  let text = $(this).text().toLowerCase().replace(/\s+/g, " ").trim();
+				  $(this).toggle(text.indexOf(value) > -1);
+			  });
+			}
+      });
+
+      $(document).on("click", ".scene-block-item", function () {
+        let id = $(this).data("id");
+        transformControls.detach(selectedObject);
+        selectedObject = null;
+
+        if (blockGroups && blockGroups.length > 0) {
+          blockGroups.forEach(function (g) {
+            if (g.name == id) {
+              transformControls.attach(g);
+              selectedObject = g;
+              tooltip('Block selected');
+            }
+          });
+      }
+      });
+    });
+  </script>
+  <script>
+    const studSize = 1000;
+    let partList = document.getElementById('blk');
+    let colList = document.getElementById('select-color');
+
+    document.getElementById("username-field").addEventListener("click", function () {
+      var content = document.getElementById("username-content");
+      if (content.style.display === "block" || content.style.display === "") {
+        content.style.display = "none";
+      } else {
+        content.style.display = "block";
+      }
+    });
+
+    document.getElementById("color-picker").addEventListener("click", function () {
+      console.log("color picker clicked");
+    });
+
+    document.getElementById("duplicate-block").addEventListener("click", function () {
+      addBlock();
+    });
+	
+	document.getElementById("delete-block").addEventListener("click", function () {
+		deleteBlock(selectedObject);
+	});
+
+    document.getElementById("takeScreenshot").addEventListener("click", function () {
+      let blob = new Blob([capture()], { type: "image/png" });
+      this.href = URL.createObjectURL(blob);
+      this.download = `creation-screenshot-${Date.now()}.png`;
+    });
+
+    document.getElementById("toggleMenu").addEventListener("click", function () {
+      var left = document.getElementById("left-container");
+      if (left.style.left === "0px" || left.style.left === "") {
+        left.style.left = "-999px";
+      } else {
+        left.style.left = "0px";
+      }
+    });
+
+    document.querySelectorAll('.tab-button').forEach(button => {
+      button.addEventListener('click', function () {
+        const is1 = this.id === 'tab1';
+        var search = document.getElementById("search-parts");
+        document.getElementById('select-block').style.display = is1 ? 'block' :
+          'none';
+        document.getElementById('block-list').style.display = is1 ? 'none' :
+          'block';
+        search.readOnly = is1 ? false : true;
+      });
+    });
+
+    document.getElementById("cre-export").addEventListener("click", function () {
+		event.preventDefault();
+		
+        let jsonData = generateSceneJSON();
+        let jsonBlob = new Blob([jsonData], { type: "application/json" });
+
+        let url = URL.createObjectURL(jsonBlob);
+		this.href = url;
+        this.download = `creation-${Date.now()}.json`;
+		
+		setTimeout(() => {
+			URL.revokeObjectURL(url);
+			this.removeAttribute("href");
+			this.removeAttribute("download");
+		}, 1000);
+    });
+	
+	document.getElementById("cre-export-ldd").addEventListener("click", function () {
+		event.preventDefault();
+	
+        let legoData = generateSceneLXFML();
+		let zip = new JSZip();
+		zip.file("IMAGE100.LXFML", legoData);
+		let elm = this;
+		
+		zip.generateAsync({ type: "blob" }).then(function (blob) {
+			let url = URL.createObjectURL(blob);
+			let date = getDate();
+			/*elm.href = url;
+			elm.download = `ldd-creation-${date}.lxf`; */
+			
+			let a = document.createElement("a");
+			a.href = url;
+			a.download = `ldd-creation-${date}.lxf`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			
+			setTimeout(() => {
+				URL.revokeObjectURL(url);
+				/*elm.removeAttribute("href");
+				elm.removeAttribute("download");*/
+			}, 10000);
+		});
+    });
+
+    document.getElementById("importBtn").addEventListener("click", function () {
+      document.getElementById("cre-import").click();
+    });
+
+    document.getElementById("cre-import").addEventListener("change", function (event) {
+        let file = event.target.files[0];
+        if (!file) {
+            console.error("No file selected");
+            tooltip("No file selected.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                const jsonData = JSON.parse(e.target.result);
+                loadSceneFromJSON(jsonData);
+            } catch (err) {
+                tooltip("Invalid JSON file.");
+                console.error(err);
+            }
+            event.target.value = "";
+        };
+        reader.readAsText(file);
+    });
+
+    /*async function loadSceneFromJSON(data) {
+      if (!data || !data.blocks || !Array.isArray(data.blocks)) {
+          console.error("Invalid JSON data.");
+          tooltip("Invalid JSON.");
+          return;
+      }
+
+      for (const block of data.blocks) {
+          try {
+				partName = block.partName;
+				partColor = '#' + block.color;
+				partPosition = block.position;
+				partRotation = block.position; */
+
+              /*if (!partName.startsWith('parts/')) {
+                  part = 'parts/' + partName;
+              } else {
+                  part = partName;
+              }*/
+			  
+			  //let part = 'parts/' + partName.replace("parts/", "").replace(".dat", "") + '.dat';
+			  
+			  
+				/*part = 'parts/' + block.ldraw; */
+				
+				/*if (!partName.includes("parts/")) {
+					let part = 'parts/' + partName;
+				}*/
+
+				/*if(addBlock()) {
+					part, partName, partColor, partPosition, partRotation = null;
+				}
+          } catch (err) {
+            console.warn(`Failed to add block: ${block.partName}`, err);
+            tooltip(`Failed to load ${block.partName}`);
+            continue;
+          }
+      }
+
+      console.log("Creation imported.");
+      tooltip("Creation imported.");
+  }*/
+  
+	  async function loadSceneFromJSON(data) {
+		if (!data || !data.blocks || !Array.isArray(data.blocks)) {
+			console.error("Invalid JSON data.");
+			tooltip("Invalid JSON.");
+			return;
+		}
+
+		for (const block of data.blocks) {
+			partName = block.partName;
+			partColor = '#' + block.color;
+			partPosition = block.position;
+			partRotation = block.rotation;
+
+			part = 'parts/' + block.ldraw;
+
+			try {
+				await new Promise((resolve, reject) => {
+					addBlock(resolve, reject);
+				});
+			} catch (err) {
+				console.warn(`Failed to add block: ${block.partName}`, err);
+				tooltip(`Failed to load ${block.partName}`);
+			}
+		}
+
+		console.log("Creation imported.");
+		tooltip("Creation imported.");
+	}
+
+    var container, camera, scene, renderer, sunlight, controls, grid_helper, ldraw_loader, raycaster, mouse, partRotation, partPosition = null;
+
+    var selectedObject, previousSelectedObject, customPosition = null;
+    let blocks = [];
+    let blockGroups = [];
+
+    init();
+    animate();
+
+    function getCookie(name) {
+        var cookies = document.cookie;
+        var parts = cookies.split(name + "=");
+        var cookieValue = null;
+        if (parts.length == 2) {
+            cookieValue = parts.pop().split(";").shift();
+        }
+        return cookieValue;
+    }
+
+    function toggleGlobalSnap() {
+      if(scene.userData.noSnap === true) {
+        scene.userData.noSnap = false;
+      } else {
+        scene.userData.noSnap = true;
+      }
+      scene.updateMatrixWorld(true);
+    }
+
+    function isDark() {
+        if(getCookie('mode')) {
+          if(getCookie('mode') === 'dark') {
+            return true;
+          } else {
+            return false;
+          }
+        } else {
+          if(window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            return true;
+          } else {
+            return false;
+          }
+        }
+    }
+
+    function snapToGrid(value, gridSize) {
+      return Math.round(value / gridSize) * gridSize;
+    }
+	
+	function getDate() {
+		const today = new Date();
+		const yyyy = today.getFullYear();
+		const mm = String(today.getMonth() + 1).padStart(2, '0');
+		const dd = String(today.getDate()).padStart(2, '0');
+
+		return `${yyyy}-${mm}-${dd}`;
+	}
+
+    function init() {
+        container = document.createElement('div');
+        container.classList.add("scene");
+
+        document.body.appendChild(container);
+        camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+        camera.position.set(250, 150, 500);
+        scene = new THREE.Scene();
+        scene.userData.noSnap = false;
+
+        if(isDark() === true) {
+          scene.background = new THREE.Color(0x333333);
+        } else {
+          scene.background = new THREE.Color(0xF5F5F5);
+        }
+
+        const sunlight = new THREE.DirectionalLight(0xffffff, 3);
+        sunlight.position.set(10, 15, 10);
+        sunlight.castShadow = true;
+        scene.add(sunlight);
+
+        const ambientlight = new THREE.AmbientLight(0xffffff, 1);
+        scene.add(ambientlight);
+
+        const pointlight = new THREE.PointLight(0xffffff, 1, 500);
+        pointlight.position.set(50, 100, -50);
+        pointlight.castShadow = true;
+        scene.add(pointlight);
+
+        const spotlight = new THREE.SpotLight(0xffffff, 2);
+        spotlight.position.set(-50, 100, 50);
+        spotlight.angle = Math.PI / 6;
+        spotlight.penumbra = 0.3;
+        spotlight.castShadow = true;
+        scene.add(spotlight);
+
+        renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+
+        transformControls = new THREE.TransformControls(camera, renderer.domElement);
+        scene.add(transformControls);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+        const stud_size = 20; // 1 stud = 20
+        const grid_size = stud_size * 16; // studs wide
+        const divisions = 16; // 1 division per stud
+
+        if(isDark() === true) {
+          grid_helper = new THREE.GridHelper(grid_size, divisions, 0x333333, 0xF5F5F5);
+        } else {
+          grid_helper = new THREE.GridHelper(grid_size, divisions, 0xF5F5F50, 0x333333);
+        }
+        scene.add(grid_helper);
+
+        ldraw_loader = new THREE.LDrawLoader();
+        ldraw_loader.preloadMaterials('https://raw.githubusercontent.com/susstevedev/gr8brik-ldraw-fork/refs/heads/main/ldraw-parts/colors/ldconfig.ldr');
+        ldraw_loader.setPath('https://raw.githubusercontent.com/susstevedev/gr8brik-ldraw-fork/refs/heads/main/ldraw-parts/actual/');
+        ldraw_loader.setPartsLibraryPath("https://raw.githubusercontent.com/susstevedev/gr8brik-ldraw-fork/refs/heads/main/ldraw-parts/actual/");
+        ldraw_loader.smoothNormals = false;
+        ldraw_loader.flatColors = true;
+        ldraw_loader.displayLines = true;
+        ldraw_loader.conditionalLines = true
+        ldraw_loader.separateObjects = true;
+        
+        raycaster = new THREE.Raycaster();
+        mouse = new THREE.Vector2();
+
+        window.addEventListener('keydown', function (event) {
+            let activeElement = document.activeElement;
+
+            if (activeElement.tagName === "INPUT" || activeElement.tagName === "TEXTAREA") {
+                return;
+            }
+
+            switch (event.code) {
+                case 'KeyT':
+                    moveBlock('t')
+                    break
+                case 'KeyR':
+                    moveBlock('r')
+                    break
+                case 'KeyS':
+                    moveBlock('s')
+                    break
+                case 'Escape':
+                    transformControls.detach(selectedObject);
+                    break
+                case 'Delete':
+                    deleteBlock(selectedObject);
+                    break
+                case 'ArrowUp':
+                    selectedObject.rotation.x -= THREE.MathUtils.degToRad(45);
+                    break;
+                case 'ArrowDown':
+                    selectedObject.rotation.x += THREE.MathUtils.degToRad(45);
+                    break;
+                case 'ArrowLeft':
+                    selectedObject.rotation.y -= THREE.MathUtils.degToRad(45);
+                    break;
+                case 'ArrowRight':
+                    selectedObject.rotation.y += THREE.MathUtils.degToRad(45);
+                    break;
+            }
+        })
+
+      document.getElementById('move-block-t').addEventListener('click', function () {
+        if (selectedObject) {
+          moveBlock('t');
+        }
+      });
+
+      document.getElementById('move-block-r').addEventListener('click', function () {
+        if (selectedObject) {
+          moveBlock('r');
+        }
+      });
+
+    window.addEventListener('resize', onWindowResize, true);
+    window.addEventListener('pointerdown', onMouseClick, true);
+    //window.addEventListener('mousemove', onMouseMove, true);
+
+      transformControls.addEventListener('mouseDown', function () {
+        controls.enabled = false;
+      });
+
+      transformControls.addEventListener('mouseUp', function () {
+        controls.enabled = true;
+      });
+
+      transformControls.addEventListener('dragging-changed', function (event) {
+        controls.enabled = !event.value;
+      });
+
+        transformControls.addEventListener('objectChange', function () {
+            if (selectedObject && !(selectedObject.userData.noSnap || scene.userData.noSnap)) {
+                selectedObject.position.set(
+                    snapToGrid(selectedObject.position.x, 10), 
+                    snapToGrid(selectedObject.position.y, 4), 
+                    snapToGrid(selectedObject.position.z, 10)
+                );
+
+                selectedObject.rotation.set(
+                    Math.round(selectedObject.rotation.x / THREE.MathUtils.degToRad(45)) * THREE.MathUtils.degToRad(45),
+                    Math.round(selectedObject.rotation.y / THREE.MathUtils.degToRad(45)) * THREE.MathUtils.degToRad(45),
+                    Math.round(selectedObject.rotation.z / THREE.MathUtils.degToRad(45)) * THREE.MathUtils.degToRad(45)
+                );
+
+                selectedObject.updateMatrixWorld(true);
+                scene.updateMatrixWorld(true);
+            }
+            updateSceneData();
+        });
+    }
+
+    function changeBlockColor(color) {
+      if (!selectedObject) {
+        tooltip("No block selected");
+        return;
+      }
+
+      selectedObject.traverse((child) => {
+        if (child.isMesh) {
+          child.material.color.set(color);
+          child.material.needsUpdate = true;
+        }
+      });
+
+      console.log(`block color changed to ${color}`);
+      tooltip(`Block color changed`);
+    }
+
+    function deleteBlock(block) {
+        if (block) {
+            if (block.isMesh) {
+                scene.remove(block);
+                block.updateMatrixWorld(true);
+                tooltip('Deleted block');
+            } else {
+              tooltip('Block is not a valid mesh')
+            }
+
+            if (blockGroups && blockGroups.length > 0) {
+                blockGroups.forEach(function (g) {
+                    g.remove(block);
+                    g.updateMatrixWorld(true);
+                });
+            }
+
+            if (selectedObject === block) {
+                transformControls.detach(block);
+                selectedObject = null;
+            }
+        } else {
+          tooltip('No block found');
+        }
+    }
+
+    function capture() {
+      renderer.render(scene, camera);
+      let screenshot = renderer.domElement.toDataURL("image/png");
+      return screenshot;
+    }
+
+    function makeid(length) {
+      let result = '';
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      const charactersLength = characters.length;
+      let counter = 0;
+      while (counter < length) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        counter += 1;
+      }
+      return result;
+    }
+
+    function addBlock(throwSuccess, throwError) {
+        if (!ldraw_loader || typeof ldraw_loader.load !== 'function') {
+            console.error('Ldrawloader is not initialized');
+            tooltip('Ldraw loader seems to be broken! Please check your internet connection.');
+            return;
+        }
+
+        if (!part) {
+            console.error('piece is undefined');
+            tooltip('Please select a block');
+            return;
+        }
+
+        if (!partColor) {
+            console.error('Color is not set.');
+            tooltip('Please select a color for the current block');
+            return;
+        }
+
+        transformControls.detach(selectedObject);
+        console.log("Loading part:", part);
+
+        ldraw_loader.load(part, function (loadedGroup) {
+        
+            if (!loadedGroup) {
+                console.error("Loaded group does not exist.");
+                tooltip('Please select a block with valid mesh data');
+                return;
+            }
+
+            let blockGroup = new THREE.Group();
+            blockGroup.name = `ldraw_${makeid(10)}`;
+            blockGroup.ldraw = part;
+
+            let subobjects = [];
+
+            loadedGroup.traverse((child) => {
+                if (child.isMesh) {
+                    child.geometry = generateUVMap(child.geometry);
+
+                    var materials = {
+                      color: new THREE.Color(partColor || "#000000"),
+                      roughness: 0.2,
+                      metalness: 0.2,
+                      clearcoat: 0.9,
+                      clearcoatRoughness: 0.2,
+                      reflectivity: 0.9
+                    };
+
+                    child.material = new THREE.MeshPhysicalMaterial(materials);
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+
+                    const transformedMesh = subobjectPosition(child);
+                    const isTiny = isSmall(transformedMesh, 19);
+
+                    if(isTiny === true) {
+                      child.userData.noSnap = true;
+                    } else if(isTiny === false) {
+                        child.userData.noSnap = false;
+                    }
+
+                    transformedMesh.material.needsUpdate = true;
+                    transformedMesh.userData.selectable = true;
+                    transformedMesh.userData.isBlock = true;
+
+                    subobjects.push(transformedMesh);
+                }
+            });
+
+            subobjects.forEach(mesh => {
+                blockGroup.add(mesh);
+            });
+			
+			if(partPosition && partRotation) {
+				blockGroup.position.set(partPosition.x, partPosition.y, partPosition.z);
+				blockGroup.rotation.set(partRotation.x, partRotation.y, partRotation.z);
+			} else {
+				blockGroup.position.y = objectSize(blockGroup).y;
+				blockGroup.rotation.x = Math.PI;
+			}
+			
+            blockGroup.userData.partName = partName;
+            scene.add(blockGroup);
+			
+            selectedObject = blockGroup;
+            transformControls.attach(blockGroup);
+			
+            blocks.push(blockGroup);
+            blockGroups.push(blockGroup);
+
+            tooltip(`Added block ${part}`);
+			throwSuccess()
+
+            const texturename = `${part.split("/").pop().split(".")[0]}.png`;
+            const texturepath = `https://raw.githubusercontent.com/susstevedev/gr8brik-ldraw-fork/refs/heads/main/ldraw-parts/actual/parts/textures/${texturename}`;
+            //const texturepath = 'https://d1xez26aurxsp6.cloudfront.net/users/qXBby2/avatars/680a924dab4ba.png';
+            const textureLoader = new THREE.TextureLoader();
+
+            textureLoader.load(texturepath, (texturemap) => {
+                texturemap.colorSpace = THREE.SRGBColorSpace;
+                blockGroup.traverse(child => {
+                    if (child.isMesh && child.material) {
+                        child.material.map = texturemap;
+                        child.material.needsUpdate = true;
+                    }
+                });
+            }, undefined, (err) => {
+                console.warn("Texture load failed or doesn't exist:", err);
+            });
+
+            updateBlockList(partName, partColor, blocks.length, blockGroup.name);
+            updateSceneData();
+            
+        }, undefined, function (error) {
+            console.error('error loading piece:', error);
+			throwError(error);
+        });
+    }
+
+    function updateBlockList(part, color, count, id) {
+      let blockList = document.getElementById('block-list');
+
+      let listItem = document.createElement('li');
+      listItem.classList.add('scene-block-item');
+      listItem.setAttribute('data-id', id);
+      listItem.textContent = `${part} (${color}, Num ${count})`;
+
+      blockList.appendChild(listItem);
+    }
+
+    function subobjectPosition(g) {
+        g.updateMatrixWorld(true);
+
+        const position = new THREE.Vector3();
+        const quaternion = new THREE.Quaternion();
+        const scale = new THREE.Vector3();
+
+        g.matrixWorld.decompose(position, quaternion, scale);
+
+        const m = g.clone();
+
+        m.position.copy(position);
+        m.quaternion.copy(quaternion);
+        m.scale.copy(scale);
+
+        m.updateMatrix();
+        return m;
+    }
+	
+	function objectSize(obj) {
+		if (!obj) {
+			return new THREE.Vector3(0, 0, 0);
+		}
+
+		const b = new THREE.Box3().setFromObject(obj);
+		const s = new THREE.Vector3();
+		b.getSize(s);
+
+		return s;
+	}
+
+    function isSmall(g, scale) {
+      const boundingBox = new THREE.Box3().setFromObject(g);
+      const size = new THREE.Vector3();
+      boundingBox.getSize(size);
+
+      return size.x < scale || size.y < scale || size.z < scale;
+  }
+
+  function generateUVMap(geometry) {
+    geometry.computeBoundingBox();
+    geometry.computeVertexNormals();
+
+    const uvs = [];
+
+    const position = geometry.attributes.position;
+    const box = geometry.boundingBox;
+
+    for (let i = 0; i < position.count; i++) {
+      const x = position.getX(i);
+      const y = position.getY(i);
+      const u = (x - box.min.x) / (box.max.x - box.min.x);
+      const v = (y - box.min.y) / (box.max.y - box.min.y);
+      uvs.push(u, v);
+    }
+
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    return geometry;
+  }
+
+
+    function generateSceneJSON() {
+      let gr8brikid = makeid(5);
+
+      const sceneData = {
+        blocks: []
+      };
+
+      if (selectedObject) {
+        transformControls.detach(selectedObject);
+        selectedObject = null;
+    }
+
+      blockGroups.forEach(function (group) {
+        let mesh_child = null;
+        group.traverse(function (child) {
+          if (child.isMesh) {
+            mesh_child = child;
+          }
+        });
+
+        if (mesh_child) {
+            let ldraw = group.ldraw.replace("parts/", "");
+            const blockData = {
+                partName: group.userData.partName,
+                color: mesh_child.material.color.getHexString(),
+                position: {
+                    x: group.position.x,
+                    y: group.position.y,
+                    z: group.position.z
+                },
+                rotation: {
+                    x: group.rotation.x,
+                    y: group.rotation.y,
+                    z: group.rotation.z
+                },
+                scale: {
+                    x: group.scale.x,
+                    y: group.scale.y,
+                    z: group.scale.z
+                },
+                blockID: group.name,
+                ldraw: ldraw,
+            };
+          sceneData.blocks.push(blockData);
+        }
+      });
+
+      return JSON.stringify(sceneData, null, 1);
+    }
+
+    function generateSceneLXFML() {
+      let sceneBricks = '';
+      let boneRefs = [];
+      let refID = 0;
+      let totalPosition = new THREE.Vector3();
+      let count = 0;
+
+      if (selectedObject) {
+        transformControls.detach(selectedObject);
+        selectedObject = null;
+      }
+	  
+	  const legoColors = {
+		  "ffffff": 1,
+		  "ff0000": 21,
+		  "00ff00": 28,
+		  "0000ff": 24,
+		  "ffff00": 24,
+		  "000000": 26,
+		  "a0a5a9": 194,
+		};
+
+
+      blockGroups.forEach(function (group) {
+        group.traverse(function (child) {
+          if (child.isMesh) {
+            totalPosition.add(group.position);
+            count++;
+          }
+        });
+      });
+
+      blockGroups.forEach(function (group) {
+        let mesh_child = null;
+        group.traverse(function (child) {
+          if (child.isMesh) {
+            mesh_child = child;
+          }
+        });
+
+        if (mesh_child) {
+		 let ldraw = group.ldraw.replace("parts/", "").replace(".dat", "");
+		 const boneID = refID;
+		 let colorID = legoColors[mesh_child.material.color.getHexString().toLowerCase()] ?? 26;
+		 
+		 let adjustedMatrix = mesh_child.matrixWorld.clone();
+		 
+		 const globalrot = new THREE.Matrix4().makeRotationX(Math.PI / 1);
+		 adjustedMatrix.premultiply(globalrot);
+		 
+		 const flipmatrix = new THREE.Matrix4().makeRotationX(Math.PI);
+		 adjustedMatrix.multiply(flipmatrix);
+		 
+		 const translationMatrix = new THREE.Matrix4().makeTranslation(-20, 0, 0); // 1 LDU
+		 adjustedMatrix.multiply(translationMatrix);
+
+          sceneBricks += `
+            <Brick refID="${refID}" designID="${ldraw}" itemNos="${ldraw}">
+              <Part refID="${refID}" designID="${ldraw}" materials="${colorID},0" decoration="0">
+                <Bone refID="${refID}" transformation="${LXFMLMatrix(adjustedMatrix)}"></Bone>
+              </Part>
+            </Brick>`;
+
+          boneRefs.push(boneID);
+          refID++;
+        }
+      });
+
+      const boneRefString = boneRefs.join(',');
+
+      const sceneData = `
+        <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+        <LXFML versionMajor="5" versionMinor="0" name="testing">
+          <Meta>
+            <Application name="LEGO Digital Designer" versionMajor="4" versionMinor="3"/>
+            <Brand name="LDD"/>
+            <BrickSet version="2670"/>
+          </Meta>
+		  <Model name="Gr8brik Creation">
+			<Meta key="use-ldraw" value="true"/>
+		  </Model>
+          <Cameras>
+            <Camera refID="0" fieldOfView="80" distance="120" transformation="1,0,0,0,1,0,0,0,1,0,0,120"/>
+          </Cameras>
+          <Bricks cameraRef="0">
+            ${sceneBricks}
+          </Bricks>
+          <RigidSystems>
+            <RigidSystem>
+              <Rigid refID="0" transformation="1,0,0,0,1,0,0,0,1,0,0,0" boneRefs="${boneRefString}"/>
+            </RigidSystem>
+          </RigidSystems>
+          <GroupSystems>
+            <GroupSystem></GroupSystem>
+          </GroupSystems>
+          <BuildingInstructions></BuildingInstructions>
+        </LXFML>
+      `;
+
+      return sceneData.replace(/\s+/g, ' ').trim();
+    }
+
+    function LXFMLMatrix(matrix4) {
+      const unit = 0.04;
+      const converted = matrix4.clone();
+	  
+	  const rotx = new THREE.Matrix4().makeRotationX(Math.PI / 1);
+	  
+	  const rot = new THREE.Matrix4();
+	  rot.multiply(rotx);
+      converted.premultiply(rot);
+
+      const position = new THREE.Vector3();
+      const quaternion = new THREE.Quaternion();
+      const scale = new THREE.Vector3();
+      converted.decompose(position, quaternion, scale);
+
+      position.multiplyScalar(unit);
+	  position.x -= 0.8;
+	  
+      converted.compose(position, quaternion, scale);
+      const elm = converted.transpose().elements;
+
+      return [
+        elm[0], elm[4], elm[8],    // X
+        elm[1], elm[5], elm[9],    // Y
+        elm[2], elm[6], elm[10],   // Z
+        elm[3], elm[7], elm[11]    // position
+      ].map(v => v.toFixed(10)).join(',');
+    }
+	
+
+    /*function generateSceneLXFML() {
+      let sceneBricks = '';
+      let refID = 1;
+
+      if (selectedObject) {
+          transformControls.detach(selectedObject);
+          selectedObject = null;
+      }
+
+      blockGroups.forEach(function (group) {
+        let mesh_child = null;
+        group.traverse(function (child) {
+          if (child.isMesh) {
+            mesh_child = child;
+          }
+        });
+
+        if (mesh_child) {
+            let ldraw = group.ldraw.replace("parts/", "");
+
+            sceneBricks += `
+            <Brick refID="${refID}" designID="${ldraw}" itemNos="${ldraw}">
+              <Part refID="${refID}" designID="${ldraw}" materials="26,0" decoration="0">
+                <Bone refID="${refID}" transformation="${LXFMLMatrix(group.matrixWorld)}">
+                </Bone>
+              </Part>
+            </Brick>`;
+
+            let refID = refID + 1;
+          };
+      });
+
+      const sceneData = `
+        <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+          <LXFML versionMajor="5" versionMinor="0" name="testing">
+            <Meta>
+                <Application name="LEGO Digital Designer" versionMajor="4" versionMinor="3"/>
+                <Brand name="LDD"/>
+                <BrickSet version="2670"/>
+              </Meta>
+              <Cameras>
+                <Camera refID="0" fieldOfView="80" distance="120" transformation="1,0,0,0,1,0,0,0,1,0,0,120"/>
+              </Cameras>
+              <Bricks cameraRef="0">
+                ${sceneBricks}
+              </Bricks>
+              <RigidSystems>
+                <RigidSystem>
+                  <Rigid refID="0" transformation="1,0,0,0,1,0,0,0,1,-3.5999999046325684,0,-5.2000002861022949" boneRefs="0"/>
+                </RigidSystem>
+              </RigidSystems>
+              <GroupSystems>
+                <GroupSystem>
+                </GroupSystem>
+              </GroupSystems>
+              <BuildingInstructions>
+              </BuildingInstructions>
+            </LXFML>
+          `;
+
+      return sceneData.replace(/\s+/g, ' ').trim();
+    }
+
+    function LXFMLMatrix(matrix4) {
+      const m = matrix4.clone().transpose().elements;
+
+      return [
+        m[0], m[4], m[8],   // row 1 (X basis)
+        m[1], m[5], m[9],   // row 2 (Y basis)
+        m[2], m[6], m[10],  // row 3 (Z basis)
+        m[3], m[7], m[11]   // translation
+      ].map(v => v.toFixed(10)).join(',');
+    } */
+
+    function updateSceneData() {
+      if (blockGroups && blockGroups.length > 0) {
+          blockGroups.forEach(function (g) {
+              let hasTinyMesh = false;
+
+              g.traverse(function (child) {
+                  if (child.isMesh && isSmall(child, 19)) {
+                      hasTinyMesh = true;
+                  }
+              });
+
+              g.userData.noSnap = hasTinyMesh;
+
+              if (!g.userData.noSnap || !scene.userData.noSnap) {
+                g.position.set(
+                      snapToGrid(g.position.x, 10),
+                      snapToGrid(g.position.y, 4),
+                      snapToGrid(g.position.z, 10)
+                  );
+              }
+
+              g.updateMatrixWorld(true);
+              scene.updateMatrixWorld(true);
+          });
+      }
+
+      if (selectedObject) {
+          selectedObject.updateMatrixWorld(true);
+      }
+  }
+
+    function onMouseClick(event) {
+        let target = event.target;
+        let container = document.querySelector(".scene");
+ 
+        if (!container.contains(target)) {
+            return;
+        } else {
+            event.preventDefault();
+        }
+ 
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+ 
+        raycaster.setFromCamera(mouse, camera);
+        let intersects = raycaster.intersectObjects(scene.children, true);
+
+        if (intersects.length > 0) {
+            selectObject(intersects[0].object);
+
+            /*window.addEventListener('pointerdown', function (event) {
+              if(event.button === 0) {
+                if(scene.userData.canDrag === true) {
+                  scene.userData.canDrag = false;
+                  if(selectedObject && selectedObject != intersects[0].object) {
+                    transformControls.detach(selectedObject);
+                    selectedObject = undefined;
+                  }
+                } else {
+                  scene.userData.canDrag = true;
+                }
+              }
+            }, true);*/
+        }
+     }
+
+      /*const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+      const intersectionPoint = new THREE.Vector3();
+      const offset = new THREE.Vector3();
+
+      function onMouseMove(event) {
+        const container = document.querySelector(".scene");
+        if (!container.contains(event.target)) {
+          return;
+        }
+
+        if(scene.userData.canDrag != true) {
+          return;
+        }
+
+        event.preventDefault();
+
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+
+        if (!selectedObject) {
+          return;
+        }
+
+        const has_intersection = raycaster.ray.intersectPlane(plane, intersectionPoint);
+        if (!has_intersection) {
+          return;
+        }
+
+        selectedObject.position.copy(intersectionPoint).add(offset);
+
+        const snap = !selectedObject.userData.noSnap || scene.userData.noSnap;
+        if (snap) {
+            applySnap(selectedObject);
+        }
+
+        selectedObject.updateMatrixWorld(true);
+        scene.updateMatrixWorld(true);
+
+        updateSceneData();
+    }*/
+ 
+     function selectObject(object) {
+        while (object.parent && !object.userData.isBlock) {
+            object = object.parent;
+        }
+ 
+        if (!object.userData.isBlock || !transformControls.enabled) {
+            return;
+        }
+ 
+        if (object === selectedObject) {
+            return;
+        }
+
+        transformControls.detach(selectedObject);
+        selectedObject = object;
+        transformControls.attach(object);
+    }
+ 
+    /*function deselectObject(obj) {
+        if (obj !== null) {
+            transformControls.detach(obj);
+            previousSelectedObject = obj;
+            selectedObject = null;
+        }
+    } */
+    
+    /*function canDrag() {
+      if(scene.userData.canDrag) {
+              scene.userData.canDrag = false;
+              window.removeEventListener('mousemove', onMouseMove, true);
+              deselectObject(selectedObject);
+            } else {
+              scene.userData.canDrag = true;
+              window.addEventListener('mousemove', onMouseMove, true);
+            }
+      } */
+
+    function applySnap(obj) {
+        obj.position.set(
+            snapToGrid(obj.position.x, 10),
+            snapToGrid(obj.position.y, 4),
+            snapToGrid(obj.position.z, 10)
+        );
+
+        function snapAngle(angle) {
+          return Math.round(angle / THREE.MathUtils.degToRad(45)) * THREE.MathUtils.degToRad(45);
+        }
+
+        obj.rotation.set(
+            snapAngle(obj.rotation.x),
+            snapAngle(obj.rotation.y),
+            snapAngle(obj.rotation.z)
+        );
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function moveBlock(mode) {
+        if (mode === "t") {
+            transformControls.setMode('translate');
+            tooltip('Changed to drag blocks');
+        }
+
+        if (mode === "r") {
+            transformControls.setMode('rotate');
+            tooltip('Changed to rotate blocks');
+        }
+
+        if (mode === "s") {
+            transformControls.setMode('scale');
+            tooltip('Changed to secret scale blocks');
+        }
+    }
+
+    function animate() {
+      //THREE.ShaderChunk.encodings_fragment = THREE.ShaderChunk.colorspace_fragment;
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const stats = new Stats();
+
+        stats.domElement.style.position = 'absolute';
+        stats.domElement.style.zIndex = '99999999';
+        stats.domElement.style.left = '0px';
+        stats.domElement.style.bottom = '0px';
+        document.body.appendChild(stats.domElement);
+
+        setInterval(function () {
+          stats.update();
+        }, 1000 / 60);
+      });
+
+      requestAnimationFrame(animate);
+      controls.update();
+      render();
+    }
+
+
+    function render() {
+      renderer.render(scene, camera);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+    }
+
+    function tooltip(text) {
+        const tooltip = document.createElement('div');
+
+        tooltip.textContent = text;
+        tooltip.setAttribute('id', 'tooltip');
+
+        document.body.appendChild(tooltip);
+
+        if (tooltip) {
+            setTimeout(() => {
+            tooltip.remove();
+            }, 5000);
+        }
+    }
+
+    window.onload = function() {
+        setTimeout(() => {
+            if (document.getElementById("preloaded-logo")) {
+                document.getElementById("preloaded-logo").style.display = "none";
+            }
+        }, 1000);
+    }
+  </script>
+
+  <!-- LDRAW.ORG CC BY 2.0 PARTS LIBRARY ATTRIBUTION -->
+  <div class="ldraw-logo">
+        <a href="http://www.ldraw.org">
+            <img style="width: 145px" src="https://threejs.org/examples/models/ldraw/ldraw_org_logo/Stamp145.png">
+        </a>
+    <br />
+    <a href="http://www.ldraw.org/" style="color:#000;">This software uses the LDraw Parts Library</a>
+  </div>
+
+</body>
+</html>
