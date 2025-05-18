@@ -7,6 +7,7 @@ if(!isset($_GET['show_errors'])) {
 $response = ['error' => 'Unknown error occurred.'];
 
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
 if($loggedin === false) {
@@ -56,11 +57,11 @@ function check_username_available($new) {
         $reason = 'Username has been taken. Please choose another.';
     }
 
-    if(!empty($users_row['changed'])) {
-        $changed = $users_row['changed'];
-        if (($changed - time()) < 86400) {
-            $change_when = $changed - time();
-            $reason = "You can change your username in " . date("H", $change_when) . " hours";
+    if (!empty($users_row['changed'])) {
+        $remaining = $users_row['changed'] - time();
+        if ($remaining < 86400) {
+            $hours_remaining = ceil($remaining / 3600);
+            $reason = "You can change your username " . time_ago($remaining);
             $available = '0';
         }
     }
@@ -209,7 +210,7 @@ if (isset($_POST['change'])) {
 
     if ($storedHash) {
         if ($storedHash === md5($oldPassword . $salt)) {
-            $newSalt = bin2hex(random_bytes(16));
+            $newSalt = uniqid();
             $newHashedPassword = md5($newPassword . $newSalt);
 
             $stmt = $conn->prepare("UPDATE users SET password = ?, salt = ? WHERE id = ?");
@@ -267,24 +268,27 @@ if(isset($_GET['email_change'])){
 
 if(isset($_GET['clear_notifications'])) {
     header('Content-Type: application/json');
-    $id = (int)$token['user'];
+    $id = (int)$users_row['id'];
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 	$alertnum = 0;
-	$stmt_2 = $conn->prepare("UPDATE users SET alert = ? WHERE id = ? LIMIT 1");
-	$stmt_2->bind_param("ii", $alertnum, $id);
+    if((int)$users_row['alert'] != 0) {
+        $stmt_2 = $conn->prepare("UPDATE users SET alert = ? WHERE id = ? LIMIT 1");
+        $stmt_2->bind_param("ii", $alertnum, $id);
 
-	if ($stmt_2->execute()) {
-        header("HTTP/1.0 200 OK");
-        echo json_encode(['success' => 'Cleared inbox notifications. Would you like to reload the web page?']);
-        exit;
-	} else {
+        if ($stmt_2->execute()) {
+            header("HTTP/1.0 200 OK");
+            echo json_encode(['success' => 'Cleared inbox notifications. Would you like to reload the web page?']);
+            exit;
+        } else {
+            header("HTTP/1.0 500 Internal Server Error");
+            echo json_encode(['error' => 'Error clearing inbox notifications.']);
+            exit;
+        }
+        $stmt_2->close();
+    } else {
         header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => 'Error clearing inbox notifications.']);
         exit;
-	}
-
-	$stmt_2->close();
-	exit;
+    }
 }
 
 if (isset($_POST['logout']) && isset($_POST['token'])) {
@@ -317,7 +321,18 @@ if (isset($_POST['logout']) && isset($_POST['token'])) {
 
 if (isset($_POST['delete_account'])) {
     header('Content-Type: application/json');
-    $id = $token['user'];
+    header("HTTP/1.0 500 Internal Server Error");
+
+    echo json_encode(['error' => 'To delete your account, please email us at ' . DB_MAIL]);
+    exit;
+
+    /*$id = $token['user'];
+    if(!$id) {
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => 'Error fetching userid. It may be plausible you were logged out from our systems or the session API is down.']);
+        exit;
+    }
+
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
     $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
@@ -338,6 +353,11 @@ if (isset($_POST['delete_account'])) {
 
         $stmt_forum = $conn3->prepare("UPDATE posts, replies SET posts.user = 0, replies.user = 0 WHERE posts.user = ? OR replies.user = ?");
         $stmt_forum->bind_param("ii", $id, $id);
+        $stmt_forum->execute();
+        $stmt_forum->close();
+
+        $stmt_forum = $conn3->prepare("UPDATE messages SET userid = 0 WHERE userid = ?");
+        $stmt_forum->bind_param("i", $id);
         $stmt_forum->execute();
         $stmt_forum->close();
 
@@ -415,7 +435,7 @@ if (isset($_POST['delete_account'])) {
     }
     $conn->close();
     $conn2->close();
-    exit;
+    exit; */
 }
 echo json_encode($response);
 exit;

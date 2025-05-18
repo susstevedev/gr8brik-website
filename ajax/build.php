@@ -57,7 +57,7 @@ if (isset($_POST['save_build'])) {
         }
     }
 
-    $file_id = bin2hex(random_bytes(16));
+    $file_id = uniqid();
     $file_name = "../cre/" . $file_id . ".json";
     $db_file_name = $file_id . ".json";
     $desc = htmlspecialchars($_POST['desc']);
@@ -70,7 +70,7 @@ if (isset($_POST['save_build'])) {
 
         if (strpos($screenshot_data, 'data:image/png;base64,') === 0) {
             $screenshot_data = base64_decode(substr($screenshot_data, strlen('data:image/png;base64,')));
-            $screenshot_path = "../cre/" . bin2hex(random_bytes(16)) . ".png";
+            $screenshot_path = "../cre/" . $file_id . ".png";
 
             if (!file_put_contents($screenshot_path, $screenshot_data)) {
                 header("HTTP/1.1 500 Internal Server Error");
@@ -281,6 +281,9 @@ function fetch_build($model_id, $csrf) {
             ]);
         }
     }
+
+    $count_result = $conn->query("SELECT COUNT(*) as vote_count FROM votes WHERE creation = $model_id");
+    $count_row = $count_result->fetch_assoc();
 
     if(isset($token['user'])) {
         $id = $token['user'];
@@ -545,16 +548,22 @@ if(isset($_GET['build_comments'])) {
     exit($comment_data);
 }
 
-if(isset($_POST['comment'])){
+if(isset($_POST['comment'])) {
     header('Content-Type: application/json');
 
 	$comment = $_POST['commentbox'];
     $model_id = $_POST['buildId'];
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 
-    if(!isset($_COOKIE['token']) && $tokendata->num_rows === 0) {
+    if(!loggedin()) {
         header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode([ 'error' => 'Please login to comment.' ]);
+        echo json_encode(['error' => 'Please login to comment.']);
+        exit;
+    }
+
+    if($users_row['verify_token'] != NULL) {
+        header("HTTP/1.0 500 Internal Server Error");
+        echo json_encode(['error' => 'Please verify your account to comment.']);
         exit;
     }
 

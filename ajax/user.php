@@ -250,7 +250,7 @@ function delete_old_sessions() {
 }
 
 function loggedin() {
-    global $conn;
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     if (isset($_COOKIE['token'])) {
         $session_stmt = $conn->prepare("SELECT * FROM sessions WHERE id = ?");
