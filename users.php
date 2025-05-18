@@ -78,16 +78,19 @@
             
                 foreach ($users as $user) {
                     $userid = $user['id'];
-                    $sql = "SELECT * FROM bans WHERE user = '$userid'";
-                    $result2 = $conn->query($sql);
+
+                    /*$stmt = $conn->prepare("SELECT * FROM bans WHERE user = ?");
+                    $stmt->bind_param("i", $userid);
+                    $stmt->execute();
+                    $result2 = $stmt->get_result();
                     $row2 = $result2->fetch_assoc();
 
-                    if(empty($user['username']) || $result2->num_rows != 0 && $row2['end_date'] >= time()) {
+                    if($result2->num_rows != 0 && $row2['end_date'] >= time()) {
                         continue;
-                    }
+                    }*/
 
-                    echo "<br /><li class='w3-padding-small w3-border'><a href='/user/" . $userid . "'>";
-                    echo "<img id='pfp' style='width:100px;height:100px;border-radius:15px;border:1px solid skyblue;' src='/acc/users/pfps/" . $userid . ".jpg'>";
+                    echo "<br /><li class='w3-padding-small w3-border'><a href='/user/" . htmlspecialchars($userid) . "'>";
+                    echo "<img id='pfp' style='width: 100px; height: 100px; border-radius: 50%; border: none;' src='/acc/users/pfps/" . htmlspecialchars($userid) . ".jpg'>";
                     if($user['admin'] === '1') {
                         echo "&nbsp;<b class='w3-xlarge w3-text-red'>" . htmlspecialchars($user['username']) . "</a></b>";
                     } else {
@@ -98,8 +101,6 @@
                     }
                     echo "<br /><b class='w3-text-grey'>" . $bbcode->toHTML(htmlspecialchars($user['description'])) . "</b></li>";
                 }
-            } else {
-                echo "<h4 class='w3-padding-small w3-border'>Please check your internet connection</h4>";
             }
 
         ?>

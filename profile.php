@@ -7,10 +7,11 @@ if(!isset($_GET['id'])) {
 }
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+
 $data = json_decode(fetch_profile($_GET['id'], $token['user'], $users_row, $_SESSION['csrf']), true);
 
 if ($data === null) {
-    exit('no user');
+    exit('An unknown error occured');
 }
 
 if($data['message'] != "OK") {
@@ -114,7 +115,7 @@ if(isset($_POST['unblock'])) {
 }
 
 if(isset($_POST['ban'])) {
-    $profile_id = $_GET['user'];
+    $profile_id = $_GET['id'];
     $reason = mysqli_real_escape_string($conn, $_POST['reason']);
     $day = $_POST['day'];
 	$month = $_POST['month'];
@@ -232,7 +233,7 @@ if(isset($_POST['ban'])) {
 
         <pre id="description"><?php echo $data['description'] ?></pre>
 
-        <span id="joined-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff"><?php echo $data['age'] ?></span>
+        <span id="joined-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">Registered <?php echo time_ago($data['age']) ?></span>
         <?php if(!empty($data['twitter'])) { ?>
             <b>-</b>
             <span id="twitter-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">
@@ -245,8 +246,8 @@ if(isset($_POST['ban'])) {
             </span>
         <?php } ?>
         <b>-</b>
-        <span id="followedby-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff"></span>
-        <hr style="border-color: inherit; width: 50%; text-align: left; margin-left: 0;" />
+        <span id="followedby-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff"></span><br />
+        <!-- <hr style="border-color: inherit; width: 50%; text-align: left; margin-left: 0;" /> -->
 
         <?php if($data['isLoggedin']) { ?>
             <?php if($token['user'] != trim($_GET['id'])) { ?>
@@ -285,7 +286,7 @@ if(isset($_POST['ban'])) {
     <div id="unfollow" class="w3-modal">
 		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
 			<div class="w3-container">
-				<span onclick="document.getElementById('unfollow').style.display='none'" class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
+				<span onclick="document.getElementById('unfollow').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
 				    <form method='post' action=''>
 					<h2>Are you sure you want to unfollow this user?</h2>
 					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('unfollow').style.display='none'">No</span> 
@@ -298,7 +299,7 @@ if(isset($_POST['ban'])) {
     <div id="block" class="w3-modal">
 		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
 			<div class="w3-container">
-				<span onclick="document.getElementById('block').style.display='none'" class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
+				<span onclick="document.getElementById('block').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
 				    <form method='post' action=''>
 					<h2>Are you sure you want to block this user?</h2>
 					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('block').style.display='none'">No</span> 
@@ -413,9 +414,24 @@ if(isset($_POST['ban'])) {
                 $result = $conn->query($sql);
 
                 while ($creation = $result->fetch_assoc()) {
-                    echo "<div class='w3-display-container w3-left w3-padding-small'>";
+                    /*echo "<div class='w3-display-container w3-left w3-padding-small'>";
 					echo "<a href='/build/" . $creation['id'] . "'><img src='/cre/" . $creation['screenshot'] . "' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-card-2 w3-border'></a>";
-                    echo "<b class='w3-display-middle w3-text-grey'>" . htmlspecialchars($creation['name'], ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401) . "</b></div>";
+                    echo "<b class='w3-display-middle w3-text-grey'>" . htmlspecialchars($creation['name'], ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401) . "</b></div>";*/
+
+                    if (empty($creation['name'])) {
+                        $creation['name'] = $data['username'] . "'s creation";
+                    }
+
+                    $truncatedName = htmlspecialchars(substr($creation['name'], 0, 30));
+                    if (strlen($creation['name']) >= 30) {
+                        $truncatedName .= '...';
+                    }
+
+                    echo "<div class='w3-display-container w3-left w3-padding'>";
+                    echo "<a href='/creation.php?id=" . $creation['id'] . "'><img src='/cre/" . $creation['screenshot'] . "' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
+                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
+                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($creation['date'])) . "</span>";
+                    echo "</div></div>";
                 }
                 $conn->close();
             ?>
@@ -431,13 +447,20 @@ if(isset($_POST['ban'])) {
 				}
 
                 $profileid = $_GET['id'];
-                $sql = "SELECT * FROM posts WHERE user = $profileid ORDER BY date DESC";
+                $sql = "SELECT * FROM messages WHERE userid = $profileid AND parent = 0 ORDER BY timestamp DESC";
                 $result = $conn->query($sql);
 
                 while ($topic = $result->fetch_assoc()) {
-                    echo "<div class='w3-display-container w3-left w3-padding-small'>";
-					echo "<a href='/topic/" . $topic['id'] . "'><img src='/img/com.jpg' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-card-2 w3-border'></a>";
-                    echo "<b class='w3-display-middle w3-text-grey'>" . htmlspecialchars($topic['title'], ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401) . "</b></div>";
+                    $truncatedName = htmlspecialchars(substr($topic['title'], 0, 30));
+                    if (strlen($topic['title']) >= 30) {
+                        $truncatedName .= '...';
+                    }
+
+                    echo "<div class='w3-display-container w3-left w3-padding'>";
+                    echo "<a href='/com/view.php?id=" . $topic['id'] . "'><img src='/img/com.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
+                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
+                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($topic['timestamp'])) . "</span>";
+                    echo "</div></div>";
                 }
                 $conn->close();
             ?>
@@ -461,35 +484,41 @@ if(isset($_POST['ban'])) {
                 $sql = "SELECT * FROM comments WHERE user = $profileid ORDER BY id DESC";
                 $result = $conn1->query($sql);
 
-                echo "<h4>creation comments</h4><br />";
+                echo "<h4>Replies to creations</h4><br />";
                 if ($result->num_rows === 0) {
-                    echo "<b>no creation comments yet from this user</b>";
+                    echo "<b>Nothing here yet</b>";
                 }
                 while ($comment = $result->fetch_assoc()) {
-                    $truncatedPost = htmlspecialchars(substr($comment['comment'], 0, 50), ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
-                    if (strlen($comment['comment']) > 50) {
-                        $truncatedPost .= "<b class='w3-large'>&nbsp;...more&nbsp;</b>";
+                    $truncatedPost = htmlspecialchars(substr($comment['comment'], 0, 30));
+                    if (strlen($comment['comment']) >= 30) {
+                        $truncatedPost .= '...';
                     }
-                    echo "<div class='w3-display-container w3-left w3-padding-small'>";
-					echo "<a href='/build/" . $comment['model'] . "#comment" . $comment['id'] . "'><img src='/img/com.jpg' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-card-2 w3-border'></a>";
-                    echo "<b class='w3-display-middle w3-text-grey'>" . $truncatedPost . "</b></div>";
+
+                    echo "<div class='w3-display-container w3-left w3-padding'>";
+                    echo "<a href='/creation.php?id=" . $comment['model'] . "#comment" . $comment['id'] . "'><img src='/img/creations.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
+                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedPost . "</h4>";
+                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", (int)$comment['date']) . "</span>";
+                    echo "</div></div>";
                 }
 
-                $sql = "SELECT * FROM replies WHERE user = $profileid ORDER BY date DESC";
+                $sql = "SELECT * FROM messages WHERE userid = $profileid AND parent != 0 ORDER BY timestamp DESC";
                 $result = $conn2->query($sql);
 
-                echo "</div><div class='w3-row'><h4>post comments</h4><br />";
+                echo "</div><div class='w3-row'><h4>Replies to posts</h4><br />";
                 if ($result->num_rows === 0) {
-                    echo "<b>no post comments yet from this user</b>";
+                    echo "<b>Nothing here yet</b>";
                 }
                 while ($reply = $result->fetch_assoc()) {
-                    $truncatedPost = htmlspecialchars(substr($reply['post'], 0, 50), ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
-                    if (strlen($reply['post']) > 50) {
-                        $truncatedPost .= "<h4>&nbsp;...more&nbsp;</h4>";
+                    $truncatedPost = htmlspecialchars(substr($reply['content'], 0, 30));
+                    if (strlen($reply['content']) >= 30) {
+                        $truncatedPost .= '...';
                     }
-                    echo "<div class='w3-display-container w3-left w3-padding-small'>";
-					echo "<a href='/topic/" . $reply['reply'] . "#reply" . $reply['id'] . "'><img src='/img/com.jpg' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-card-2 w3-border'></a>";
-                    echo "<b class='w3-display-middle w3-text-grey'>" . $truncatedPost . "</b></div>";
+
+                    echo "<div class='w3-display-container w3-left w3-padding'>";
+                    echo "<a href='/com/view.php?id=" . $reply['parent'] . "#reply" . $reply['id'] . "'><img src='/img/com.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
+                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedPost . "</h4>";
+                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($reply['timestamp'])) . "</span>";
+                    echo "</div></div>";
                 }
                 $conn1->close();
                 $conn2->close();

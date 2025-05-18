@@ -55,8 +55,6 @@ if(isset($_POST['report'])){
             
 }
 if(isset($_POST['delete'])){
-    exit("Error");
-
     /*$creation = "cre/" . basename($_SERVER['QUERY_STRING']);
     unlink($creation);
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
@@ -66,7 +64,6 @@ if(isset($_POST['delete'])){
 	$stmt = $conn->prepare($sql);
 	$stmt->bind_param("i", $model);
 	$stmt->execute();*/
-
 }
 ?>
 <!DOCTYPE html>

@@ -13,6 +13,7 @@ if(!isset($model_id)) {
     exit;
 }
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 
 $data = json_decode(fetch_build($model_id, $_SESSION['csrf']), true);
 
@@ -70,6 +71,63 @@ if ($_POST['report']) {
     }
     exit;
 }
+
+if ($_POST['delete_model']) {
+    header('Content-Type: application/json');
+
+    if ($_SESSION['csrf'] === $_POST['csrf_token']) {
+        if (isset($_COOKIE['token']) && $users_row && trim($users_row['id']) === trim($data['userid'])) {                
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+            $model_id = (int)$_POST['model_id'];
+
+            $sql = "SELECT * FROM model WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $model_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($row = $result->fetch_assoc()) {
+                $modelFile = basename($row['model']);
+                $screenshotFile = basename($row['screenshot']);
+                $crePath = realpath(__DIR__ . "/cre") . '/';
+
+                if (file_exists($crePath . $modelFile)) {
+                    unlink($crePath . $modelFile);
+                }
+
+                if (file_exists($crePath . $screenshotFile)) {
+                    unlink($crePath . $screenshotFile);
+                }
+
+                $sql2 = "DELETE FROM model WHERE id = ?";
+                $stmt2 = $conn->prepare($sql2);
+                $stmt2->bind_param("i", $model_id);
+
+                if($stmt2->execute()) {
+                    $stmtVotes = $conn->prepare("DELETE FROM votes WHERE creation = ?");
+                    $stmtVotes->bind_param("i", $model_id);
+                    $stmtVotes->execute();
+
+                    $stmtComments = $conn->prepare("DELETE FROM comments WHERE model = ?");
+                    $stmtComments->bind_param("i", $model_id);
+                    $stmtComments->execute();
+                    
+                    echo json_encode(['success' => 'Creation deleted']);
+                } else {
+                    echo json_encode(['error' => 'Error deleting model listing']);
+                }
+            } else {
+                echo json_encode(['error' => 'Creation not found']);
+            }
+
+        } else {
+            echo json_encode(['error' => 'An authentication error has occured']);
+        }
+    } else {
+        echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -83,7 +141,7 @@ if ($_POST['report']) {
 <div id="report" class="w3-modal" style="z-index: 999999">
     <div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
         <div class="w3-container">
-            <span onclick="$('#report').hide();" class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
+            <span onclick="$('#report').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
             <form id="reportForm">
                 <h2>Why do you want to flag this creation?</h2>
                 <b>You can only report a creation when it violates our <a href="/rules?src=creation" target="_blank"><i class="fa fa-external-link" aria-hidden="true"></i>rules</a>.</b><br />
@@ -100,8 +158,27 @@ if ($_POST['report']) {
                 <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf']; ?>">
                 <input type="hidden" name="report" value="1">
 
-                <span class="w3-btn w3-large w3-white w3-hover-blue" onclick="$('#report').hide();">Close</span>
-                <button type="submit" class="w3-btn w3-large w3-white w3-hover-red">Report</button>
+                <span class="w3-btn w3-large w3-white w3-hover-blue w3-round-small" onclick="$('#report').hide();">Close</span>
+                <button type="submit" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">Report</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="delete-model" class="w3-modal" style="z-index: 999999">
+    <div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
+        <div class="w3-container">
+            <span onclick="$('#delete-model').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
+            <form id="deleteModelForm">
+                <h2>Are you sure you want to delete this creation?</h2>
+                <b>Deleting a creation does not delete comments, comment votes, or votes on it.</b><br />
+
+                <input type="hidden" name="model_id" value="<?php echo $model_id; ?>">
+                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf']; ?>">
+                <input type="hidden" name="delete_model" value="1">
+
+                <span class="w3-btn w3-large w3-white w3-hover-blue w3-round-small" onclick="$('#delete-model').hide();">Close</span>
+                <button type="submit" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">Delete</button>
             </form>
         </div>
     </div>
@@ -168,7 +245,7 @@ if ($_POST['report']) {
 document.addEventListener("DOMContentLoaded", function () {
     $(document).ready(function() {
         let embed_style = "width:50vw;height:50vh;";
-        let embed_class = "w3-border w3-border-black w3-round-small w3-card-2 w3-hover-shadow";
+        let embed_class = "w3-border w3-border-black w3-round w3-card-2 w3-hover-shadow";
         let embed_model = "<?php echo urlencode($data['model']) ?>";
 
         $("#data-model-embed").html(`<iframe id="data-model-embed" src="/new-viewer.html?model=${embed_model}" style="${embed_style}" class="${embed_class}">`);
@@ -197,6 +274,29 @@ document.addEventListener("DOMContentLoaded", function () {
                             alert(response.success);
                             $("#report").hide();
                             $("#reportForm")[0].reset();
+                        } else {
+                            alert(response.error);
+                        }
+                    },
+                    error: function() {
+                        alert("An error occurred. Please try again.");
+                    }
+                });
+            });
+        });
+
+        $("#deleteModelForm").submit(function(e) {
+            e.preventDefault();
+            fetchCSRFToken(function() {
+                $.ajax({
+                    url: "",
+                    type: "POST",
+                    data: $("#deleteModelForm").serialize(),
+                    dataType: "json",
+                    success: function(response) {
+                        if (response.success) {
+                            alert(response.success);
+                            window.location.reload();
                         } else {
                             alert(response.error);
                         }
@@ -256,6 +356,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const btn = $(this);
             const commentBox = $("#comment-form textarea[name='comment-box']").val();
             const commentBtnText = $("#comment-btn-text");
+            const errorElm = $("#ajax-error");
 
             commentBtnText.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
             btn.prop("disabled", true);
@@ -265,17 +366,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 method: "POST",
                 data: { comment: true, buildId: <?php echo $_GET['id'] ?>, commentbox: commentBox },
                 success: function(response) {
-                    commentBtnText.html('Comment');
-                    btn.prop("disabled", false);
-                    alert('Comment posted!');
-                    window.location.reload();
+                    if (response.success) {
+                        commentBtnText.html('Comment');
+                        btn.prop("disabled", false);
+                        alert('Comment posted!');
+                        window.location.reload();
+                    } else {
+                        errorElm.text(response.error).show(500).delay(5000).hide(500);
+                    }
                 },
                 error: (jqXHR, textStatus, errorThrown) => {
                     commentBtnText.html('Comment');
                     btn.prop("disabled", false);
                     console.error("error:", textStatus, errorThrown, jqXHR);
                     const response = JSON.parse(jqXHR.responseText);
-                    alert(response.error);
+                    errorElm.text(response.error).show(500).delay(5000).hide(500);
                 }
             });
         });
@@ -302,11 +407,13 @@ document.addEventListener("DOMContentLoaded", function () {
 <?php } ?>
 
 <main id="wrapper">
+    <div id="ajax-error" style="display: none;" class="w3-top w3-padding w3-round w3-red"></div>
+
     <center><header class="loader"></header></center>
     <header>
         <h2 id="data-name"><?php echo $data['name'] ?></h2>
         <h4 id="data-stats">
-            <i class="fa fa-clock-o" aria-hidden="true"></i>Posted&nbsp;<?php echo $data['date'] ?><br />
+            <i class="fa fa-clock-o" aria-hidden="true"></i>Posted&nbsp;<?php echo time_ago($data['date']) ?><br />
             <i class="fa fa-user-o" aria-hidden="true"></i>By
                 <?php if($data['model_admin'] === '1') { ?>
                 <a id="data-user-link" class="w3-text-red w3-hover-text-yellow" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?>
@@ -317,7 +424,7 @@ document.addEventListener("DOMContentLoaded", function () {
             <i class="fa fa-arrow-circle-o-up" aria-hidden="true"></i><?php echo $data['likes'] ?>&nbsp;likes<br />
             <i class="fa fa-eye" aria-hidden="true"></i><?php echo $data['views'] ?>&nbsp;views<br />
         </h4>
-    </header><hr />
+    </header>
 
     <figure class="data-model-screenshot" style="margin: 20px !important;">
         <p><img id="data-model-screenshot" src="/cre/<?php echo $data['screenshot'] ?>" style="width:50vw;height:50vh;border:1px solid;border-radius:15%;display:none;" loading='lazy'></p>
@@ -349,8 +456,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         <?php if(trim($token['user']) === trim($data['userid'])) { ?>
             <div class="tooltip" id="data-delete-model">
-                <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Delete not available right now</span>
-                <button xonclick=document.getElementById("delete").style.display="block" name="delete" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" disabled/>Delete</button>&nbsp;
+                <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Delete this creation</span>
+                <button onclick=document.getElementById("delete-model").style.display="block" name="delete" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />Delete</button>&nbsp;
             </div>
         <?php } ?>
 
@@ -360,10 +467,7 @@ document.addEventListener("DOMContentLoaded", function () {
         </div>
     <?php } ?>
         
-    <p>Share:</p>
-    <p><textarea class="w3-input w3-card-2 w3-hover-shadow w3-mobile w3-round" rows='2' cols='60' readonly>http://www.gr8brik.rf.gd/build/<?php echo htmlspecialchars($_GET['id']) ?></textarea></p>
-    <p>Or...</p>
-    <p><textarea class="w3-input w3-card-2 w3-hover-shadow w3-mobile w3-round" rows='2' cols='60' readonly>http://www.gr8brik.rf.gd/ajax/build.php?fetch=true&buildId=<?php echo htmlspecialchars($_GET['id']) ?></textarea></p><hr />
+    <p><span class="w3-large">Embed:</span></p><p><textarea class="w3-card-2 w3-round" rows='2' cols='65' readonly>http://www.gr8brik.rf.gd/new-viewer.html?model=<?php echo htmlspecialchars($data['model']) ?></textarea></p><hr />
 
     <div class="w3-container">
         <?php if($data['message'] != "OK") { ?>
@@ -401,7 +505,7 @@ document.addEventListener("DOMContentLoaded", function () {
         <?php } ?>
         <div id="comment<?php echo $comment['id'] ?>" class="w3-row w3-margin-bottom">
             <div class="w3-col" style="width: 50px;">
-                <div class='w3-dropdown-hover w3-bar-block' style="background-color: transparent;">
+                <!---<div class='w3-dropdown-hover w3-bar-block' style="background-color: transparent;">
                     <a href="/user/<?php echo $comment['userid'] ?>" class="w3-bar-item">
                         <img class="w3-card-2 w3-hover-shadow w3-light-grey w3-circle" width="50px" height="50px" src="/acc/users/pfps/<?php echo $comment['userid'] ?>.jpg">
                     </a>
@@ -410,10 +514,11 @@ document.addEventListener("DOMContentLoaded", function () {
                         <b class="<?php echo $comment['user_admin'] === '1' ? 'w3-text-red' : '' ?>"><?php echo $comment['username'] ?></b><br />
                         <span><?php echo $comment['user_about'] ?></span>
                     </div>
-                </div>
+                </div> -->
+                <img class="w3-bar-item w3-circle w3-card-2 w3-border-blue w3-light-grey" width="50px" height="50px" src="/acc/users/pfps/<?php echo $comment['userid'] ?>.jpg">
             </div>
             <div class="w3-hide-small w3-col w3-margin" style="width: 1px;">
-                <i class="fa fa-play fa-rotate-180" style="font-size: 15px;"></i>
+                <i class="w3-large w3-text-white fa fa-play fa-rotate-180" xstyle="font-size: 15px;"></i>
             </div>
             <div class="w3-col w3-card-2 w3-hover-shadow" style="width: 75%;">
                 <article class="gr8-theme w3-light-grey w3-padding" style="min-height: 75px;">

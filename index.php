@@ -5,7 +5,7 @@ isLoggedin();
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>About</title>
+    <title>All-in-browser Lego &reg; modeler</title>
     <?php include 'header.php' ?>
 </head>
 
@@ -61,10 +61,10 @@ isLoggedin();
 
     <div class="w3-content w3-card-2 w3-light-grey w3-padding-small w3-left" style="max-width: 525px;position: relative;">
 
-        <a href="#feed"><img class="mySlides" src="img/feed.jpg" style="width:500px;height:250px;display:none;" loading='lazy' class="w3-animate-right"></a>
-        <a href="#community"><img class="mySlides" src="img/com.jpg" style="width:500px;height:250px;display:none;" loading='lazy' class="w3-animate-right"></a>
-        <a href="#creations"><img class="mySlides" src="img/creations.jpg" style="width:500px;height:250px;display:none;" loading='lazy' class="w3-animate-right"></a>
-        <a href="#uploads"><img class="mySlides" src="img/upload.jpg" style="width:500px;height:250px;display:none;" loading='lazy' class="w3-animate-right"></a>
+        <a href="#feed"><img class="mySlides" src="img/feed.jpg" style="width:500px;height:250px;display:none;" class="w3-animate-right"></a>
+        <a href="#community"><img class="mySlides" src="img/com.jpg" style="width:500px;height:250px;display:none;" class="w3-animate-right"></a>
+        <a href="#creations"><img class="mySlides" src="img/creations.jpg" style="width:500px;height:250px;display:none;" class="w3-animate-right"></a>
+        <a href="#uploads"><img class="mySlides" src="img/upload.jpg" style="width:500px;height:250px;display:none;" class="w3-animate-right"></a>
 
         <a class="w3-btn-floating w3-blue w3-xlarge w3-hover-white" style="position:absolute;top:45%;left:0" onclick="plusDivs(-1)"><i class="fa fa-arrow-left" aria-hidden="true"></i></a>
         <a class="w3-btn-floating w3-blue w3-xlarge w3-hover-white" style="position:absolute;top:45%;right:0" onclick="plusDivs(1)"><i class="fa fa-arrow-right" aria-hidden="true"></i></a>
@@ -75,7 +75,7 @@ isLoggedin();
 
         <p style="word-wrap: break-word;">GR8BRIK is a block building browser game written in ThreeJS, for modern browsers. No download needed, just click the big white button below to go to the Modeler tab.</p>
 
-        <a href="/modeler/" class="w3-btn w3-large w3-white w3-hover-blue" target="_blank">Start Building NOW!</a>
+        <a href="/modeler" class="w3-btn w3-large w3-white w3-hover-blue" target="_blank">Start Building NOW!</a>
 
         <br /><b>Or...</b><br />
 
@@ -117,18 +117,23 @@ isLoggedin();
                 <a href="/acc/index#upload" class="w3-btn w3-blue w3-hover-white">Upload</a><hr />
             </div>
 
-            <!-- <div id="tweet-container" class="w3-container w3-left">
+    <a 
+        class="twitter-timeline" 
+        href="https://twitter.com/Evan85908317?ref_src=twsrc%5Etfw"
+    >Tweets by Evan85908317</a><script 
+        async 
+        src="https://platform.twitter.com/widgets.js" 
+        charset="utf-8"
+    ></script>
 
-                <a class="twitter-timeline" data-lang="en" data-width="800" data-height="400" data-dnt="true" data-theme="dark" href="https://twitter.com/Evan85908317?ref_src=twsrc%5Etfw">Tweets by Evan85908317</a> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
-
-            </div>
-
-            <div id="discord-container" class="w3-container w3-right">
-
-                <iframe src="https://discord.com/widget?id=1307420772377165884&theme=dark" width="350" height="500" allowtransparency="true" frameborder="0" sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"></iframe>
-
-            </div>
-        </div> -->
+    <iframe 
+        src="https://discord.com/widget?id=1307420772377165884&theme=dark" 
+        width="350" 
+        height="500" 
+        allowtransparency="true" 
+        frameborder="0" 
+        sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
+    ></iframe>
 
 <?php include('linkbar.php'); ?>
 

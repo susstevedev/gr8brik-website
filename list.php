@@ -1,5 +1,6 @@
 <?php
-    require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 
     if (isset($_GET['featured'])) {
         header('Content-type: application/json');
@@ -78,7 +79,7 @@
 <html lang="en">
 <head>
     <?php if(isset($_COOKIE['token'])) { ?>
-        <title>The second web based online LEGO® modeler in over a decade</title>
+        <title>All-in-browser Lego &reg; modeler</title>
     <?php } else { ?>
         <title>Creations</title>
     <?php } ?>
@@ -94,8 +95,8 @@
         ?>
 
         <?php if(isset($_GET['invalid_login'])) { ?>
-            <span id='error' class='w3-padding w3-round w3-red w3-top'>You've been logged out 
-                <?php echo isset($_GET['reason']) ? htmlspecialchars(rawurldecode($_GET['reason']), ENT_QUOTES, 'UTF-8') : "(unknown reason)"; ?>!
+            <span id='error' class='w3-padding w3-round w3-red w3-top'>You've been logged out because
+                <?php echo isset($_GET['reason']) ? htmlspecialchars(rawurldecode($_GET['reason']), ENT_QUOTES, 'UTF-8') : "of an unknown reason"; ?>!
             </span>
         <?php } ?>
 
@@ -176,18 +177,18 @@
             $result = $stmt->get_result();
 
             $followed_users = [];
-            while ($row = $result->fetch_assoc()) {
-                $followed_users[] = $row['profileid'];
-            }
 
             if ($result->num_rows != 0) {
-                $sql = 'SELECT * FROM model WHERE user IN (' . implode(',', $followed_users) . ') ORDER BY date DESC LIMIT 10 OFFSET ' .  $offset;
+                while ($row = $result->fetch_assoc()) {
+                    $followed_users[] = $row['profileid'];
+                }
 
+                $sql = 'SELECT * FROM model WHERE user IN (' . implode(',', $followed_users) . ') ORDER BY date DESC LIMIT 10 OFFSET ' .  $offset;
                 echo '<p>You can get a better feed by following more people. <a href="/users">Users page</a>.</p>';
             } else {
-                $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 10 OFFSET' .  $offset;
+                $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 10 OFFSET ' .  $offset;
 
-                echo '<h4>Your not following anyone</h4>';
+                echo '<h4>You\'re not following anyone</h4>';
                 echo '<p>Start following people to engage with people and get a custom feed.</p>';
                 echo '<a href="/users" class="w3-btn w3-large w3-white w3-hover-blue">Users Page</a><br /><b>Or...</b><br />';
                 echo '<a href="/rules">Rules Page</a>&nbsp;<a href="/terms">Terms and Conditions</a>&nbsp;<a href="/privacy">Privacy Policy</a>';
@@ -256,13 +257,18 @@
             $stmt->execute();
             $result2 = $stmt->get_result();
         }
-
+        
+        // if there is models found
         if ($result2->num_rows > 0) {
             echo "<table class='w3-table-all' style='color:black;'>";
             while ($row = $result2->fetch_assoc()) {
                 $model_id = $row['id'];
                 $userid = $row['user'];
 
+                /*
+                    Fetch users, like count, and bans
+                    We also check if those are invalid
+                */
                 $stmt = $conn->prepare('SELECT * FROM users WHERE id = ?');
                 $stmt->bind_param('i', $userid);
                 $stmt->execute();
@@ -295,16 +301,25 @@
                     $truncatedName .= '...';
                 }
 
-                echo "<div class='w3-display-container w3-left w3-padding'>";
+                /*echo "<div class='w3-display-container w3-left w3-padding'>";
                 echo "<a href='/build/" . $row['id'] . "'><img src='/cre/" . $row['screenshot'] . "' width='320' height='240' loading='lazy' class='gr8-theme w3-card-2 w3-hover-shadow w3-border w3-border-white'></a>";
                 echo "<span class='gr8-theme w3-large w3-display-middle w3-card-2 w3-light-grey w3-padding-small'>" . $truncatedName . '</span>';
                 echo "<span class='gr8-theme w3-display-bottommiddle w3-card-2 w3-light-grey w3-padding-small'>" . $row['views'] . ' views - ' . $likes['count'] . " likes - By ";
-                echo "<a href='/user/" . $row['user'] . "'>" . $username . "</a></span></div>";
+                echo "<a href='/user/" . $row['user'] . "'>" . $username . "</a></span></div>"; */
+
+                ?>
+                <div class='w3-display-container w3-left w3-padding'>
+                <a href='/creation.php?id=<?php echo $row['id'] ?>'><img src='/cre/<?php echo $row['screenshot'] ?>' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>
+                <div class='w3-card-2 w3-light-grey w3-padding-small'><h4><?php echo $truncatedName ?></h4>
+                <span>By <a href='/profile.php?id=<?php echo $row['user'] ?>'><?php echo $username ?></a> on <?php echo date("D, M d, Y", strtotime($row['date'])) ?></span>
+                </div></div>
+                <?php
             }
             echo "</table><br /><br />";
         } else {
             echo "<b>No creations found.</b><br />";
         }
+        // Foward back buttons
         $sorting = isset($_GET['sort']) ? $_GET['sort'] : "following";
         $searching = isset($_GET['q']) ? $_GET['q'] : "";
         echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" href="?p=' . ($page - 1) . '&sort=' . $sorting . '&q=' . $searching . '">Back</a>&nbsp;';
