@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 isLoggedin();
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
@@ -32,30 +33,52 @@ isLoggedin();
 
             $i = 0;
 			while ($row = $result->fetch_assoc()) {
-                if (is_numeric($row['timestamp'])) {
-                    $time = gmdate("M d, Y h:i A", $row['timestamp']);
-                } else {
-                    $time = 'NaN';
-                }
+                $time = time_ago(date('Y-m-d H:i:s', $row['timestamp']));
 
-                echo "<form action='../ajax/auth' method='GET'>";
-				echo "<article id='sessionModal' class='w3-card-2 w3-light-grey w3-padding w3-large'>";
-                echo "<input type='hidden' id='tokenId' name='tokenId' value='" . $row['id'] . "' />";
-				echo "<span>User login " . ++$i . "</span><br />";
-                echo "<span>On account " . $row['username'] . "</span><br />";
-                echo "<span>From hashed IP " . $row['login_from'] . "</span><br />";
-                echo "<time datetime='" . $row['timestamp'] . "'>Signed in on " . $time . ", UTC</time><br />";
+				echo "<article id='sessionModal' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
+                echo "<span>From IP " . $row['login_from'] . "</span><br />";
+                echo "<time datetime='" . $row['timestamp'] . "'>Signed in " . $time . "</time><br />";
                 if($_COOKIE['token'] != $row['id']) {
-                    echo "<input type='submit' id='revoke' name='revoke' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo' value='Revoke Session' />";
+                    echo "<button data-id='" . $row['id'] . "' class='revoke-session w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>
+                        <i class='fa fa-times' aria-hidden='true'></i>
+                        Revoke Session
+                    </button>";
                 } else {
-                    echo "<p class='w3-text-dark-grey w3-yellow w3-card-2 w3-hover-shadow w3-padding-small'>This is your current session.<br /> To sign out, hover over your username on the navbar and select 'Logout'.</p>";
+                    echo "<span><i class='fa fa-info-circle w3-padding-tiny' aria-hidden='true'></i>This is your current session.</span>";
                 }
-				echo "</article></form><br />";
+                echo "</article><br />";
             }
             $result->free();
             $conn2->close();
 		
 		?><br /><br />
+
+        <script>
+        $(document).ready(function() {
+            $(document).on("click", ".revoke-session", function() {
+                event.preventDefault();
+                let session = $(this).data("id");
+                let btn = $(this);
+                let form = $(this).parent();
+                    
+                $.ajax({
+                    url: "/ajax/auth",
+                    method: "GET",
+                    data: { revoke: true, tokenId: session },
+                    success: function(response) {
+                        console.log(response.success);
+                        form.remove();
+                        alert('Session deleted!');
+                    },
+                    error: (jqXHR, textStatus, errorThrown) => {
+                        console.error("error:", textStatus, errorThrown, jqXHR);
+                        const response = JSON.parse(jqXHR.responseText);
+                        alert(response.error);
+                    }
+                });
+            });
+        });
+        </script>
 		
     <?php include '../linkbar.php' ?>
 </body>

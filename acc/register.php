@@ -1,55 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-isLoggedIn();
 
-if(isset($_POST['login'])) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if ($conn->connect_error) {
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => "An error occured while connecting to the database"]);
-        exit;
-    }
-    $username = $conn->real_escape_string(htmlspecialchars($_POST['name']));	
-	$password = md5($_POST['pwd']);
-	$email = $conn->real_escape_string($_POST['mail']);
-    $age = date("Y-m-d");
-
-    if(empty($_POST['pwd']) || empty($_POST['mail']) || empty($_POST['name'])) {
-		header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => "One of the field(s) are blank"]);
-        exit;
-    }
-		
-	$sql_check = "SELECT id FROM users WHERE username = '$username' UNION ALL SELECT id FROM users WHERE email = '$email'";
-    $stmt = $conn->query($sql_check);
-
-	if ($stmt->num_rows > 0) {
-		header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => "Username or email already in use"]);
-        exit;
-	} else {
-		$sql = "INSERT INTO users (username, password, email, age) VALUES ('$username', '$password', '$email', '$age')";
-		if ($conn->query($sql) === TRUE) {
-            $sql = "SELECT id FROM users WHERE username = '$username'";
-            $result = $conn->query($sql);
-            $row2 = $result->fetch_assoc();
-
-            $userid = $row2['id'];
-            $tokenid = uniqid('', true);
-            $time = time();
-
-            $sql = "INSERT INTO sessions (id, user, username, password, timestamp) VALUES ('$tokenid', '$userid', '$username', '$pwd', '$time')";
-            if ($conn->query($sql) === TRUE) {
-                setcookie('token', $tokenid, $time + (10 * 365 * 24 * 60 * 60), "/", ".gr8brik.rf.gd");
-                $_SESSION['username'] = $userid;
-                $_SESSION['auth'] = true;
-            }
-		} else {
-			header("HTTP/1.0 500 Internal Server Error");
-            echo json_encode(['error' => " "]);
-            exit;
-		}
-	}   
+if(loggedin() === true) {
+    header('Location: index.php');
 }
 
 $words = ['Brick', 'Minifig', 'Stud', 'Build', 'Block', 'Stack', 'Baseplate', 'Roadplate', 'Fanatic', 'Craftsman', 'Awesome', 'Great'];
@@ -69,13 +22,6 @@ $combinedString = $randomWord1 . $randomWord2 . $randomNumber;
 </head>
 <body class="w3-container w3-light-blue">
     <?php include '../navbar.php'; ?>
-     <style>
-        @media only screen and (max-width: 768px) {
-            #linkbar, #mobilenav, #toggleModeMenu, #toggleLight, #toggleDark {
-                display: none;
-            }
-        }
-    </style>
     <script>
         $(document).ready(function() {
             $("#loginBtn").click(function(event) {
@@ -90,11 +36,15 @@ $combinedString = $randomWord1 . $randomWord2 . $randomNumber;
                     method: "POST",
                     data: { register: true, name: name, mail: mail, pwd: pwd },
                     success: function(response) {
-                        window.location.reload();
+                        if(response.success === true) {
+                            window.location.href = "/";
+                        } else {
+                            alert(response.error || "An unknown error occurred. Please try again later.")
+                        }
                     },
 
                     error: function(jqXHR, textStatus, errorThrown) {
-                        if (jqXHR.status === 500) {
+                        if (jqXHR.status === 500 || jqXHR.status === 400) {
                             var response = JSON.parse(jqXHR.responseText);
                             alert(response.error);
                         } else {
@@ -108,11 +58,81 @@ $combinedString = $randomWord1 . $randomWord2 . $randomNumber;
     </script>
     <h2>Create Account</h2>
     <div id="loginForm" class="w3-container">
-        <b>Already have an account? <a href="login">Login</a></b><br />
+        <span>Already have an account? <a href="login">Login</a></span><br />
         <input class="w3-input w3-border" value="<?php echo $combinedString; ?>" type="text" name="name" placeholder="Username"><br />
         <input class="w3-input w3-border" type="email" name="mail" placeholder="Email"><br />
-        <input class="w3-input w3-border" type="password" name="pwd" placeholder="Password">
-        <br /><b>By registering you are agreeing to our <a href="/terms.php" class="reload">Terms and Conditions</a> and <a href="/privacy.php" class="reload">Privacy Policy</a>.</b>
+        <input class="w3-input w3-border" type="password" name="pwd" placeholder="Password"><br />
+        <!--<p>Birth date:</p>
+        <div class="w3-row-padding">
+            <select class="w3-select" name="day">
+                <option value="01" disabled selected>day</option>
+                <option>01</option>
+                <option>02</option>
+                <option>03</option>
+                <option>04</option>
+                <option>05</option>
+                <option>06</option>
+                <option>07</option>
+                <option>09</option>
+                <option>10</option>
+                <option>11</option>
+                <option>12</option>
+                <option>13</option>
+                <option>14</option>
+                <option>15</option>
+                <option>16</option>
+                <option>17</option>
+                <option>18</option>
+                <option>19</option>
+                <option>20</option>
+                <option>21</option>
+                <option>22</option>
+                <option>23</option>
+                <option>24</option>
+                <option>25</option>
+                <option>26</option>
+                <option>27</option>
+                <option>28</option>
+                <option>29</option>
+                <option>30</option>
+                <option>31</option>
+            </select><br />
+            <select class="w3-select" name="month">
+                <option value="1" disabled selected>month</option>
+                <option value="1">Jan</option>
+                <option value="2">Feb</option>
+                <option value="3">Mar</option>
+                <option value="4">Apr</option>
+                <option value="5">May</option>
+                <option value="6">Jun</option>
+                <option value="7">Jul</option>
+                <option value="8">Aug</option>
+                <option value="9">Sep</option>
+                <option value="10">Oct</option>
+                <option value="11">Nov</option>
+                <option value="12">Dec</option>
+            </select><br />
+            <select class="w3-select" name="year">
+                <option value="" disabled selected>year</option>
+                </select></div></p>
+
+                <script>
+                // dynamic year system
+                const s = document.querySelector('select[name="year"]');
+                for (let y = 1890; y <= 2027; y++) {
+                    const o = document.createElement("option");
+                    o.value = y;
+                    o.textContent = y;
+                    s.appendChild(o);
+                }
+                </script> -->
+        <br />
+        <p>By registering you are agreeing:</p>
+        <ul>
+            <li>To our <a href="/terms.php">Terms and Conditions</a></li> 
+            <li>To our <a href="/privacy.php">Privacy Policy</a></li>
+            <li>You are at least 13 years old</li>
+        </ul>
         <br /><button class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" id="loginBtn" name="login">Create Account</button>
         
     </div>

@@ -59,31 +59,51 @@ if (isset($_POST["upload"])) {
 $conn->close();
 
 if (isset($_POST['picture'])) {
+    $okay = true;
+
     if(isset($_POST['deletePfp'])){
-        $pfp = "../acc/users/pfps/" . $id . ".jpg";
+        $pfp = "users/pfps/" . $id . ".jpg";
         unlink($pfp);
         header("Location: index.php");
+        exit;
     } else {
+        if($users_row['verify_token'] != NULL) {
+            echo "Please verify your account to upload or edit your profile picture.";
+            $okay = false;
+            exit;
+        }
+
+        $mime = mime_content_type($_FILES["fileToUpload"]["tmp_name"]);
+
+        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif'])) {
+            echo "Only JPEG, PNG, and GIF files are allowed.";
+            exit;
+        }
 
         if(empty($_FILES['fileToUpload'])) {
-            $uploadOkay = 0;
+            echo 'No file selected.';
+            $okay = false;
+            exit;
         }
 
-        $dir = "../acc/users/pfps/";
-        $target_file = $dir . basename($_FILES['fileToupload']['name']);
+        $dir = "users/pfps/";
         $upload = $dir . $id . '.jpg';
 
-        if ($_FILES["fileToupload"]["size"] > 5242880) {
-            $uploadOk = 0;
+        if ($_FILES["fileToUpload"]["size"] > 5242880) {
+            echo 'File too large.';
+            $okay = false;
+            exit;
         }
 
-        if ($uploadOk === 0) {
-            echo 'Sorry, there was an error uploading your file.';
-        } else {
-            if (move_uploaded_file($_FILES["fileToupload"]["tmp_name"], $upload)) {
-                $uploadOk = 1;
+        if ($okay != false) {
+            if (move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $upload)) {
+                ob_start();
+                echo "Profile picture updated";
+                ob_end_flush();
+                header("refresh:3; url=index.php");
             } else {
-                $uploadOk = 0;
+                echo "Could not upload profile picture to file storage.";
+                exit;
             }
         }
     }
@@ -526,13 +546,35 @@ if(isset($_POST['deactive'])) {
                 method: "POST",
                 data: { delete_account: true },
                 success: function(response) {
-                    $(".w3-main").show().text(response.success);
+                    if(response.success) {
+                        $(".w3-main").show().text(response.success);
+                    } else {
+                        alert(response.error);
+                    }
                 },
 
                 error: function(jqXHR, textStatus, errorThrown) {
                     var response = JSON.parse(jqXHR.responseText);
                     console.error(jqXHR, textStatus, errorThrown);
-                    $(".w3-main").show().text(response.error);
+                    alert(response.error);
+                    $("#delete-account-btn").attr('disabled', false).text('Yes');
+                }
+            });
+        });
+
+        $("#logout-btn").click(function(event) {
+            $("#logout-btn").attr('disabled', true).html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
+
+            $.ajax({
+                url: "../ajax/account_settings",
+                method: "POST",
+                data: { logout: true, token: $.cookie('token') },
+                success: function(response) {
+                    window.location.reload();
+                },
+
+                error: function(jqXHR, textStatus, errorThrown) {
+                    alert('Error logging out.')
                 }
             });
         });
@@ -636,7 +678,7 @@ if(isset($_POST['deactive'])) {
         </form>
     </div></div><br /><br />
 
-    <a href="/acc/login?status=logout" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink">Logout</a><br /><br />
+    <button id='logout-btn' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink' />Logout</button>
 
     <h2>Danger zone</h2>
     

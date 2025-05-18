@@ -11,69 +11,6 @@ if(isset($_GET['status']) && $_GET['status'] === 'logout') {
 }
 isLoggedin();
 
-/*
-
-if(isset($_POST['login'])) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if ($conn->connect_error) {
-        header('HTTP/1.0 500 Internal Server Error');
-        echo json_encode(['error' => "Database connection failed"]);
-        exit;
-    }       
-    $mail = $conn->real_escape_string($_POST['mail']);
-    $pwd = md5($_POST['pwd']);
-
-    if(empty($_POST['mail'])) {
-		header('HTTP/1.0 500 Internal Server Error');
-        echo json_encode(['error' => "Email cannot be blank"]);
-        exit;
-    }
-
-    $sql = "SELECT * FROM users WHERE email = '$mail'";
-    $result = $conn->query($sql);
-    $row = $result->fetch_assoc();
-
-    if($pwd === $row['password'] && !empty($row['username'])) {
-        $username = $row['username'];
-        $userid = $row['id'];
-        $tokenid = uniqid('', true);
-        $time = time();
-
-        if(!empty($row['deactive'])) {
-            $sql = "INSERT INTO sessions (id, user, username, password, timestamp) VALUES ('$tokenid', '$userid', '$username', '$pwd', '$time')";
-            if ($conn->query($sql) === TRUE) {
-                header('HTTP/1.0 500 Internal Server Error');
-                echo json_encode(['popup' => "Do you want to reactivate your account?", 'error' => "See modal for more info", 'goto' => "http://www.gr8brik.rf.gd/acc/index?reactive=1&token=" . $tokenid ]);
-                exit;
-            }
-        }
-
-        $sql = "SELECT * FROM bans WHERE user = '$userid'";
-        $result2 = $conn->query($sql);
-
-        while ($row2 = $result2->fetch_assoc()) {
-            if ($result2->num_rows > 0 && $row2['end_date'] >= time()) {
-                header('HTTP/1.0 500 Internal Server Error');
-                echo json_encode(['error' => $row['username'] . " has been banned until " . gmdate("M d, Y H:i", $row2['end_date']) . " for " . $row2['reason']]);
-                exit;
-            }
-        }
-
-        $sql = "INSERT INTO sessions (id, user, username, password, timestamp) VALUES ('$tokenid', '$userid', '$username', '$pwd', '$time')";
-		if ($conn->query($sql) === TRUE) {
-            setcookie('token', $tokenid, $time + (10 * 365 * 24 * 60 * 60), "/", ".gr8brik.rf.gd");
-            $_SESSION['username'] = $userid;
-            $_SESSION['auth'] = true;
-            exit;
-        }
-    } else {
-		header('HTTP/1.0 500 Internal Server Error');
-        echo json_encode(['error' => "Invalid email or password"]);
-        exit;
-    }
-}
-
-*/
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -121,7 +58,7 @@ if(isset($_POST['login'])) {
                             window.location.href = "/";
                         } else {
                             $("#error").show()
-                            $("#error-text").text(response.error);
+                            $("#error-text").text(response.error || "An error occured. Please try again later.");
                             $("#error").delay(5000).fadeOut(2500);
                         }
                     },
@@ -183,8 +120,7 @@ if(isset($_POST['login'])) {
         <span>Don't have an account? <a href="register">Register</a></span><br />
         <input class="w3-input w3-border" type="email" name="mail" placeholder="Email or username"><br />
         <input class="w3-input w3-border" type="password" name="pwd" placeholder="Password"><br />
-        <!-- <span>You'll be logged in for 30 days.</span><br /> -->
-        <span><small>Your session will be remembered, so you don't need to re-login everytime you visit our services</small></span><br />
+        <span><small>Your session will be remembered, so you don't need to re-login everytime you visit our services.</small></span><br />
         <button class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" id="loginBtn" name="login">Login</button>
     </div>
     <?php include '../linkbar.php' ?>

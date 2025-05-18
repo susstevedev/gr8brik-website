@@ -1,9 +1,10 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-isLoggedIn();
+if(loggedin() !== true) {
+    header('Location:login.php');
+}
 
 if(isset($_POST['unfollow'])) {
-	
     $profileid = $_GET['user'];
 	$sql = "DELETE FROM follow WHERE userid = ? AND profileid = ?";
 	$stmt = $conn->prepare($sql);
@@ -11,7 +12,18 @@ if(isset($_POST['unfollow'])) {
 	$stmt->execute();
 	$stmt->close();
 	$conn->close();
-	die;
+	exit;
+}
+
+if(isset($_POST['unblock'])) {
+    $profileid = $_GET['user'];
+	$sql = "DELETE FROM user_blocks WHERE userid = ? AND profileid = ?";
+	$stmt = $conn->prepare($sql);
+	$stmt->bind_param("ii", $id, $profileid);
+	$stmt->execute();
+	$stmt->close();
+	$conn->close();
+	exit;
 }
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
@@ -29,14 +41,17 @@ if(isset($_POST['unfollow'])) {
     ?>
 
     <script>
-        document.addEventListener("DOMContentLoaded", function() {
+        $(document).ready(function() {
             openTab('followingtab');
         });
     </script>
 
+    <div class="message w3-padding w3-round w3-red">Some accounts may not appear here.</div><br />
+
     <div class="w3-bar">
-        <a class='w3-bar-item w3-bottombar' style="width: 50%; text-align: center;" onclick="openTab('followingtab', this)">Following</a>
-        <a class='w3-bar-item w3-bottombar' style="width: 50%; text-align: center;" onclick="openTab('followerstab', this)">Followers</a>
+        <a class='w3-bar-item w3-bottombar' style="width: 33%; text-align: center;" onclick="openTab('followingtab', this)">Following</a>
+        <a class='w3-bar-item w3-bottombar' style="width: 33%; text-align: center;" onclick="openTab('followerstab', this)">Followers</a>
+        <a class='w3-bar-item w3-bottombar' style="width: 33%; text-align: center;" onclick="openTab('blockedtab', this)">Blocked</a>
     </div>
 
     <?php
@@ -45,7 +60,7 @@ if(isset($_POST['unfollow'])) {
             exit($conn2->connect_error);
         }
 
-		$sql = "SELECT DISTINCT profileid FROM follow WHERE userid = '$id' ORDER BY id DESC";
+		$sql = "SELECT DISTINCT profileid FROM follow WHERE userid = '" . $token['user'] . "' ORDER BY id DESC";
         $result = $conn2->query($sql);
 
         echo "<div id='followingtab' class='tab w3-animate-opacity w3-hide'><h4>Who you follow</h4>";
@@ -54,21 +69,25 @@ if(isset($_POST['unfollow'])) {
             $profileid = $row['profileid'];
             $sql2 = "SELECT * FROM users WHERE id = '$profileid'";
             $result2 = $conn2->query($sql2);
-            if($result2->num_rows > 0) {
+            //if($result2->num_rows > 0) {
                 $row2 = $result2->fetch_assoc();
 
                 echo "<article class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
-                echo "<a href='../user/" . $profileid . "'>" . $row2['username'] . '</a><br />';
+                echo "<a href='../user/" . $profileid . "'>" . $row2['username']. '</a><br />';
+                if(!empty($row2['description'])) {
+                    echo "<b>" . $row2['description'] . '</b><br />';
+                }
                 echo "<form id='unfollow' method='post' action='following.php?user=" . $profileid . "'></form>";
-                echo "<input form='unfollow' type='submit' value='Unfollow' name='unfollow' class='w3-btn w3-large w3-white w3-hover-red w3-mobile w3-border'>";
+                echo "<input form='unfollow' type='submit' value='Unfollow' name='unfollow' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>";
                 echo "</article><br />";
-            }
-            $result2->free();
+
+                $result2->free();
+            //}
         }
         $result->free();
         echo "</div>";
 
-        $sql = "SELECT DISTINCT userid FROM follow WHERE profileid = '$id' ORDER BY id DESC";
+        $sql = "SELECT DISTINCT userid FROM follow WHERE profileid = '" . $token['user'] . "' ORDER BY id DESC";
         $result3 = $conn2->query($sql);
 
         echo "<div id='followerstab' class='tab w3-animate-opacity w3-hide'><h4>Who follows you</h4>";
@@ -77,18 +96,42 @@ if(isset($_POST['unfollow'])) {
             $userid = $row3['userid'];
             $sql2 = "SELECT * FROM users WHERE id = '$userid'";
             $result4 = $conn2->query($sql2);
-            if($result4->num_rows > 0) {
+            //if($result4->num_rows > 0) {
                 $row4 = $result4->fetch_assoc();
 
                 echo "<article class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
                 echo "<a href='../user/" . $userid . "'>" . $row4['username'] . '</a><br />';
-                //echo "<form id='block' method='post' action='following.php?block=" . $userid . "'></form>";
-                //echo "<input form='block' type='submit' value='Block' name='block' class='w3-btn w3-large w3-white w3-hover-red w3-mobile w3-border' disabled>";
+                if(!empty($row4['description'])) {
+                    echo "<b>" . $row4['description'] . '</b><br />';
+                }
                 echo "</article><br />";
-            }
+            //}
             $result4->free();
         }
         $result3->free();
+        echo "</div>";
+
+        $result4 = $conn2->query("SELECT DISTINCT profileid FROM user_blocks WHERE userid = '" . $token['user'] . "' ORDER BY id DESC");
+        echo "<div id='blockedtab' class='tab w3-animate-opacity w3-hide'><h4>Who you blocked</h4>";
+
+		while ($row4 = $result4->fetch_assoc()) {
+            $userid = $row4['profileid'];
+            $result5 = $conn2->query("SELECT * FROM users WHERE id = '$userid'");
+            //if($result5->num_rows > 0) {
+                $row5 = $result5->fetch_assoc();
+
+                echo "<article class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
+                echo "<a href='../user/" . $userid . "'>" . $row5['username'] . '</a><br />';
+                if(!empty($row5['description'])) {
+                    echo "<b>" . $row5['description'] . '</b><br />';
+                }
+                echo "<form id='unblock' method='post' action='following.php?user=" . $profileid . "'></form>";
+                echo "<input form='unblock' type='submit' value='Unblock' name='unblock' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>";
+                echo "</article><br />";
+            //}
+            $result5->free();
+        }
+        $result4->free();
         $conn2->close();
         echo "</div>";
 	?>
