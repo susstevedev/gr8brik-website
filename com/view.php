@@ -148,7 +148,7 @@ if(isset($_POST['comment'])){
     echo '<br /><time title="' . $date . '" datetime="' . $date . '">Posted ' . time_ago($date) . '</time>';
     echo '<br /><span>' . $post_count . ' total posts</span></div>';
     echo '<span class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny" style="flex-shrink: 1; width: 80%;"><pre>';
-    echo $bbcode->toHTML($decoded_post) . '</pre></span></div><br />';
+    echo $bbcode->toHTML($decoded_post) . '</pre></span></div><br /><hr />';
 
     $sql = "SELECT * FROM messages WHERE parent = $post_id ORDER BY timestamp ASC LIMIT $limit OFFSET $offset";
     $comResult = $conn->query($sql);
