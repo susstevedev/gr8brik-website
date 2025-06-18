@@ -1,10 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
 
-if(loggedin()) {
-    $userid = $token['user'];
-}
-
 if(!isset($_GET['id'])) {
     header("HTTP/1.0 404 Not Found");
     exit;
@@ -12,10 +8,10 @@ if(!isset($_GET['id'])) {
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
-$data = json_decode(fetch_profile($_GET['id'], $_SESSION['csrf']), true);
+$data = json_decode(fetch_profile($_GET['id'], $token['user'], $users_row, $_SESSION['csrf']), true);
 
 if ($data === null) {
-    exit('An unknown error occured');
+    exit('no user');
 }
 
 if($data['message'] != "OK") {
@@ -29,17 +25,17 @@ if (isset($_POST['follow'])) {
 
     $sql_follow = "INSERT INTO follow (userid, profileid, date) VALUES (?, ?, ?)";
     $stmt_follow = $conn->prepare($sql_follow);
-    $stmt_follow->bind_param("iii", $userid, $profile_id, $time);
+    $stmt_follow->bind_param("iii", $id, $profile_id, $time);
     $result = $stmt_follow->execute();
     $stmt_follow->close();
 
-    if ($userid != $profile_id) {
+    if ($id != $profile_id) {
         $content = $profile_id;
         $category = 1;
 
         $sql_notification = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
         $stmt_notification = $conn->prepare($sql_notification);
-        $stmt_notification->bind_param("iisii", $profile_id, $userid, $time, $content, $category);
+        $stmt_notification->bind_param("iisii", $profile_id, $id, $time, $content, $category);
         $stmt_notification->execute();
         $stmt_notification->close();
 
@@ -75,7 +71,7 @@ if (isset($_POST['follow'])) {
 
 if(isset($_POST['unfollow'])) {
     $profile_id = $_GET['id'];
-    $sql = "DELETE FROM follow WHERE userid = '$userid' AND profileid = '$profile_id'";
+    $sql = "DELETE FROM follow WHERE userid = '$id' AND profileid = '$profile_id'";
     $result = $conn->query($sql);
     if ($result) {
         header("HTTP/1.0 200 OK");
@@ -92,7 +88,7 @@ if (isset($_POST['block'])) {
 
     $sql_block = "INSERT INTO user_blocks (userid, profileid, date) VALUES (?, ?, ?)";
     $stmt_block = $conn->prepare($sql_block);
-    $stmt_block->bind_param("iii", $userid, $profile_id, $time);
+    $stmt_block->bind_param("iii", $id, $profile_id, $time);
     $result = $stmt_block->execute();
     $stmt_block->close();
 
@@ -107,7 +103,7 @@ if (isset($_POST['block'])) {
 
 if(isset($_POST['unblock'])) {
     $profile_id = $_GET['id'];
-    $sql = "DELETE FROM user_blocks WHERE userid = '$userid' AND profileid = '$profile_id'";
+    $sql = "DELETE FROM user_blocks WHERE userid = '$id' AND profileid = '$profile_id'";
     $result = $conn->query($sql);
     if ($result) {
         header("HTTP/1.0 200 OK");
@@ -119,7 +115,7 @@ if(isset($_POST['unblock'])) {
 }
 
 if(isset($_POST['ban'])) {
-    $profile_id = (int)$_GET['id'];
+    $profile_id = $_GET['id'];
     $reason = mysqli_real_escape_string($conn, $_POST['reason']);
     $day = $_POST['day'];
 	$month = $_POST['month'];
@@ -128,56 +124,17 @@ if(isset($_POST['ban'])) {
 	$duration = $ban_date - time();
     $start_date = time();
     $end_date = $start_date + $duration;
-
-    if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-        exit('Invalid user ID!');
-    }
-
-    if ($duration <= 0) {
-        exit('Ban date must be in the future!');
-    }
 		
-    if($users_row['admin'] != '0') {
+    if($admin != 0) {
         $sql = "INSERT INTO bans (user, reason, start_date, end_date) VALUES ($profile_id, '$reason', $start_date, $end_date)";
         $result = $conn->query($sql);
         if ($result) {
-            $sql2 = "DELETE FROM sessions WHERE user = $profile_id";
-            $result2 = $conn->query($sql2);
-            if($result2) {
-                header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
-                exit;
-            }
+            header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
+            exit;
         } else {
-            exit('An SQL error occured!');
+            echo $conn->error;
+            exit;
         }
-    } else {
-        exit('User is not an administrator!');
-    }
-}
-
-if(isset($_POST['delete'])) {
-    if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-        exit('Invalid user ID!');
-    }
-
-    $profile_id = (int)$_GET['id'];
-    $today = date("Y-m-d H:i:s");
-		
-    if($users_row['admin'] != '0') {
-        $sql = "UPDATE users SET username = NULL, blog_user_id = NULL, deactive = '$today' WHERE id = $profile_id";
-        $result = $conn->query($sql);
-        if ($result) {
-            $sql2 = "DELETE FROM sessions WHERE user = $profile_id";
-            $result2 = $conn->query($sql2);
-            if($result2) {
-                header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
-                exit;
-            }
-        } else {
-            exit('An SQL error occured!');
-        }
-    } else {
-        exit('User is not an administrator!');
     }
 }
 ?>
@@ -292,38 +249,30 @@ if(isset($_POST['delete'])) {
         <span id="followedby-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff"></span><br />
         <!-- <hr style="border-color: inherit; width: 50%; text-align: left; margin-left: 0;" /> -->
 
-        <?php if(loggedin()) { ?>
+        <?php if($data['isLoggedin']) { ?>
             <?php if($token['user'] != trim($_GET['id'])) { ?>
             <span id="action-buttons">
                 <?php if($data['isFollowing'] === true) { ?>
                     <button onclick='document.getElementById("unfollow").style.display="block"' name="unfollow" class="button-unfollow w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />
-                        Unfollow User
+                        Unfollow
                     </button>&nbsp;
                 <?php } elseif($data['isFollowing'] === false) { ?>
-                    <input id="button-follow" form="followUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Follow User" name="follow">&nbsp;
+                    <input id="button-follow" form="followUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Follow" name="follow">&nbsp;
                 <?php } ?>
-
-                <div class="w3-dropdown-hover">
-                    <button class="gr8-theme w3-btn w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-gray">More...</button>
-                    <div class="w3-dropdown-content gr8-theme w3-bar-block w3-padding-small w3-border w3-border-gray w3-round-small">
-                        <?php if($data['blockedUser'] === false) { ?>
-                            <button onclick='document.getElementById("block").style.display="block"' name="block" class="w3-bar-item w3-button" />
-                                Block User
-                            </button>
-                        <?php } elseif($data['blockedUser'] === true) { ?>
-                            <input id="button-unblock" form="unblockUser" class="w3-bar-item w3-button" type="submit" value="Unblock User" name="unblock">
-                        <?php } ?>
-
-                        <?php if($users_row['admin'] != '0') { ?>
-                            <button id="button-ban-user" onclick='document.getElementById("ban").style.display="block"' name="ban" class="w3-bar-item w3-button" />
-                                Ban User
-                            </button>
-                            <button id="button-delete-user" onclick='document.getElementById("delete").style.display="block"' name="delete" class="w3-bar-item w3-button" />
-                                Delete User
-                            </button>
-                        <?php } ?>
-                    </div>
-                </div>
+                
+                <?php if($data['canBan'] === true) { ?>
+                    <button id="button-ban-user" onclick='document.getElementById("ban").style.display="block"' name="ban" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />
+                        Ban
+                    </button>&nbsp;
+                <?php } ?>
+                
+                <?php if($data['blockedUser'] === false) { ?>
+                <button onclick='document.getElementById("block").style.display="block"' name="block" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />
+                    Block
+                </button>&nbsp;
+                <?php } elseif($data['blockedUser'] === true) { ?>
+                    <input id="button-unblock" form="unblockUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Unblock" name="unblock">&nbsp;
+                <?php } ?>
 
                 <form id="followUser" action="" method="post"></form>
                 <form id="unblockUser" action="" method="post"></form>
@@ -361,19 +310,6 @@ if(isset($_POST['delete'])) {
 	</div>
 
     <?php if($admin != 0) { ?>
-        <div id="delete" class="w3-modal">
-            <div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
-                <div class="w3-container">
-                    <span onclick="document.getElementById('delete').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
-                        <form method='post' action=''>
-                        <h2>Are you sure you want to delete this user?</h2>
-                        <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span> 
-                        <input type="submit" value="Yes" name="delete" class="w3-btn w3-large w3-white w3-hover-red">
-                    </form>
-                </div>
-            </div>
-        </div>
-
             <div id="ban" class="w3-modal">
 				<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
 					<div class="w3-container">
@@ -478,24 +414,9 @@ if(isset($_POST['delete'])) {
                 $result = $conn->query($sql);
 
                 while ($creation = $result->fetch_assoc()) {
-                    /*echo "<div class='w3-display-container w3-left w3-padding-small'>";
+                    echo "<div class='w3-display-container w3-left w3-padding-small'>";
 					echo "<a href='/build/" . $creation['id'] . "'><img src='/cre/" . $creation['screenshot'] . "' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-card-2 w3-border'></a>";
-                    echo "<b class='w3-display-middle w3-text-grey'>" . htmlspecialchars($creation['name'], ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401) . "</b></div>";*/
-
-                    if (empty($creation['name'])) {
-                        $creation['name'] = $data['username'] . "'s creation";
-                    }
-
-                    $truncatedName = htmlspecialchars(substr($creation['name'], 0, 30));
-                    if (strlen($creation['name']) >= 30) {
-                        $truncatedName .= '...';
-                    }
-
-                    echo "<div class='w3-display-container w3-left w3-padding'>";
-                    echo "<a href='/creation.php?id=" . $creation['id'] . "'><img src='/cre/" . $creation['screenshot'] . "' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
-                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($creation['date'])) . "</span>";
-                    echo "</div></div>";
+                    echo "<b class='w3-display-middle w3-text-grey'>" . htmlspecialchars($creation['name'], ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401) . "</b></div>";
                 }
                 $conn->close();
             ?>
@@ -511,20 +432,13 @@ if(isset($_POST['delete'])) {
 				}
 
                 $profileid = $_GET['id'];
-                $sql = "SELECT * FROM messages WHERE userid = $profileid AND parent = 0 ORDER BY timestamp DESC";
+                $sql = "SELECT * FROM posts WHERE user = $profileid ORDER BY date DESC";
                 $result = $conn->query($sql);
 
                 while ($topic = $result->fetch_assoc()) {
-                    $truncatedName = htmlspecialchars(substr($topic['title'], 0, 30));
-                    if (strlen($topic['title']) >= 30) {
-                        $truncatedName .= '...';
-                    }
-
-                    echo "<div class='w3-display-container w3-left w3-padding'>";
-                    echo "<a href='/com/view.php?id=" . $topic['id'] . "'><img src='/img/com.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
-                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($topic['timestamp'])) . "</span>";
-                    echo "</div></div>";
+                    echo "<div class='w3-display-container w3-left w3-padding-small'>";
+					echo "<a href='/topic/" . $topic['id'] . "'><img src='/img/com.jpg' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-card-2 w3-border'></a>";
+                    echo "<b class='w3-display-middle w3-text-grey'>" . htmlspecialchars($topic['title'], ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401) . "</b></div>";
                 }
                 $conn->close();
             ?>
@@ -548,41 +462,35 @@ if(isset($_POST['delete'])) {
                 $sql = "SELECT * FROM comments WHERE user = $profileid ORDER BY id DESC";
                 $result = $conn1->query($sql);
 
-                echo "<h4>Replies to creations</h4><br />";
+                echo "<h4>creation comments</h4><br />";
                 if ($result->num_rows === 0) {
-                    echo "<b>Nothing here yet</b>";
+                    echo "<b>no creation comments yet from this user</b>";
                 }
                 while ($comment = $result->fetch_assoc()) {
-                    $truncatedPost = htmlspecialchars(substr($comment['comment'], 0, 30));
-                    if (strlen($comment['comment']) >= 30) {
-                        $truncatedPost .= '...';
+                    $truncatedPost = htmlspecialchars(substr($comment['comment'], 0, 50), ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
+                    if (strlen($comment['comment']) > 50) {
+                        $truncatedPost .= "<b class='w3-large'>&nbsp;...more&nbsp;</b>";
                     }
-
-                    echo "<div class='w3-display-container w3-left w3-padding'>";
-                    echo "<a href='/creation.php?id=" . $comment['model'] . "#comment" . $comment['id'] . "'><img src='/img/creations.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedPost . "</h4>";
-                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", (int)$comment['date']) . "</span>";
-                    echo "</div></div>";
+                    echo "<div class='w3-display-container w3-left w3-padding-small'>";
+					echo "<a href='/build/" . $comment['model'] . "#comment" . $comment['id'] . "'><img src='/img/com.jpg' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-card-2 w3-border'></a>";
+                    echo "<b class='w3-display-middle w3-text-grey'>" . $truncatedPost . "</b></div>";
                 }
 
-                $sql = "SELECT * FROM messages WHERE userid = $profileid AND parent != 0 ORDER BY timestamp DESC";
+                $sql = "SELECT * FROM replies WHERE user = $profileid ORDER BY date DESC";
                 $result = $conn2->query($sql);
 
-                echo "</div><div class='w3-row'><h4>Replies to posts</h4><br />";
+                echo "</div><div class='w3-row'><h4>post comments</h4><br />";
                 if ($result->num_rows === 0) {
-                    echo "<b>Nothing here yet</b>";
+                    echo "<b>no post comments yet from this user</b>";
                 }
                 while ($reply = $result->fetch_assoc()) {
-                    $truncatedPost = htmlspecialchars(substr($reply['content'], 0, 30));
-                    if (strlen($reply['content']) >= 30) {
-                        $truncatedPost .= '...';
+                    $truncatedPost = htmlspecialchars(substr($reply['post'], 0, 50), ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401);
+                    if (strlen($reply['post']) > 50) {
+                        $truncatedPost .= "<h4>&nbsp;...more&nbsp;</h4>";
                     }
-
-                    echo "<div class='w3-display-container w3-left w3-padding'>";
-                    echo "<a href='/com/view.php?id=" . $reply['parent'] . "#reply" . $reply['id'] . "'><img src='/img/com.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedPost . "</h4>";
-                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($reply['timestamp'])) . "</span>";
-                    echo "</div></div>";
+                    echo "<div class='w3-display-container w3-left w3-padding-small'>";
+					echo "<a href='/topic/" . $reply['reply'] . "#reply" . $reply['id'] . "'><img src='/img/com.jpg' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-card-2 w3-border'></a>";
+                    echo "<b class='w3-display-middle w3-text-grey'>" . $truncatedPost . "</b></div>";
                 }
                 $conn1->close();
                 $conn2->close();

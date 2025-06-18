@@ -296,7 +296,7 @@
                     continue;
                 }
 
-                $truncatedName = htmlspecialchars(substr($row['name'], 0, 30));
+                $truncatedName = substr($row['name'], 0, 30);
                 if (strlen($row['name']) >= 30) {
                     $truncatedName .= '...';
                 }
@@ -308,11 +308,13 @@
                 echo "<a href='/user/" . $row['user'] . "'>" . $username . "</a></span></div>"; */
 
                 ?>
+
                 <div class='w3-display-container w3-left w3-padding'>
-                <a href='/creation.php?id=<?php echo $row['id'] ?>'><img src='/cre/<?php echo $row['screenshot'] ?>' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>
-                <div class='w3-card-2 w3-light-grey w3-padding-small'><h4><?php echo $truncatedName ?></h4>
+                <a href='/creation.php?id=<?php echo $row['id'] ?>'><img src='/cre/<?php echo $row['screenshot'] ?>' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow w3-grey'></a>
+                <div class='gr8-theme w3-card-2 w3-light-grey w3-padding-small'><h4><?php echo $truncatedName ?></h4>
                 <span>By <a href='/profile.php?id=<?php echo $row['user'] ?>'><?php echo $username ?></a> on <?php echo date("D, M d, Y", strtotime($row['date'])) ?></span>
                 </div></div>
+
                 <?php
             }
             echo "</table><br /><br />";

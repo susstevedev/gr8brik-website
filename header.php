@@ -13,8 +13,8 @@
 <link rel="manifest" href="https://susstevedev.github.io/gr8brik/manifest.json">
 
 <?php
-    if (!isset($_COOKIE['new_ui'])) {
-        $variant = (string)mt_rand(0, 2);
+    if (!isset($_COOKIE['new_ui']) || $_COOKIE['new_ui'] === (string)2) {
+        $variant = (string)mt_rand(0, 1);
         setcookie('new_ui', $variant, time() + (86400 * 30), "/");
         $_COOKIE['new_ui'] = $variant;
         header("Location: " . $_SERVER['REQUEST_URI']);

@@ -246,9 +246,9 @@ document.addEventListener("DOMContentLoaded", function () {
     $(document).ready(function() {
         let embed_style = "width:50vw;height:50vh;";
         let embed_class = "w3-border w3-border-black w3-round w3-card-2 w3-hover-shadow";
-        let embed_model = "<?php echo urlencode($data['model']) ?>";
+        let embed_model = "<?php echo urlencode($_GET['id']) ?>";
 
-        $("#data-model-embed").html(`<iframe id="data-model-embed" src="/new-viewer.html?model=${embed_model}" style="${embed_style}" class="${embed_class}">`);
+        $("#data-model-embed").html(`<iframe id="data-model-embed" src="/new-viewer.html?model=${embed_model}&t=<?php echo md5(time()) ?>" style="${embed_style}" class="${embed_class}">`);
 
         $("#otherReasonToggle").change(function() {
             $("#otherReason").toggleClass("w3-hide", !this.checked);
@@ -305,6 +305,46 @@ document.addEventListener("DOMContentLoaded", function () {
                         alert("An error occurred. Please try again.");
                     }
                 });
+            });
+        });
+
+        $(document).on("click", ".like-creation", function() {
+            event.preventDefault();
+            let btn = $(this);
+
+            $.ajax({
+                url: "/ajax/build",
+                method: "POST",
+                data: { upvote: true, model_id: embed_model },
+                success: function(response) {
+                    console.log(response.success);
+                    btn.replaceWith(`<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-down"></span>Unlike</button>`);
+                },
+                error: (jqXHR, textStatus, errorThrown) => {
+                    console.error("error:", textStatus, errorThrown, jqXHR);
+                    const response = JSON.parse(jqXHR.responseText);
+                    alert(response.error);
+                }
+            });
+        });
+
+        $(document).on("click", ".unlike-creation", function() {
+            event.preventDefault();
+            let btn = $(this);
+
+            $.ajax({
+                url: "/ajax/build",
+                method: "POST",
+                data: { downvote: true, model_id: embed_model },
+                success: function(response) {
+                    console.log(response.success);
+                    btn.replaceWith(`<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>Like</button>`);
+                },
+                error: (jqXHR, textStatus, errorThrown) => {
+                    console.error("error:", textStatus, errorThrown, jqXHR);
+                    const response = JSON.parse(jqXHR.responseText);
+                    alert(response.error);
+                }
             });
         });
 
@@ -442,16 +482,18 @@ document.addEventListener("DOMContentLoaded", function () {
             <button onclick="dropdown()" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Download...</button>
         </div>
         <div id="gr8-dropdown" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
-            <a id="data-build-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="/cre/<?php echo $data['model'] ?>" download="c.json">creation</a>
-            <a id="data-screenshot-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="/cre/<?php echo $data['screenshot'] ?>" download="s.png">screenshot</a>
+            <a id="data-build-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="/cre/<?php echo $data['model'] ?>" download="<?php echo htmlspecialchars($data['name']) ?>.json">creation</a>
+            <a id="data-screenshot-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="/cre/<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?>.png">screenshot</a>
         </div>
     </div>
 
     <?php if($loggedin === true) { ?>
         <?php if ($data['voted'] === true) { ?>
-            &nbsp;<input form="downvote" class="w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange" type="submit" value="Unlike" name="downvote">&nbsp;
+            <!-- &nbsp;<input form="downvote" class="w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange" type="submit" value="Unlike" name="downvote">&nbsp; -->
+            &nbsp;<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-down"></span>Unlike</button>&nbsp;
         <?php } else { ?>
-            &nbsp;<input form="upvote" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Like" name="upvote">&nbsp;
+            <!-- &nbsp;<input form="upvote" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Like" name="upvote">&nbsp; -->
+            &nbsp;<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>Like</button>&nbsp;
         <?php } ?>
 
         <?php if(trim($token['user']) === trim($data['userid'])) { ?>
@@ -483,7 +525,7 @@ document.addEventListener("DOMContentLoaded", function () {
             </div>
         <?php } else { ?>
             <div>
-                <a href="/acc/login" class="w3-btn w3-padding-small w3-white w3-hover-blue">LOGIN TO COMMENT</a>
+                <a href="/acc/login" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Login to comment</a>
             </div>
         <?php } ?>
     </div>
