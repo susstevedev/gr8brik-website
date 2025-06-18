@@ -1,39 +1,48 @@
-<!-- GR8BRIK VERSION 6-15-2025 (SUBOBJECT AND TEXTURES BETA 3.0) -->
+<!-- GR8BRIK VERSION 6-5-2025 (SUBOBJECT AND TEXTURES BETA 2.9) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>GR8BRIK Modeler</title>
+  <title>Gr8brik Modeler</title>
   <meta charset="utf-8">
   <base href="/mod/new/">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
   <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/7/Stats.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@latest/dist/jszip.min.js" integrity="sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=" crossorigin="anonymous"></script>
-  <link rel="stylesheet" type="text/css" href="index.css?v=6152025_test1">
+  <link rel="stylesheet" type="text/css" href="index.css?v=652025_test3">
 </head>
 
 <body>
   <div id="top-container">
-    <span id="link-home"><img src="/img/logo.jpg" id="logo-img" /><a href="/"><span>&nbsp;GR8BRIK&nbsp;</span></a><span class="tag">BETA</span></span>
-    <a href="https://www.gr8brik.rf.gd/acc/login" id="username-field">Login</a>
+    <span id="link-home"><img src="/img/logo.jpg" id="logo-img" /><a href="/"><span>&nbsp;Gr8brik&nbsp;</span></a><span class="tag">BETA</span></span>
+    <!-- <a href="https://www.gr8brik.rf.gd/acc/login" id="username-field">Login</a> -->
+
+    <span class="username-container">
+      <span id="username-field">Login</span>
+      <div id="username-content">
+        <a href="/acc/creations" class="username-link">My creations</a>
+        <a href="/user/" id="profile-link" class="username-link">My profile</a>
+      </div>
+    </span>
   </div>
 
   <div id="info">
-    <p"><a href="https://www.gr8brik.rf.gd/" target="_blank">GR8BRIK beta</a> - Build June 15th, 2025</p>
+    <!-- <p style="height: 1vh;"></p> -->
+    <p"><a href="https://www.gr8brik.rf.gd/" target="_blank">Gr8brik beta</a> - Build June 5th, 2025</p>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.min.js"></script>
+  <!-- <script type="module" src="https://cdn.jsdelivr.net/npm/three@latest/examples/jsm/loaders/ColladaLoader.js"></script> -->
   <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/LDrawLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/controls/OrbitControls.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/dat.gui@latest/build/dat.gui.min.js"></script> -->
   <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/controls/TransformControls.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.1/spectrum.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.1/spectrum.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
 
   <button id="toggleMenu" class="mobile-toggle">&#x2630;</button>
-  <button id="takeScreenshot" class="mobile-toggle" style="top: 155px; padding-right: 0px; padding-left: 0px;"><i class="fa fa-camera" aria-hidden="true" alt="screenshot"></i></button>
-  <button id="getPriceInfo" class="mobile-toggle" style="top: 255px; padding-right: 0px; padding-left: 0px;"><i class="fa fa-money" aria-hidden="true" alt="get price info"></i></button>
-  
+  <a id="takeScreenshot" class="mobile-toggle" style="top: 155px; height: 25px; padding-right: 0px; padding-left: 0px;"><i class="fa fa-camera" aria-hidden="true" alt="screenshot"></i></a>
   <div id="left-container">
     <p style="height: 2vh;"></p>
     
@@ -42,23 +51,27 @@
     <button class="btn" title="Save creation data to database" id="save-popup-open"><i class="fa fa-database" aria-hidden="true"></i>Save to Cloud</button><br />
     <button id="import-popup-open" class="btn"><i class="fa fa-download" aria-hidden="true"></i>Import...</button>
     <button id="export-popup-open" class="btn"><i class="fa fa-upload" aria-hidden="true"></i>Export...</button><hr />
+	
+    <!-- <button id="importBtn" class="btn"><i class="fa fa-download" aria-hidden="true"></i>Import</button>
+    <a id="cre-export" title="Download creation data as a json file" class="btn"><i class="fa fa-upload" aria-hidden="true"></i>Export</a><br />
+    <button id="import-btn-three" title="Import creation data from threejs json" class="btn"><i class="fa fa-cubes" aria-hidden="true"></i>Import Threejs</button><br />
+    <a id="cre-export-ldd" title="Download creation data as a lxf file" class="btn"><i class="fa fa-floppy-o" aria-hidden="true"></i>Export as LXF</a>
+    <button id="cre-export-three" title="Download creation data as a threejs data" class="btn"><i class="fa fa-cubes" aria-hidden="true"></i>Export as Threejs</button><br /><hr /> -->
     
     <span>Edit tools</span><br />
     <button class="btn" title="Change controls to arrows to move blocks up and down, side-by-side." id="move-block-t"><i class="fa fa-arrows-alt" aria-hidden="true"></i>Drag</button>
     <button class="btn" title="Change controls to rotate blocks, in all directions." id="move-block-r"><i class="fa fa-refresh" aria-hidden="true"></i>Rotate</button><br />
-    <button id="duplicate-part" class="btn" title="Copy the block that was last added and paste it"><i class="fa fa-files-o" aria-hidden="true"></i>Duplicate Block</button><br />
+    <button id="duplicate-block" class="btn" title="Copy the block that was last added and paste it"><i class="fa fa-files-o" aria-hidden="true"></i>Duplicate Block</button><br />
     <button id="delete-block" class="btn" title="Remove a block from the scene, along with all records of it"><i class="fa fa-trash" aria-hidden="true"></i>Delete Block</button><hr />
 
     <span>Color</span><br />
-    <input type="text" id="color-picker" /><input type="number" id="selected-map" min="0" max="50" step="1" value="0"><hr />
-    <span id="obj-colors"></span>
+    <input type="text" id="color-picker" /><hr />
 
     <span>Filter</span><br />
 
     <select id="part-type-filter" style="display: inline-block;">
         <option value="brick" selected>Bricks</option>
         <option value="plate">Plates</option>
-        <option value="baseplate">Baseplates</option>
         <option value="tile">Tiles</option>
         <option value="slope">Slopes</option>
         <option value="minifig">Minifigs</option>
@@ -81,12 +94,12 @@
     <button id="tab1" class="tab-button">Add blocks</button>
     <button id="tab2" class="tab-button">Scene blocks</button><br /><br />
     
-	  <input type="file" id="cre-import" accept=".json,.gr8" style="display: none;"><input type="file" id="cre-import-three" accept=".json" style="display: none;">
-	  <span id="cre-export" style="display: none;"></span><span id="cre-export-gr8" style="display: none;"></span><span id="cre-export-ldd" style="display: none;"></span><span id="cre-export-three" style="display: none;"></span><span id="cre-export-dae" style="display: none;"></span>
+	  <input type="file" id="cre-import" accept=".json" style="display: none;"><input type="file" id="cre-import-three" accept=".json" style="display: none;">
+	  <span id="cre-export" style="display: none;"></span><span id="cre-export-ldd" style="display: none;"></span><span id="cre-export-three" style="display: none;"></span><span id="cre-export-dae" style="display: none;"></span>
 
     <span id="select-block"></span>
     <ul id="block-list">
-      <div class="warn">GR8BRIK treats some items as groups</div>
+      <div class="warn">Gr8brik treats some items as groups</div>
     </ul>
   </div>
 
@@ -106,10 +119,14 @@
     <div id="import-popup-form">
 		<select id="import-format" style="display: inline-block;">
 			<option value="cloud" selected>From account</option>
-			<option value="json">GR8BRIK</option>
+			<option value="json">GR8BRIK json</option>
 			<option value="three">ThreeJS</option>
 		</select><br />
 		<p><button class="btn" title="Finish importing" id="import-finish">Select file</button></p>
+		
+      <!--<p><input class="w3-input w3-border" type="text" name="name" placeholder="Name"></p>
+      <p><textarea name="desc" rows="4" cols="32" placeholder="Description"></textarea></p>
+      <p><button class="btn" title="Finish saving" id="download-json">Save Creation</button></p> -->
     </div>
   </div>
   
@@ -118,11 +135,10 @@
     <h3><span style="color: #fff;">Export Model</span></h3>
     <div id="export-popup-form">
 		<select id="export-format" style="display: inline-block;">
-      <option value="gr8">GR8BRIK (.gr8)</option>
-			<option value="json">GR8BRIK (.json)</option>
-			<option value="three">ThreeJS (.json)</option>
-			<option value="lxf">Lego Digital Designer (.lxf)</option>
-			<option value="dae">Collada (.dae)</option>
+			<option value="json">GR8BRIK json</option>
+			<option value="three">ThreeJS</option>
+			<option value="lxf">Lego Digital Designer</option>
+			<option value="dae">Collada dae</option>
 		</select><br />
 		<p><button class="btn" title="Finish exporting" id="export-finish">Download file</button></p>
     </div>
@@ -131,8 +147,6 @@
   <div id="settings-popup">
     <button class="btn-alt" style="float: right; top: 0;">&#10006;</button>
     <h3><span style="color: #fff;">Modeler Settings</span></h3>
-    <input type="checkbox" id="smooth-normals-enable" checked>
-    <label for="smooth-normals">Enable smooth normals</label>
 		<p><button class="btn" title="Finish editing settings" id="settings-finish">Save</button></p>
     </div>
   </div>
@@ -170,13 +184,11 @@
 			fetch(start_url + "/ajax/user.php?ajax=true")
 				.then(res => res.json())
 				.then(response => {
-          if(response.success) {
-            const field = document.getElementById("username-field");
-            //field.style.display = "inline";
-            field.innerText = response.user;
-            field.setAttribute("href", "/acc/creations");
-            tooltip('Logged in as ' + response.user);
-          }
+					const field = document.getElementById("username-field");
+					field.style.display = "inline";
+					field.textContent = response.user;
+					field.setAttribute("href", "/acc/creations");
+					tooltip('Logged in as ' + response.user);
 				})
 				.catch(async (err) => {
 					try {
@@ -190,9 +202,11 @@
 		}
 		login();
 		
+		
 		let displayed_parts = [];
 		let current_type = '';
 		let cached_parts = {};
+		
 		
 		// load parts from url
 		function loadParts(type) {
@@ -227,14 +241,13 @@
 			displayed_parts.forEach(part => {
 				const span = document.createElement("span");
 				span.id = part.file;
-        span.title = part.name;
 				span.setAttribute("value", part.file);
 				span.innerHTML = `
 					<img src="https://library.ldraw.org/images/library/official/parts/${part.file.split(".")[0]}.png" loading="lazy" width="45px" />
 					<br />
 					<small class="part-list-number">${part.file.split(".")[0]}</small>
 					&nbsp;
-					<!-- <small class="hover-only">${part.name}</small> -->
+					<small class="hover-only">${part.name}</small>
 				`;
 				container.appendChild(span);
 			});
@@ -249,19 +262,11 @@
 				const items = Array.from(document.querySelectorAll("#select-block span"));
 
 				items.forEach(item => {
-					//const text = item.textContent.toLowerCase().replace(/\s+/g, " ").trim();
-          const text = (item.title || "").toLowerCase().replace(/\s+/g, " ").trim();
+					const text = item.textContent.toLowerCase().replace(/\s+/g, " ").trim();
 					item.style.display = text.includes(value) ? 'flex' : 'none';
 				});
 			}
 		});
-
-    // hover effects
-    document.querySelectorAll("#select-block span").forEach(function (elm) {
-        elm.addEventListener("mouseover", function (event) {
-            alert('test');
-        });
-    });
 		
 		// add a new block
 		document.getElementById("select-block").addEventListener("click", function (e) {
@@ -350,7 +355,7 @@
 		document.getElementById("import-finish").addEventListener("click", function () {
 			const format = document.getElementById("import-format").value;
 			if(format === "cloud") {
-				tooltip('GR8BRIK models from your account cannot be imported yet.');
+				tooltip('Gr8brik models from your account cannot be imported yet.');
 				return;
 			}
 			if(format === "three") {
@@ -372,9 +377,6 @@
 			}
 			if(format === "json") {
 				document.getElementById("cre-export").click();
-			}
-      if(format === "gr8") {
-				document.getElementById("cre-export-gr8").click();
 			}
 			if(format === "lxf") {
 				document.getElementById("cre-export-ldd").click();
@@ -738,15 +740,8 @@
       console.log("color picker clicked");
     });
 
-    document.getElementById("duplicate-part").addEventListener("click", function () {
-      if(selectedObject) {
-        duplicatePart();
-      }
-    });
-
-    document.getElementById("selected-map").addEventListener("input", function () {
-      console.log(`Selected material number is ${this.value}`);
-      selectedMap = this.value;
+    document.getElementById("duplicate-block").addEventListener("click", function () {
+      addBlock();
     });
 	
 	document.getElementById("delete-block").addEventListener("click", function () {
@@ -799,24 +794,7 @@
 		setTimeout(() => {
 			URL.revokeObjectURL(url);
 		}, 10000);
-  });
-
-  document.getElementById("cre-export-gr8").addEventListener("click", () => {
-    const fileData = generateSceneJSON();
-		const dataBlob = new Blob([fileData], { type: "application/json" });
-		const elm = this;
-		
-		const url = URL.createObjectURL(dataBlob);
-		const date = getDate();
-		const a = document.createElement("a");
-		a.href = url;
-		a.download = `gr8brik-creation-${date}.gr8`;
-		a.click();
-			
-		setTimeout(() => {
-			URL.revokeObjectURL(url);
-		}, 10000);
-  });
+    });
 	
 	document.getElementById("cre-export-ldd").addEventListener("click", () => {
 		console.log('clicked');
@@ -962,7 +940,7 @@
         reader.readAsText(file);
     });
 
-    var container, camera, scene, renderer, lighting, controls, grid_helper, ldraw_loader, raycaster, mouse, partRotation, partPosition, selectedObject, customPosition, selectedMap = null;
+    var container, camera, scene, renderer, lighting, controls, grid_helper, ldraw_loader, raycaster, mouse, partRotation, partPosition, selectedObject, customPosition = null;
 
     let blocks = [];
     let blockGroups = [];
@@ -989,30 +967,6 @@
       scene.updateMatrixWorld(true);
     }
 
-    // toggle smooth normals
-    // todo make this actually work
-    document.getElementById("smooth-normals-enable").addEventListener("click", function () {
-      ldraw_loader.smoothNormals = this.checked;
-
-      scene.traverse((child) => {
-        if (child.isMesh && child.userData.isBlock && child.geometry) {
-          child.geometry.computeVertexNormals();
-          child.geometry.attributes.normal.needsUpdate = true;
-
-          if (Array.isArray(child.material)) {
-            child.material.forEach(mat => {
-              mat.flatShading = !ldraw_loader.smoothNormals;
-              mat.needsUpdate = true;
-            });
-          } else {
-            child.material.flatShading = !ldraw_loader.smoothNormals;
-            child.material.needsUpdate = true;
-          }
-        }
-      });
-      scene.updateMatrixWorld(true);
-    });
-
     function isDark() {
         if(getCookie('mode')) {
           if(getCookie('mode') === 'dark') {
@@ -1029,9 +983,9 @@
         }
     }
 
-  function snapToGrid(value, gridSize) {
-    return Math.round(value / gridSize) * gridSize;
-  }
+    function snapToGrid(value, gridSize) {
+      return Math.round(value / gridSize) * gridSize;
+    }
 	
 	function getDate() {
 		const today = new Date();
@@ -1060,10 +1014,6 @@
     // WebGl renderer
     renderer = new THREE.WebGLRenderer({alpha: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
-    // set pixel ratio
-    // @the_an0nym on mecabricks/discord/youtube pointed out how if your screen resolution isn't 100% (and in some cases just always), the scene looks buggy
-    // https://discord.com/channels/1307420772377165884/1323840015087702026/1381346420535201998
-    renderer.setPixelRatio(window.devicePixelRatio);
     container.appendChild(renderer.domElement);
 		
     // Camera
@@ -1101,11 +1051,13 @@
 			scene.add(grid_helper);
 		}
 
-    const ldraw_path = "https://raw.githubusercontent.com/susstevedev/gr8brik-ldraw-fork/refs/heads/main/ldraw-parts/";
+    const ldraw_path = "https://raw.githubusercontent.com/susstevedev/gr8brik-ldraw-fork/refs/heads/main/ldraw-parts/actual/";
     ldraw_loader = new THREE.LDrawLoader();
-    ldraw_loader.preloadMaterials(ldraw_path + 'colors/ldconfig.ldr');
-    ldraw_loader.setPath(ldraw_path + 'actual/');
-    ldraw_loader.setPartsLibraryPath(ldraw_path + 'actual/');
+    /*ldraw_loader.preloadMaterials('https://raw.githubusercontent.com/susstevedev/gr8brik-ldraw-fork/refs/heads/main/ldraw-parts/colors/ldconfig.ldr');
+    ldraw_loader.setPath('https://raw.githubusercontent.com/susstevedev/gr8brik-ldraw-fork/refs/heads/main/ldraw-parts/actual/'); 
+    ldraw_loader.setPartsLibraryPath("https://raw.githubusercontent.com/susstevedev/gr8brik-ldraw-fork/refs/heads/main/ldraw-parts/actual/"); */
+    ldraw_loader.setPath(ldraw_path);
+    ldraw_loader.setPartsLibraryPath(ldraw_path);
         
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
@@ -1222,27 +1174,17 @@
 		selectedObject.traverse((child) => {
 			if (child.isMesh && child.material) {
 				if (Array.isArray(child.material)) {
-          let mat;
-          if (selectedMap != null) {
-            if (child.material[selectedMap]) {
-              mat = child.material[selectedMap];
-            } else {
-              selectedMap = null;
-              tooltip('Invalid multi color map selected');
-              return;
+					child.material.forEach((mat) => {
+						if (mat.color) {
+              if (mat.map) {
+                  mat.color.set("#ffffff");
+              } else {
+                  mat.color.set(color);
+              }
             }
-          } else {
-            mat = child.material[0];
-          }
-
-          if (mat && mat.color && !mat.map) {
-            mat.color.set(color);
-            mat.needsUpdate = true;
-          }
-
-          selectedMap = null;
+					});
           updateSceneData();
-        } else if (child.material.color) {
+				} else if (child.material.color) {
 					child.material.color.set(color);
 					child.material.needsUpdate = true;
           updateSceneData();
@@ -1283,65 +1225,32 @@
 		updateSceneData();
   }
 
-  function capture() {
-    let thumb = new THREE.Scene();
-    thumb.background = null;
+    function capture() {
+      let original = scene.background;
+      scene.background = null;
+      deselect(selectedObject);
 
-    let count = 0;
+      renderer.render(scene, camera);
+      let screenshot = renderer.domElement.toDataURL("image/png");
 
-    scene.traverse(function (object) {
-      if (object.isMesh) {
-        let cloned = clone_mesh_clean(object);
-        if (cloned) {
-          thumb.add(cloned);
-          if(object.userData.isBlock) {
-            cloned.rotation.z += Math.PI;
-            cloned.rotation.y += Math.PI;
-          }
-          console.log(cloned);
-          count++;
-        }
-      }
-    });
-
-    if (count === 0) {
-      console.warn("scene is empty");
-      return null;
+      scene.background = original;
+      return screenshot;
     }
 
-    let light2 = new THREE.DirectionalLight(0xffffff, 1);
-    light2.position.set(250, 250, 250);
-    thumb.add(light2);
-
-    let camera2 = camera.clone();
-
-    let ambient2 = new THREE.AmbientLight(0xdddddd);
-    thumb.add(ambient2);
-
-    let renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    renderer.setClearColor(0x000000, 0); // transparent
-    renderer.setSize(500, 500);
-    renderer.render(thumb, camera2);
-
-    let thumbnail = renderer.domElement.toDataURL("image/png");
-    return thumbnail;
-  }
-
-  function makeid(length) {
+    function makeid(length) {
       let result = '';
       const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      const charactersLength = characters.length;
       let counter = 0;
-
       while (counter < length) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
         counter += 1;
       }
-
       return result;
-  }
+    }
 
     // Last cleaned up 6/2/2025 by susstevedev
-  function addBlock(throwSuccess, throwError) {
+    function addBlock(throwSuccess, throwError) {
         if (!ldraw_loader) {
             console.error('LdrawLoader is missing!');
             tooltip('Error setting LdrawLoader. Please refresh the page and try again.');
@@ -1385,7 +1294,6 @@
 
                   child.userData.isBlock = true;
                   child.userData.isTexture = false;
-                  child.userData.parentName = partName;
                   
                   transformControls.attach(child);
                   selectedObject = child;
@@ -1398,7 +1306,6 @@
               if (child.material && child.material.map && child.isMesh && !child.isLineSegments) {
                 child.userData.isBlock = true;
                 child.userData.isTexture = true;
-                child.userData.parentName = partName;
               }
             });
 
@@ -1444,37 +1351,37 @@
           console.error('error loading piece:', error);
           throwError(error);
       });
-  }
+    }
 
-  function updateBlockList(part, color, count, id) {
-    let blockList = document.getElementById('block-list');
-    let listItem = document.createElement('li');
+    function updateBlockList(part, color, count, id) {
+      let blockList = document.getElementById('block-list');
 
-    listItem.classList.add('scene-block-item');
-    listItem.setAttribute('data-id', id);
-    listItem.textContent = `${part} (${color}, Num ${count})`;
+      let listItem = document.createElement('li');
+      listItem.classList.add('scene-block-item');
+      listItem.setAttribute('data-id', id);
+      listItem.textContent = `${part} (${color}, Num ${count})`;
 
-    blockList.appendChild(listItem);
-  }
+      blockList.appendChild(listItem);
+    }
 
-  function subobjectPosition(g) {
-      g.updateMatrixWorld(true);
+    function subobjectPosition(g) {
+        g.updateMatrixWorld(true);
 
-      const position = new THREE.Vector3();
-      const quaternion = new THREE.Quaternion();
-      const scale = new THREE.Vector3();
+        const position = new THREE.Vector3();
+        const quaternion = new THREE.Quaternion();
+        const scale = new THREE.Vector3();
 
-      g.matrixWorld.decompose(position, quaternion, scale);
+        g.matrixWorld.decompose(position, quaternion, scale);
 
-      const m = g.clone();
+        const m = g.clone();
 
-      m.position.copy(position);
-      m.quaternion.copy(quaternion);
-      m.scale.copy(scale);
+        m.position.copy(position);
+        m.quaternion.copy(quaternion);
+        m.scale.copy(scale);
 
-      m.updateMatrix();
-      return m;
-  }
+        m.updateMatrix();
+        return m;
+    }
 	
 	function objectSize(obj) {
 		if (!obj) {
@@ -1488,12 +1395,12 @@
 		return s;
 	}
 
-  function isSmall(g, scale) {
-    const boundingBox = new THREE.Box3().setFromObject(g);
-    const size = new THREE.Vector3();
-    boundingBox.getSize(size);
+    function isSmall(g, scale) {
+      const boundingBox = new THREE.Box3().setFromObject(g);
+      const size = new THREE.Vector3();
+      boundingBox.getSize(size);
 
-    return size.x < scale || size.y < scale || size.z < scale;
+      return size.x < scale || size.y < scale || size.z < scale;
   }
 
   function generateUVMap(geometry) {
@@ -1516,34 +1423,6 @@
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     return geometry;
   }
-
-  function getPriceInfo() {
-    if(selectedObject) {
-      let part = selectedObject.parent.userData.fileName.replace("parts/", "").replace(".dat", "");
-
-      fetch(`parts.php?part_price=true&part=${part}`)
-        .then(res => res.json())
-        .then(data => {
-          const price = data.part_prices?.USD?.new;
-          if (price !== undefined) {
-            console.log("new price in united states dollars: $" + price);
-          } else {
-            console.warn(`price data unavailable for ${part}`);
-          }
-        });
-		}
-  }
-
-  function duplicatePart() {
-    if(selectedObject) {
-      // I've never seen anyone use parent.parent but it works :D
-      // Modern problems require modern solutions
-      part = `parts/${selectedObject.userData.parentName}`;
-      partName = selectedObject.userData.parentName;
-      partColor = `#${selectedObject.material.color.getHexString().toLowerCase()}`;
-      addBlock();
-    }
-  }
   
 	function createGroup(gname, gelm) {
 		let group = new THREE.Group();
@@ -1552,119 +1431,61 @@
     return group;
 	}
 
-    /* function generateSceneJSON() {
-      let sceneData = {
-        blocks: []
-      };
-
-      if (selectedObject) {
-          transformControls.detach(selectedObject);
-          selectedObject = null;
-      }
-
-      blockGroups.forEach(function (group) {
-        let group_color = null;
-        console.log("blockGroups:", blockGroups);
-          if (group) {
-             group.traverse(function (child) {
-              if (child && child.isMesh) {
-
-                if (!child.material.map && !child.isLineSegments) {
-                  group_color = child.material.color.getHexString().toLowerCase();
-                }
-              
-                let blockData = {
-                  partName: group.userData.partName,
-                  color: group_color,
-                  position: {
-                    x: group.position.x,
-                    y: group.position.y,
-                    z: group.position.z
-                  },
-                  rotation: {
-                    x: group.rotation.x,
-                    y: group.rotation.y,
-                    z: group.rotation.z
-                  },
-                  scale: {
-                    x: group.scale.x,
-                    y: group.scale.y,
-                    z: group.scale.z
-                  },
-                  blockID: group.name,
-                  ldraw: group.ldraw.replace("parts/", ""),
-                };
-                sceneData.blocks.push(blockData);
-              }
-             });
-          }
-      });
-      return JSON.stringify(sceneData, null, 1);
-    } */
-  
     function generateSceneJSON() {
-      //let sceneData = { metadata: {}, blocks: [], cameras: {}, lights: {} };
+      let gr8brikid = makeid(5);
 
-      let sceneData = {
-        metadata: {
-          file_version: 1.1,
-          name: "My Model",
-          description: null
-        },
-        camera: camera.clone().toJSON(),
-        light: lighting.clone().toJSON(),
+      const sceneData = {
         blocks: []
       };
 
       if (selectedObject) {
         transformControls.detach(selectedObject);
         selectedObject = null;
-      }
+    }
 
       blockGroups.forEach(function (group) {
-        if (!group || !group.userData.partName) {
-          return;
-        }
+			let mesh_child = null;
+			let mesh_child_color = null;
+			
+			group.traverse(function (child) {
+			  if (child.isMesh) {
+				mesh_child = child;
+			  }
 
-        let group_color = null;
-        let mesh_child = null;
+			if (mesh_child) {
+				if(!mesh_child.material.map && !mesh_child.isLineSegments) {
+					mesh_child_color = mesh_child.material.color.getHexString().toLowerCase() ?? null;
+				}
+					
+				let ldraw = group.ldraw.replace("parts/", "");
+				const blockData = {
+					partName: mesh_child.userData.partName,
+					color: mesh_child_color,
+					position: {
+                        // prod fix because the new update is coming later and i cant
+						x: mesh_child.position.x,
+						y: mesh_child.position.y,
+						z: mesh_child.position.z
+					},
+					rotation: {
+						x: mesh_child.rotation.x + Math.PI,
+						y: mesh_child.rotation.y,
+						z: mesh_child.rotation.z
+					},
+					scale: {
+						x: mesh_child.scale.x,
+						y: mesh_child.scale.y,
+						z: mesh_child.scale.z
+					},
+					blockID: group.name,
+					ldraw: ldraw,
+				};
+			  sceneData.blocks.push(blockData);
+			}
+		  });
+	  });
 
-        group.traverse(function (child) {
-          if (child.isMesh) {
-            // saving the child object because using the group itself doesn't work
-            // todo update block groups in the updateSceneData() function
-            // 6/14/2025
-            mesh_child = child;
-            mesh_color = child.material.color.getHexString().toLowerCase();
-          }
-        });
-
-        const blockData = {
-          partName: group.userData.partName,
-          color: mesh_color,
-          position: {
-            x: mesh_child.position.x,
-            y: mesh_child.position.y,
-            z: mesh_child.position.z
-          },
-          rotation: {
-            x: mesh_child.rotation.x + Math.PI,
-            y: mesh_child.rotation.y,
-            z: mesh_child.rotation.z
-          },
-          scale: {
-            x: mesh_child.scale.x,
-            y: mesh_child.scale.y,
-            z: mesh_child.scale.z
-          },
-          blockID: group.name,
-          ldraw: group.ldraw.replace("parts/", ""),
-        };
-
-        sceneData.blocks.push(blockData);
-      });
-
-      return JSON.stringify(sceneData, null, 2);
+      return JSON.stringify(sceneData, null, 1);
     }
 
     function generateSceneLXFML() {
@@ -1678,6 +1499,33 @@
         transformControls.detach(selectedObject);
         selectedObject = null;
       }
+		
+		/*const lego_color_map = {
+		  "FF0000": 21, // Bright Red
+		  "00FF00": 28, // Bright Green
+		  "0000FF": 23, // Bright Blue
+		  "FFFF00": 24, // Bright Yellow
+		  "00FFFF": 107, // Bright Light Blue (closest to Cyan)
+		  "FF00FF": 221, // Bright Magenta
+		  "000000": 0, // Black
+		  "FFFFFF": 15, // White
+		  "808080": 7, // Light Gray
+		  "FFA500": 25, // Orange
+		  "800080": 268, // Dark Purple (closest)
+		  "FFC0CB": 222, // Light Pink
+		  "A52A2A": 70, // Reddish Brown
+		  "FFD700": 297, // Warm Gold
+		  "C0C0C0": 179, // Silver
+		  "8B0000": 320, // Dark Red
+		  "006400": 288, // Dark Green
+		  "00008B": 272, // Earth Blue
+		  "C91A09": 21, // Bright Red
+		  "A0BCAC": 151, // Sand Green
+		  "7789A5": 212, // Sand Blue
+		  "958A73": 19, // Tan
+		  "A3A2A4": 208, // Light Bluish Gray
+		  "635F61": 194 // Dark Bluish Gray
+		};*/
 
     const lego_color_map = {
       "C91A09": 21, // Bright Red
@@ -1727,25 +1575,25 @@
         });
 
         if (mesh_child) {
-          let ldraw = group.ldraw.replace("parts/", "").replace(".dat", "");
-          const boneID = refID;
-          let colorID = 21;
-            
-          if(!mesh_child.material.map && !mesh_child.isLineSegments) {
-            const hex = mesh_child.material.color.getHexString().toUpperCase();
-            colorID = lego_color_map[hex] ?? 26;
-          }
+		 let ldraw = group.ldraw.replace("parts/", "").replace(".dat", "");
+		 const boneID = refID;
+		 let colorID = 21;
 		 
-          let adjustedMatrix = mesh_child.matrixWorld.clone();
-          
-          const globalrot = new THREE.Matrix4().makeRotationX(Math.PI / 1);
-          adjustedMatrix.premultiply(globalrot);
-          
-          const flipmatrix = new THREE.Matrix4().makeRotationX(Math.PI);
-          adjustedMatrix.multiply(flipmatrix);
-          
-          const translationMatrix = new THREE.Matrix4().makeTranslation(-20, 0, 0); // 1 LDU
-          adjustedMatrix.multiply(translationMatrix);
+		 if(!mesh_child.material.map && !mesh_child.isLineSegments) {
+			const hex = mesh_child.material.color.getHexString().toUpperCase();
+			colorID = lego_color_map[hex] ?? 26;
+		}
+		 
+		 let adjustedMatrix = mesh_child.matrixWorld.clone();
+		 
+		 const globalrot = new THREE.Matrix4().makeRotationX(Math.PI / 1);
+		 adjustedMatrix.premultiply(globalrot);
+		 
+		 const flipmatrix = new THREE.Matrix4().makeRotationX(Math.PI);
+		 adjustedMatrix.multiply(flipmatrix);
+		 
+		 const translationMatrix = new THREE.Matrix4().makeTranslation(-20, 0, 0); // 1 LDU
+		 adjustedMatrix.multiply(translationMatrix);
 
           sceneBricks += `
             <Brick refID="${refID}" designID="${ldraw}" itemNos="${ldraw}">
@@ -1763,13 +1611,13 @@
 
       const sceneData = `
         <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-        <LXFML versionMajor="5" versionMinor="0" name="Imported GR8BRIK Creation">
+        <LXFML versionMajor="5" versionMinor="0" name="Imported Gr8brik Creation">
           <Meta>
             <Application name="LEGO Digital Designer" versionMajor="4" versionMinor="3"/>
             <Brand name="LDD"/>
             <BrickSet version="2670"/>
           </Meta>
-		  <Model name="Imported GR8BRIK Creation"></Model>
+		  <Model name="Imported Gr8brik Creation"></Model>
           <Cameras>
             <Camera refID="0" fieldOfView="80" distance="120" transformation="1,0,0,0,1,0,0,0,1,0,0,120"/>
           </Cameras>
@@ -1795,10 +1643,10 @@
       const unit = 0.04;
       const converted = matrix4.clone();
 	  
-	    const rotx = new THREE.Matrix4().makeRotationX(Math.PI / 1);
+	  const rotx = new THREE.Matrix4().makeRotationX(Math.PI / 1);
 	  
-	    const rot = new THREE.Matrix4();
-	    rot.multiply(rotx);
+	  const rot = new THREE.Matrix4();
+	  rot.multiply(rotx);
       converted.premultiply(rot);
 
       const position = new THREE.Vector3();
@@ -1807,7 +1655,7 @@
       converted.decompose(position, quaternion, scale);
 
       position.multiplyScalar(unit);
-	    position.x -= 0.8;
+	  position.x -= 0.8;
 	  
       converted.compose(position, quaternion, scale);
       const elm = converted.transpose().elements;
@@ -1821,83 +1669,35 @@
     }
 
     function updateSceneData() {
-	    if (blockGroups && blockGroups.length > 0) {
-        blockGroups.forEach(function (g) {
-			    g.updateMatrixWorld(true);
-          let hasTinyMesh = false;
+	  if (blockGroups && blockGroups.length > 0) {
+          blockGroups.forEach(function (g) {
+			  g.updateMatrixWorld(true);
+              let hasTinyMesh = false;
 
-          g.traverse(function (child) {
-				    child.updateMatrixWorld(true);
-              if (child.isMesh && isSmall(child, 19)) {
-                hasTinyMesh = true;
+              g.traverse(function (child) {
+				  child.updateMatrixWorld(true);
+                  if (child.isMesh && isSmall(child, 19)) {
+                      hasTinyMesh = true;
+                  }
+              });
+
+              g.userData.noSnap = hasTinyMesh;
+
+              if (!g.userData.noSnap || !scene.userData.noSnap) {
+                g.position.set(
+                      snapToGrid(g.position.x, 10),
+                      snapToGrid(g.position.y, 4),
+                      snapToGrid(g.position.z, 10)
+                  );
               }
           });
-
-          g.userData.noSnap = hasTinyMesh;
-
-          if (!g.userData.noSnap || !scene.userData.noSnap) {
-            g.position.set(
-                snapToGrid(g.position.x, 10),
-                snapToGrid(g.position.y, 4),
-                snapToGrid(g.position.z, 10)
-            );
-          }
-        });
-		    scene.updateMatrixWorld(true);
-      }
+		  scene.updateMatrixWorld(true);
+      } 
 	  
       if (selectedObject) {
           selectedObject.updateMatrixWorld(true);
       }
   }
-
-  /* 
-  Clone mesh data and not anything like transform controls because idk how to remove it
-  */
-  function clone_mesh_clean(obj) {
-      if (!obj.isMesh) { 
-        return null;
-      }
-
-      const mat = obj.material.clone();
-      const geometry = obj.geometry.clone();
-
-      const obj_clone = new THREE.Mesh(geometry, mat);
-      obj_clone.position.copy(obj.position);
-      obj_clone.rotation.copy(obj.rotation);
-      obj_clone.scale.copy(obj.scale);
-      obj_clone.name = obj.name;
-
-      return obj_clone;
-  }
-
-  /* function updateMaterials() {
-    if(!selectedObject) {
-      return;
-    }
-
-    displayedColors = document.getElementById("obj-colors");
-    displayedColors.innerHTML = "";
-
-		selectedObject.traverse((child) => {
-			if (child.isMesh && child.material) {
-				if (Array.isArray(child.material)) {
-          child.material.forEach((mat, index) => {
-            console.log(mat);
-            if (mat && mat.color instanceof THREE.Color && typeof mat.color.getHexString === "function") {
-              const colorHex = `#${mat.color.getHexString()}`;
-              const span = document.createElement("span");
-              console.log(`Subpart ${index}: ${colorHex}`);
-              span.style.backgroundColor = colorHex;
-              span.style.padding = "2px 2px 2px 2px";
-              displayedColors.appendChild(span);
-            }
-          });
-				}
-			}
-		});
-    updateSceneData();
-  } */
 
     function onMouseClick(event) {
         let target = event.target;
@@ -1940,14 +1740,48 @@
         transformControls.attach(obj);
 		    selectedObject = obj;
         
-        /* partColor = `#${obj.material.color.getHexString()}`;
-        $("#your-color-input").spectrum("set", partColor); */
+        if(obj.material) {
+          obj.material.opacity = 1;
+          obj.material.transparent = false;
+          obj.material.needsUpdate = true;
+        }
     }
 
     function deselect(obj) {
       transformControls.detach(obj);
 		  selectedObject = null;
     }
+
+    // Edit of onMouseClick for hovering
+    /*document.addEventListener('mousemove', function(event) {
+        let target = event.target;
+        let container = document.querySelector(".scene");
+        let lastHover = null;
+        const rect = container.getBoundingClientRect();
+ 
+        if (!container.contains(target)) {
+            document.body.style.cursor = 'auto';
+            return;
+        } else {
+            event.preventDefault();
+        }
+
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        let intersects = raycaster.intersectObjects(scene.children.filter(obj => obj.visible), true);
+
+        if (intersects.length > 0 && intersects[0].object !== selectedObject && intersects[0].object.userData.isBlock) {
+            container.style.cursor = 'pointer';
+            let obj = intersects[0].object;
+            obj.material.opacity = 0.5;
+            obj.material.transparent = true;
+            obj.material.needsUpdate = true;            
+        } else {
+            container.style.cursor = 'auto';
+        }
+    }); */
 
     function onWindowResize() {
         camera.aspect = window.innerWidth / window.innerHeight;
@@ -1992,7 +1826,6 @@
       controls.update();
       lighting.position.copy(camera.position);
       renderer.render(scene, camera);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
     }
 
     function tooltip(text) {
