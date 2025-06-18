@@ -10,7 +10,7 @@ include $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-if($loggedin === false) {
+if(!loggedin()) {
     header("HTTP/1.0 403 Forbidden");
     echo json_encode(['error' => 'Invalid sign in token provided', 'code' => '403']);
     exit;
@@ -316,6 +316,32 @@ if (isset($_POST['logout']) && isset($_POST['token'])) {
         header("HTTP/1.0 500 Internal Server Error");
         echo json_encode(['error' => 'Invalid session token']);
         exit;
+    }
+}
+
+if (isset($_POST['deactive_account'])) {
+    if (!loggedin()) {
+        exit('User not authenticated!');
+    }
+
+    $profile_id = (int)$token['user'];
+    $today = date("Y-m-d H:i:s");
+
+    $stmt = $conn->prepare("UPDATE users SET blog_user_id = NULL, deactive = ? WHERE id = ?");
+    $stmt->bind_param("si", $today, $profile_id);
+
+    if ($stmt->execute()) {
+        $stmt2 = $conn->prepare("DELETE FROM sessions WHERE user = ?");
+        $stmt2->bind_param("i", $profile_id);
+
+        if ($stmt2->execute()) {
+            header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
+            exit;
+        } else {
+            exit($stmt2->error);
+        }
+    } else {
+        exit($stmt->error);
     }
 }
 

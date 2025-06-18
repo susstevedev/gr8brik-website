@@ -110,7 +110,7 @@ function login_user($user, $pwd) {
                     }
                 } else {
                     header('HTTP/1.0 500 Internal Server Error');
-                    return ['error' => "This account will be deleted"];
+                    return ['error' => "This account has been deactivated"];
                 }
             }
 
