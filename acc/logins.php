@@ -29,7 +29,7 @@ isLoggedin();
 
             $sessionAmount = mysqli_num_rows($result);
 
-            echo "<h4>" . $sessionAmount . " active sessions. Your currently on a " . $user_agent . " browser</h4>";
+            echo "<h4>" . $sessionAmount . " active sessions. You are currently on a " . $user_agent . " browser.</h4>";
 
             $i = 0;
 			while ($row = $result->fetch_assoc()) {

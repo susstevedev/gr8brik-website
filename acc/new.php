@@ -59,18 +59,20 @@ isLoggedIn();
 			$sql = "SELECT * FROM notifications WHERE user = " . $token['user'] . " ORDER BY timestamp DESC";
             $result = $conn2->query($sql);
 
-            $url = null;
-            $post = 'New notification';
-            $user = null;
-            $img = '../img/info.jpg';
-
 			while ($row = $result->fetch_assoc()) {
+                $url = null;
+                $post = null;
+                $user = null;
+                $img = null;
                 $profile = $row['profile'];
+                $valid = false;
+
                 $sql2 = "SELECT * FROM users WHERE id = $profile";
                 $result2 = $conn2->query($sql2);
                 $row2 = $result2->fetch_assoc();
 
                 if ($row['category'] === "1") {
+                    $valid = true;
                     $url = "/user/" . $profile;
                     $post = "followed you";
                     $user = $row2['username'];
@@ -81,6 +83,7 @@ isLoggedIn();
                     $result3 = $conn3->query("SELECT * FROM model WHERE id = $content");
                     $row3 = $result3->fetch_assoc();
 
+                    $valid = true;
                     $img = '../cre/' . $row3['screenshot'];
                     $url = "/build/" . $content;
                     $post = "commented on " . $row3['name'];
@@ -94,9 +97,10 @@ isLoggedIn();
                     $result3 = $conn3->query("SELECT * FROM messages WHERE id = $content");
                     $row3 = $result3->fetch_assoc();
 
+                    $valid = true;
                     $img = '../img/com.jpg';
                     $url = "/topic/" . $row['content'];
-                    $post = "replied to " . htmlspecialchars($row3['title']) ?: "[deleted]";
+                    $post = "replied to " . $row3['title'] ?: "[deleted]";
                     $user = $row2['username'];
 
                     $result3->free();
@@ -106,17 +110,18 @@ isLoggedIn();
                 if (is_numeric($row['timestamp'])) {
                     $time = time_ago(date("Y-m-d H:i:s", $row['timestamp']));
                 } else {
-                    $time = "time_ago(null)";
+                    $time = "A long time ago";
                 }
 
-				echo "<article class='w3-card-2 w3-hover-shadow gr8-theme w3-light-grey w3-padding w3-large'>";
-                echo "<a href='" . $url . "'><img src='" . $img . "' style='width: 150px; height: 150px; border-radius: 2px;' alt='" . $img . "' title='" . $img . "'>";
-				echo "<span style='display: inline-block; vertical-align: top; padding: 5px 5px 5px 5px;'>";
-                echo htmlspecialchars($user) . "&nbsp;" . htmlspecialchars($post) . "!</span></a>";
-                echo "<time class='w3-right w3-text-grey' datetime=''>" . $time . "</time>";
-				echo "</article><br />";
+                if($valid == true) {
+                    echo "<article class='w3-card-2 w3-hover-shadow gr8-theme w3-light-grey w3-padding w3-large'>";
+                    echo "<a href='" . $url . "'><img src='" . $img . "' style='width: 150px; height: 150px; border-radius: 2px;' alt='" . $img . "' title='" . $img . "'>";
+                    echo "<span style='display: inline-block; vertical-align: top; padding: 5px 5px 5px 5px;'>";
+                    echo htmlspecialchars($user) . "&nbsp;" . htmlspecialchars($post) . "</span></a>";
+                    echo "<time class='w3-right w3-text-grey' datetime=''>" . $time . "</time>";
+                    echo "</article><br />";
+                }
 
-                $img = null;
                 $result2->free();
             }
             $result->free();

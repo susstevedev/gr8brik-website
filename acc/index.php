@@ -4,17 +4,15 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 if(isset($_GET['reactive'])) {
     $token = $_GET['token'];
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $varfalse = "";
 
     $tokendata = $conn->query("SELECT * FROM sessions WHERE id = '$token' LIMIT 1");
     $tokenrow = $tokendata->fetch_assoc();
-    $user = $tokenrow['user'];
+    $user = (int)$tokenrow['user'];
     
-    $stmt_2 = $conn->prepare("UPDATE users SET deactive = ? WHERE id = ? LIMIT 1");
-    $stmt_2->bind_param("ss", $varfalse, $user);
+    $stmt_2 = $conn->prepare("UPDATE users SET deactive = NULL WHERE id = ? LIMIT 1");
+    $stmt_2->bind_param("i", $user);
     if ($stmt_2->execute()) {
         setcookie('token', $token, time() + (10 * 365 * 24 * 60 * 60), "/");
-        $_SESSION['username'] = $user;
         header('Location: index.php');
         exit;
     }
@@ -22,12 +20,7 @@ if(isset($_GET['reactive'])) {
 
 isLoggedin();
 
-$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-if (isset($_POST["upload"])) {
+/*if (isset($_POST["upload"])) {
 	$description = $_POST['description'];
 	$name = $_POST['model_name'];
 	$userid = $id;
@@ -54,18 +47,28 @@ if (isset($_POST["upload"])) {
     } else {
         echo "Sorry, there was an error uploading your file.";
     }
-}
+} 
 
-$conn->close();
+$conn->close(); */
 
 if (isset($_POST['picture'])) {
     $okay = true;
 
     if(isset($_POST['deletePfp'])){
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
         $pfp = "users/pfps/" . $id . ".jpg";
-        unlink($pfp);
-        header("Location: index.php");
-        exit;
+
+        $stmt = $conn->prepare("UPDATE users SET picture = NULL WHERE id = ?");
+        $stmt->bind_param("s", $id);
+        if (!$conn->connect_error && $stmt->execute()) {
+            unlink($pfp);
+            ob_start();
+            echo "Profile picture removed";
+            ob_end_flush();
+            header("refresh:3; url=index.php");
+        } else {
+            exit('Error removing profile picture');
+        }
     } else {
         if($users_row['verify_token'] != NULL) {
             echo "Please verify your account to upload or edit your profile picture.";
@@ -86,8 +89,8 @@ if (isset($_POST['picture'])) {
             exit;
         }
 
-        $dir = "users/pfps/";
-        $upload = $dir . $id . '.jpg';
+        $db_pfp = '/acc/users/pfps/' . $id . '.jpg';
+        $upload = "users/pfps/" . $id . ".jpg";
 
         if ($_FILES["fileToUpload"]["size"] > 5242880) {
             echo 'File too large.';
@@ -97,10 +100,23 @@ if (isset($_POST['picture'])) {
 
         if ($okay != false) {
             if (move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $upload)) {
-                ob_start();
-                echo "Profile picture updated";
-                ob_end_flush();
-                header("refresh:3; url=index.php");
+                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+                if ($conn->connect_error) {
+                    exit("database connection failed " . $conn->connect_error);
+                }
+
+                $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
+                $stmt->bind_param("ss", $db_pfp, $id);
+                if ($stmt->execute()) {
+                    ob_start();
+                    echo "Profile picture updated";
+                    ob_end_flush();
+                    header("refresh:3; url=index.php");
+                } else {
+                    echo "Could not update profile picture row in the database";
+                    exit;
+                }
             } else {
                 echo "Could not upload profile picture to file storage.";
                 exit;
@@ -363,28 +379,13 @@ if(isset($_POST['deactive'])) {
 		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
 			<div class="w3-container">
 				<span onclick="document.getElementById('deactive').style.display='none'" class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
-				<form method='post' action=''>
+				<form method='post' action='/ajax/account_settings.php'>
 					<h2>Are you sure you want to deactivate your account?</h2>
                     <p><input type="password" name="password" placeholder="Password" class="w3-input w3-border w3-mobile" required /></p>
-                    <p>&nbsp;You can restore your account until 30 days after you deactivate.&nbsp;After 30 days, your account and data will be deleted. If you want to delete everything ASAP, try deleting it instead.</p>
+                    <p>You can restore your account until 30 days after you deactivate. After 30 days, your account will be deleted and all data anonymized.</p>
                     <p><b class="w3-red">Your data may not be recoverable after 30 days.</b></p>
 					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('deactive').style.display='none'">No</span>&nbsp;
-					<input type="submit" value="Yes" name="deactive" class="w3-btn w3-large w3-white w3-hover-red">
-				</form>
-			</div>
-		</div>
-	</div>
-
-    <div id="delete" class="w3-modal">
-		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
-			<div class="w3-container">
-				<span onclick="document.getElementById('delete').style.display='none'" class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
-				<form method='post' action=''>
-					<h2>Are you sure you want to permanently delete your account?</h2>
-                    <p>This will delete <b>everything</b> on your account* (forum posts and replies will only be anonymized).</p>
-                    <p class="w3-text-red">This action <b>cannot</b> be undone!</p>
-					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span>&nbsp;
-                    <span id="delete-account-btn" name="delete-account-btn" class="w3-btn w3-large w3-white w3-hover-red">Yes</span>
+					<input type="submit" value="Yes" name="deactive_account" class="w3-btn w3-large w3-white w3-hover-red">
 				</form>
 			</div>
 		</div>
@@ -518,66 +519,6 @@ if(isset($_POST['deactive'])) {
                 }
             });
         });
-
-        $("#exportmydata-btn").click(function(event) {
-            $("#exportmydata-btn").attr('disabled', true).html('<img src="/img/loading.gif" style="width: 25px; height: 25px;" />');
-
-            $.ajax({
-                url: "../ajax/account_settings",
-                method: "POST",
-                data: { export_data: true },
-                success: function(response) {
-                    $(".w3-main").show().text(response.success);
-                },
-
-                error: function(jqXHR, textStatus, errorThrown) {
-                    var response = JSON.parse(jqXHR.responseText);
-                    console.error(jqXHR, textStatus, errorThrown);
-                    $(".w3-main").show().text(response.error);
-                }
-            });
-        });
-
-        $("#delete-account-btn").click(function(event) {
-            $("#delete-account-btn").attr('disabled', true).html('<img src="/img/loading.gif" style="width: 25px; height: 25px;" />');
-
-            $.ajax({
-                url: "../ajax/account_settings",
-                method: "POST",
-                data: { delete_account: true },
-                success: function(response) {
-                    if(response.success) {
-                        $(".w3-main").show().text(response.success);
-                    } else {
-                        alert(response.error);
-                    }
-                },
-
-                error: function(jqXHR, textStatus, errorThrown) {
-                    var response = JSON.parse(jqXHR.responseText);
-                    console.error(jqXHR, textStatus, errorThrown);
-                    alert(response.error);
-                    $("#delete-account-btn").attr('disabled', false).text('Yes');
-                }
-            });
-        });
-
-        $("#logout-btn").click(function(event) {
-            $("#logout-btn").attr('disabled', true).html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
-
-            $.ajax({
-                url: "../ajax/account_settings",
-                method: "POST",
-                data: { logout: true, token: $.cookie('token') },
-                success: function(response) {
-                    window.location.reload();
-                },
-
-                error: function(jqXHR, textStatus, errorThrown) {
-                    alert('Error logging out.')
-                }
-            });
-        });
     });
     </script>
 
@@ -632,7 +573,7 @@ if(isset($_POST['deactive'])) {
 
     <form id="pictureForm" method="post" action="" enctype="multipart/form-data">
         <p>We recommend your profile picture be 50x50 pixels</p>
-		<p><input type="file" name="fileToupload" id="fileToupload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
+		<p><input type="file" name="fileToUpload" id="fileToUpload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
 		<input type="submit" value="Upload" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-quarter">
         <?php 
             if(file_exists('users/pfps/' . $id . '.jpg')){
@@ -678,18 +619,13 @@ if(isset($_POST['deactive'])) {
         </form>
     </div></div><br /><br />
 
-    <button id='logout-btn' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink' />Logout</button>
+    <a class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" href="login.php?status=logout">Logout</a>
 
     <h2>Danger zone</h2>
     
     <div class="tooltip">
     <button onclick="document.getElementById('deactive').style.display='block'" name='deactive' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink' />Deactivate Account</button>
-        <span class="w3-tag w3-round w3-blue w3-padding-small tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Deactivate your GR8BRIK account.</span>
-    </div>
-
-    <div class="tooltip">
-        <button onclick="document.getElementById('delete').style.display='block'" name='delete' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink' />Delete Account</button>
-        <span class="w3-tag w3-round w3-blue w3-padding-small tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Delete your GR8BRIK account forever, ASAP.</span>
+        <span class="w3-tag w3-round w3-blue w3-padding-small tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Deactivate your account.</span>
     </div>
 
     <?php include ('../linkbar.php') ?>
