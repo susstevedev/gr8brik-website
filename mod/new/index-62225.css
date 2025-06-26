@@ -190,38 +190,33 @@ select, option {
     border-radius: 5px;
 		animation: fromright 0.5s ease-out forwards;
 		transition: transform 0.5s ease;
-    box-shadow: 5px 5px 7px rgba(0, 0, 0, 0.10);
   }
 
-  .mobile-toggle {
-      position: fixed;
-      top: 50px;
-      right: 25px;
-      width: 50px;
-      height: 55px;
-      /*background: #333333; */
-      color: var(--ui-text-color);
-      background-color: transparent;
-	    backdrop-filter: blur(15px);
-	    -webkit-backdrop-filter: blur(15px);
-      padding: 15px;
-      border: 2px rgba(0, 0, 0, 0.16) solid;
-      border-radius: 2px;
-      z-index: 1100;
-      text-align: center;
-      display: inline-block;
-      transition: all 0.2s ease-in-out;
-      /* from https://getcssscan.com/css-box-shadow-examples (number #12) */
-      box-shadow: rgba(0, 0, 0, 0.06) 0px 0px 0px 1px;
-  }
+    .mobile-toggle {
+        position: fixed;
+        top: 50px;
+        right: 25px;
+        width: 50px;
+        height: 55px;
+        background: #333333;
+        color: white;
+        padding: 15px;
+        border: 2px rgba(0, 0, 0, 0.16) solid;
+        border-radius: 2px;
+        z-index: 1100;
+        text-align: center;
+        display: inline-block;
+        transition: all 0.2s ease-in-out;
+        /* from https://getcssscan.com/css-box-shadow-examples (number #12) */
+        box-shadow: rgba(0, 0, 0, 0.06) 0px 0px 0px 1px;
+      }
 
-  .mobile-toggle:hover {
-      /* background: #242424;
-      color: white; */
-      background-color: var(--ui-color);
-      cursor: pointer;
-      box-shadow: rgba(2, 2, 2, 0.06) 2px 2px 2px 2px;
-  }
+    .mobile-toggle:hover {
+        background: #242424;
+        color: white;
+        cursor: pointer;
+        box-shadow: rgba(2, 2, 2, 0.06) 2px 2px 2px 2px;
+    }
 
   #logo-img {
     border-radius: 10px;
@@ -268,12 +263,9 @@ select, option {
   #select-block span,
   #block-list li {
 	  margin-left: 5px;
-    margin-bottom: 5px;
     padding: 15px 15px 15px 15px;
-	  border: 1px solid var(--ui-anti-color);
-    border-radius: 5px;
+	  border: 1px solid #000;
     cursor: pointer;
-    box-shadow: 5px 5px 7px rgba(0, 0, 0, 0.10);
   }
 
   #block-list {

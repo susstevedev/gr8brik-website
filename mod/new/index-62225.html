@@ -1,25 +1,15 @@
-<!-- GR8BRIK VERSION 6-23-2025 (SUBOBJECT AND TEXTURES BETA 3.1) -->
+<!-- GR8BRIK VERSION 6-15-2025 (SUBOBJECT AND TEXTURES BETA 3.0) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Modeler - GR8BRIK</title>
+  <title>GR8BRIK Modeler</title>
   <meta charset="utf-8">
   <base href="/mod/new/">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-
   <script src="https://code.jquery.com/jquery-3.7.1.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/7/Stats.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@latest/dist/jszip.min.js" integrity="sha256-rMfkFFWoB2W1/Zx+4bgHim0WC7vKRVrq6FTeZclH1Z4=" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/LDrawLoader.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/controls/TransformControls.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.1/spectrum.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/RGBELoader.js"></script>
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.1/spectrum.min.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
-  <link rel="stylesheet" type="text/css" href="index.css?v=6222025_test1">
+  <link rel="stylesheet" type="text/css" href="index.css?v=6152025_test1">
 </head>
 
 <body>
@@ -29,13 +19,20 @@
   </div>
 
   <div id="info">
-    <p><a href="https://www.gr8brik.rf.gd/" target="_blank">GR8BRIK beta</a> - Build June 23rd, 2025</p>
+    <p"><a href="https://www.gr8brik.rf.gd/" target="_blank">GR8BRIK beta</a> - Build June 15th, 2025</p>
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/LDrawLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/controls/TransformControls.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.1/spectrum.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.1/spectrum.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
 
   <button id="toggleMenu" class="mobile-toggle">&#x2630;</button>
   <button id="takeScreenshot" class="mobile-toggle" style="top: 155px; padding-right: 0px; padding-left: 0px;"><i class="fa fa-camera" aria-hidden="true" alt="screenshot"></i></button>
   <button id="getPriceInfo" class="mobile-toggle" style="top: 255px; padding-right: 0px; padding-left: 0px;"><i class="fa fa-money" aria-hidden="true" alt="get price info"></i></button>
-  <button id="resetCamera" class="mobile-toggle" style="top: 355px; padding-right: 0px; padding-left: 0px;"><i class="fa fa-refresh" aria-hidden="true" alt="reset camera location"></i></button>
   
   <div id="left-container">
     <p style="height: 2vh;"></p>
@@ -81,8 +78,8 @@
 
     <input type="text" id="search-parts" placeholder="search parts..." /><hr />
 
-    <button id="tab1" class="tab-button">Parts list</button>
-    <button id="tab2" class="tab-button">Parts in scene</button><br /><br />
+    <button id="tab1" class="tab-button">Add blocks</button>
+    <button id="tab2" class="tab-button">Scene blocks</button><br /><br />
     
 	  <input type="file" id="cre-import" accept=".json,.gr8" style="display: none;"><input type="file" id="cre-import-three" accept=".json" style="display: none;">
 	  <span id="cre-export" style="display: none;"></span><span id="cre-export-gr8" style="display: none;"></span><span id="cre-export-ldd" style="display: none;"></span><span id="cre-export-three" style="display: none;"></span><span id="cre-export-dae" style="display: none;"></span>
@@ -722,6 +719,11 @@
     const studSize = 1000;
     let partList = document.getElementById('blk');
     let colList = document.getElementById('select-color');
+	
+	/*import * as THREE from `https://cdn.jsdelivr.net/npm/three@${three_version}/build/three.module.js`;
+	window.THREE = THREE;
+	
+	import { OBJExporter } from `https://cdn.jsdelivr.net/npm/three@${three_version}/examples/jsm/exporters/OBJExporter.js`; */
 
     document.getElementById("username-field").addEventListener("click", function () {
       var content = document.getElementById("username-content");
@@ -960,7 +962,7 @@
         reader.readAsText(file);
     });
 
-    var container, camera, scene, renderer, controls, grid_helper, ldraw_loader, raycaster, mouse, partRotation, partPosition, selectedObject, customPosition, selectedMap = null;
+    var container, camera, scene, renderer, lighting, controls, grid_helper, ldraw_loader, raycaster, mouse, partRotation, partPosition, selectedObject, customPosition, selectedMap = null;
 
     let blocks = [];
     let blockGroups = [];
@@ -994,6 +996,9 @@
 
       scene.traverse((child) => {
         if (child.isMesh && child.userData.isBlock && child.geometry) {
+          child.geometry.computeVertexNormals();
+          child.geometry.attributes.normal.needsUpdate = true;
+
           if (Array.isArray(child.material)) {
             child.material.forEach(mat => {
               mat.flatShading = !ldraw_loader.smoothNormals;
@@ -1073,23 +1078,16 @@
     directional_lighting.position.set(10, 15, 10);
     scene.add(directional_lighting);
 
-    /*const lighting = new THREE.DirectionalLight(0xffffff, 2);
+    lighting = new THREE.DirectionalLight(0xffffff, 2);
     lighting.position.copy(camera.position);
-    scene.add(lighting); */
-
-    const rgbe_loader = new THREE.RGBELoader();
-    //https://polyhaven.com/a/autumn_field_puresky
-    rgbe_loader.load('https://cdn.jsdelivr.net/gh/susstevedev/gr8brik-new/lib/autumn_field_puresky_1k.hdr', function (texture) {
-      texture.mapping = THREE.EquirectangularReflectionMapping;
-      scene.environment = texture;
-    });
+    scene.add(lighting);
 
     transformControls = new THREE.TransformControls(camera, renderer.domElement);
     scene.add(transformControls);
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.8;
+    controls.dampingFactor = 0.2;
 
     const stud_size = 20; // 1 stud = 20
     const grid_size = stud_size * 16; // studs wide
@@ -1380,10 +1378,9 @@
 
                   child.material = new THREE.MeshPhysicalMaterial({
                     color: new THREE.Color(partColor || "#000000"),
-                    reflectivity: 0.5,
-                    roughness: 0.4,
+                    roughness: 0.2,
                     metalness: 0.1,
-                    envMapIntensity: 0.5,
+                    reflectivity: 0.5,
                   });
 
                   child.userData.isBlock = true;
@@ -1539,6 +1536,8 @@
 
   function duplicatePart() {
     if(selectedObject) {
+      // I've never seen anyone use parent.parent but it works :D
+      // Modern problems require modern solutions
       part = `parts/${selectedObject.userData.parentName}`;
       partName = selectedObject.userData.parentName;
       partColor = `#${selectedObject.material.color.getHexString().toLowerCase()}`;
@@ -1552,15 +1551,68 @@
 		group.add(gelm);
     return group;
 	}
+
+    /* function generateSceneJSON() {
+      let sceneData = {
+        blocks: []
+      };
+
+      if (selectedObject) {
+          transformControls.detach(selectedObject);
+          selectedObject = null;
+      }
+
+      blockGroups.forEach(function (group) {
+        let group_color = null;
+        console.log("blockGroups:", blockGroups);
+          if (group) {
+             group.traverse(function (child) {
+              if (child && child.isMesh) {
+
+                if (!child.material.map && !child.isLineSegments) {
+                  group_color = child.material.color.getHexString().toLowerCase();
+                }
+              
+                let blockData = {
+                  partName: group.userData.partName,
+                  color: group_color,
+                  position: {
+                    x: group.position.x,
+                    y: group.position.y,
+                    z: group.position.z
+                  },
+                  rotation: {
+                    x: group.rotation.x,
+                    y: group.rotation.y,
+                    z: group.rotation.z
+                  },
+                  scale: {
+                    x: group.scale.x,
+                    y: group.scale.y,
+                    z: group.scale.z
+                  },
+                  blockID: group.name,
+                  ldraw: group.ldraw.replace("parts/", ""),
+                };
+                sceneData.blocks.push(blockData);
+              }
+             });
+          }
+      });
+      return JSON.stringify(sceneData, null, 1);
+    } */
   
     function generateSceneJSON() {
+      //let sceneData = { metadata: {}, blocks: [], cameras: {}, lights: {} };
+
       let sceneData = {
         metadata: {
-          file_version: 1.2,
+          file_version: 1.1,
           name: "My Model",
           description: null
         },
-        camera: camera.position,
+        camera: camera.clone().toJSON(),
+        light: lighting.clone().toJSON(),
         blocks: []
       };
 
@@ -1583,11 +1635,7 @@
             // todo update block groups in the updateSceneData() function
             // 6/14/2025
             mesh_child = child;
-            if (!Array.isArray(child.material)) {
-              mesh_color = child.material.color.getHexString().toLowerCase();
-            } else {
-              mesh_color = child.material[0].color.getHexString().toLowerCase();
-            }
+            mesh_color = child.material.color.getHexString().toLowerCase();
           }
         });
 
@@ -1924,11 +1972,6 @@
         }
     }
 
-    document.getElementById("resetCamera").addEventListener("click", function () {
-      camera.position.set(250, 250, 250);
-      scene.updateMatrixWorld();
-    });
-
     // Last refactor 6/3/2025 by susstevedev
     function animate() {
       document.addEventListener('DOMContentLoaded', function () {
@@ -1947,7 +1990,7 @@
 
       requestAnimationFrame(animate);
       controls.update();
-      //lighting.position.copy(camera.position);
+      lighting.position.copy(camera.position);
       renderer.render(scene, camera);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
     }
