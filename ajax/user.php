@@ -1,5 +1,5 @@
 <?php
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/constants.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/config.php';
 session_start();
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 $loggedin = loggedin();
