@@ -26,7 +26,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                 $pDown = $page - 1;
                 $pUp = $page + 1;
 
-                $count_result = $conn->query("SELECT COUNT(*) as post_count FROM posts");
+                $count_result = $conn->query("SELECT COUNT(*) as post_count FROM messages WHERE parent IS NULL OR parent = 0");
                 $count_row = $count_result->fetch_assoc();
                 $post_count = $count_row['post_count'];
                 $total_pages = ceil($post_count / $limit);

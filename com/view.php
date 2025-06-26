@@ -18,6 +18,11 @@ $userid = $row['userid'];
 $title = $row['title'];
 $post = $row['content'];
 $date = $row['timestamp'];
+if(!empty($row['edited'])) {
+    $edit_date = $row['edited'];
+} else {
+    $edit_date = $row['timestamp'];
+}
 
 $decoded_post = htmlentities($post, ENT_QUOTES, 'UTF-8');
 
@@ -134,7 +139,7 @@ if(isset($_POST['comment'])){
 
     echo "<div class='gr8-theme w3-container w3-light-grey w3-card-4'>";
     echo "<h2>" . $title . "</h2>";
-    echo "<h4>By <a href='/user/" . $userid . "'>@" . $username . "</a> on " . $date . "</h4>";
+    echo "<h4>By <a href='/user/" . $userid . "'>@" . $username . "</a> on " . $date . ", edited " . $edit_date . "</h4>";
     echo '<h4>' . $reply_count . ' replies, ' . $total_pages . ' pages, on page ' . $page . ', in ' . $category_row['status'] . '</h4></div><br />';
 
     $post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$userid'");
