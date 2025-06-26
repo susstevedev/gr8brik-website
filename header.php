@@ -3,13 +3,13 @@
 
     $head = preg_replace_callback('/<title>(.*?)<\/title>/i', function ($match) {
         $title = trim($match[1]);
-        return "<title>{$title} | Gr8brik</title>";
+        return "<title>{$title} | GR8BRIK</title>";
     }, $head);
 
     echo $head;
 ?>
 
-<link rel="canonical" href="http://www.gr8brik.rf.gd<?php echo htmlspecialchars($_SERVER['REQUEST_URI'], ENT_QUOTES, 'UTF-8'); ?>" />
+<link rel="canonical" href="https://gr8brik.rf.gd<?php echo htmlspecialchars($_SERVER['REQUEST_URI'], ENT_QUOTES, 'UTF-8'); ?>" />
 <link rel="manifest" href="https://susstevedev.github.io/gr8brik/manifest.json">
 
 <?php

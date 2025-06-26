@@ -202,7 +202,7 @@
         $model_count_sql = $stmt->get_result();
 
         $model_count = $model_count_sql->fetch_assoc();
-        echo '<h4>' . $model_count['count'] . ' models.</h4>';
+        echo '<h4><i class="fa fa-info-circle w3-padding-small" aria-hidden="true"></i>' . $model_count['count'] . ' total creations</h4>';
 
         if (isset($_GET['q']) && $_GET['q']) {
             $is_search = true;
@@ -258,7 +258,7 @@
             $result2 = $stmt->get_result();
         }
         
-        // if there is models found
+        // if there is some creations found from the query
         if ($result2->num_rows > 0) {
             echo "<table class='w3-table-all' style='color:black;'>";
             while ($row = $result2->fetch_assoc()) {

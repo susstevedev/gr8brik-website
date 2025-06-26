@@ -255,7 +255,7 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         function fetchCSRFToken(callback) {
-            $.get("/ajax/constants.php", { get_csrf_token: 1 }, function(data) {
+            $.get("/ajax/config.php", { get_csrf_token: 1 }, function(data) {
                 $("#csrf_token").val(data.csrf_token);
                 callback();
             }, "json");
