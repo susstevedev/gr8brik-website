@@ -36,8 +36,10 @@ function sess_read($id) {
 function sess_write($id, $data) {
     global $sess_db;
     $time = time();
-    $stmt = $sess_db->prepare("REPLACE INTO php_sessions (id, data, timestamp) VALUES (?, ?, ?)");
-    $stmt->bind_param("ssi", $id, $data, $time);
+    $ip = $_SERVER['REMOTE_ADDR'];
+
+    $stmt = $sess_db->prepare("REPLACE INTO php_sessions (id, data, timestamp, ip) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("ssis", $id, $data, $time, $ip);
     return $stmt->execute();
 }
 
@@ -66,6 +68,8 @@ session_set_save_handler(
 );
 
 register_shutdown_function('session_write_close');
+ini_set('session.gc_maxlifetime', 1000);
+ini_set('session.gc_probability', 5);
 session_start();
 
 if (!isset($_SESSION['requests'])) {

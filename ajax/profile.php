@@ -312,10 +312,16 @@ function fetch_profile($profile_id, $csrf) {
     $model_count = $stmt->get_result()->fetch_assoc()['all_models'];
     $stmt->close();
 
-    $stmt = $conn2->prepare("SELECT views FROM model WHERE user = ?");
+    $stmt = $conn2->prepare("SELECT SUM(views) as total_views FROM model WHERE user = ?");
     $stmt->bind_param("s", $profile_id);
     $stmt->execute();
-    $views = $stmt->get_result()->fetch_assoc()['views'];
+    $views = $stmt->get_result()->fetch_assoc()['total_views'] ?? 0;
+    $stmt->close();
+
+    $stmt = $conn2->prepare("SELECT SUM(likes) as total_likes FROM model WHERE user = ?");
+    $stmt->bind_param("s", $profile_id);
+    $stmt->execute();
+    $likes = $stmt->get_result()->fetch_assoc()['total_likes'] ?? 0;
     $stmt->close();
 
     $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
@@ -359,6 +365,7 @@ function fetch_profile($profile_id, $csrf) {
         'followers' => htmlspecialchars($followers),
         'following' => htmlspecialchars($following),
         'views' => htmlspecialchars($views),
+        'likes' => htmlspecialchars($likes),
         'blockedUser' => (bool)$blockedUser,
         'hasBanner' => $hasBanner,
         'isFollowing' => (bool)$isFollowing,

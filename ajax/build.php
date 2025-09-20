@@ -8,6 +8,31 @@ $bbcode = new BBCode;
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
+if(isset($_GET['size'])) {
+    header('Content-Type: application/json');
+
+    if(!isset($_GET['user'])) {
+        if (!isset($token['user'])) {
+            header("HTTP/1.1 401 Unauthorized");
+            echo json_encode(['error' => "Please login to view this data."]);
+            exit;
+        }
+        $user = $token['user'];
+    } else {
+        $user = (int)$_GET['user'];
+    }
+
+    $stmt = $conn->prepare("SELECT SUM(size) as total_used FROM model WHERE user = ?");
+    $stmt->bind_param("i", $user);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $total = $result->fetch_assoc()['total_used'] ?? 0;
+    $stmt->close();
+
+    echo json_encode(['success' => true, 't' => time(), 'total' => (int)$total]);
+    exit;
+}
+
 if (isset($_POST['save_build'])) {
     header('Content-Type: application/json');
 
@@ -57,6 +82,13 @@ if (isset($_POST['save_build'])) {
         }
     }
 
+    $stmt = $conn->prepare("SELECT SUM(size) as total_used FROM model WHERE user = ?");
+    $stmt->bind_param("i", $user);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $total = $result->fetch_assoc()['total_used'] ?? 0;
+    $stmt->close();
+
     $file_id = uniqid();
     $file_name = "../cre/" . $file_id . ".json";
     $db_file_name = $file_id . ".json";
@@ -64,6 +96,13 @@ if (isset($_POST['save_build'])) {
     $name = htmlspecialchars($_POST['name']);
     $date = date("Y-m-d H:i:s");
     $screenshot_path = "/img/no_image.png";
+    $db_file_size = strlen($modelJson);
+    
+    if (($total + $db_file_size) > MODEL_STORAGE_LIMIT) {
+        header("HTTP/1.0 413 Payload Too Large");
+        echo json_encode(['error' => "Storage limit was reached. Please delete older creations to save new ones."]);
+        exit;
+    }
 
     if (!empty($_POST['screenshot'])) {
         $screenshot_data = $_POST['screenshot'];
@@ -86,19 +125,21 @@ if (isset($_POST['save_build'])) {
         exit;
     }
 
+    $db_file_size = filesize($file_name);
+
     if ($conn->connect_error) {
         header("HTTP/1.1 500 Internal Server Error");
         echo json_encode(['error' => "Database connection failed."]);
         exit;
     }
 
-    $stmt = $conn->prepare("INSERT INTO model (user, model, description, name, date, screenshot) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt = $conn->prepare("INSERT INTO model (user, model, description, name, date, size, screenshot) VALUES (?, ?, ?, ?, ?, ?, ?)");
     if (!$stmt) {
         header("HTTP/1.1 500 Internal Server Error");
         echo json_encode(['error' => "Failed to save your creation to the database."]);
         exit;
     }
-    $stmt->bind_param("isssss", $user, $db_file_name, $desc, $name, $date, $screenshot_path);
+    $stmt->bind_param("issssis", $user, $db_file_name, $desc, $name, $date, $db_file_size, $screenshot_path);
 
     if (!$stmt->execute()) {
         header("HTTP/1.1 500 Internal Server Error");
@@ -550,6 +591,44 @@ function fetch_comments($model_id, $csrf) {
     return json_encode($comments); 
 }
 
+function get_user_storage($name) {
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+    $stmt = $conn->prepare("SELECT id, username FROM users WHERE username = ?");
+    $stmt->bind_param("s", $name);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $user_id = $row['id'] ?? 0;
+    $name = $row['username'] ?? "[deleted]";
+    $stmt->close();
+
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+
+    $stmt = $conn->prepare("SELECT SUM(size) as total_used FROM model WHERE user = ?");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $total_used = $result->fetch_assoc()['total_used'] ?? 0;
+    $stmt->close();
+
+    header("HTTP/1.0 200 OK");
+    $data[] = [
+        'userid' => $user_id,
+        'username' => $name,
+        'total_used' => $total_used
+    ];
+    return $data;
+}
+
+if(isset($_GET['getUserStorage'])) {
+    header('Content-Type: application/json');
+    $name = htmlspecialchars($_GET['name']);
+    $usedStorage = get_user_storage($name);
+    echo json_encode($usedStorage);
+    exit;
+}
+
 if(isset($_GET['build_comments'])) {
     header('Content-Type: application/json');
     $model_id = htmlspecialchars((int)$_GET['buildId']);
@@ -561,9 +640,16 @@ if(isset($_POST['comment'])) {
     header('Content-Type: application/json');
 
 	$comment = $_POST['commentbox'];
+    $csrf = $_POST['csrf_token'];
     $model_id = $_POST['buildId'];
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+    if ($_SESSION['csrf'] !== $_POST['csrf_token']) {
+        header('HTTP/1.0 403 Forbidden');
+        echo json_encode(['error' => 'Your cross-site-request-forgery token seems to be invalid.']);
+        exit;
+    }
 
     if(!loggedin()) {
         header("HTTP/1.0 500 Internal Server Error");
@@ -713,7 +799,17 @@ if ($loggedin === true) {
             echo json_encode(['error' => 'invalid model']);
             exit;
         }
+
         $model_id = (int)$_POST['model_id'];
+
+        $stmt = $conn->prepare("UPDATE model SET likes = likes - 1 WHERE id = ?");
+        $stmt->bind_param("i", $model_id);
+        if (!$stmt->execute()) {
+            echo json_encode(['error' => 'failed to update likes']);
+            $stmt->close();
+            exit;
+        }
+        $stmt->close();
 
         $stmt = $conn->prepare("DELETE FROM votes WHERE user = ? AND creation = ?");
         $stmt->bind_param("ii", $id, $model_id);
@@ -746,6 +842,10 @@ if ($loggedin === true) {
             echo json_encode(['error' => 'You have already liked this!']);
             exit;
         }
+
+        $stmt = $conn->prepare("UPDATE model SET likes = likes + 1 WHERE id = ?");
+        $stmt->bind_param("i", $model_id);
+        $stmt->execute();
 
         $stmt = $conn->prepare("INSERT INTO votes (creation, user) VALUES (?, ?)");
         $stmt->bind_param("ii", $model_id, $id);

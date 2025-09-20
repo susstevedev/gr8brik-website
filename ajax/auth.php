@@ -2,7 +2,6 @@
 /*
     2025 Gr8brik team
     This page, auth.php, is exactly what it sounds like: an authentication system used by Gr8brik
-    TODO: Add prepared statements without using OO (object oriented) MySQLi
 */
 
 header('Content-type: application/json');
@@ -86,19 +85,38 @@ function login_user($user, $pwd) {
     $row = mysqli_fetch_assoc($result);
 
     if (mysqli_num_rows($result) > 0) {
-        // For accounts created before Feb of 2025
-        // I plan to remove this in a later iteration of the website
+        // Hashing
+
+        $db_hashed_pwd = null;
+
         if (!empty($row['salt'])) {
-            $db_hashed_pwd = md5($pwd . $row['salt']);
-        } else {
+            if (md5($pwd . $row['salt']) === $row['password']) {
+                $db_hashed_pwd = md5($pwd . $row['salt']);
+            }
+        } elseif (md5($pwd) === $row['password']) {
             $db_hashed_pwd = md5($pwd);
+        } elseif (password_verify($pwd, $row['password'])) {
+            $db_hashed_pwd = null;
         }
 
-        if ($db_hashed_pwd === $row['password']) {
+        if ($db_hashed_pwd !== null || password_verify($pwd, $row['password'])) {
             $userid = $row['id'];
             $login_from = $_SERVER['REMOTE_ADDR'];
             $tokenid = uniqid();
             $time = time();
+
+            // Rehash legacy password
+            if($db_hashed_pwd !== null) {
+                $new_hash = password_hash($pwd, PASSWORD_DEFAULT);
+                $new_salt = null;
+
+                $stmt = $conn->prepare("UPDATE users SET password = ?, salt = ? WHERE id = ?");
+                $stmt->bind_param("ssi", $new_hash, $new_salt, $userid);
+
+                if (!$stmt->execute()) {
+                    return ['error' => "Error rehashing password. Please contact us at " . DB_MAIL];
+                }
+            }
 
             // For account deactivation (soft deletion until a certain date)
             if (!empty($row['deactive'])) {
@@ -264,7 +282,6 @@ function register_user($username, $password, $email) {
             $time = time();
 
             // Create session token
-            // Evan: Ten years is long enough, right?
             $sql = "INSERT INTO sessions (id, login_from, user, password, timestamp) VALUES ('$tokenid', '$login_from', '$userid', '$password', '$time') LIMIT 1";
             if (mysqli_query($conn, $sql)) {
                 setcookie('token', $tokenid, $time + (60 * 60 * 24 * 400), "/", ".gr8brik.rf.gd");

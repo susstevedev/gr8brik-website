@@ -12,6 +12,7 @@ if(loggedin() === true) {
     if (rand(1, 10) === 1) {
         //regenerate_session();
         delete_old_sessions();
+        update_auth_timestamp();
         //delete_inactive_users();
     }
 }
@@ -119,6 +120,7 @@ function login() {
         if($tokendata->num_rows != 0) {
             $token = $tokendata->fetch_assoc();
             $id = $token['user'];
+            $_SESSION['userid'] = $token['user'];
 
             $user_stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
             $user_stmt->bind_param("i", $id);
@@ -149,10 +151,21 @@ function login() {
 }
 login();
 
+function update_auth_timestamp() {
+    global $conn, $token, $tokendata;
+    $time = time();
+    $ip = $_SERVER['REMOTE_ADDR'];
+    $sessionid = $_COOKIE['token'];
+
+    $stmt = $conn->prepare("UPDATE sessions SET timestamp = ?, login_from = ? WHERE id = ?");
+    $stmt->bind_param("sss", $time, $ip, $sessionid);
+    return $stmt->execute();
+}
+
 if(isset($_GET['ajax'])) {
     header('Content-type: application/json');
     if(loggedin() === true) {
-        $logindata = json_encode([
+        /*$logindata = json_encode([
             'success' => true, 
             'loggedin' => true, 
             'requested' => time(), 
@@ -167,6 +180,12 @@ if(isset($_GET['ajax'])) {
             'alert' => $alert, 
             'age' => $age, 
             'changed' => $changed
+        ]); */
+        $logindata = json_encode([
+            'success' => true, 
+            'id' => $id,  
+            'user' => $user, 
+            'alert' => $alert, 
         ]);
         echo $logindata;
         exit;
@@ -176,7 +195,7 @@ if(isset($_GET['ajax'])) {
     }
 }
 
-function logout($reason, $redirect) {
+function logout($redirect) {
     global $conn, $token;
     $sessionid = $token['id'];
 
@@ -203,7 +222,7 @@ function logout($reason, $redirect) {
     }
 
     if($redirect === true) {
-        header('Location:/list.php?invalid_login=true&reason=' . urlencode($reason));
+        header('Location: /list.php');
         exit;
     }
 }
@@ -250,7 +269,7 @@ function delete_old_sessions() {
     return false;
 }
 
-function delete_inactive_users() {
+/* function delete_inactive_users() {
     global $conn;
     $stmt = $conn->prepare("DELETE FROM users WHERE deactive IS NOT NULL AND deactive < NOW() - INTERVAL 30 DAY");
     
@@ -262,7 +281,7 @@ function delete_inactive_users() {
         $stmt->close();
         return false;
     }
-}
+} */
 
 function loggedin() {
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -309,6 +328,7 @@ function loggedin() {
     return false;
 }
 
+// will remove soon
 function isLoggedin() {
     global $tokendata;
 

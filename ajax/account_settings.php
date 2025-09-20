@@ -4,7 +4,7 @@ if(!isset($_GET['show_errors'])) {
     error_reporting(0);
 }
 
-$response = ['error' => 'Unknown error occurred.'];
+$response = ['error' => 'An unknown error has occurred.'];
 
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
@@ -12,7 +12,7 @@ $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
 if(!loggedin()) {
     header("HTTP/1.0 403 Forbidden");
-    echo json_encode(['error' => 'Invalid sign in token provided', 'code' => '403']);
+    echo json_encode(['error' => 'Invalid session token provided', 'code' => '403', 'version' => 'LEGACY']);
     exit;
 }
 
@@ -106,16 +106,14 @@ if(isset($_GET['username_change'])) {
     exit;
 }
 
-
-if(isset($_GET['twitter_change'])){
-    $new = htmlspecialchars($_GET['handle']);
-    $id = $token['user'];
+function twitter_change($new) {
+    global $users_row;
+    $id = (int)$users_row['id'];
 
     if(strlen($new) > 15) {
         $error_message = "Twitter handle's can only be 15 characters.";
         header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => $error_message]);
-        exit;
+        return ['error' => $error_message];
     }
 
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -123,36 +121,46 @@ if(isset($_GET['twitter_change'])){
 	$stmt_2 = $conn->prepare("UPDATE users SET twitter = ? WHERE id = ?");
     $stmt_2->bind_param("ss", $new, $id);
     if ($stmt_2->execute()) {
-        echo "success";
-        exit;
+        return ['success' => 'Your profile has been updated with the new Twitter account.', 'code' => '403', 'version' => 'NEW'];
     }
 }
 
+if(isset($_GET['twitter_change'])) {
+    $handle = urldecode(htmlspecialchars($_GET['handle']));
+    $result = twitter_change($handle);
+    header("HTTP/1.0 200 OK");
+    echo json_encode($result);
+    exit;
+}
 
-if(isset($_GET['about_change'])){
-    $new = urldecode(htmlspecialchars($_GET['description'], ENT_NOQUOTES));
-    $id = $token['user'];
+function about_change($new) {
+    global $users_row;
+    $id = (int)$users_row['id'];
 
     if(strlen($new) > 200) {
         header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => 'About section can only be 200 characters.']);
-        exit;
+        return ['error' => 'About section can only be 200 characters.'];
     }
 
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 	$stmt_2 = $conn->prepare("UPDATE users SET description = ? WHERE id = ?");
+
     $stmt_2->bind_param("si", $new, $id);
     if ($stmt_2->execute()) {
-        echo json_encode(['success' => 'About section was changed successfully!']);
-        exit;
+        return ['success' => 'About section was changed successfully!'];
     } else {
         header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => 'Error changing about section.']);
-        exit;
+        return ['error' => 'Error changing about section.'];
     }
+
     $stmt->close();
-    header("HTTP/1.0 500 Internal Server Error");
-    echo json_encode(['error' => 'Could not follow through any checks.']);
+}
+
+if(isset($_GET['about_change'])){
+    $new = urldecode(htmlspecialchars($_GET['description'], ENT_NOQUOTES));
+    $result = about_change($new);
+    header("HTTP/1.0 200 OK");
+    echo json_encode($result);
     exit;
 }
 
@@ -291,7 +299,7 @@ if(isset($_GET['clear_notifications'])) {
     }
 }
 
-if (isset($_POST['logout']) && isset($_POST['token'])) {
+/* if (isset($_POST['logout']) && isset($_POST['token'])) {
     header('Content-Type: application/json');
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
     $sessionid = $_COOKIE['token'];
@@ -317,6 +325,10 @@ if (isset($_POST['logout']) && isset($_POST['token'])) {
         echo json_encode(['error' => 'Invalid session token']);
         exit;
     }
+} */
+
+if (isset($_POST['logout'])) {
+    logout(null, false);
 }
 
 if (isset($_POST['deactive_account'])) {
