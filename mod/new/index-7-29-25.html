@@ -1,4 +1,4 @@
-<!-- GR8BRIK VERSION 7-17-2025 (SUBOBJECT AND TEXTURES BETA 3.3.2) -->
+<!-- GR8BRIK VERSION 7-5-2025 (SUBOBJECT AND TEXTURES BETA 3.3.2) -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,7 +18,6 @@
   <script src="https://cdn.jsdelivr.net/npm/three@latest/examples/js/loaders/RGBELoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.127.0/examples/js/exporters/GLTFExporter.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/susstevedev/gr8brik/lib/ColladaExporter-modded.js?v=6262025_test3"></script>
-  <script src="https://cdn.jsdelivr.net/gh/GitHubDragonFly/GitHubDragonFly.github.io/viewers/static/js/exporters/OBJExporter.js?v=762025_test1"></script>
   
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/spectrum/1.8.1/spectrum.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css">
@@ -32,7 +31,7 @@
   </div>
 
   <div id="info">
-    <p><a href="https://www.gr8brik.rf.gd/" target="_blank">GR8BRIK beta</a> - Build July 17th, 2025</p>
+    <p><a href="https://www.gr8brik.rf.gd/" target="_blank">GR8BRIK beta</a> - Build July 5th, 2025</p>
   </div>
 
   <button id="toggleMenu" class="mobile-toggle">&#x2630;</button>
@@ -114,7 +113,7 @@
 			<option value="cloud" selected>From account</option>
 			<option value="json">GR8BRIK (.json, .gr8)</option>
 			<option value="three">ThreeJS (.json)</option>
-      <option value="ldr">Ldraw (.ldr, .dat, .mpd)</option>
+      <option value="ldr">Ldraw (.ldr, .dat)</option>
 		</select><br />
 		<p><button class="btn" title="Finish importing" id="import-finish">Select file</button></p>
     </div>
@@ -127,11 +126,9 @@
 		<select id="export-format" style="display: inline-block;">
       <option value="gr8">GR8BRIK (.gr8)</option>
 			<option value="json">GR8BRIK (.json)</option>
-      <option value="mpd">Ldraw (.mpd)</option>
 			<option value="three">ThreeJS (.json)</option>
 			<option value="lxf">Lego Digital Designer (.lxf)</option>
 			<option value="dae">Collada (.dae)</option>
-      <option value="obj">Wavefront (.obj)</option>
       <option value="glb">GL Transmission Format (.gltf)</option>
 		</select><br />
 		<p><button class="btn" title="Finish exporting" id="export-finish">Download file</button></p>
@@ -140,16 +137,12 @@
 
   <div id="settings-popup">
     <button class="btn-alt" style="float: right; top: 0;">&#10006;</button>
-    <h3><span style="color: var(--ui-text-color);">Modeler Settings</span></h3>
+    <h3><span style="color: #fff;">Modeler Settings</span></h3>
     <input type="checkbox" id="smooth-normals-enable" checked>
-    <label for="smooth-normals-enable">Enable smooth normals</label><br />
-    <input type="checkbox" id="display-lines-enable">
-    <label for="display-lines-enable">Enable lines on objects</label><br />
-
-    <hr />
-
-		<button class="btn" title="Load autosave from device" onclick="read_autosave();"><i class="fa fa-floppy-o" aria-hidden="true"></i>Recover Autosave</button><br />
-    <button class="btn" title="Clear autosave from device" onclick="clear_autosave();"><i class="fa fa-trash" aria-hidden="true"></i>Trash Autosave</button><br />
+    <label for="smooth-normals-enable">Enable smooth normals</label>
+    <input type="checkbox" id="display-lines-enable"><br />
+    <label for="display-lines-enable">Enable lines on objects</label>
+		<p><button class="btn" title="Finish editing settings" id="settings-finish">Save</button></p>
     </div>
   </div>
 
@@ -239,8 +232,6 @@
 		function displayParts() {
 			const container = document.getElementById("select-block");
 			container.innerHTML = '';
-      displayed_parts = displayed_parts.sort((a, b) => a.name.length - b.name.length);
-
 			displayed_parts.forEach(part => {
 				const span = document.createElement("span");
 				span.id = part.file;
@@ -371,12 +362,10 @@
 		document.getElementById("download-json").addEventListener("click", function () {
 			const sceneJSON = generateSceneJSON();
 			if (sceneJSON) {
-        autosave();
-
-        if (selectedObject) {
-          transformControls.detach(selectedObject);
-          selectedObject = null;
-        }
+				const jsonData = sceneJSON;
+				const date = new Date();
+				date.setTime(date.getTime() + (365 * 24 * 60 * 60 * 1000));
+				document.cookie = "localsave=" + btoa(jsonData) + "; expires=" + date.toUTCString();
 
 				const name = document.querySelector("#save-popup input[name='name']").value.trim();
 				const desc = document.querySelector("#save-popup textarea[name='desc']").value.trim();
@@ -389,7 +378,7 @@
 					headers: { "Content-Type": "application/x-www-form-urlencoded" },
 					body: new URLSearchParams({
 						save_build: true,
-						creation: sceneJSON,
+						creation: jsonData,
 						name,
 						desc,
 						screenshot
@@ -399,7 +388,7 @@
 				.then(response => {
 					tooltip(response.success);
 					this.innerText = "Save Creation";
-					//this.disabled = true;
+					this.disabled = true;
 				})
 				.catch(async err => {
 					try {
@@ -441,23 +430,18 @@
 		document.getElementById("export-finish").addEventListener("click", function () {
 			const format = document.getElementById("export-format").value;
       selectedExport = document.getElementById("export-format").value;
-
 			if(format === "three") {
 				document.getElementById("cre-export-three").click();
 			}
-
 			if(format === "json") {
 				document.getElementById("cre-export").click();
 			}
-
       if(format === "gr8") {
 				document.getElementById("cre-export-gr8").click();
 			}
-
 			if(format === "lxf") {
 				document.getElementById("cre-export-ldd").click();
 			}
-
 			if(format === "dae") {
 				const collada = new THREE.ColladaExporter();
 				const collada_data = collada.parse(filter_objects_peices());
@@ -474,56 +458,32 @@
 					URL.revokeObjectURL(url);
 				}, 10000);
 			}
-
       // gltfexporter is async
       if (format === "glb") {
         const exporter = new THREE.GLTFExporter();
         const date = getDate();
         const scene = filter_objects_peices();
-        console.log(scene.children.length, "meshes to export");
+
+        scene.scale.x = 0.1;
+        scene.scale.y = 0.1;
+        scene.scale.z = 0.1;
 
         exporter.parse(
           scene,
           function (result) {
-            //const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
-            const blob = new Blob([result], { type: 'model/gltf-binary' });
+            const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `creation-${date}.glb`;
+            a.download = `gltf-${date}.gltf`;
             a.click();
 
             setTimeout(() => 
               URL.revokeObjectURL(url), 
             10000);
           },
-          {
-            binary: true,
-            onlyVisible: true,
-            embedImages: true,
-            forceIndices: true,
-            forcePowerOfTwoTextures: true,
-          }
+          { binary: false }
         );
-      }
-
-      if (format === "obj") {
-        const exporter = new THREE.OBJExporter();
-        const date = getDate();
-        const result = exporter.parse(filter_objects_peices());
-
-        const blob = new Blob([result], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `obj-mtl-${date}.obj`;
-        a.click();
-
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
-      }
-
-      if (format === "mpd") {
-        exportSceneToMPD("creation");
       }
 		});
 
@@ -803,116 +763,6 @@
 		URL.revokeObjectURL(url);
 	});
 
-  function exportSceneToMPD(name) {
-    const lines = [];
-
-    const ldraw_color_map = {
-      "C91A09": 4, // Bright Red
-      "F8CC00": 14, // Bright Yellow
-      "0020A0": 12, // Bright Blue
-      "005700": 28, // Dark Green
-      "FE8A18": 10, // Bright Orange
-      "D941BB": 124, // Bright Violet / Dark Purple
-
-      "000000": 0, // Black
-      "FFFFFF": 15, // White
-      "747371": 294, // Dark Stone Grey / Dark Bluish Grey
-      "A3A2A4": 295, // Medium Stone Grey / Light Bluish Grey
-      "958A73": 5, // Brick Yellow / Tan
-      "6C5C4D": 8, // Dark Stone Grey / Dark Brown
-
-      "812A00": 308, // Reddish Brown
-      "5883C1": 23, // Medium Blue
-      "4B974B": 37, // Sand Green
-      "A52A2A": 59, // Dark Red
-      "B36D2C": 38, // Dark Orange
-      "FCB7BC": 223, // Bright Pink
-
-      "60C0E0": 212, // Bright Light Blue
-      "FBE696": 226, // Light Yellow
-      "84B68D": 36, // Bright Green
-      "92B28B": 335, // Bright Yellowish Green / Lime
-      "002A5A": 26, // Dark Blue
-      "DDDD22": 334, // Vibrant Yellow
-    };
-
-    lines.push(`0 FILE ${name}.ldr`);
-    lines.push(`0 ${name}`);
-    lines.push(`0 Name: ${name}.ldr`);
-    lines.push(`0 Author: Exported from Three.js`);
-    lines.push(`0 !LDRAW_ORG Model`);
-    lines.push(`0 !LICENSE Redistributable under CCAL version 2.0`);
-    lines.push(`0`);
-
-    scene.traverse(child => {
-      if (!child.isMesh || !child.userData.ldraw || !child.userData.isBlock) {
-        return;
-      }
-
-      const obj = child.clone();
-      obj.applyMatrix4(new THREE.Matrix4().makeScale(1, 1, -1));
-      obj.updateMatrixWorld(true);
-
-      let color_code = 16;
-      if(obj.material && !Array.isArray(obj.material)) {
-        const hex = obj.material.color.getHexString() || "ffffff";
-        color_code = ldraw_color_map[hex.toUpperCase()];
-      }
-
-      const file = obj.userData.ldraw.replace("parts/", "");
-      const color = color_code;
-
-      const pos = new THREE.Vector3();
-      const quat = new THREE.Quaternion();
-      const scale = new THREE.Vector3();
-      obj.matrixWorld.decompose(pos, quat, scale);
-
-      /* const matrix = new THREE.Matrix3().setFromMatrix4(obj.matrixWorld);
-
-      const e = matrix.elements;
-
-      const rot = e;
-      const x = pos.x;
-      const y = pos.y;
-      const z = pos.z; */
-
-      const scaleFactor = 1000 / 0.4;
-
-      //const matrix = new THREE.Matrix3().setFromMatrix4(obj.matrixWorld);
-      //const rot = matrix.elements.map(n => n.toFixed(5));
-      //const e = matrix.elements;
-
-      const e = obj.matrixWorld.elements;
-
-      const rot = [
-        e[0], e[4], e[8],  e[12] * scaleFactor,
-        e[1], e[5], e[9],  e[13] * scaleFactor,
-        e[2], e[6], e[10], e[14] * scaleFactor,
-      ].map(n => n.toFixed(5));
-
-      /* const x = (pos.x * scaleFactor).toFixed(2);
-      const y = (pos.y * scaleFactor).toFixed(2);
-      const z = (pos.z * scaleFactor).toFixed(2); */
-
-      //const line = `1 ${color} ${x} ${y} ${z} ${rot.join(' ')} ${file}`;
-      const line = `1 ${color} ${rot.join(' ')} ${file}`;
-      lines.push(line);
-    });
-
-    let result =  lines.join('\n');
-    const date = getDate();
-
-    const blob = new Blob([result], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `creation-${date}.mpd`;
-    a.click();
-
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-  }
-
-
     document.getElementById("cre-import").addEventListener("change", function (event) {
         let file = event.target.files[0];
         if (!file) {
@@ -1074,7 +924,7 @@
         reader.readAsText(file);
     });
 
-    var container, camera, scene, renderer, controls, grid_helper, directional_lighting, ambient_lighting, ldraw_loader, loading_manager, mouse, partRotation, partPosition, selectedObject, customPosition, selectedMap, selectedExport, named_parts = null;
+    var container, camera, scene, renderer, controls, grid_helper, ldraw_loader, loading_manager, mouse, partRotation, partPosition, selectedObject, customPosition, selectedMap, selectedExport, named_parts = null;
 
     let blocks = [];
     let blockGroups = [];
@@ -1103,7 +953,7 @@
 
     // toggle smooth normals
     // todo make this actually work
-    document.getElementById("smooth-normals-enable").addEventListener("change", function () {
+    document.getElementById("smooth-normals-enable").addEventListener("click", function () {
       ldraw_loader.smoothNormals = this.checked;
 
       scene.traverse((child) => {
@@ -1122,12 +972,12 @@
       scene.updateMatrixWorld(true);
     });
 
-    document.getElementById("display-lines-enable").addEventListener("change", function () {
+    document.getElementById("display-lines-enable").addEventListener("click", function () {
       const displayLines = this.checked;
       scene.userData.displayLines = displayLines;
 
       scene.traverse((obj) => {
-        if (obj.isLineSegments && obj.userData && obj.userData.ldr_line === true) {
+        if (obj.isMesh && obj.userData.isCustomLine) {
           obj.visible = displayLines;
         }
       });
@@ -1165,14 +1015,6 @@
 	}
 
   function init() {
-    if(isDark()) {
-			document.body.classList.add("dark");
-		} else {
-      if(document.body.classList.contains("dark")) {
-			  document.body.classList.remove("dark");
-      }
-		}
-
     // Scene container
     container = document.createElement('div');
     container.classList.add("scene");
@@ -1181,8 +1023,7 @@
     // Scene
     scene = new THREE.Scene();
     scene.userData.noSnap = false;
-    scene.userData.displayLines = false;
-
+    scene.userData.displayLines === false;
     if(isDark()) {
 			scene.background = new THREE.Color(0x252424);
 		} else {
@@ -1192,9 +1033,9 @@
     // WebGl renderer
     renderer = new THREE.WebGLRenderer({alpha: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
-
     // set pixel ratio
-    // @the_an0nym pointed out how if your screen resolution isn't 100% (and in some cases just always), the scene looks buggy
+    // @the_an0nym on mecabricks/discord/youtube pointed out how if your screen resolution isn't 100% (and in some cases just always), the scene looks buggy
+    // https://discord.com/channels/1307420772377165884/1323840015087702026/1381346420535201998
     renderer.setPixelRatio(window.devicePixelRatio);
     container.appendChild(renderer.domElement);
 		
@@ -1203,12 +1044,16 @@
     camera.position.set(250, 250, 250);
 		
     // Lighting
-		ambient_lighting = new THREE.AmbientLight(0xdddddd, 1);
+		const ambient_lighting = new THREE.AmbientLight(0xdddddd, 1);
     scene.add(ambient_lighting);
 
-		directional_lighting = new THREE.DirectionalLight(0xffffff, 3);
-    directional_lighting.position.set(250, 250, 250);
+		const directional_lighting = new THREE.DirectionalLight(0xdddddd, 1);
+    directional_lighting.position.set(10, 15, 10);
     scene.add(directional_lighting);
+
+    /*const lighting = new THREE.DirectionalLight(0xffffff, 2);
+    lighting.position.copy(camera.position);
+    scene.add(lighting); */
 
     const rgbe_loader = new THREE.RGBELoader();
     //https://polyhaven.com/a/autumn_field_puresky
@@ -1224,7 +1069,7 @@
     controls.enableDamping = true;
     controls.dampingFactor = 0.8;
 
-    const stud_size = 20; // 1 stud = 20 three/ldr units
+    const stud_size = 20; // 1 stud = 20
     const grid_size = stud_size * 16; // studs wide
     const divisions = 16; // 1 division per stud
 		
@@ -1248,6 +1093,54 @@
     };
 	
 	named_parts = new Map();
+	
+	/* loading_manager.setURLModifier((url) => {
+		const cleanName = url.split("/").pop().toLowerCase();
+
+		if (
+		!cleanName.startsWith("s/") && 
+		!cleanName.startsWith("p/") && 
+		!cleanName.startsWith("48/") && 
+		!cleanName.startsWith("7/") && 
+		!cleanName.startsWith("8/") && 
+		!cleanName.includes("stud") && 
+		!cleanName.includes("-") && 
+		cleanName.endsWith(".dat") &&
+		/^[0-9]/.test(cleanName)) {
+			if (!named_parts.has(cleanName)) {
+			  named_parts.set(cleanName, {
+				url,
+				type: cleanName,
+			  });
+			}
+		}
+
+		return url;
+	}); */
+	
+	/*loading_manager.setURLModifier((url) => {
+		const fileName = url.split("/").pop().toLowerCase();
+
+		const primitive = url.includes("/p/") || url.includes("/48/") || url.includes("/7/") || url.includes("/8/");
+		const subp = url.includes("/s/");
+
+		const real =
+			!primitive &&
+			!subp &&
+			!fileName.includes("stud") &&
+			!fileName.includes("-") &&
+			fileName.endsWith(".dat") &&
+			/^[0-9]/.test(fileName);
+
+		if (real && !named_parts.has(fileName)) {
+			named_parts.set(fileName, {
+				url,
+				type: fileName,
+			});
+		}
+
+		return url;
+	}); */
 
     const ldraw_path = "https://raw.githubusercontent.com/susstevedev/gr8brik-ldraw-fork/refs/heads/main/ldraw-parts/";
     ldraw_loader = new THREE.LDrawLoader();
@@ -1255,8 +1148,8 @@
     ldraw_loader.setPath(ldraw_path + 'actual/');
     ldraw_loader.setPartsLibraryPath(ldraw_path + 'actual/');
 	
-	  // lifesaver thanks chatgpt
-	  ldraw_loader.separateObjects = true;
+	// lifesaver thanks chatgpt
+	ldraw_loader.separateObjects = true;
         
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
@@ -1326,7 +1219,7 @@
         controls.enabled = !event.value;
       });
 
-      /* transformControls.addEventListener('objectChange', function () {
+      transformControls.addEventListener('objectChange', function () {
         if (selectedObject && !(selectedObject.userData.noSnap || scene.userData.noSnap)) {
           selectedObject.position.set(
             snapToGrid(selectedObject.position.x, 10), 
@@ -1344,52 +1237,7 @@
           scene.updateMatrixWorld(true);
         }
         updateSceneData();
-      });		*/
-
-      let original_pos = new THREE.Vector3();
-      let original_rot = new THREE.Euler();
-
-      transformControls.addEventListener('mouseDown', () => {
-        if (selectedObject) {
-          original_pos.copy(selectedObject.position);
-          original_rot.copy(selectedObject.rotation);
-        }
-      });
-
-      transformControls.addEventListener('objectChange', function () {
-        if (selectedObject && !(selectedObject.userData.noSnap || scene.userData.noSnap)) {
-          const delta_pos = new THREE.Vector3().subVectors(selectedObject.position, original_pos);
-          const snapped_pos = new THREE.Vector3(
-            snapToGrid(delta_pos.x, 10),
-            snapToGrid(delta_pos.y, 4),
-            snapToGrid(delta_pos.z, 10)
-          );
-
-          const final_pos = original_pos.clone().add(snapped_pos);
-          selectedObject.position.copy(final_pos);
-
-          const delta_rot = new THREE.Euler(
-            selectedObject.rotation.x - original_rot.x,
-            selectedObject.rotation.y - original_rot.y,
-            selectedObject.rotation.z - original_rot.z
-          );
-
-          const snapped_rot = new THREE.Euler(
-            Math.round(delta_rot.x / THREE.MathUtils.degToRad(45)) * THREE.MathUtils.degToRad(45),
-            Math.round(delta_rot.y / THREE.MathUtils.degToRad(45)) * THREE.MathUtils.degToRad(45),
-            Math.round(delta_rot.z / THREE.MathUtils.degToRad(45)) * THREE.MathUtils.degToRad(45)
-          );
-
-          const final_rot = new THREE.Euler(original_rot.x + snapped_rot.x, original_rot.y + snapped_rot.y, original_rot.z + snapped_rot.z);
-
-          selectedObject.rotation.copy(final_rot);
-
-          selectedObject.updateMatrixWorld(true);
-          scene.updateMatrixWorld(true);
-        }
-        updateSceneData();
-      });
-
+      });		
     }
 
     /*function changeBlockColor(color) {
@@ -1552,8 +1400,8 @@
     // Last cleaned up 6/2/2025 by susstevedev
   function addBlock(throwSuccess, throwError) {
         if (!ldraw_loader) {
-            console.error('LdrawLoader is missing or not loaded yet.');
-            tooltip('Something really, really, wrong has occured. Weird...');
+            console.error('LdrawLoader is missing!');
+            tooltip('Error setting LdrawLoader. Please refresh the page and try again.');
             return;
         }
 
@@ -1564,7 +1412,7 @@
         }
 
         if (!partColor) {
-            console.warn('Part color is not set. Setting color as white.');
+            console.warn('Part color is not set! Setting color as white.');
             partColor = "#ffffff";
         }
 
@@ -1581,8 +1429,6 @@
             let blockGroup = new THREE.Group();
             blockGroup.name = `ldraw_${makeid(10)}`;
             blockGroup.ldraw = part;
-
-            let display_lines = scene.userData.displayLines;
 			
             loadedGroup.traverse((child) => {
               if (child.isLineSegments && child.parent.isGroup) {
@@ -1591,10 +1437,6 @@
               }
 
               if (child.isMesh && !child.material.map && !child.isLineSegments && !Array.isArray(child.material)) {
-                  const pos = new THREE.Vector3();
-                  const pos2 = child.getWorldPosition(pos);
-                  console.log(pos2);
-
                   child.material = new THREE.MeshPhysicalMaterial({
                     color: new THREE.Color(partColor || "#000000"),
                     reflectivity: 0.5,
@@ -1602,11 +1444,18 @@
                     metalness: 0.1,
                     envMapIntensity: 0.5,
                   });
+				  
+				  /* const parts_arr = Array.from(named_parts.entries());
+				  let part_name_child = null;
+				  parts_arr.forEach(([key, value]) => {
+					console.log(`${key}: ${value.type}`);
+					part_name_child = value.type;
+				  }); */
 
                   child.userData.isBlock = true;
                   child.userData.isTexture = false;
-                  child.userData.ldraw = child.parent.userData.fileName || partName;
-                  child.userData.ldr_line = false;
+				  child.userData.parentName = partName;
+                  child.userData.ldraw = child.parent.userData.fileName;
                   
                   transformControls.attach(child);
                   selectedObject = child;
@@ -1615,24 +1464,22 @@
               if (child.material && child.material.map && child.isMesh && !child.isLineSegments) {
                 child.userData.isBlock = true;
                 child.userData.isTexture = true;
-                child.userData.ldraw = child.parent.userData.fileName || partName;
-				        child.userData.ldr_line = false;
+				child.userData.parentName = partName;
+                child.userData.ldraw = child.parent.userData.fileName;
               }
 
-				      child.userData.parentName = partName;
-              child.userData.id = makeid(15);
-              child.userData.original_mat = child.material;
+              let display_lines = scene.userData.displayLines;
 
-              if (child.material && child.isMesh && !child.isLineSegments) {
+              if (display_lines && child.material && child.isMesh && !child.isLineSegments) {
                 const edges = new THREE.EdgesGeometry(child.geometry); 
                 const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial( { color: 0x000000 } ) );
-                line.userData.ldr_line = true;
+                child.userData.isCustomLine = true;
                 child.add(line);
 
                 if(display_lines != true) {
                   line.visible = false;
                 }
-              }
+              }  
             });
 
             blockGroup.add(loadedGroup);
@@ -1836,20 +1683,6 @@
 		}
   }
 
-  function getFilename(obj) {
-    if(obj) {
-      while (obj) {
-        if (obj.userData) {
-          if(obj.userData.fileName) {
-            return obj.userData.fileName;
-          }
-        }
-        obj = obj.parent;
-      }
-      return null;
-    }
-  }
-
   function duplicatePart() {
     if(selectedObject) {
       part = `parts/${selectedObject.userData.parentName}`;
@@ -1949,79 +1782,78 @@
 	
 	function generateSceneJSON() {
 	  let sceneData = {
-      metadata: {
-        file_version: 1.2,
-        name: "My Model",
-        description: null
-      },
-      camera: camera.position,
-      settings: JSON.stringify(scene.userData),
-      blocks: []
+		metadata: {
+		  file_version: 1.2,
+		  name: "My Model",
+		  description: null
+		},
+		camera: camera.position,
+		blocks: []
 	  };
 
-	  /* if (selectedObject) {
-      transformControls.detach(selectedObject);
-      selectedObject = null;
-	  } */
+	  if (selectedObject) {
+		transformControls.detach(selectedObject);
+		selectedObject = null;
+	  }
 
 	  blockGroups.forEach(function (group) {
-      if (!group) {
-        return;
-      }
+		if (!group) {
+			return;
+		}
 
-      const meshes = [];
+		const meshes = [];
 
-      group.traverse(function (child) {
-        if (child.isMesh && child.userData.isBlock) {
-          meshes.push(child);
-        }
-      });
+		group.traverse(function (child) {
+		  if (child.isMesh && child.userData.isBlock) {
+			meshes.push(child);
+		  }
+		});
 
-      meshes.forEach(mesh_child => {
-        const pos = new THREE.Vector3();
-        const rot = new THREE.Quaternion();
-        const scale = new THREE.Vector3();
-        const euler = new THREE.Euler();
+		meshes.forEach(mesh_child => {
+		  const pos = new THREE.Vector3();
+		  const rot = new THREE.Quaternion();
+		  const scale = new THREE.Vector3();
+		  const euler = new THREE.Euler();
 
-        mesh_child.updateMatrixWorld(true);
-        mesh_child.getWorldPosition(pos);
-        mesh_child.getWorldQuaternion(rot);
-        mesh_child.getWorldScale(scale);
-        euler.setFromQuaternion(rot);
+		  mesh_child.updateMatrixWorld(true);
+		  mesh_child.getWorldPosition(pos);
+		  mesh_child.getWorldQuaternion(rot);
+		  mesh_child.getWorldScale(scale);
+		  euler.setFromQuaternion(rot);
 
-        // Colors
-        if (Array.isArray(mesh_child.material)) {
-          mesh_color = mesh_child.material[0].color.getHexString().toLowerCase();
-        } else {
-          mesh_color = mesh_child.material.color.getHexString().toLowerCase();
-        }
+		  if (Array.isArray(mesh_child.material)) {
+             mesh_color = mesh_child.material[0].color.getHexString().toLowerCase();
+           } else {
+             mesh_color = mesh_child.material.color.getHexString().toLowerCase();
+           }
 
-        const blockData = {
-          color: mesh_color,
-          position: {
-            x: pos.x,
-            y: pos.y,
-            z: pos.z
-          },
-          rotation: {
-            x: euler.x,
-            y: euler.y,
-            z: euler.z
-          },
-          scale: {
-            x: scale.x,
-            y: scale.y,
-            z: scale.z
-          },
-          id: mesh_child.userData.id || mesh_child.uuid,
-          ldraw: mesh_child.userData.ldraw.replace("parts/", ""),
-        };
+		  const blockData = {
+			partName: group.userData.partName,
+			color: mesh_color,
+			position: {
+			  x: pos.x,
+			  y: pos.y,
+			  z: pos.z
+			},
+			rotation: {
+			  x: euler.x,
+			  y: euler.y,
+			  z: euler.z
+			},
+			scale: {
+			  x: scale.x,
+			  y: scale.y,
+			  z: scale.z
+			},
+			blockID: group.name,
+			ldraw: mesh_child.userData.ldraw.replace("parts/", ""),
+		  };
 
-        sceneData.blocks.push(blockData);
-      });
+		  sceneData.blocks.push(blockData);
+		});
 	  });
 
-	  return JSON.stringify(sceneData);
+	  return JSON.stringify(sceneData, null, 2);
 	}
 
     function generateSceneLXFML() {
@@ -2036,35 +1868,35 @@
         selectedObject = null;
       }
 
-      const lego_color_map = {
-        "C91A09": 21, // Bright Red
-        "F8CC00": 24, // Bright Yellow
-        "0020A0": 23, // Bright Blue
-        "005700": 28, // Dark Green
-        "FE8A18": 25, // Bright Orange
-        "D941BB": 221, // Bright Violet
+    const lego_color_map = {
+      "C91A09": 21, // Bright Red
+      "F8CC00": 24, // Bright Yellow
+      "0020A0": 23, // Bright Blue
+      "005700": 28, // Dark Green
+      "FE8A18": 25, // Bright Orange
+      "D941BB": 221, // Bright Violet
 
-        "000000": 26, // Black
-        "FFFFFF": 1, // White
-        "747371": 199, // Dark Bluish Grey
-        "A3A2A4": 208, // Light Bluish Grey
-        "958A73": 2, // Brick Yellow
-        "6C5C4D": 86, // Dark Brown
+      "000000": 26, // Black
+      "FFFFFF": 1, // White
+      "747371": 199, // Dark Bluish Grey
+      "A3A2A4": 208, // Light Bluish Grey
+      "958A73": 2, // Brick Yellow
+      "6C5C4D": 86, // Dark Brown
 
-        "812A00": 120, // Reddish Brown
-        "5883C1": 102, // Medium Blue
-        "4B974B": 151, // Sand Green
-        "A52A2A": 59, // Dark Red
-        "B36D2C": 106, // Dark Orange
-        "FCB7BC": 104, // Bright Pink
+      "812A00": 120, // Reddish Brown
+      "5883C1": 102, // Medium Blue
+      "4B974B": 151, // Sand Green
+      "A52A2A": 59, // Dark Red
+      "B36D2C": 106, // Dark Orange
+      "FCB7BC": 104, // Bright Pink
 
-        "60C0E0": 107, // Bright Light Blue
-        "FBE696": 103, // Light Yellow
-        "84B68D": 37, // Bright Green
-        "92B28B": 34, // Bright Yellowish Green
-        "002A5A": 140, // Dark Blue
-        "DDDD22": 334, // Vibrant Yellow (sometimes 24 is used)
-      };
+      "60C0E0": 107, // Bright Light Blue
+      "FBE696": 103, // Light Yellow
+      "84B68D": 37, // Bright Green
+      "92B28B": 34, // Bright Yellowish Green
+      "002A5A": 140, // Dark Blue
+      "DDDD22": 334, // Vibrant Yellow (sometimes 24 is used)
+    };
 
       blockGroups.forEach(function (group) {
         group.traverse(function (child) {
@@ -2206,54 +2038,6 @@
       if (selectedObject) {
           selectedObject.updateMatrixWorld(true);
       }
-
-      if(scene.children.length != 0) {
-        autosave();
-      }
-  }
-
-  function autosave() {
-    const jsonData = generateSceneJSON();
-		const date = new Date();
-		date.setTime(date.getTime() + (365 * 24 * 60 * 60 * 1000));
-		document.cookie = "localsave=" + JSON.stringify(JSON.parse(jsonData)) + "; expires=" + date.toUTCString();
-  }
-
-  function read_autosave() {
-    const saved = getCookie("localsave");
-
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        loadSceneFromJSON(parsed);
-        camera.position.x = parsed.camera.x;
-        camera.position.y = parsed.camera.y;
-        camera.position.z = parsed.camera.z;
-        scene.userData = parsed.settings;
-        console.log(parsed.camera);
-      } catch (e) {
-        console.warn("failed to load autosave " + e);
-      }
-    }
-  }
-
-  function clear_autosave() {
-    const saved = getCookie("localsave");
-
-    if (saved) {
-      try {
-        let parsed = JSON.parse(saved);
-        parsed.blocks = null;
-        parsed.camera = null;
-        const date = new Date();
-        date.setTime(date.getTime() + (365 * 24 * 60 * 60 * 1000));
-        document.cookie = "localsave=" + JSON.stringify(parsed) + "; expires=" + date.toUTCString();
-
-        tooltip('Cleared autosave');
-      } catch (e) {
-        console.warn("failed to load autosave " + e);
-      }
-    }
   }
 
   /* 
@@ -2277,7 +2061,7 @@
   } */
 
   function clone_mesh_clean(obj) {
-    if (!obj.isMesh || !obj.geometry) {
+    if (!obj.isMesh) {
       return null;
     }
 
@@ -2289,11 +2073,10 @@
         mat = obj.material.clone();
       }
     } else {
-      mat = new THREE.MeshLambertMaterial();
+      mat = new THREE.MeshStandardMaterial();
     }
 
     const geometry = obj.geometry.clone();
-    geometry.name = obj.name || 'mesh';
     const obj_clone = new THREE.Mesh(geometry, mat);
 
     obj.updateMatrixWorld(true);
@@ -2301,59 +2084,22 @@
     obj.getWorldQuaternion(obj_clone.quaternion);
     obj.getWorldScale(obj_clone.scale);
 
-    obj_clone.name = obj.name || 'clone';
+    obj_clone.name = obj.name;
 
     return obj_clone;
   }
-
-  /* function normalize_color(color) {
-    if(!color) {
-      return;
-    }
-
-    let r = color.r;
-    let g = color.g;
-    let b = color.b;
-
-    const max_rgb = Math.max(r, g, b);
-    if (max_rgb < 0.1) {
-      const boost = 1.0 / max_rgb;
-      r = Math.min(1.0, r * boost);
-      g = Math.min(1.0, g * boost);
-      b = Math.min(1.0, b * boost);
-    }
-
-    return new THREE.Color(r, g, b);
-  } */
-
-  /*function brighten_color(color) {
-    // 0.6 is brightness
-    return new THREE.Color(
-      Math.max(color.r, 0.6),
-      Math.max(color.g, 0.6),
-      Math.max(color.b, 0.6)
-    );
-  } */
 
   function filter_objects_peices() {
     let thumb = new THREE.Scene();
 
     scene.traverse(function (object) {
       if (object.isMesh && object.userData.isBlock) {
-        const hexColor = object.material?.color || object.material?.map || new THREE.Color(0xffffff);
+        const hexColor = object.material?.color || new THREE.Color(0xff00ff);
         let cloned = clone_mesh_clean(object);
         if (cloned) {
           if(cloned.material && cloned.material.color && selectedExport === "dae") {
             apply_vertex_from_hex(cloned, hexColor);
             cloned.material.vertexColors = true;
-          } else if (cloned.material && Array.isArray(cloned.material)) {
-            cloned.material.forEach(mat => {
-              if (mat?.color) {
-                mat.color = mat.color.getHexString();
-              }
-            });
-          } else {
-            cloned.material = new THREE.MeshPhysicalMaterial({ color: hexColor, metalness: 0, roughness: 1 });
           }
           thumb.add(cloned);
           cloned.rotation.setFromQuaternion(cloned.quaternion);
