@@ -80,6 +80,8 @@ if (isset($_POST['accept'])) {
                 exit($conn2->connect_error);
             }
 
+            $empty = "<center><b>No creations reported. You're all caught up!</b><br />";
+
             $sql = "SELECT * FROM reported ORDER BY date DESC";
             $result = $conn->query($sql);
             if ($result->num_rows > 0) {
@@ -141,12 +143,13 @@ if (isset($_POST['accept'])) {
                         echo "<span class='gr8-theme w3-large w3-display-middle w3-card-2 w3-light-grey w3-padding-small'>" . $truncatedName . "</span>";
                         echo "<span class='gr8-theme w3-display-bottommiddle w3-card-2 w3-light-grey w3-padding-small'>" . $row2['views'] . " views - " . $likes['count'] . " likes - By ";
                         echo "<a href='/user/" . $row2['user'] . "'>" . $username . "</a></span></div>";
+                    } else {
+                        echo $empty;
                     }
                 }
                 $stmt->close();
             } else {
-                echo "<center><b>No creations reported. Your all caught up!</b><br />";
-                //echo "<img src='/img/empty.png' style='width:518px;height:288px;'></center>";
+                echo $empty;
             }
             $conn->close();
             $conn2->close();

@@ -36,8 +36,8 @@ isLoggedin();
                 $time = time_ago(date('Y-m-d H:i:s', $row['timestamp']));
 
 				echo "<article id='sessionModal' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
-                echo "<span>From IP " . $row['login_from'] . "</span><br />";
-                echo "<time datetime='" . $row['timestamp'] . "'>Signed in " . $time . "</time><br />";
+                echo "<span>Last IP " . $row['login_from'] . "</span><br />";
+                echo "<time datetime='" . $row['timestamp'] . "'>Last active " . $time . "</time><br />";
                 if($_COOKIE['token'] != $row['id']) {
                     echo "<button data-id='" . $row['id'] . "' class='revoke-session w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>
                         <i class='fa fa-times' aria-hidden='true'></i>

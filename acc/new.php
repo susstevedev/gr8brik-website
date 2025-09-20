@@ -73,7 +73,7 @@ isLoggedIn();
 
                 if ($row['category'] === "1") {
                     $valid = true;
-                    $url = "/user/" . $profile;
+                    $url = "/profile?id=" . $profile;
                     $post = "followed you";
                     $user = $row2['username'];
                     $img = '../acc/users/pfps/' . $profile;
@@ -85,7 +85,7 @@ isLoggedIn();
 
                     $valid = true;
                     $img = '../cre/' . $row3['screenshot'];
-                    $url = "/build/" . $content;
+                    $url = "/creation?id=" . $content;
                     $post = "commented on " . $row3['name'];
                     $user = $row2['username'];
 
@@ -99,7 +99,7 @@ isLoggedIn();
 
                     $valid = true;
                     $img = '../img/com.jpg';
-                    $url = "/topic/" . $row['content'];
+                    $url = "/com/view?id=" . $row['content'];
                     $post = "replied to " . $row3['title'] ?: "[deleted]";
                     $user = $row2['username'];
 

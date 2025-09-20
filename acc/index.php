@@ -18,6 +18,17 @@ if(isset($_GET['reactive'])) {
     }
 }
 
+if(isset($_GET['settings'])) {
+    $_SESSION['settings'] = true;
+    if((int)$_GET['setting_font'] === 0) {
+        $_SESSION['setting_font'] = null;
+    } else {
+        $_SESSION['setting_font'] = (int)$_GET['setting_font'] . "px";
+    }
+    header('Location:index.php?done=true');
+    exit;
+}
+
 isLoggedin();
 
 /*if (isset($_POST["upload"])) {
@@ -554,6 +565,13 @@ if(isset($_POST['deactive'])) {
 
     <p class="success w3-light-grey w3-card-2 w3-padding-small"></p>
     <p class="error w3-red w3-card-2 w3-padding-small"></p>
+
+    <h2>Frontend</h2>
+    <form id="settings" method="get" action="">
+        <p>These settings will effect how your user interface looks. Please note that these are for testing and may not presist between sessions.</p>
+        <p>Font size (in pixels, zero will reset the value): </p><input type="number" min="0" max="100" name="setting_font" value="15" placeholder="Font size" class="w3-input w3-border w3-mobile w3-third" />
+        <input type="submit" name="settings" value="Submit" class="w3-btn w3-blue w3-hover-white w3-third w3-border w3-border-indigo" />
+    </form><br /><br />
 
     <h2>Account</h2>
     
