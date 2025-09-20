@@ -67,7 +67,7 @@ if ($_POST['report']) {
             echo json_encode(['error' => 'Oops! Please login to report a creation.']);
         }
     } else {
-        echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
+        echo json_encode(['error' => 'Oops! Your cross-site-request-forgery token seems to be invalid.']);
     }
     exit;
 }
@@ -143,7 +143,7 @@ if ($_POST['delete_model']) {
         <div class="w3-container">
             <span onclick="$('#report').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
             <form id="reportForm">
-                <h2>Why do you want to flag this creation?</h2>
+                <h2>Why do you want to report this creation?</h2>
                 <b>You can only report a creation when it violates our <a href="/rules?src=creation" target="_blank"><i class="fa fa-external-link" aria-hidden="true"></i>rules</a>.</b><br />
                 <input type="checkbox" name="reason[]" value="violent" class="w3-check"> <label>Violent</label><br />
                 <input type="checkbox" name="reason[]" value="misinformation" class="w3-check"> <label>Misinformation</label><br />
@@ -393,35 +393,38 @@ document.addEventListener("DOMContentLoaded", function () {
         $(document).on("click", "#post-comment", function() {
             event.preventDefault();
 
-            const btn = $(this);
-            const commentBox = $("#comment-form textarea[name='comment-box']").val();
-            const commentBtnText = $("#comment-btn-text");
-            const errorElm = $("#ajax-error");
+            fetchCSRFToken(function() {
+                const btn = $(this);
+                const commentBox = $("#comment-form textarea[name='comment-box']").val();
+                const commentBtnText = $("#comment-btn-text");
+                const errorElm = $("#ajax-error");
+                const csrf = $("#comment-form input[name='csrf_token']").val();
 
-            commentBtnText.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
-            btn.prop("disabled", true);
+                commentBtnText.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
+                btn.prop("disabled", true);
 
-            $.ajax({
-                url: "/ajax/build",
-                method: "POST",
-                data: { comment: true, buildId: <?php echo $_GET['id'] ?>, commentbox: commentBox },
-                success: function(response) {
-                    if (response.success) {
+                $.ajax({
+                    url: "/ajax/build",
+                    method: "POST",
+                    data: { comment: true, buildId: <?php echo $_GET['id'] ?>, commentbox: commentBox, csrf_token: csrf },
+                    success: function(response) {
+                        if (response.success) {
+                            commentBtnText.html('Comment');
+                            btn.prop("disabled", false);
+                            alert('Comment posted!');
+                            window.location.reload();
+                        } else {
+                            errorElm.text(response.error).show(500).delay(5000).hide(500);
+                        }
+                    },
+                    error: (jqXHR, textStatus, errorThrown) => {
                         commentBtnText.html('Comment');
                         btn.prop("disabled", false);
-                        alert('Comment posted!');
-                        window.location.reload();
-                    } else {
+                        console.error("error:", textStatus, errorThrown, jqXHR);
+                        const response = JSON.parse(jqXHR.responseText);
                         errorElm.text(response.error).show(500).delay(5000).hide(500);
                     }
-                },
-                error: (jqXHR, textStatus, errorThrown) => {
-                    commentBtnText.html('Comment');
-                    btn.prop("disabled", false);
-                    console.error("error:", textStatus, errorThrown, jqXHR);
-                    const response = JSON.parse(jqXHR.responseText);
-                    errorElm.text(response.error).show(500).delay(5000).hide(500);
-                }
+                });
             });
         });
     });
@@ -456,9 +459,9 @@ document.addEventListener("DOMContentLoaded", function () {
             <i class="fa fa-clock-o" aria-hidden="true"></i>Posted&nbsp;<?php echo time_ago($data['date']) ?><br />
             <i class="fa fa-user-o" aria-hidden="true"></i>By
                 <?php if($data['model_admin'] === '1') { ?>
-                <a id="data-user-link" class="w3-text-red w3-hover-text-yellow" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?>
+                <a id="data-user-link" class="w3-text-red w3-hover-text-yellow" href="/profile?id=<?php echo $data['userid'] ?>"><?php echo $data['username'] ?>
                 <?php } else { ?>
-                <a id="data-user-link" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?>
+                <a id="data-user-link" href="/profile?id=<?php echo $data['userid'] ?>"><?php echo $data['username'] ?>
                 <?php } ?>
             </a><br />
             <i class="fa fa-arrow-circle-o-up" aria-hidden="true"></i><?php echo $data['likes'] ?>&nbsp;likes<br />
@@ -489,23 +492,33 @@ document.addEventListener("DOMContentLoaded", function () {
 
     <?php if($loggedin === true) { ?>
         <?php if ($data['voted'] === true) { ?>
-            <!-- &nbsp;<input form="downvote" class="w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange" type="submit" value="Unlike" name="downvote">&nbsp; -->
-            &nbsp;<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-down"></span>Unlike</button>&nbsp;
+            <div class="tooltip" id="data-unlike-creation">
+                <!-- &nbsp;<input form="downvote" class="w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange" type="submit" value="Unlike" name="downvote">&nbsp; -->
+                <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Remove your vote from this creation</span>
+                &nbsp;<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-down"></span>Unlike</button>&nbsp;
+            </div>
         <?php } else { ?>
-            <!-- &nbsp;<input form="upvote" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Like" name="upvote">&nbsp; -->
-            &nbsp;<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>Like</button>&nbsp;
+            <div class="tooltip" id="data-like-creation">
+                <!-- &nbsp;<input form="upvote" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Like" name="upvote">&nbsp; -->
+                <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Vote on this creation and support the creator</span>
+                &nbsp;<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>Like</button>&nbsp;
+            </div>
         <?php } ?>
 
         <?php if(trim($token['user']) === trim($data['userid'])) { ?>
             <div class="tooltip" id="data-delete-model">
                 <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Delete this creation</span>
-                <button onclick=document.getElementById("delete-model").style.display="block" name="delete" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />Delete</button>&nbsp;
+                <button onclick=document.getElementById("delete-model").style.display="block" name="delete" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />
+                    <i class="fa fa-trash" aria-hidden="true"></i>Delete
+                </button>&nbsp;
             </div>
         <?php } ?>
 
         <div class="tooltip" id="data-report-model">
-            <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Report a model to Admins</span>
-            <button onclick=document.getElementById("report").style.display="block" name="flag" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />Flag</button>&nbsp;
+            <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Report this creation to moderators</span>
+            <button onclick=document.getElementById("report").style.display="block" name="flag" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />
+                <i class="fa fa-flag" aria-hidden="true"></i>Report
+            </button>&nbsp;
         </div>
     <?php } ?>
         
@@ -519,6 +532,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 <div id='post'>
                     <textarea name='comment-box' id='comment-box' class='w3-input w3-card-2 w3-hover-shadow w3-mobile w3-half w3-round' placeholder='add a comment... (type @username to mention someone)' rows='4' cols='40'></textarea>
                 </div><br />
+                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf']; ?>">
                 <button id='post-comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo'>
                     <span id="comment-btn-text">Comment</span>
                 </button>

@@ -1,9 +1,9 @@
 <?php
-    require_once 'acc/classes/user.php';
+    require_once 'ajax/config.php';
 
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-    $count_result = $conn->query("SELECT COUNT(*) as active FROM users WHERE deactive = '' AND admin = 0");
+    $count_result = $conn->query("SELECT COUNT(*) as active FROM users WHERE deactive IS NULL AND admin = 0");
     $count_result2 = $conn->query("SELECT COUNT(*) as deleted FROM users WHERE deactive != ''");
     $count_result3 = $conn->query("SELECT COUNT(*) as admin FROM users WHERE admin = 1");
 
@@ -23,7 +23,7 @@
 ?>
 <html>
   <head>
-  <title>/chart</title>
+  <title>Users chart - Gr8brik.rf.gd</title>
     <link rel="stylesheet" href="/lib/w3.css">
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script type="text/javascript">
@@ -52,6 +52,7 @@
       }
     </script>
   </head>
+  <p>Last fixed <?php echo date("M d, Y H:i",filemtime('chart.php')); ?></p>
   <body class="w3-container w3-light-grey">
     <div id="piechart" style="width: 500px; height: 500px;" class="w3-light-grey"></div>
     <a href="http://www.gr8brik.rf.gd/users?src=googleChart" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" target="_blank">Users Page</a>

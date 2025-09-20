@@ -1,0 +1,41 @@
+php_value display_errors On
+php_value mbstring.http_input auto
+php_value date.timezone America/New_York
+RewriteEngine On
+RewriteBase /
+RewriteCond %{HTTP_HOST} !^www. [NC]
+RewriteRule ^(.*)$ http://www.%{HTTP_HOST}/$1 [R=301,L]
+Options +Indexes
+IndexOptions +FancyIndexing
+ErrorDocument 301 default
+ErrorDocument 400 default
+ErrorDocument 401 default
+ErrorDocument 403 default
+ErrorDocument 404 default
+ErrorDocument 429 default
+ErrorDocument 500 default
+ErrorDocument 503 default
+RewriteCond %{HTTPS} off
+RewriteRule (.*) https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule !.*.php$ %{REQUEST_FILENAME}.php [QSA,L]
+RewriteRule ^@([a-zA-Z0-9+/=_.%&()-]+)$ /old_profile3.php?user=$1 [QSA,L]
+RewriteRule ^user/([a-zA-Z0-9+/=_.%&()-]+)$ /profile.php?id=$1 [QSA,L]
+RewriteRule ^build/([a-zA-Z0-9+/=_.%&()-]+)$ /creation.php?id=$1 [QSA,L]
+RewriteRule ^topic/([a-zA-Z0-9+/=_.%&()-]+)$ /com/view.php?id=$1 [QSA,L]
+Redirect 301 /manifest.json https://susstevedev.github.io/gr8brik/manifest.json
+<Files serviceWorker.js>
+    Header set Cache-Control "max-age=0, no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "Wed, 11 Jan 1984 05:00:00 GMT"
+</Files>
+# Redirect 503 /
+# disables caching 
+# <IfModule mod_headers.c> 	
+# Header set Cache-Control "no-cache, no-store, must-revalidate" 	
+# Header set Pragma "no-cache" 	
+# Header set Expires 0 
+# </IfModule>
+# RewriteCond %{HTTP:Cookie} adm=1 [NC]
+# RewriteRule .* - [L]
+# RewriteRule .* - [R=503,L]

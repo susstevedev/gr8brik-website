@@ -1,6 +1,8 @@
 <?php
-require_once $_SERVER['DOCUMENT_ROOT'] . '/acc/classes/user.php';
-isLoggedin();
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+    if(loggedin()) {
+        header('Location:list.php');
+    }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -73,67 +75,43 @@ isLoggedin();
 
     <div class="main-text w3-container w3-right">
 
-        <p style="word-wrap: break-word;">GR8BRIK is a block building browser game written in ThreeJS, for modern browsers. No download needed, just click the big white button below to go to the Modeler tab.</p>
+        <p style="word-wrap: break-word;">GR8BRIK is a block building browser game written in ThreeJS and uses the Ldraw parts library, for modern browsers. No download needed, just click the big white button below to go to the Modeler tab.</p>
 
-        <a href="/modeler" class="w3-btn w3-large w3-white w3-hover-blue" target="_blank">Start Building NOW!</a>
+        <a href="/modeler" class="w3-btn w3-large w3-white w3-hover-blue" target="_blank">Start Building!</a>
 
         <br /><b>Or...</b><br />
 
-        <a href="/acc/login">Login</a><br />
+        <a href="/acc/login.php">Login</a><br />
 
-        <a href="/acc/register">Create Account</a><br />
+        <a href="/acc/register.php">Create Account</a><br />
 
-        <a href="/rules">Rules</a><br />
+        <a href="/com/view.php?id=17">Rules</a><br />
 
-        <a href="/terms">Terms and Conditions</a><br />
+        <a href="/terms.php">Terms and Conditions</a><br />
 
-        <a href="/privacy">Privacy Policy</a><br />
+        <a href="/privacy.php">Privacy Policy</a><br />
 
     </div>
 
         <div class="w3-container w3-center"><hr />
-
-            <div id="feed">
-                <h1>A feed just for you</h1>
-                <p>When you login to GR8BRIK; there is now a personalised feed of the 6 newest models, posts and comments on our service. You can view these models by clicking on them and enabling the WebGl window.</p>
-                <a href="/home" class="w3-btn w3-blue w3-hover-white">Feed</a><hr />
-            </div>
-
             <div id="community">
                 <h1>Awesome community</h1>
-                <p>In the GR8BRIK community, you can view posts of other and if you login, you can post on the community forums!</p>
-                <a href="/com/" class="w3-btn w3-blue w3-hover-white">Community</a><hr />
+                <p>The GR8BRIK community is a forum of Lego lovers like you that use GR8BRIK and other tools. You can view posts of other and post on there.</p>
+                <a href="/com/" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Community</a><hr />
             </div>
 
             <div id="creations">
                 <h1>Full of builds</h1>
-                <p>On GR8BRIK, you can scroll on for hours looking at people's builds via the creations page.</p>
-                <a href="/list" class="w3-btn w3-blue w3-hover-white">Creations</a><hr />
+                <p>On GR8BRIK you can scroll view others public creation's for free, and download them in the GR8BRIK .gr8 or .json file format.</p>
+                <a href="/list" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Creations</a><hr />
             </div>
 
             <div id="uploads">
-                <h1>Upload your creations</h1>
-                <p>When you login to GR8BRIK; you can upload a model you've created from the Modeler. Once done, you can view it on the feed or creations page.</p>
-                <a href="/acc/index#upload" class="w3-btn w3-blue w3-hover-white">Upload</a><hr />
+                <h1>Fast, quick, easy-to-use, modeler</h1>
+                <p>GR8BRIK's modeler may be one of the best part of our service; where you can model your own creation using Ldraw bricks.</p>
+                <a href="/modeler" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Create</a><hr />
             </div>
-
-    <a 
-        class="twitter-timeline" 
-        href="https://twitter.com/Evan85908317?ref_src=twsrc%5Etfw"
-    >Tweets by Evan85908317</a><script 
-        async 
-        src="https://platform.twitter.com/widgets.js" 
-        charset="utf-8"
-    ></script>
-
-    <iframe 
-        src="https://discord.com/widget?id=1307420772377165884&theme=dark" 
-        width="350" 
-        height="500" 
-        allowtransparency="true" 
-        frameborder="0" 
-        sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
-    ></iframe>
+        </div>
 
 <?php include('linkbar.php'); ?>
 

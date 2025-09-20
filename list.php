@@ -19,7 +19,7 @@
             exit(json_encode(["error" => "unique id missing"]));
         }
 
-        $stmt = $conn2->prepare("SELECT * FROM featured ORDER BY id DESC");
+        $stmt = $conn2->prepare("SELECT model_id FROM featured ORDER BY id DESC");
         $stmt->execute();
         $result = $stmt->get_result();
 
@@ -64,10 +64,12 @@
                         'username' => $truncated_username,
                         'title' => $truncated_name,
                         'views' => $row2['views'],
+                        'likes' => $row2['likes'],
+                        'modelcount' => $i + 1
                     ];
                 }
             }
-            if (++$i == 6) break;
+            if (++$i == 5) break;
         }
 
         echo json_encode($builds);
@@ -168,7 +170,7 @@
         $is_search = false;
 
         $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
-        $offset = ($page - 1) * 10;
+        $offset = ($page - 1) * 12;
 
         if (isset($_COOKIE['token']) && $tokendata->num_rows != 0) {
             $stmt = $conn->prepare('SELECT * FROM follow WHERE userid = ?');
@@ -183,10 +185,10 @@
                     $followed_users[] = $row['profileid'];
                 }
 
-                $sql = 'SELECT * FROM model WHERE user IN (' . implode(',', $followed_users) . ') ORDER BY date DESC LIMIT 10 OFFSET ' .  $offset;
+                $sql = 'SELECT * FROM model WHERE user IN (' . implode(',', $followed_users) . ') ORDER BY date DESC LIMIT 12 OFFSET ' .  $offset;
                 echo '<p>You can get a better feed by following more people. <a href="/users">Users page</a>.</p>';
             } else {
-                $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 10 OFFSET ' .  $offset;
+                $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 12 OFFSET ' .  $offset;
 
                 echo '<h4>You\'re not following anyone</h4>';
                 echo '<p>Start following people to engage with people and get a custom feed.</p>';
@@ -194,7 +196,7 @@
                 echo '<a href="/rules">Rules Page</a>&nbsp;<a href="/terms">Terms and Conditions</a>&nbsp;<a href="/privacy">Privacy Policy</a>';
             }
         } else {
-            $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 10 OFFSET ' .  $offset;
+            $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 12 OFFSET ' .  $offset;
         }
 
         $stmt = $conn2->prepare('SELECT COUNT(*) as count FROM model');
@@ -210,7 +212,7 @@
             $query = isset($_GET['q']) ? trim($_GET['q']) : '';
             $search = "%" . $conn2->real_escape_string(htmlspecialchars($query)) . "%";
 
-            $stmt = $conn2->prepare('SELECT * FROM model WHERE name LIKE ? LIMIT 10 OFFSET ' .  $offset);
+            $stmt = $conn2->prepare('SELECT * FROM model WHERE name LIKE ? LIMIT 12 OFFSET ' .  $offset);
             $stmt->bind_param('s', $search);
             $stmt->execute();
             $result2 = $stmt->get_result();
@@ -220,31 +222,32 @@
 
         if (isset($_GET['sort']) && $_GET['sort']) {
             if ($_GET['sort'] === 'views') {
-                $sql  = 'SELECT * FROM model ORDER BY views DESC LIMIT 10 OFFSET ' .  $offset;
+                $sql  = 'SELECT * FROM model ORDER BY views DESC LIMIT 12 OFFSET ' .  $offset;
                 $sort = 'Most viewed';
             }
             if ($_GET['sort'] === 'likes') {
-                $sql = 'SELECT model.*, COUNT(*) AS vote_count FROM model LEFT JOIN votes ON model.id = votes.creation WHERE model.removed = 0 GROUP BY model.id ORDER BY vote_count DESC LIMIT 10 OFFSET ' .  $offset;
+                //$sql = 'SELECT model.*, COUNT(*) AS vote_count FROM model LEFT JOIN votes ON model.id = votes.creation WHERE model.removed = 0 GROUP BY model.id ORDER BY vote_count DESC LIMIT 12 OFFSET ' .  $offset;
+                $sql  = 'SELECT * FROM model ORDER BY likes DESC LIMIT 12 OFFSET ' .  $offset;
                 $sort = 'Most liked';
             }
             if ($_GET['sort'] === 'az') {
-                $sql  = 'SELECT * FROM model ORDER BY name ASC LIMIT 10 OFFSET ' .  $offset;
+                $sql  = 'SELECT * FROM model ORDER BY name ASC LIMIT 12 OFFSET ' .  $offset;
                 $sort = 'Alphabetical A-Z';
             }
             if ($_GET['sort'] === 'za') {
-                $sql  = 'SELECT * FROM model ORDER BY name DESC LIMIT 10 OFFSET ' .  $offset;
+                $sql  = 'SELECT * FROM model ORDER BY name DESC LIMIT 12 OFFSET ' .  $offset;
                 $sort = 'Alphabetical Z-A';
             }
             if ($_GET['sort'] === 'oldest') {
-                $sql  = 'SELECT * FROM model ORDER BY date ASC LIMIT 10 OFFSET ' .  $offset;
+                $sql  = 'SELECT * FROM model ORDER BY date ASC LIMIT 12 OFFSET ' .  $offset;
                 $sort = 'Oldest creations';
             }
             if ($_GET['sort'] === 'newest') {
-                $sql  = 'SELECT * FROM model ORDER BY date DESC LIMIT 10 OFFSET ' .  $offset;
+                $sql  = 'SELECT * FROM model ORDER BY date DESC LIMIT 12 OFFSET ' .  $offset;
                 $sort = 'Newest creations';
             }
             if ($_GET['sort'] === 'all') {
-                $sql  = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 10 OFFSET ' .  $offset;
+                $sql  = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 12 OFFSET ' .  $offset;
                 $sort = 'All creations';
             }
             if (!empty($sort)) {
@@ -313,6 +316,8 @@
                 <a href='/creation.php?id=<?php echo $row['id'] ?>'><img src='/cre/<?php echo $row['screenshot'] ?>' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow w3-grey'></a>
                 <div class='gr8-theme w3-card-2 w3-light-grey w3-padding-small'><h4><?php echo $truncatedName ?></h4>
                 <span>By <a href='/profile.php?id=<?php echo $row['user'] ?>'><?php echo $username ?></a> on <?php echo date("D, M d, Y", strtotime($row['date'])) ?></span>
+                <br />
+                <span>Viewed <?php echo $row['views'] ?> times, <?php echo $likes['count'] ?> likes</span>
                 </div></div>
 
                 <?php

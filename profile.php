@@ -201,7 +201,7 @@ if(isset($_POST['delete'])) {
     <?php } ?>
 
     <script>
-        const userid = <?php echo $_GET['id'] ?>;
+        const userid = '<?php echo $_GET['id'] ?>';
         $(document).ready(function() {
             function followed() {
                 $.ajax({
@@ -213,13 +213,13 @@ if(isset($_POST['delete'])) {
                         if (response.length > 0) {
                             if (response.length <= 3) {
                                 followedBy = response.map(user => `
-                                    <a href="/user/${user.userid}">
+                                    <a href="/profile?id=${user.userid}">
                                         <img src="/acc/users/pfps/${user.userid}.jpg" width="15px" height="15px" />
                                     ${user.username}</a>`).join(", ");
                             } else {
                                 let first = response.slice(0, 3);
                                 let others = response.length - 3;
-                                followedBy = first.map(user => `<a href="/user/${user.userid}">
+                                followedBy = first.map(user => `<a href="/profile?id=${user.userid}">
                                     <img src="/acc/users/pfps/${user.userid}.jpg" width="15px" height="15px" />
                                 ${user.username}</a>`).join(", ");
                                 followedBy += ` and ${others} others you know`;
@@ -268,9 +268,11 @@ if(isset($_POST['delete'])) {
             <?php } ?>
 
             <span style="font-size:20px;">
-                <span><b id="data-model-count" style="text-decoration: underline dotted;"><?php echo $data['model_count'] ?></b>&nbsp;creations</span>
-                <span><b id="data-follower-count" style="text-decoration: underline dotted;"><?php echo $data['followers'] ?></b>&nbsp;followers</span>
-                <span><b id="data-following-count" style="text-decoration: underline dotted;"><?php echo $data['following'] ?></b>&nbsp;following</span>
+                <span><b id="data-model-count"><?php echo $data['model_count'] ?></b>&nbsp;creations</span>
+                <span><b id="data-follower-count"><?php echo $data['followers'] ?></b>&nbsp;followers</span>
+                <span><b id="data-following-count"><?php echo $data['following'] ?></b>&nbsp;following</span>
+                <span><b id="data-view-count"><?php echo $data['views'] ?></b>&nbsp;views</span>
+                <span><b id="data-like-count"><?php echo $data['likes'] ?></b>&nbsp;likes</span>
             </span>
         </span>
 
@@ -281,16 +283,16 @@ if(isset($_POST['delete'])) {
             <b>-</b>
             <span id="twitter-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">
                 <a id="twitter-link" href="https://twitter.com/<?php echo $data['twitter'] ?>" target="_blank">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-twitter-x" viewBox="0 0 16 16">
+                    <!-- <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-twitter-x" viewBox="0 0 16 16">
                         <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
-                    </svg>
+                    </svg> -->
+                    <i class="fa fa-twitter" aria-hidden="true"></i>
                     <?php echo $data['twitter'] ?>
                 </a>
             </span>
         <?php } ?>
         <b>-</b>
         <span id="followedby-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff"></span><br />
-        <!-- <hr style="border-color: inherit; width: 50%; text-align: left; margin-left: 0;" /> -->
 
         <?php if(loggedin()) { ?>
             <?php if($token['user'] != trim($_GET['id'])) { ?>
@@ -314,7 +316,7 @@ if(isset($_POST['delete'])) {
                             <input id="button-unblock" form="unblockUser" class="w3-bar-item w3-button" type="submit" value="Unblock User" name="unblock">
                         <?php } ?>
 
-                        <?php if($users_row['admin'] != '0') { ?>
+                        <?php if($users_row['admin'] != (int)'0') { ?>
                             <button id="button-ban-user" onclick='document.getElementById("ban").style.display="block"' name="ban" class="w3-bar-item w3-button" />
                                 Ban User
                             </button>
@@ -328,6 +330,8 @@ if(isset($_POST['delete'])) {
                 <form id="followUser" action="" method="post"></form>
                 <form id="unblockUser" action="" method="post"></form>
             </span>
+            <?php } else { ?>
+                <a href="/acc/index.php" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" />Edit Profile</a>&nbsp;
             <?php } ?>
         <?php } ?>
 
@@ -467,21 +471,19 @@ if(isset($_POST['delete'])) {
 			<h3>creations</h3>
 		    <div class="w3-row">
 			<?php
-				$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 
-				if ($conn->connect_error) {
-					die("Connection failed: " . $conn->connect_error);
-				}
-				
+                if ($conn->connect_error) {
+                    die("Connection failed: " . $conn->connect_error);
+                }
+                
                 $profileid = $_GET['id'];
-                $sql = "SELECT * FROM model WHERE user = $profileid ORDER BY date DESC";
-                $result = $conn->query($sql);
+                $stmt = $conn->prepare("SELECT * FROM model WHERE user = ? ORDER BY date DESC");
+                $stmt->bind_param("i", $profileid);
+                $stmt->execute();
+                $result = $stmt->get_result();
 
                 while ($creation = $result->fetch_assoc()) {
-                    /*echo "<div class='w3-display-container w3-left w3-padding-small'>";
-					echo "<a href='/build/" . $creation['id'] . "'><img src='/cre/" . $creation['screenshot'] . "' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-card-2 w3-border'></a>";
-                    echo "<b class='w3-display-middle w3-text-grey'>" . htmlspecialchars($creation['name'], ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401) . "</b></div>";*/
-
                     if (empty($creation['name'])) {
                         $creation['name'] = $data['username'] . "'s creation";
                     }
@@ -493,10 +495,12 @@ if(isset($_POST['delete'])) {
 
                     echo "<div class='w3-display-container w3-left w3-padding'>";
                     echo "<a href='/creation.php?id=" . $creation['id'] . "'><img src='/cre/" . $creation['screenshot'] . "' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
+                    echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
                     echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($creation['date'])) . "</span>";
                     echo "</div></div>";
                 }
+
+                $stmt->close();
                 $conn->close();
             ?>
 			</div>
@@ -522,7 +526,7 @@ if(isset($_POST['delete'])) {
 
                     echo "<div class='w3-display-container w3-left w3-padding'>";
                     echo "<a href='/com/view.php?id=" . $topic['id'] . "'><img src='/img/com.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
+                    echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
                     echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($topic['timestamp'])) . "</span>";
                     echo "</div></div>";
                 }
@@ -560,7 +564,7 @@ if(isset($_POST['delete'])) {
 
                     echo "<div class='w3-display-container w3-left w3-padding'>";
                     echo "<a href='/creation.php?id=" . $comment['model'] . "#comment" . $comment['id'] . "'><img src='/img/creations.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedPost . "</h4>";
+                    echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedPost . "</h4>";
                     echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", (int)$comment['date']) . "</span>";
                     echo "</div></div>";
                 }
@@ -580,7 +584,7 @@ if(isset($_POST['delete'])) {
 
                     echo "<div class='w3-display-container w3-left w3-padding'>";
                     echo "<a href='/com/view.php?id=" . $reply['parent'] . "#reply" . $reply['id'] . "'><img src='/img/com.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 w3-light-grey w3-padding-small'><h4>" . $truncatedPost . "</h4>";
+                    echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedPost . "</h4>";
                     echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($reply['timestamp'])) . "</span>";
                     echo "</div></div>";
                 }
