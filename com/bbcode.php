@@ -42,10 +42,10 @@ class BBCode {
             }
 
             $username = $conn->real_escape_string($match[2]);
-            $matchResult = $conn->query("SELECT * FROM users WHERE username = '$username' LIMIT 1");
+            $matchResult = $conn->query("SELECT id FROM users WHERE username = '$username'");
 
             if ($matchResult && $matchRow = $matchResult->fetch_assoc()) {
-                return "<a href=\"/user/{$matchRow['id']}\"><b>@{$username}</b></a>";
+                return "<a href=\"/profile?id={$matchRow['id']}\"><b>@{$username}</b></a>";
             } else {
                 return "@{$username}";
             }

@@ -43,22 +43,32 @@ if(isset($_POST['comment'])){
 	
 	$comment = $_POST['commentbox'];
 		
-		$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-		if ($conn->connect_error) {
-			die("Connection failed: " . $conn->connect_error);
+		$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+		if ($conn2->connect_error) {
+			die("Connection failed: " . $conn2->connect_error);
 		}
+
+        if($comment === "" || $comment === null) {
+            echo "Message shall contain text.";
+            exit;
+        }
 		
 		$date = date("Y-m-d H:i:s");
         $sql = "INSERT INTO messages (userid, parent, content, timestamp) VALUES (?, ?, ?, ?)";
-        $stmt2 = $conn->prepare($sql);
+        $stmt2 = $conn2->prepare($sql);
         $stmt2->bind_param("iiss", $id, $post_id, $comment, $date);
-        $stmt2->execute();
+
+        if ($stmt2->execute()) {
+            $goto = $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING'];
+            header('Location: ' . $goto);
+        } else {
+            echo "An error has occured. Please try again later.";
+            exit;
+        }
         $stmt2->close();
-        $conn->close();
 
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-        if($users_row['id'] != $userid) {
+        if($id != $userid) {
+            $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
             $time = time();
             $content = $post_id;
             $category = 3;
@@ -71,26 +81,16 @@ if(isset($_POST['comment'])){
 
             $date = time();
             $sql = "SELECT alert FROM users WHERE id = ?";
-            $stmt3 = $conn->prepare($sql);
+            $stmt3 = $conn2->prepare($sql);
             $stmt3->bind_param("i", $userid);
             $stmt3->bind_result($alert);
             $stmt3->execute();
             $stmt3->close();
 
             $alertnum = $alert + 1;
-            $stmt4 = $conn->prepare("UPDATE users SET alert = ? WHERE id = ?");
+            $stmt4 = $conn2->prepare("UPDATE users SET alert = ? WHERE id = ?");
             $stmt4->bind_param("si", $alertnum, $userid);
-
-            if ($stmt->execute()) {
-                $goto = $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING'];
-                header('Location: ' . $goto);
-            } else {
-                echo "<script>alert('An error has occurred')</script>";
-            }
-            $stmt->close();
         }
-        $conn->close();
-	
 }
 
 ?>

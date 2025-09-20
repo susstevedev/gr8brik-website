@@ -67,6 +67,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                     <th>Post</th>
                     <th>Date</th>
                     <th>User</th>
+                    <th>Last post by</th>
                 </tr>
             </thead>
             <tbody>
@@ -111,14 +112,14 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
 			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
 			
-				$sql = "SELECT id, userid, title, content, timestamp
+				$sql = "SELECT id, userid, title, content, timestamp, last_posted
                         FROM messages
                         WHERE (status = 'general' OR status = 'locked') AND parent IS NULL OR parent = 0
                         ORDER BY timestamp DESC
                         LIMIT $limit OFFSET $offset";
 				$stmt = $conn->prepare($sql);
 				$stmt->execute();
-				$stmt->bind_result($id, $post_user, $title, $post, $date);
+				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted);
 				
 				while ($stmt->fetch()) {	
                     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -130,6 +131,18 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                     $stmt2->bind_result($username);
                     $stmt2->fetch();
                     $stmt2->close();
+
+                    if($last_posted != null || $last_posted != 0) {
+                        $sql = "SELECT username FROM users WHERE id = ?";
+                        $stmt2 = $conn2->prepare($sql);
+                        $stmt2->bind_param("i", $last_posted);
+                        $stmt2->execute();
+                        $stmt2->bind_result($last_post_username);
+                        $stmt2->fetch();
+                        $stmt2->close();
+                    } else {
+                        $last_post_username = null;
+                    }
 
                     $conn2->close();
 
@@ -144,8 +157,10 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
                     echo "<tr><td><a href='view.php?id=" . $id . "'><i class='fa fa-users w3-padding-small w3-text-grey' aria-hidden='true' title='General Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                     echo "<td>" . $date . "</td>";
-                    echo "<td><a href='../user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td></tr>";
-                    $username = '';
+                    echo "<td><a href='../profile?id=" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
+                    echo "<td><a href='../profile?id=" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";
+                    $username = null;
+                    $last_post_username = null;
                 }
 
                 define('DB_NAME4', 'if0_36019408_blog');
