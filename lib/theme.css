@@ -58,7 +58,8 @@ input {
 }
 
 .w3-main, .linkbar, .consoleErrorBox {
-    margin-left: 18%;
+    margin-left: 18% !important;
+    -webkit-overflow-scrolling: touch;
 }
 
 .altcha-footer, .altcha-logo {
@@ -166,8 +167,7 @@ img.emoji {
         margin-right: 0px;
         padding: 0px 0px 0px 0px;
     }
-    .pull-to-refresh-loading {
-        width: 15%; 
-        height: 15%;
+    .w3-main, .linkbar, .consoleErrorBox {
+      margin-left: 0px !important;
     }
 }
