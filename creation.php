@@ -33,18 +33,26 @@ if ($_POST['report']) {
     if ($_SESSION['csrf'] === $_POST['csrf_token']) {
         if (isset($_COOKIE['token']) && $tokendata) {
             $id = (int)$token['user'];
-            $report_id = bin2hex(random_bytes(32));
+            $report_id = bin2hex(random_bytes(16));
             $date = date("Y-m-d H:i:s");
-            $model_id = (int) htmlspecialchars($_POST['model_id']);
+            $model_id = (int)htmlspecialchars($_POST['model_id']);
 
-            $reasons = isset($_POST['reason']) ? $_POST['reason'] : [];
+            /*$reasons = isset($_POST['reason']) ? $_POST['reason'] : [];
             $reasons = array_map('htmlspecialchars', $reasons);
             
             if (!empty($_POST['other'])) {
                 $reasons[] = htmlspecialchars($_POST['other']);
             }
 
-            $reasonString = implode(', ', $reasons);
+            $reasonString = implode(', ', $reasons); */
+
+            if (!empty($_POST['other']) || isset($_POST['reason']) && $_POST['reason'] === "something-else") {
+                $reason = htmlspecialchars($_POST['other']);
+            } elseif(isset($_POST['reason'])) {
+                $reason = htmlspecialchars($_POST['reason']);
+            } else {
+                echo json_encode(['error' => 'Oops! No reason selected.']);
+            }
 
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
             if ($conn->connect_error) {
@@ -53,7 +61,7 @@ if ($_POST['report']) {
             }
 
             $stmt = $conn->prepare("INSERT INTO reported (id, build, date, reason, user) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("sissi", $report_id, $model_id, $date, $reasonString, $id);
+            $stmt->bind_param("sissi", $report_id, $model_id, $date, $reason, $id);
 
             if ($stmt->execute()) {
                 echo json_encode(['success' => 'Creation reported! Thanks for making our platform a safe space for everyone!']);
@@ -145,11 +153,12 @@ if ($_POST['delete_model']) {
             <form id="reportForm">
                 <h2>Why do you want to report this creation?</h2>
                 <b>You can only report a creation when it violates our <a href="/rules?src=creation" target="_blank"><i class="fa fa-external-link" aria-hidden="true"></i>rules</a>.</b><br />
-                <input type="checkbox" name="reason[]" value="violent" class="w3-check"> <label>Violent</label><br />
-                <input type="checkbox" name="reason[]" value="misinformation" class="w3-check"> <label>Misinformation</label><br />
-                <input type="checkbox" name="reason[]" value="inappropriate-content" class="w3-check"> <label>Inappropriate content</label><br />
-                <input type="checkbox" name="reason[]" value="harrasing-me" class="w3-check"> <label>Harassing me</label><br />
-                <input type="checkbox" name="reason[]" value="something-else" class="w3-check" id="otherReasonToggle"> <label>Something else</label><br /><br />
+                <input type="checkbox" name="reason" value="violent" class="w3-check"> <label>Violent</label><br />
+                <input type="checkbox" name="reason" value="misinformation" class="w3-check"> <label>Misinformation</label><br />
+                <input type="checkbox" name="reason" value="inappropriate-content" class="w3-check"> <label>Inappropriate content</label><br />
+                <input type="checkbox" name="reason" value="harrasing-me" class="w3-check"> <label>Harassing me</label><br />
+                <input type="checkbox" name="reason" value="spam" class="w3-check"> <label>Spam</label><br />
+                <input type="checkbox" name="reason" value="something-else" class="w3-check" id="otherReasonToggle"> <label>Something else</label><br /><br />
                 
                 <textarea class="w3-input w3-card-2 w3-hover-shadow w3-mobile w3-round w3-hide" name="other" id="otherReason" placeholder="Explain more..." rows="4"></textarea><br />
 
@@ -248,7 +257,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let embed_class = "w3-border w3-border-black w3-round w3-card-2 w3-hover-shadow";
         let embed_model = "<?php echo urlencode($_GET['id']) ?>";
 
-        $("#data-model-embed").html(`<iframe id="data-model-embed" src="/new-viewer.html?model=${embed_model}&t=<?php echo md5(time()) ?>" style="${embed_style}" class="${embed_class}">`);
+        $("#data-model-embed").html(`<iframe id="data-model-embed" src="/viewer.html?model=${embed_model}&t=<?php echo md5(time()) ?>" style="${embed_style}" class="${embed_class}">`);
 
         $("#otherReasonToggle").change(function() {
             $("#otherReason").toggleClass("w3-hide", !this.checked);
@@ -456,14 +465,16 @@ document.addEventListener("DOMContentLoaded", function () {
     <header>
         <h2 id="data-name"><?php echo $data['name'] ?></h2>
         <h4 id="data-stats">
-            <i class="fa fa-clock-o" aria-hidden="true"></i>Posted&nbsp;<?php echo time_ago($data['date']) ?><br />
+            <i class="fa fa-clock-o" aria-hidden="true"></i>Posted&nbsp;<span title="<?php echo $data['date'] ?>"><?php echo time_ago($data['date']) ?></span><br />
             <i class="fa fa-user-o" aria-hidden="true"></i>By
-                <?php if($data['model_admin'] === '1') { ?>
-                <a id="data-user-link" class="w3-text-red w3-hover-text-yellow" href="/profile?id=<?php echo $data['userid'] ?>"><?php echo $data['username'] ?>
+            	<?php if($data['userid'] === 0) { ?>
+            		<span id="data-user-link"><?php echo $data['username'] ?></span>
+                <?php } elseif($data['model_admin'] === '1') { ?>
+                	<a id="data-user-link" class="w3-text-red w3-hover-text-yellow" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?></a>
                 <?php } else { ?>
-                <a id="data-user-link" href="/profile?id=<?php echo $data['userid'] ?>"><?php echo $data['username'] ?>
+                	<a id="data-user-link" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?></a>
                 <?php } ?>
-            </a><br />
+            <br />
             <i class="fa fa-arrow-circle-o-up" aria-hidden="true"></i><?php echo $data['likes'] ?>&nbsp;likes<br />
             <i class="fa fa-eye" aria-hidden="true"></i><?php echo $data['views'] ?>&nbsp;views<br />
         </h4>
@@ -493,13 +504,11 @@ document.addEventListener("DOMContentLoaded", function () {
     <?php if($loggedin === true) { ?>
         <?php if ($data['voted'] === true) { ?>
             <div class="tooltip" id="data-unlike-creation">
-                <!-- &nbsp;<input form="downvote" class="w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange" type="submit" value="Unlike" name="downvote">&nbsp; -->
                 <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Remove your vote from this creation</span>
                 &nbsp;<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-down"></span>Unlike</button>&nbsp;
             </div>
         <?php } else { ?>
             <div class="tooltip" id="data-like-creation">
-                <!-- &nbsp;<input form="upvote" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Like" name="upvote">&nbsp; -->
                 <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Vote on this creation and support the creator</span>
                 &nbsp;<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>Like</button>&nbsp;
             </div>
@@ -561,30 +570,24 @@ document.addEventListener("DOMContentLoaded", function () {
         <?php } ?>
         <div id="comment<?php echo $comment['id'] ?>" class="w3-row w3-margin-bottom">
             <div class="w3-col" style="width: 50px;">
-                <!---<div class='w3-dropdown-hover w3-bar-block' style="background-color: transparent;">
-                    <a href="/user/<?php echo $comment['userid'] ?>" class="w3-bar-item">
-                        <img class="w3-card-2 w3-hover-shadow w3-light-grey w3-circle" width="50px" height="50px" src="/acc/users/pfps/<?php echo $comment['userid'] ?>.jpg">
-                    </a>
-                    <div class='gr8-theme w3-light-grey w3-card-2 w3-padding w3-round w3-dropdown-content'>
-                        <img class="w3-card-2 w3-circle" width="50px" height="50px" src="/acc/users/pfps/<?php echo $comment['userid'] ?>.jpg"><br />
-                        <b class="<?php echo $comment['user_admin'] === '1' ? 'w3-text-red' : '' ?>"><?php echo $comment['username'] ?></b><br />
-                        <span><?php echo $comment['user_about'] ?></span>
-                    </div>
-                </div> -->
-                <img class="w3-bar-item w3-circle w3-card-2 w3-border-blue w3-light-grey" width="50px" height="50px" src="/acc/users/pfps/<?php echo $comment['userid'] ?>.jpg">
+                <img class="w3-bar-item w3-circle w3-card-2" width="50px" height="50px" src="/acc/users/pfps/<?php echo $comment['userid'] ?>.jpg">
             </div>
             <div class="w3-hide-small w3-col w3-margin" style="width: 1px;">
-                <i class="w3-large w3-text-white fa fa-play fa-rotate-180" xstyle="font-size: 15px;"></i>
+                <i class="w3-large w3-text-white gr8-theme fa fa-play fa-rotate-180" xstyle="font-size: 15px;"></i>
             </div>
             <div class="w3-col w3-card-2 w3-hover-shadow" style="width: 75%;">
                 <article class="gr8-theme w3-light-grey w3-padding" style="min-height: 75px;">
                     <header class="w3-padding-bottom">
+                        <?php if($comment['userid'] != 0) { ?>
                         <b>
                             <a href="/user/<?php echo $comment['userid'] ?>" 
                                class="<?php echo $comment['user_admin'] === '1' ? 'w3-text-red w3-hover-text-yellow' : '' ?>">
                                 <?php echo $comment['username'] ?>
                             </a>
                         </b>
+                        <?php } else { ?>
+                        	<b title="User has either deleted their account or are banned"><?php echo $comment['username'] ?></b>
+                        <?php } ?>
                         <span class="w3-mobile w3-right">
                             <time datetime="<?php echo $comment['date'] ?>"><?php echo $comment['date'] ?></time> -
                             <span id="votes"><?php echo $comment['votes'] ?> votes</span>

@@ -2,3 +2,6 @@
 
 User-agent: *
 Disallow: 
+Disallow: /acc/users/
+Disallow: /ajax/
+Sitemap: sitemap2.php

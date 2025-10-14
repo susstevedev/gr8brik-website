@@ -1,6 +1,7 @@
 <?php
     require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
     require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+	require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/filesize.php';
 
     if (isset($_GET['featured'])) {
         header('Content-type: application/json');
@@ -13,11 +14,12 @@
             exit("fail  " . $conn->connect_error . " / " . $conn2->connect_error);
         }
 
-        $unique = filter_input(INPUT_GET, 'unique', FILTER_SANITIZE_STRING);
+        /*$unique = filter_input(INPUT_GET, 'unique', FILTER_SANITIZE_STRING);
         if (!$unique) {
             header('HTTP/1.0 403 Forbidden');
             exit(json_encode(["error" => "unique id missing"]));
         }
+        */
 
         $stmt = $conn2->prepare("SELECT model_id FROM featured ORDER BY id DESC");
         $stmt->execute();
@@ -31,6 +33,7 @@
         $builds = [];
 
         while ($row = $result->fetch_assoc()) {
+            $build_count = $result->num_rows;
             $model_id = $row['model_id'];
 
             $stmt = $conn2->prepare("SELECT * FROM model WHERE id = ?");
@@ -64,15 +67,71 @@
                         'username' => $truncated_username,
                         'title' => $truncated_name,
                         'views' => $row2['views'],
-                        'likes' => $row2['likes'],
-                        'modelcount' => $i + 1
+                        'likes' => $row2['likes']
                     ];
                 }
             }
             if (++$i == 5) break;
         }
 
-        echo json_encode($builds);
+        echo json_encode(['build_count' => $build_count, 'builds' => $builds]);
+        exit;
+    }
+
+    if (isset($_GET['feature_v2'])) {
+        header('Content-type: application/json');
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+
+        if ($conn->connect_error || $conn2->connect_error) {
+            header('HTTP/1.0 500 Internal Server Error');
+            exit("Could not connect to database");
+        }
+
+
+            $stmt = $conn2->prepare("SELECT * FROM model WHERE feature = 1 ORDER BY date DESC LIMIT 5");
+            $stmt->execute();
+            $result2 = $stmt->get_result();
+            $build_count = $result2->num_rows;
+            $builds = [];
+      
+            while ($row2 = $result2->fetch_assoc()) {
+              
+                $truncated_name = substr($row2['name'], 0, 30);
+                if (strlen($row2['name']) >= 30) {
+                    $truncated_name .= "...";
+                }
+                
+                $userid = $row2['user'];
+
+                $stmt2 = $conn->prepare("SELECT * FROM users WHERE id = ?");
+                $stmt2->bind_param("s", $userid);
+                $stmt2->execute();
+                $result3 = $stmt2->get_result();
+
+                if ($result3 && $user = $result3->fetch_assoc()) {
+                    $truncated_username = substr($user['username'], 0, 15);
+                    if (strlen($user['username']) >= 15) {
+                        $truncated_username .= "...";
+                    }
+
+                    $builds[] = [
+                        'model_id' => $row2['id'],
+                        'user' => $user['id'],
+                        'username' => $truncated_username,
+                        'title' => $truncated_name,
+                        'views' => $row2['views'],
+                        'likes' => $row2['likes']
+                    ];
+                }
+        }
+
+        echo json_encode([
+          'fetched_at_int' => $_SERVER['REQUEST_TIME'], 
+          'fetched_at_str' => date("Y-m-d H:i:s", $_SERVER['REQUEST_TIME']), 
+          'build_count' => $build_count, 
+          'builds' => $builds
+        ]);
         exit;
     }
 
@@ -152,15 +211,16 @@
             <label for="sort"><span>Sort by&nbsp;</span></label>
             <select name="sort" id="sort">
                 <option selected>Following</option>
-                <option value="all">All creations</option>
+                <option value="feature">Featured</option>
+                <option value="all">All</option>
                 <option value="views">Most viewed</option>
                 <option value="likes">Most liked</option>
                 <option value="az">Alphabetical A-Z</option>
                 <option value="za">Alphabetical Z-A</option>
-                <option value="oldest">Oldest creations</option>
-                <option value="newest">Newest creations</option>
+                <option value="oldest">Oldest</option>
+                <option value="newest">Newest</option>
             </select>
-            <input class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Apply Filters">
+            <input class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo" type="submit" value="Apply Filters">
         </form><br />
         
         <?php
@@ -186,25 +246,34 @@
                 }
 
                 $sql = 'SELECT * FROM model WHERE user IN (' . implode(',', $followed_users) . ') ORDER BY date DESC LIMIT 12 OFFSET ' .  $offset;
+              
+              if (
+                isset($_GET['sort']) 
+                && $_GET['sort'] === "Following" 
+                || empty($_GET['sort']) 
+                && empty($_GET['q'])
+              ) {
                 echo '<p>You can get a better feed by following more people. <a href="/users">Users page</a>.</p>';
+              }
+              
             } else {
                 $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 12 OFFSET ' .  $offset;
 
                 echo '<h4>You\'re not following anyone</h4>';
-                echo '<p>Start following people to engage with people and get a custom feed.</p>';
-                echo '<a href="/users" class="w3-btn w3-large w3-white w3-hover-blue">Users Page</a><br /><b>Or...</b><br />';
+                echo '<p>Start following people to engage with more people and get a custom feed.</p>';
+                echo '<a href="/users" class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo">Users Page</a><br /><b>Or...</b><br />';
                 echo '<a href="/rules">Rules Page</a>&nbsp;<a href="/terms">Terms and Conditions</a>&nbsp;<a href="/privacy">Privacy Policy</a>';
             }
         } else {
             $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 12 OFFSET ' .  $offset;
         }
 
-        $stmt = $conn2->prepare('SELECT COUNT(*) as count FROM model');
+        /*$stmt = $conn2->prepare('SELECT COUNT(*) as count FROM model');
         $stmt->execute();
         $model_count_sql = $stmt->get_result();
 
         $model_count = $model_count_sql->fetch_assoc();
-        echo '<h4><i class="fa fa-info-circle w3-padding-small" aria-hidden="true"></i>' . $model_count['count'] . ' total creations</h4>';
+        echo '<h4><i class="fa fa-info-circle w3-padding-small" aria-hidden="true"></i>' . $model_count['count'] . ' total creations</h4>'; */
 
         if (isset($_GET['q']) && $_GET['q']) {
             $is_search = true;
@@ -212,8 +281,8 @@
             $query = isset($_GET['q']) ? trim($_GET['q']) : '';
             $search = "%" . $conn2->real_escape_string(htmlspecialchars($query)) . "%";
 
-            $stmt = $conn2->prepare('SELECT * FROM model WHERE name LIKE ? LIMIT 12 OFFSET ' .  $offset);
-            $stmt->bind_param('s', $search);
+            $stmt = $conn2->prepare('SELECT * FROM model WHERE (name LIKE ? OR description LIKE ?) LIMIT 12 OFFSET ' .  $offset);
+            $stmt->bind_param('ss', $search, $search);
             $stmt->execute();
             $result2 = $stmt->get_result();
 
@@ -221,6 +290,10 @@
         }
 
         if (isset($_GET['sort']) && $_GET['sort']) {
+            if ($_GET['sort'] === 'feature') {
+                $sql  = 'SELECT * FROM model WHERE feature = 1 ORDER BY date DESC LIMIT 12 OFFSET ' .  $offset;
+                $sort = 'Featured creations';
+            }
             if ($_GET['sort'] === 'views') {
                 $sql  = 'SELECT * FROM model ORDER BY views DESC LIMIT 12 OFFSET ' .  $offset;
                 $sort = 'Most viewed';
@@ -251,7 +324,7 @@
                 $sort = 'All creations';
             }
             if (!empty($sort)) {
-                echo '<p>Sorting by <b>' . $sort . '</b></p><br />';
+                echo '<p>Sorting by <b>' . $sort . '</b></p>';
             }
         }
 
@@ -263,8 +336,12 @@
         
         // if there is some creations found from the query
         if ($result2->num_rows > 0) {
+          
+            echo '<h4><i class="fa fa-info-circle w3-padding-small" aria-hidden="true"></i>' . $result2->num_rows . ' total creations</h4>';
+          
             echo "<table class='w3-table-all' style='color:black;'>";
             while ($row = $result2->fetch_assoc()) {
+              
                 $model_id = $row['id'];
                 $userid = $row['user'];
 
@@ -272,6 +349,7 @@
                     Fetch users, like count, and bans
                     We also check if those are invalid
                 */
+              
                 $stmt = $conn->prepare('SELECT * FROM users WHERE id = ?');
                 $stmt->bind_param('i', $userid);
                 $stmt->execute();
@@ -279,11 +357,13 @@
                 $user = $result3->fetch_assoc();
                 $username = isset($user['username']) ? $user['username'] : '';
 
+                /*
                 $stmt = $conn2->prepare('SELECT COUNT(*) as count FROM votes WHERE creation = ?');
                 $stmt->bind_param('i', $model_id);
                 $stmt->execute();
                 $result4 = $stmt->get_result();
                 $likes = $result4->fetch_assoc();
+                */
 
                 $stmt = $conn->prepare('SELECT * FROM bans WHERE user = ?');
                 $stmt->bind_param('i', $userid);
@@ -313,11 +393,11 @@
                 ?>
 
                 <div class='w3-display-container w3-left w3-padding'>
-                <a href='/creation.php?id=<?php echo $row['id'] ?>'><img src='/cre/<?php echo $row['screenshot'] ?>' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow w3-grey'></a>
+                <a href='/build/<?php echo $row['id'] ?>'><img src='<?php echo $row['screenshot'] ?>' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow w3-grey'></a>
                 <div class='gr8-theme w3-card-2 w3-light-grey w3-padding-small'><h4><?php echo $truncatedName ?></h4>
-                <span>By <a href='/profile.php?id=<?php echo $row['user'] ?>'><?php echo $username ?></a> on <?php echo date("D, M d, Y", strtotime($row['date'])) ?></span>
+                <span>By <a href='/user/<?php echo $row['user'] ?>'><?php echo $username ?></a> on <?php echo date("D, M d, Y", strtotime($row['date'])) ?></span>
                 <br />
-                <span>Viewed <?php echo $row['views'] ?> times, <?php echo $likes['count'] ?> likes</span>
+                <span>Viewed <?php echo $row['views'] ?> times, <?php echo $row['likes'] ?> likes, <?php echo size_unit($row['size']) ?></span>
                 </div></div>
 
                 <?php

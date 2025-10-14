@@ -18,14 +18,24 @@ if ($data === null) {
     exit('An unknown error occured');
 }
 
-if($data['message'] != "OK") {
+if($data['message'] != null | !empty($data['message'])) {
     $error = $data['message'];
     $data['username'] = 'User';
 }
 
 if (isset($_POST['follow'])) {
-    $profile_id = $_GET['id'];
+    if(!isset($token['user'])) {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "Please login to follow this user.";
+    }
+
+    $profile_id = (int)$_GET['id'];
     $time = time();
+
+    if((int)$token['user'] === $profile_id) {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "You cannot follow yourself.";
+    }
 
     $sql_follow = "INSERT INTO follow (userid, profileid, date) VALUES (?, ?, ?)";
     $stmt_follow = $conn->prepare($sql_follow);
@@ -69,12 +79,23 @@ if (isset($_POST['follow'])) {
         $message = "Followed this user with success!";
     } else {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "An error has happened while following this user.";
+        $error = "An error occured while following this user.";
     }
 }
 
 if(isset($_POST['unfollow'])) {
-    $profile_id = $_GET['id'];
+    if(!isset($token['user'])) {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "Please login to follow this user.";
+    }
+
+    $profile_id = (int)$_GET['id'];
+
+    if((int)$token['user'] === $profile_id) {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "You cannot follow yourself.";
+    }
+
     $sql = "DELETE FROM follow WHERE userid = '$userid' AND profileid = '$profile_id'";
     $result = $conn->query($sql);
     if ($result) {
@@ -82,13 +103,23 @@ if(isset($_POST['unfollow'])) {
         $message = "Unfollowed this user with success!";
     } else {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "An error has happened while unfollowing this user.";
+        $error = "An error occured while unfollowing this user.";
     }
 }
 
 if (isset($_POST['block'])) {
-    $profile_id = $_GET['id'];
+    if(!isset($token['user'])) {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "Please login to follow this user.";
+    }
+
+    $profile_id = (int)$_GET['id'];
     $time = time();
+
+    if((int)$token['user'] === $profile_id) {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "You cannot follow yourself.";
+    }
 
     $sql_block = "INSERT INTO user_blocks (userid, profileid, date) VALUES (?, ?, ?)";
     $stmt_block = $conn->prepare($sql_block);
@@ -106,7 +137,18 @@ if (isset($_POST['block'])) {
 }
 
 if(isset($_POST['unblock'])) {
-    $profile_id = $_GET['id'];
+    if(!isset($token['user'])) {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "Please login to follow this user.";
+    }
+
+    $profile_id = (int)$_GET['id'];
+
+    if((int)$token['user'] === $profile_id) {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "You cannot follow yourself.";
+    }
+
     $sql = "DELETE FROM user_blocks WHERE userid = '$userid' AND profileid = '$profile_id'";
     $result = $conn->query($sql);
     if ($result) {
@@ -202,19 +244,21 @@ if(isset($_POST['delete'])) {
 
     <script>
         const userid = '<?php echo $_GET['id'] ?>';
+                               
         $(document).ready(function() {
             function followed() {
                 $.ajax({
                     url: "/ajax/profile",
                     method: "GET",
-                    data: { follow: userid },
+                    //data: { follow: userid },
+                    data: { followed_by: userid },
                     success: function(response) {
                         let followedBy = "";
                         if (response.length > 0) {
                             if (response.length <= 3) {
                                 followedBy = response.map(user => `
-                                    <a href="/profile?id=${user.userid}">
-                                        <img src="/acc/users/pfps/${user.userid}.jpg" width="15px" height="15px" />
+                                    <a href="${user.url}">
+                                        <img src="${user.pfp}" width="15px" height="15px" />
                                     ${user.username}</a>`).join(", ");
                             } else {
                                 let first = response.slice(0, 3);
