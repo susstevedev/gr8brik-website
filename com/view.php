@@ -177,8 +177,13 @@ if(isset($_POST['comment'])){
             $userResult = $stmt2->get_result();
             $userRow = $userResult->fetch_assoc();
 
-            $c_username = htmlspecialchars($userRow['username']);
-            $isAdmin = $userRow['admin'] === 1 ? "color: red;" : "";
+            if($userRow) {
+            	$c_username = htmlspecialchars($userRow['username']);
+            	$isAdmin = $userRow['admin'] === 1 ? "color: red;" : "";
+            } else {
+                $c_username = "[deleted]";
+                $isAdmin = false;
+            }
 
             $user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user'");
             $user_post_count_row = $user_post_count_result->fetch_assoc();
