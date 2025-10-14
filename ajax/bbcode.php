@@ -2,7 +2,7 @@
 /**
  * BBCode to HTML converter
  *
- * Created by Kai Mallea (kmallea@gmail.com), modified by susstevedev (evanrutledge226@gmail.com) for Gr8brik.rf.gd
+ * Created by Kai Mallea (kmallea@gmail.com), modified by susstevedev (mail@gr8brik.rf.gd) for Gr8brik.rf.gd
  *
  * Licensed under the MIT license: http://www.opensource.org/licenses/mit-license.php
  */
@@ -42,10 +42,10 @@ class BBCode {
             }
 
             $username = $conn->real_escape_string($match[2]);
-            $matchResult = $conn->query("SELECT * FROM users WHERE username = '$username' LIMIT 1");
+            $matchResult = $conn->query("SELECT id FROM users WHERE username = '$username'");
 
             if ($matchResult && $matchRow = $matchResult->fetch_assoc()) {
-                return "<a href=\"/user/{$matchRow['id']}\"><b>@{$username}</b></a>";
+                return "<a class=\"gr8-username-embed\" href=\"/user/{$matchRow['id']}\"><b>@{$username}</b></a>";
             } else {
                 return "@{$username}";
             }
@@ -112,8 +112,7 @@ class BBCode {
 
     // Replace [url]...[/url] with <a href="...">...</a>
     $this->bbcode_table["/\[url\](.*?)\[\/url\]/is"] = function ($match) {
-        $url = "http://go.gr8brik.rf.gd/index.php?uri=" . base64_encode($match[1]) . "&ref=gr8brik.webapp";
-      return "<a href=\"$url\" target=\"_blank\">$match[1]</a>"; 
+      return "<a href=\"$match[1]\" target=\"_blank\">$match[1]</a>"; 
     };
 
     

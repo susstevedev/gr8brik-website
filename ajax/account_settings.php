@@ -357,14 +357,32 @@ if (isset($_POST['deactive_account'])) {
     }
 }
 
-if (isset($_POST['delete_account'])) {
+if(isset($_GET['export_acc_row'])) {
+    if(loggedin()) {
+        $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->bind_param("i", $_SESSION['userid']);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if($result->num_rows != 0) {
+            $export = $result->fetch_assoc();
+            echo json_encode($export);
+            exit;
+        }
+    } else {
+        echo null;
+        exit;
+    }
+}
+
+/* if (isset($_POST['delete_account'])) {
     header('Content-Type: application/json');
     header("HTTP/1.0 500 Internal Server Error");
 
     echo json_encode(['error' => 'To delete your account, please email us at ' . DB_MAIL]);
     exit;
 
-    /*$id = $token['user'];
+    $id = $token['user'];
     if(!$id) {
         header("HTTP/1.0 500 Internal Server Error");
         echo json_encode(['error' => 'Error fetching userid. It may be plausible you were logged out from our systems or the session API is down.']);
@@ -434,7 +452,7 @@ if (isset($_POST['delete_account'])) {
         $stmt_appeals->execute();
         $stmt_appeals->close();
 
-        $extensions = ['jpg', 'png', 'jpeg', 'webp'];
+        $extensions = ['jpg', 'png', 'jpeg', 'webp', 'gif'];
         foreach ($extensions as $ext) {
             $file = "../acc/users/pfps/$id.$ext";
             if (file_exists($file)) {
@@ -473,8 +491,8 @@ if (isset($_POST['delete_account'])) {
     }
     $conn->close();
     $conn2->close();
-    exit; */
-}
+    exit;
+} */
 echo json_encode($response);
 exit;
 ?>

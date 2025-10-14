@@ -2,24 +2,39 @@
 error_reporting(0);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/filesize.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
 $bbcode = new BBCode;
 
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-if(isset($_GET['size'])) {
+if(isset($_GET['storage'])) {
     header('Content-Type: application/json');
 
     if(!isset($_GET['user'])) {
         if (!isset($token['user'])) {
             header("HTTP/1.1 401 Unauthorized");
-            echo json_encode(['error' => "Please login to view this data."]);
+            echo json_encode(['success' => false, 'message' => 'Please login to view this data.']);
             exit;
         }
         $user = $token['user'];
+        $name_user = $users_row['username'];
     } else {
         $user = (int)$_GET['user'];
+        
+        $query = "SELECT username FROM users WHERE id = ? AND deactive IS NULL";
+        $stmt = $conn2->prepare($query);
+        $stmt->bind_param("i", $user);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if($result->num_rows > 0) {
+        	$name_user = $result->fetch_assoc()['username'] ?? '[deleted]';
+        } else {
+            header("HTTP/1.1 404 Not Found");
+            echo json_encode(['success' => false, 'message' => '404 not found']);
+            exit;
+        }
     }
 
     $stmt = $conn->prepare("SELECT SUM(size) as total_used FROM model WHERE user = ?");
@@ -29,7 +44,7 @@ if(isset($_GET['size'])) {
     $total = $result->fetch_assoc()['total_used'] ?? 0;
     $stmt->close();
 
-    echo json_encode(['success' => true, 't' => time(), 'total' => (int)$total]);
+    echo json_encode(['success' => true, 'user' => $name_user, 't' => time(), 'total' => (int)$total]);
     exit;
 }
 
@@ -40,7 +55,7 @@ if (isset($_POST['save_build'])) {
 
     if (empty($modelJson)) {
         header("HTTP/1.1 400 Bad Request");
-        echo json_encode(['error' => "No model data received."]);
+        echo json_encode(['error' => "Request is empty."]);
         exit;
     }
 
@@ -100,7 +115,7 @@ if (isset($_POST['save_build'])) {
     
     if (($total + $db_file_size) > MODEL_STORAGE_LIMIT) {
         header("HTTP/1.0 413 Payload Too Large");
-        echo json_encode(['error' => "Storage limit was reached. Please delete older creations to save new ones."]);
+        echo json_encode(['error' => "Storage limit of " . size_unit(MODEL_STORAGE_LIMIT) . " was reached. Please delete older creations to save new ones."]);
         exit;
     }
 
@@ -288,13 +303,13 @@ function fetch_build($model_id, $csrf) {
 
     $userid = $row2['user'];
     $model = $row2['model'];
-    $description = $row2['description'];
     $name = $row2['name'];
     $date = $row2['date'];
     $screenshot = $row2['screenshot'];
     $views = $row2['views'];
+    $votes = $row2['likes'];
     $isRemoved = $row2['removed'];
-    $decoded_description = htmlentities($description, ENT_QUOTES, 'UTF-8');
+    $decoded_description = $bbcode->toHTML(nl2br($row2['description']));
        
     if ($conn2->connect_error) {
         exit($conn2->connect_error);
@@ -312,13 +327,15 @@ function fetch_build($model_id, $csrf) {
     $result = $conn2->query($sql);
     $row = $result->fetch_assoc();
 
-    if ($result->num_rows < 0) {
-        $username = "[deleted]";
+    if (!empty($row['deactive'])) {
+        $username = $row['username'];
         $userid = 0;
-    } else {
+    } elseif($result->num_rows > 0 || !empty($row['username'])) {
         $username = $row['username'];
         $model_admin = $row['admin'];
-        $model_verified = $row['verified'];
+	} else {
+        $username = "[deleted]";
+        $userid = 0;
     }
     
     $result3 = $conn2->query("SELECT * FROM bans WHERE user = $userid");
@@ -328,14 +345,11 @@ function fetch_build($model_id, $csrf) {
         if ($result3->num_rows > 0 && $row3['end_date'] >= time()) {
             header('HTTP/1.0 500 Internal Server Error');
             return json_encode([
-                "message" => 'Creation could not load as the account that made it has been suspended',
+                "message" => 'Creation could not load as the account that made it has been banned',
                 "error" => 'ACC_BANNED'
             ]);
         }
     }
-
-    $count_result = $conn->query("SELECT COUNT(*) as vote_count FROM votes WHERE creation = $model_id");
-    $count_row = $count_result->fetch_assoc();
 
     if(isset($token['user'])) {
         $id = $token['user'];
@@ -351,6 +365,7 @@ function fetch_build($model_id, $csrf) {
             header("HTTP/1.0 403 Forbidden");
             return json_encode([
                 "message" => htmlspecialchars($row['username']) . " has blocked you.",
+                "error" => 'ACC_BLOCKING'
             ]);
         }
 
@@ -380,19 +395,17 @@ function fetch_build($model_id, $csrf) {
         'userid' => $userid, 
         'modelid' => $model_id, 
         'model' => $row2['model'], 
-        'description' => $row2['description'], 
+        'description' => $decoded_description, 
         'name' => $row2['name'], 
         'date' => $row2['date'], 
         'screenshot' => $row2['screenshot'], 
         'views' => $views, 
         'isRemoved' => $row2['removed'], 
         'voted' => $voted, 
-        'likes' => $count_row['vote_count'], 
-        'decoded_description' => htmlentities($description, ENT_QUOTES, 'UTF-8'), 
+        'likes' => $votes, 
+        'decoded_description' => $decoded_description,
         'username' => $username, 
         'model_admin' => $row['admin'], 
-        'model_verified' => $row['verified'], 
-        'myUserId' => $token['user'] ?: false, 
         'message' => $message
     ];
     return json_encode($data);
@@ -527,7 +540,7 @@ function fetch_comments($model_id, $csrf) {
         }
         
         $c_user = $row['user'];
-        $userResult = $conn2->query("SELECT * FROM users WHERE id = $c_user");
+        $userResult = $conn2->query("SELECT * FROM users WHERE id = '$c_user'");
         $userRow = $userResult->fetch_assoc();
 
         $banResult = $conn2->query("SELECT * FROM bans WHERE user = '$c_user' LIMIT 1");
@@ -556,12 +569,11 @@ function fetch_comments($model_id, $csrf) {
 
         $username = $userRow['username'];
 
-        if ($banResult->num_rows > 0 && $banRow['end_date'] >= time()) {
-            $username = "[deleted]";
+        if (!empty($userRow['deactive']) || $banResult->num_rows > 0 && $banRow['end_date'] >= time()) {
             $c_user = 0;
         }
 
-        if (!empty($userRow['deactive'] || $userResult->num_rows < 0)) {
+        if ($userResult->num_rows === 0 || empty($userRow['id'])) {
             $username = "[deleted]";
             $c_user = 0;
         }

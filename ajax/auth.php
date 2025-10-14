@@ -146,7 +146,15 @@ function login_user($user, $pwd) {
             // Create login session
             $sql = "INSERT INTO sessions (id, login_from, user, password, timestamp) VALUES ('$tokenid', '$login_from', '$userid', '$db_hashed_pwd', '$time') LIMIT 1";
             if (mysqli_query($conn, $sql)) {
-                setcookie('token', $tokenid, $time + (10 * 365 * 24 * 60 * 60), "/", ".gr8brik.rf.gd");
+                //setcookie('token', $tokenid, $time + (10 * 365 * 24 * 60 * 60), "/", ".gr8brik.rf.gd");
+                setcookie('token', $tokenid, [
+                    'expires' => $time + (60 * 60 * 24 * 400),
+                    'path' => '/',
+                    'domain' => '.gr8brik.rf.gd',
+                    'secure' => false,
+                    'httponly' => true,
+                    'samesite' => 'Lax'
+                ]);
                 $_SESSION['userid'] = $userid;
                 return ['success' => true];
             }
@@ -284,7 +292,15 @@ function register_user($username, $password, $email) {
             // Create session token
             $sql = "INSERT INTO sessions (id, login_from, user, password, timestamp) VALUES ('$tokenid', '$login_from', '$userid', '$password', '$time') LIMIT 1";
             if (mysqli_query($conn, $sql)) {
-                setcookie('token', $tokenid, $time + (60 * 60 * 24 * 400), "/", ".gr8brik.rf.gd");
+                //setcookie('token', $tokenid, $time + (60 * 60 * 24 * 400), "/", ".gr8brik.rf.gd");
+                setcookie('token', $tokenid, [
+                    'expires' => $time + (60 * 60 * 24 * 400),
+                    'path' => '/',
+                    'domain' => '.gr8brik.rf.gd',
+                    'secure' => false,
+                    'httponly' => true,
+                    'samesite' => 'Lax'
+                ]);
                 $_SESSION['userid'] = $userid;
                 return ['success' => true];
             }

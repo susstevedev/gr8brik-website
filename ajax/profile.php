@@ -1,14 +1,14 @@
 <?php
-//error_reporting(0);
+error_reporting(0);
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 $bbcode = new BBCode;
 
-if(isset($_GET['follow'])) {
+if(isset($_GET['followed_by'])) {
     header('Content-Type: application/json');
     if(isset($_COOKIE['token']) && $tokendata->num_rows != 0) {
-        $profile_id = $_GET['follow'];
+        $profile_id = $_GET['followed_by'];
 
         $stmt1 = $conn->prepare("SELECT userid FROM follow WHERE profileid = ?");
         $stmt1->bind_param("s", $profile_id);
@@ -79,8 +79,11 @@ if(isset($_GET['follow'])) {
 
                         if ($result3->num_rows > 0) {
                             $followed_by[] = array(
-                                'username' => htmlspecialchars($r3['username']),
+                                'url' => '/user/' . $userid,
+                                'url_legacy' => '/user/' . htmlspecialchars($r3['username']),
                                 'userid' => $userid, 
+                                'pfp' => '/acc/users/pfps/' . $userid . '.jpg',
+                                'username' => htmlspecialchars($r3['username']),
                                 'random' => uniqid()
                             );
                         }
@@ -196,7 +199,7 @@ function user_blocks($profileid, $userid, $username) {
 
 function fetch_profile($profile_id, $csrf) {
     global $token, $users_row;
-    $userid = $token['user'];
+    $userid = $token['user'] ?? null;
 
     require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
     $bbcode = new BBCode();
@@ -211,7 +214,8 @@ function fetch_profile($profile_id, $csrf) {
     if (empty($profile_id) || $profile_id === null) {
         header("HTTP/1.0 403 Forbidden");
         return json_encode([
-            "message" => 'No user ID provided!'        
+            "message" => 'No user ID provided!',
+            "error" => 'USR_ID_NUL'
         ]);
     }
 
@@ -284,14 +288,15 @@ function fetch_profile($profile_id, $csrf) {
         header("HTTP/1.0 403 Forbidden");
         return json_encode([
             "message" => htmlspecialchars($row['username']) . " has blocked you.",
-            "error" => 'ACC_BLOCKED_LOGIN_USER'
+            "error" => 'ACC_BLOCKED_USR'
         ]);
     }
     
     if (!loggedin()) {
         header("HTTP/1.0 403 Forbidden");
         return json_encode([
-            "message" => "Sign in to view " . htmlspecialchars($row['username']) . "'s creations, posts, and comments."        
+            "message" => "Sign in to view " . htmlspecialchars($row['username']) . "'s creations, posts, and comments.",
+            "error" => 'USR_SESS_NUL'
         ]);
     }
 
@@ -352,7 +357,7 @@ function fetch_profile($profile_id, $csrf) {
         header("HTTP/1.0 200 OK");
     }
 
-    $message = "OK";
+    $message = null;
     $data = [
         'userid' => $row['id'],
         'username' => htmlspecialchars($row['username']),
@@ -360,6 +365,7 @@ function fetch_profile($profile_id, $csrf) {
         'verified' => (string)$row['verified'],
         'description' => isset($row['description']) ? $bbcode->toHTML($row['description']) : '', 
         'twitter' => htmlspecialchars($row['twitter']),
+        'bsky' => htmlspecialchars($row['bsky']),
         'age' => htmlspecialchars($row['age']),
         'model_count' => htmlspecialchars($model_count),
         'followers' => htmlspecialchars($followers),
