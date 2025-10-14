@@ -247,7 +247,7 @@
         span.title = part.name;
 				span.setAttribute("value", part.file);
 				span.innerHTML = `
-					<img src="https://library.ldraw.org/images/library/official/parts/${part.file.split(".")[0]}.png" loading="lazy" width="45px" />
+					<img src="https://library.ldraw.org/media/ldraw/official/parts/${part.file.split(".")[0]}.png?${Date.now()}" loading="lazy" width="45px" />
 					<br />
 					<small class="part-list-number">${part.file.split(".")[0]}</small>
 					&nbsp;
