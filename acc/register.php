@@ -126,14 +126,14 @@ $combinedString = $randomWord1 . $randomWord2 . $randomNumber;
                     s.appendChild(o);
                 }
                 </script> -->
-        <br />
-        <p>By registering you are agreeing:</p>
+        <p>By registering, you are agreeing:</p>
         <ul>
             <li>To our <a href="/terms.php">Terms and Conditions</a></li> 
             <li>To our <a href="/privacy.php">Privacy Policy</a></li>
-            <li>You are at least 13 years old</li>
+            <li>That you are at least 13 years old</li>
+            <li>You do not live in the UK, the state of Wyoming or Mississippi</li>
         </ul>
-        <br /><button class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" id="loginBtn" name="login">Create Account</button>
+        <br /><button class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo" id="loginBtn" name="login">Create Account</button>
         
     </div>
     <?php include '../linkbar.php' ?>

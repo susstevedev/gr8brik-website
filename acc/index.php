@@ -1,11 +1,43 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
-if(isset($_GET['reactive'])) {
+/* if(isset($_GET['reactive'])) {
     $token = $_GET['token'];
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     $tokendata = $conn->query("SELECT * FROM sessions WHERE id = '$token' LIMIT 1");
+    $tokenrow = $tokendata->fetch_assoc();
+    $user = (int)$tokenrow['user'];
+    
+    $stmt_2 = $conn->prepare("UPDATE users SET deactive = NULL WHERE id = ? LIMIT 1");
+    $stmt_2->bind_param("i", $user);
+    if ($stmt_2->execute()) {
+        setcookie('token', $token, time() + (10 * 365 * 24 * 60 * 60), "/");
+        header('Location: index.php');
+        exit;
+    }
+} */
+
+if(isset($_POST['deactive'])) {
+    $id = $conn->real_escape_string($token['user']);
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    $date = date("Y-m-d");
+    
+    $stmt_2 = $conn->prepare("UPDATE users SET deactive = ? WHERE id = ? LIMIT 1");
+    $stmt_2->bind_param("si", $date, $id);
+    if ($stmt_2->execute()) {
+        logout();
+    }
+}
+
+if(isset($_GET['reactive'])) {
+    $token = $conn->real_escape_string($_GET['token']);
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+    $stmt = $conn->prepare("SELECT * FROM sessions WHERE id = ? LIMIT 1");
+    $stmt->bind_param("s", $token);
+    $stmt->execute();
+    $tokendata = $stmt->get_result();
     $tokenrow = $tokendata->fetch_assoc();
     $user = (int)$tokenrow['user'];
     
@@ -351,17 +383,6 @@ if(isset($_POST['e_change'])){
             }
             $stmt->close();
 }
-if(isset($_POST['deactive'])) {
-    $id = $conn->real_escape_string($token['user']);
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $date = date("Y-m-d");
-    
-    $stmt_2 = $conn->prepare("UPDATE users SET deactive = ? WHERE id = ? LIMIT 1");
-    $stmt_2->bind_param("si", $date, $id);
-    if ($stmt_2->execute()) {
-        logout();
-    }
-}
 ?>
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
@@ -519,6 +540,47 @@ if(isset($_POST['deactive'])) {
                 error: function(jqXHR, textStatus, errorThrown) {
                     if (jqXHR.status === 403) {
                         appCrash('403', 'Invalid login');
+                    } else if (jqXHR.status === 500) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        $(".error").show();
+                        $(".error").text(response.error);
+                    } else {
+                        console.error("AJAX Error:", textStatus, errorThrown);
+                        alert("An error occurred. Please try again later.");
+                    }
+                }
+            });
+        });
+        
+         $("#export_data").click(function(event) {
+            event.preventDefault();
+
+            var token = $.cookie('token');
+
+            $.ajax({
+                url: "../ajax/account_settings",
+                method: "GET",
+                data: { export_acc_row: true, token: token },
+                success: function(response) {
+                    $(".success").show();
+                    $(".success").text("Exporting to JSON file soon. Please do not close this window.");
+                    
+                    const blob = new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    const date = new Date();
+                    
+                    a.href = url;
+                    a.download = `export-${response.username}-${date}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                },
+
+                error: function(jqXHR, textStatus, errorThrown) {
+                    if (jqXHR.status === 403) {
+                        appCrash('403', 'Invalid login');
                     }else if (jqXHR.status === 500) {
                         var response = JSON.parse(jqXHR.responseText);
                         $(".error").show();
@@ -640,6 +702,8 @@ if(isset($_POST['deactive'])) {
     <a class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" href="login.php?status=logout">Logout</a>
 
     <h2>Danger zone</h2>
+    
+    <button id="export_data" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink">Export account row</button>
     
     <div class="tooltip">
     <button onclick="document.getElementById('deactive').style.display='block'" name='deactive' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink' />Deactivate Account</button>

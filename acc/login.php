@@ -2,7 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
 if(isset($_GET['status']) && $_GET['status'] === 'logout') {
-    $tokenid = $_COOKIE['token'];
+    $tokenid = htmlspecialchars($_COOKIE['token']);
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     $conn->query("DELETE FROM sessions WHERE id = '$tokenid'");
@@ -102,7 +102,7 @@ isLoggedin();
         </div>
     </div>
 
-    <div id="error" style="display: none;" class="w3-red w3-card-2 w3-padding-tiny"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span>&nbsp;<span id="error-text"></span></div>
+    <div id="error" style="display: none;" class="w3-red w3-card-2 w3-padding w3-round"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span>&nbsp;<span id="error-text"></span></div>
     <div id="welcome-large">
         <h2>Login</h2>
     </div>
@@ -121,7 +121,7 @@ isLoggedin();
         <input class="w3-input w3-border" type="email" name="mail" placeholder="Email or username"><br />
         <input class="w3-input w3-border" type="password" name="pwd" placeholder="Password"><br />
         <span><small>Your session will be remembered, so you don't need to re-login everytime you visit our services.</small></span><br />
-        <button class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" id="loginBtn" name="login">Login</button>
+        <button class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo" id="loginBtn" name="login">Login</button>
     </div>
     <?php include '../linkbar.php' ?>
 </body>

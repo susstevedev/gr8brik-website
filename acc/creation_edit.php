@@ -1,9 +1,34 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-isLoggedIn();
-
-define('DB_NAME2', 'if0_36019408_creations');
+if(!loggedin()) {
+    header('Location:../index.php');
+    exit;
+}
 $model_id = $_GET['id'];
+$user_id = $token['user'];
+
+if (isset($_POST['edit'])) {
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+    if ($conn->connect_error) {
+        exit($conn->connect_error);
+    }
+
+    $name = htmlspecialchars($_POST['name']);
+    $about = htmlspecialchars($_POST['about']);
+
+    $stmt = $conn->prepare("UPDATE model SET name = ?, description = ? WHERE id = ? AND user = ?");
+    $stmt->bind_param("ssii", $name, $about, $model_id, $user_id);
+    $result = $stmt->execute();
+
+    if ($result) {
+        header('Location: ../creation.php?id=' . $model_id);
+        exit;
+    } else {
+        echo $conn->error;
+        exit;
+    }
+    $stmt->close();
+}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -23,36 +48,37 @@ $model_id = $_GET['id'];
             <?php
                 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
                 
-                $sql = "SELECT * FROM model WHERE id = $model_id";
-                $result = $conn->query($sql);
+                $sql = "SELECT * FROM model WHERE id = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param('i', $model_id);
+                $stmt->execute();
+                $result = $stmt->get_result();
                 $row = $result->fetch_assoc();
                 $error = false;
 
                 if($result->num_rows === 0) {
-                    echo "<h4>Error: Invalid creation ID.</h4>";
+                    echo "<h4>Creation not found.</h4>";
                     $error = true;
                 }
 
-                if($row['user'] != $id) {
-                    echo "<h4>Error: Invalid login match with creation creator.</h4>";
+                if(isset($row['user']) && $row['user'] != $user_id) {
+                    echo "<h4>You cannot edit a creation that you did not create.</h4>";
                     $error = true;
                 }
-
-                /*$stmt = $conn->prepare($sql);
-                $stmt->bind_param("s", $model_id);
-                $stmt->execute();
-                $stmt->bind_result($model_id, $model_user, $model, $model_name, $model_screenshot);*/
             
                 if($error === false) {
-                    echo "<img src='../cre/" . $row['screenshot'] . "' width='320' height='240' loading='lazy' class='w3-hover-shadow w3-border w3-round w3-right'>";
-                    echo "<div class='w3-border w3-border-black w3-round'>";
-                    echo "<b>Edit " . $row['name'] . "</b><br />";
-                    echo "<p>Name:<input type='text' value='" . $row['name'] . "'></p>";
-                    echo "<p>Description:<textarea value='" . $row['description'] . "' rows='2' cols='80'>" . $row['description'] . "</textarea></p>";
-                    echo "<p><input type='submit' class='w3-btn' value='Please try again later' disabled></p>";
-                    echo "</div>";
+                    ?>
+                    <form method='post' action=''>
+                    <img src='<?php echo $row['screenshot'] ?>' width='250' loading='lazy' class='w3-hover-shadow w3-border w3-round w3-right'>
+                    <div class='w3-border w3-border-black w3-padding-large w3-round'>
+                    <b>Edit <?php echo $row['name'] ?: $row['model'] ?></b><br />
+                    <p>Name:<textarea name='name' value='<?php echo $row['name'] ?: 'Title' ?>' rows='1' cols='80'><?php echo $row['name'] ?: 'Title' ?></textarea></p>
+                    <p>Description:<textarea name='about' value='<?php echo $row['description'] ?: 'Description' ?>' rows='2' cols='80'><?php echo $row['description'] ?: 'Description' ?></textarea></p>
+                    <p><input type='submit' name='edit' class='w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo' value='Submit'></p>
+                   	</div></form>
+            		<?php
                 } else {
-                    echo "<b>Failed to load creation due to errors.</b>";
+                    echo "<b>Failed to load creation.</b>";
                 }
             
             ?>

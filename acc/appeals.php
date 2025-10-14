@@ -1,10 +1,12 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
-isLoggedIn();
+if(!loggedin()) {
+    header('Location: login.php');
+}
 
-if(isset($_SESSION['username'])){
-    if($admin != '1'){
+if(isset($token['user'])) {
+    if($users_row['admin'] != '1'){
         header('Location: index.php');
     }
 }
@@ -77,10 +79,10 @@ if(isset($_POST['accept'])) {
                     $username = htmlspecialchars($row['username']) ?: "Unknown User";
                     $query2->free_result();
 
-                    echo "<article class='w3-card-2 w3-light-grey w3-padding-small'>";
+                    echo "<article class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>";
                     echo "<header><img src='/ajax/pfp?method=image&id=" . base64_encode($user) . "' id='pfp' style='border-radius: 50%;'><br />";
-                    echo "<h4><a href='/user/" . $user . "'>" . htmlspecialchars($username) . "</a></h4></header>";
-                    echo "<b>" . $reason . "</b><br />";
+                    echo "<h3><a href='/user/" . $user . "'>" . htmlspecialchars($username) . "</a></h3></header>";
+                    echo "<h4>" . $reason . "</h4>";
                     echo "<b>Appeal valid until " . date('F j, Y, g:i a', (int)$date) . " (" . time_ago(date('Y-m-d H:i:s', (int)$date)) . ").</b>";
                     echo "<form method='post' action='appeals.php?user=" . $user . "&name=" . $username . "'>";
                     echo "<input type='submit' value='Keep user banned' name='deny' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>&nbsp;";
