@@ -244,6 +244,7 @@ if(isset($_POST['delete'])) {
 
     <script>
         const userid = '<?php echo $_GET['id'] ?>';
+        const bsky = '<?php echo $data['bsky'] ?>';
                                
         $(document).ready(function() {
             function followed() {
@@ -263,8 +264,8 @@ if(isset($_POST['delete'])) {
                             } else {
                                 let first = response.slice(0, 3);
                                 let others = response.length - 3;
-                                followedBy = first.map(user => `<a href="/profile?id=${user.userid}">
-                                    <img src="/acc/users/pfps/${user.userid}.jpg" width="15px" height="15px" />
+                                followedBy = first.map(user => `<a href="${user.url}">
+                                    <img src="${user.pfp}" width="15px" height="15px" />
                                 ${user.username}</a>`).join(", ");
                                 followedBy += ` and ${others} others you know`;
                             }
@@ -285,9 +286,39 @@ if(isset($_POST['delete'])) {
                 });
             }
             window.followed = followed();
+            
+            function bsky_fetch() {
+                    var token = $.cookie('token');
+
+                    $.ajax({
+                        url: `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${bsky}`,
+                        method: "GET",
+                        success: function(response) {
+                            console.log(response.handle);
+                            $("#bsky-link").append(response.handle);
+                            var link = $("#bsky-link").attr("href");
+                            link = link + response.handle;
+                            $("#bsky-link").attr("href", link);
+                        },
+
+                        error: function(jqXHR, textStatus, errorThrown) {
+                            if (jqXHR.status === 403) {
+                                console.log('Not authed');
+                            } else if (jqXHR.status === 500) {
+                                var response = JSON.parse(jqXHR.responseText);
+                                console.log(response);
+                            } else {
+                                console.error("AJAX Error: " + textStatus, errorThrown);
+                            }
+                        }
+                    });
+            }
+            window.bsky_fetch = bsky_fetch();
         });
+        
         document.addEventListener("DOMContentLoaded", function() {
             followed();
+            bsky_fetch();
         });
     </script>
 
@@ -299,7 +330,7 @@ if(isset($_POST['delete'])) {
     <?php } ?>
         
         <span style="font-size: 30px; display: inline-block; vertical-align: top; max-width: 100%;">
-            <img id="picture" style="width: 50px; height: 50px; border-radius: 50px;" src="/acc/users/pfps/<?php echo htmlspecialchars($_GET['id']) ?>.jpg" />
+            <img id="picture" style="width: 50px; height: 50px; border-radius: 50px;" src="<?php echo $data['picture'] ?>" />
 
             <?php if(!empty($data['admin'])) { ?>
                 <span id="username" class="w3-text-red"><?php echo $data['username'] ?></span>
@@ -323,6 +354,7 @@ if(isset($_POST['delete'])) {
         <pre id="description"><?php echo $data['description'] ?></pre>
 
         <span id="joined-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">Registered <?php echo time_ago($data['age']) ?></span>
+        
         <?php if(!empty($data['twitter'])) { ?>
             <b>-</b>
             <span id="twitter-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">
@@ -335,6 +367,19 @@ if(isset($_POST['delete'])) {
                 </a>
             </span>
         <?php } ?>
+        
+        <?php if(!empty($data['bsky'])) { ?>
+            <b>-</b>
+            <span id="bsky-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">
+                <a id="bsky-link" href="https://bsky.app/profile/" target="_blank">
+                    <svg style="width: 16px; height: 16px; fill: #fff;" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <title>Bluesky</title>
+                        <path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364.136-.02.275-.039.415-.056-.138.022-.276.04-.415.056-3.912.58-7.387 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a8.741 8.741 0 0 1-.415-.056c.14.017.279.036.415.056 2.67.297 5.568-.628 6.383-3.364.246-.828.624-5.79.624-6.478 0-.69-.139-1.861-.902-2.206-.659-.298-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8Z"></path>
+                    </svg>
+                </a>
+            </span>
+        <?php } ?>
+        
         <b>-</b>
         <span id="followedby-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff"></span><br />
 
@@ -343,10 +388,10 @@ if(isset($_POST['delete'])) {
             <span id="action-buttons">
                 <?php if($data['isFollowing'] === true) { ?>
                     <button onclick='document.getElementById("unfollow").style.display="block"' name="unfollow" class="button-unfollow w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />
-                        Unfollow User
+                        Unfollow
                     </button>&nbsp;
                 <?php } elseif($data['isFollowing'] === false) { ?>
-                    <input id="button-follow" form="followUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Follow User" name="follow">&nbsp;
+                    <input id="button-follow" form="followUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Follow" name="follow">&nbsp;
                 <?php } ?>
 
                 <div class="w3-dropdown-hover">
@@ -365,7 +410,7 @@ if(isset($_POST['delete'])) {
                                 Ban User
                             </button>
                             <button id="button-delete-user" onclick='document.getElementById("delete").style.display="block"' name="delete" class="w3-bar-item w3-button" />
-                                Delete User
+                                Deactivate Profile
                             </button>
                         <?php } ?>
                     </div>
@@ -375,7 +420,7 @@ if(isset($_POST['delete'])) {
                 <form id="unblockUser" action="" method="post"></form>
             </span>
             <?php } else { ?>
-                <a href="/acc/index.php" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" />Edit Profile</a>&nbsp;
+                <a href="/acc/index" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" />Edit Profile</a>&nbsp;
             <?php } ?>
         <?php } ?>
 
@@ -512,7 +557,7 @@ if(isset($_POST['delete'])) {
 
     <span id="data-user-actions">
 	    <a href="#creations" id="creations"></a>
-			<h3>creations</h3>
+			<h3>Creations</h3>
 		    <div class="w3-row">
 			<?php
                 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
@@ -538,9 +583,9 @@ if(isset($_POST['delete'])) {
                     }
 
                     echo "<div class='w3-display-container w3-left w3-padding'>";
-                    echo "<a href='/creation.php?id=" . $creation['id'] . "'><img src='/cre/" . $creation['screenshot'] . "' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
+                    echo "<a href='/build/" . $creation['id'] . "'><img src='" . $creation['screenshot'] . "' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
                     echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
-                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($creation['date'])) . "</span>";
+                    echo "<span>By <a href='/user/" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($creation['date'])) . "</span>";
                     echo "</div></div>";
                 }
 
@@ -550,7 +595,7 @@ if(isset($_POST['delete'])) {
 			</div>
 			<hr />
 			<a href="#posts" id="posts"></a>
-				<h3>posts</h3>
+				<h3>Posts</h3>
 				<div class="w3-row">
 			<?php
 				$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
@@ -581,7 +626,7 @@ if(isset($_POST['delete'])) {
 			<hr />
 		<a href="#comments" id="comments"></a>
             <div class="w3-row">
-			<h3>comments</h3>
+			<h3>Comments</h3>
             <?php
                 $conn1 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
                 $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);

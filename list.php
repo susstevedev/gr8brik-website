@@ -375,9 +375,9 @@
                     $row['name'] = $username . "'s creation";
                 }
 
-                if ($result3->num_rows <= 0 || $banResult->num_rows > 0 && $banRow['end_date'] >= time()) {
+                /*if ($result3->num_rows <= 0 || $banResult->num_rows > 0 && $banRow['end_date'] >= time()) {
                     continue;
-                }
+                }*/
 
                 $truncatedName = substr($row['name'], 0, 30);
                 if (strlen($row['name']) >= 30) {

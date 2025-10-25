@@ -326,8 +326,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 method: "POST",
                 data: { upvote: true, model_id: embed_model },
                 success: function(response) {
-                    console.log(response.success);
-                    btn.replaceWith(`<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-down"></span>Unlike</button>`);
+                    if(response.success) {
+                    	console.log(response.success);
+                    	btn.replaceWith(`<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-down"></span>Unlike</button>`);
+                    } else if(response.error) {
+                        alert(response.error);
+                    }
                 },
                 error: (jqXHR, textStatus, errorThrown) => {
                     console.error("error:", textStatus, errorThrown, jqXHR);
@@ -346,8 +350,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 method: "POST",
                 data: { downvote: true, model_id: embed_model },
                 success: function(response) {
-                    console.log(response.success);
-                    btn.replaceWith(`<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>Like</button>`);
+                    if(response.success) {
+                        console.log(response.success);
+                        btn.replaceWith(`<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>Like</button>`);
+                    } else if(response.error) {
+                        alert(response.error);
+                    }
                 },
                 error: (jqXHR, textStatus, errorThrown) => {
                     console.error("error:", textStatus, errorThrown, jqXHR);
@@ -481,7 +489,7 @@ document.addEventListener("DOMContentLoaded", function () {
     </header>
 
     <figure class="data-model-screenshot" style="margin: 20px !important;">
-        <p><img id="data-model-screenshot" src="/cre/<?php echo $data['screenshot'] ?>" style="width:50vw;height:50vh;border:1px solid;border-radius:15%;display:none;" loading='lazy'></p>
+        <p><img id="data-model-screenshot" src="<?php echo $data['screenshot'] ?>" style="width:50vw;height:50vh;border:1px solid;border-radius:15%;display:none;" loading='lazy'></p>
         <p id="data-model-embed">Your browser failed to load the viewer. Please make sure you didn't stop the page from loading, Javascript is enabled, and your browser is up-to-date.</p>
         <figcaption class="gr8-theme w3-card-2 w3-hover-shadow w3-light-grey w3-padding w3-large w3-round">
         <?php if(!empty($data['description'])) { ?>
@@ -496,8 +504,8 @@ document.addEventListener("DOMContentLoaded", function () {
             <button onclick="dropdown()" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Download...</button>
         </div>
         <div id="gr8-dropdown" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
-            <a id="data-build-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="/cre/<?php echo $data['model'] ?>" download="<?php echo htmlspecialchars($data['name']) ?>.json">creation</a>
-            <a id="data-screenshot-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="/cre/<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?>.png">screenshot</a>
+            <a id="data-build-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['model'] ?>" download="<?php echo htmlspecialchars($data['name']) ?>.gr8">creation</a>
+            <a id="data-screenshot-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?>.png">screenshot</a>
         </div>
     </div>
 
@@ -570,7 +578,7 @@ document.addEventListener("DOMContentLoaded", function () {
         <?php } ?>
         <div id="comment<?php echo $comment['id'] ?>" class="w3-row w3-margin-bottom">
             <div class="w3-col" style="width: 50px;">
-                <img class="w3-bar-item w3-circle w3-card-2" width="50px" height="50px" src="/acc/users/pfps/<?php echo $comment['userid'] ?>.jpg">
+                <img class="w3-bar-item w3-circle w3-card-2" width="50px" height="50px" src="<?php echo $comment['picture'] ?>">
             </div>
             <div class="w3-hide-small w3-col w3-margin" style="width: 1px;">
                 <i class="w3-large w3-text-white gr8-theme fa fa-play fa-rotate-180" xstyle="font-size: 15px;"></i>
@@ -586,8 +594,9 @@ document.addEventListener("DOMContentLoaded", function () {
                             </a>
                         </b>
                         <?php } else { ?>
-                        	<b title="User has either deleted their account or are banned"><?php echo $comment['username'] ?></b>
+                        	<b title="User has either deleted their account or has been banned"><?php echo $comment['username'] ?></b>
                         <?php } ?>
+                        <b><?php echo $comment['is_op'] ? 'OP' : '' ?></b>
                         <span class="w3-mobile w3-right">
                             <time datetime="<?php echo $comment['date'] ?>"><?php echo $comment['date'] ?></time> -
                             <span id="votes"><?php echo $comment['votes'] ?> votes</span>
@@ -597,7 +606,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         <?php echo $comment['comment'] ?>
                     </span><br />
 
-                    <?php if ($loggedin === true) { ?>
+                    <?php if (loggedin()) { ?>
                         <?php if ($comment['voted'] === false) { ?>
                             <div class="tooltip">
                                 <span class="w3-tag w3-round w3-blue tooltiptext">
@@ -613,8 +622,6 @@ document.addEventListener("DOMContentLoaded", function () {
                                 <button data-id="<?php echo $comment['id'] ?>" class="downvote-btn fa fa-arrow-down w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"></button>
                             </div>
                         <?php } ?>
-                    <?php } else { ?>
-                        <span><b>Please login to upvote.</b></span>
                     <?php } ?>
                 </article>
             </div>
