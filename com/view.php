@@ -135,7 +135,7 @@ if(isset($_POST['comment'])){
     }
 
     $username = htmlspecialchars($row['username']);
-    $isAdmin = $row['admin'] === '1' ? "color: red;" : "";
+    $isAdmin = $row['admin'] === '1' ? "w3-red" : "";
 
     echo "<div class='gr8-theme w3-container w3-light-grey w3-card-4'>";
     echo "<h2>" . $title . "</h2>";
@@ -147,12 +147,12 @@ if(isset($_POST['comment'])){
     $post_count = $post_count_row['reply_count'];
 
     echo '<div class="w3-row" style="display:flex;width:100%;">';
-    echo '<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny w3-margin-right" style="flex-shrink: 1; width: 20%;">';
-    echo '<img id="pfp" src="/acc/users/pfps/' . $userid . '.jpg">';
-    echo '<br /><a href="../user/' . $userid . '"><span style="text-overflow: ellipsis; ' . $isAdmin . '">' . $username . '</span></a>';
+    echo '<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-margin-right" style="flex-shrink: 1; width: 20%;">';
+    echo '<img id="pfp" src="' . $row['picture'] . '">';
+    echo '<br /><a href="../user/' . $userid . '"><span class="' . $isAdmin . '" style="text-overflow: ellipsis;">' . $username . '</span></a>';
     echo '<br /><time title="' . $date . '" datetime="' . $date . '">Posted ' . time_ago($date) . '</time>';
     echo '<br /><span>' . $post_count . ' total posts</span></div>';
-    echo '<span class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny" style="flex-shrink: 1; width: 80%;"><pre>';
+    echo '<span class="gr8-theme w3-card-2 w3-light-grey w3-padding-small" style="flex-shrink: 1; width: 80%;"><pre>';
     echo $bbcode->toHTML($decoded_post) . '</pre></span></div><br /><hr />';
 
     $sql = "SELECT * FROM messages WHERE parent = $post_id ORDER BY timestamp ASC LIMIT $limit OFFSET $offset";
@@ -179,10 +179,12 @@ if(isset($_POST['comment'])){
 
             if($userRow) {
             	$c_username = htmlspecialchars($userRow['username']);
-            	$isAdmin = $userRow['admin'] === 1 ? "color: red;" : "";
+            	$isAdmin = $userRow['admin'] === 1 ? "w3-red" : "";
+                $pfp = $userRow['picture'] ?: '/img/no_image.png';
             } else {
                 $c_username = "[deleted]";
-                $isAdmin = false;
+                $isAdmin = "";
+                $pfp = '/img/no_image.png';
             }
 
             $user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user'");
@@ -190,12 +192,12 @@ if(isset($_POST['comment'])){
             $user_post_count = $user_post_count_row['reply_count'];
 
             echo '<div class="w3-row" style="display:flex;width:100%;">';
-            echo '<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny w3-margin-right" style="flex-shrink: 1; width: 20%;">';
-            echo '<img id="pfp" src="/acc/users/pfps/' . $c_user . '.jpg">';
-            echo '<br /><a href="../user/' . $c_user . '"><span style="text-overflow: ellipsis; ' . $isAdmin . '">' . $c_username . '</span></a>';
+            echo '<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-margin-right" style="flex-shrink: 1; width: 20%;">';
+            echo '<img id="pfp" src="' . $pfp . '">';
+            echo '<br /><a href="../user/' . $c_user . '"><span class="' . $isAdmin . '" style="text-overflow: ellipsis;">' . $c_username . '</span></a>';
             echo '<br /><time title="' . $c_date . '" datetime="' . $c_date . '">Posted ' . time_ago($c_date) . '</time>';
             echo '<br /><span>' . $user_post_count . ' total posts</span></div>';
-            echo '<span class="gr8-theme w3-card-2 w3-light-grey w3-padding-tiny" style="flex-shrink: 1; width:80%;"><pre>';
+            echo '<span class="gr8-theme w3-card-2 w3-light-grey w3-padding-small" style="flex-shrink: 1; width:80%;"><pre>';
             echo $bbcode->toHTML($decoded_comment) . '</pre></span></div><br />';
         }
 
