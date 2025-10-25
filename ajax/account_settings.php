@@ -121,13 +121,34 @@ function twitter_change($new) {
 	$stmt_2 = $conn->prepare("UPDATE users SET twitter = ? WHERE id = ?");
     $stmt_2->bind_param("ss", $new, $id);
     if ($stmt_2->execute()) {
-        return ['success' => 'Your profile has been updated with the new Twitter account.', 'code' => '403', 'version' => 'NEW'];
+        return ['success' => 'Your profile has been updated with the new Twitter account.', 'code' => '200', 'version' => 'NEW'];
+    }
+}
+
+function bsky_change($new) {
+    global $users_row;
+    $id = (int)$users_row['id'];
+
+	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+	$stmt_2 = $conn->prepare("UPDATE users SET bsky = ? WHERE id = ?");
+    $stmt_2->bind_param("ss", $new, $id);
+    if ($stmt_2->execute()) {
+        return ['success' => 'Your profile has been updated with the new Bluesky account.', 'code' => '200', 'version' => 'NEW'];
     }
 }
 
 if(isset($_GET['twitter_change'])) {
     $handle = urldecode(htmlspecialchars($_GET['handle']));
     $result = twitter_change($handle);
+    header("HTTP/1.0 200 OK");
+    echo json_encode($result);
+    exit;
+}
+
+if(isset($_GET['bsky_change'])) {
+    $handle = urldecode(htmlspecialchars($_GET['handle']));
+    $result = bsky_change($handle);
     header("HTTP/1.0 200 OK");
     echo json_encode($result);
     exit;

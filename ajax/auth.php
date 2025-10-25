@@ -5,7 +5,7 @@
 */
 
 header('Content-type: application/json');
-error_reporting(0);
+//error_reporting(0);
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
 if (isset($_GET['revoke']) && isset($_GET['tokenId'])) {
@@ -202,6 +202,8 @@ function register_user($username, $password, $email) {
             return ['error' => "Username field is blank"];
         }
     }
+    
+    $picture = 'https://profile.accounts.firefox.com/v1/avatar/' . substr($username, 0, 1);
 
     if(strlen($password) > 255) {
         header("HTTP/1.0 400 Bad Request");
@@ -217,32 +219,6 @@ function register_user($username, $password, $email) {
 
     // Prevents re-registration for banned or deactivated accounts
     // Allow list replaced with not allowed list to avoid some issues with school emails
-
-    /*$allowed_domains = array(
-        'gmail.com', 
-        'hotmail.com', 
-        'outlook.com', 
-        'live.com', 
-        'msn.com', 
-        'live.co.uk', 
-        'yahoo.com', 
-        'yahoo.co.uk', 
-        'yahoo.ca', 
-        'proton.me', 
-        'protonmail.com', 
-        'pm.me', 
-        'protonmail.ch', 
-        'apple.com', 
-        'icloud.com', 
-        'me.com', 
-        'gmx.net', 
-        'gmx.com', 
-        'mail.com', 
-        'zoho.com', 
-        'tutanota.com', 
-        'gr8brik.infinityfreeapp.com',
-        'gr8brik.rf.gd'
-    );*/
 
     $nonallowed_domains = array(
         'mailinator.com',
@@ -280,7 +256,7 @@ function register_user($username, $password, $email) {
         header("HTTP/1.0 400 Bad Request");
         return ['error' => "Username or email already in use"];
     } else {
-        $sql = "INSERT INTO users (username, password, salt, email, age, verify_token) VALUES ('$username', '$password', '$salt', '$email', '$created', '$tokenid') LIMIT 1";
+        $sql = "INSERT INTO users (username, password, salt, email, age, picture, verify_token) VALUES ('$username', '$password', '$salt', '$email', '$created', '$picture', '$tokenid') LIMIT 1";
         if (mysqli_query($conn, $sql)) {
             $sql = "SELECT id FROM users WHERE username = '$username'";
             $result = mysqli_query($conn, $sql);

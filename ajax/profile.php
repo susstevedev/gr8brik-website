@@ -82,7 +82,8 @@ if(isset($_GET['followed_by'])) {
                                 'url' => '/user/' . $userid,
                                 'url_legacy' => '/user/' . htmlspecialchars($r3['username']),
                                 'userid' => $userid, 
-                                'pfp' => '/acc/users/pfps/' . $userid . '.jpg',
+                                'pfp_legacy' => '/acc/users/pfps/' . $userid . '.jpg',
+                                'pfp' => $r3['picture'],
                                 'username' => htmlspecialchars($r3['username']),
                                 'random' => uniqid()
                             );
@@ -264,18 +265,12 @@ function fetch_profile($profile_id, $csrf) {
             ]);
         }
     }
-
-    $blockedUser = false;
-    $sql = "SELECT * FROM user_blocks WHERE userid = ? AND profileid = ? LIMIT 1";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ii", $id, $profile_id);
+    
+    $stmt = $conn->prepare("SELECT COUNT(*) as blocking FROM user_blocks WHERE userid = ? AND profileid = ?");
+    $stmt->bind_param("ii", $_SESSION['userid'], $profile_id);
     $stmt->execute();
-    $result3 = $stmt->get_result();
+    $is_blocking = $stmt->get_result()->fetch_assoc()['blocking'];
     $stmt->close();
-
-    if ($result3->num_rows > 0) {
-        $blockedUser = true;
-    }
 
     $sql = "SELECT * FROM user_blocks WHERE userid = ? AND profileid = ? LIMIT 1";
     $stmt = $conn->prepare($sql);
@@ -303,12 +298,6 @@ function fetch_profile($profile_id, $csrf) {
     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
     if ($conn2->connect_error) {
         exit($conn2->connect_error);
-    }
-
-    if(file_exists("../acc/users/banners/" . $profile_id . "..jpg")) {
-        $hasBanner = 1;
-    } else {
-        $hasBanner = 0;
     }
 
     $stmt = $conn2->prepare("SELECT COUNT(*) as all_models FROM model WHERE user = ?");
@@ -340,17 +329,11 @@ function fetch_profile($profile_id, $csrf) {
     $stmt->execute();
     $following = $stmt->get_result()->fetch_assoc()['following'];
     $stmt->close();
-
-    $stmt = $conn->prepare("SELECT * FROM follow WHERE userid = ? AND profileid = ?");
-    $stmt->bind_param("ss", $userid, $profile_id);
-    $stmt->execute();
-    $result3 = $stmt->get_result();
     
-    if($result3->num_rows === 0 || !$result3) {
-        $isFollowing = false;
-    } else {
-        $isFollowing = true;
-    }
+    $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ? AND profileid = ?");
+    $stmt->bind_param("ss", $_SESSION['userid'], $profile_id);
+    $stmt->execute();
+    $is_following = $stmt->get_result()->fetch_assoc()['following'];
     $stmt->close();
 
     if(isset($_GET['user'])) {
@@ -359,22 +342,20 @@ function fetch_profile($profile_id, $csrf) {
 
     $message = null;
     $data = [
-        'userid' => $row['id'],
         'username' => htmlspecialchars($row['username']),
         'admin' => (string)$row['admin'],
-        'verified' => (string)$row['verified'],
         'description' => isset($row['description']) ? $bbcode->toHTML($row['description']) : '', 
         'twitter' => htmlspecialchars($row['twitter']),
         'bsky' => htmlspecialchars($row['bsky']),
         'age' => htmlspecialchars($row['age']),
+        'picture' => htmlspecialchars($row['picture']),
         'model_count' => htmlspecialchars($model_count),
         'followers' => htmlspecialchars($followers),
         'following' => htmlspecialchars($following),
         'views' => htmlspecialchars($views),
         'likes' => htmlspecialchars($likes),
-        'blockedUser' => (bool)$blockedUser,
-        'hasBanner' => $hasBanner,
-        'isFollowing' => (bool)$isFollowing,
+        'blockedUser' => (bool)$is_blocking,
+        'isFollowing' => (bool)$is_following,
         'message' => $message
     ];
 

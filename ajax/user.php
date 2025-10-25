@@ -207,7 +207,7 @@ function regenerate_session() {
                     'samesite' => 'Lax'
                 ]);
 
-                return true;
+                return header("Location:" . $_SERVER['REQUEST_URI'] . "?sess_reload=1");
             } else {
                 echo("mysql error " . $stmt2->error);
                 exit;
