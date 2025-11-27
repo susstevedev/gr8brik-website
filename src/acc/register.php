@@ -128,8 +128,8 @@ $combinedString = $randomWord1 . $randomWord2 . $randomNumber;
                 </script> -->
         <p>By registering, you are agreeing:</p>
         <ul>
-            <li>To our <a href="/terms.php">Terms and Conditions</a></li> 
-            <li>To our <a href="/privacy.php">Privacy Policy</a></li>
+            <li>To our <a href="/info/terms.php">Terms and Conditions</a></li> 
+            <li>To our <a href="/info/privacy.php">Privacy Policy</a></li>
             <li>That you are at least 13 years old</li>
             <li>You do not live in the UK, the state of Wyoming or Mississippi</li>
         </ul>

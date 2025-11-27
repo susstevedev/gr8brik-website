@@ -11,7 +11,7 @@
 <?php include('navbar.php') ?>
 <br /><br /><center>
 
-<h4>Last updated <?php echo gmdate("M d, Y H:i", filemtime('terms.php')); ?></h4>
+<h4>Last updated <?php echo gmdate("M d, Y H:i",filemtime('terms.php')); ?></h4>
 
 <h2>1. Terms</h2>
 

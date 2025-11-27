@@ -5,7 +5,7 @@ if(!loggedin()) {
         <img src="/img/logo/384.png" width="50px" height="50px" title="gr8-logo" class="w3-circle w3-left" />
         <span class="w3-left w3-padding">
             <span><a href="/acc/login">Login</a> or <a href="/acc/register">Register</a> to see upload your own Lego-like creations to the cloud.</span>
-            <span><a href="/terms.php">Terms of Service</a> -- <a href="/privacy.php">Privacy Policy</a>.</span>
+            <span><a href="/info/terms.php">Terms of Service</a> -- <a href="/info/privacy.php">Privacy Policy</a>.</span>
     </div>
     ';
 }
@@ -20,8 +20,8 @@ if(!loggedin()) {
 <div id="linkbar" class="gr8-theme w3-navbar w3-card-2 w3-padding-small w3-light-grey w3-center">
     <p class="w3-large">
 		<span>©2023-2025 the Gr8Brik team. All rights reserved.</span>
-        <a href="/terms.php">Terms and Conditions</a>.
-        <a href="/privacy.php">Privacy Policy</a>.
+        <a href="/info/terms.php">Terms and Conditions</a>.
+        <a href="/info/privacy.php">Privacy Policy</a>.
         <a href="mailto:<?php echo DB_MAIL ?>" target="_blank" class="fa fa-envelope w3-xlarge w3-hover-text-red" alt="Email"></a>
         <a href="https://twitter.com/gr8brik" target="_blank" class="w3-hover-text-blue" alt="Twitter">
             <!-- <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" fill="currentColor" class="bi bi-twitter-x" viewBox="0 0 16 16">

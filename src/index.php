@@ -57,9 +57,9 @@
         <a href="/acc/login.php">Login</a><br />
         <a href="/acc/register.php">Create Account</a><br />
         <a href="/com/view.php?id=17">Rules</a><br />
-        <a href="/terms.php">Terms and Conditions</a><br />
+        <a href="/info/terms.php">Terms and Conditions</a><br />
         
-        <a href="/privacy.php">Privacy Policy</a><br />
+        <a href="/info/privacy.php">Privacy Policy</a><br />
     </div>
 
     <div class="w3-container w3-center"><hr />
