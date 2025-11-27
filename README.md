@@ -2,8 +2,8 @@
 
 GR8BRIK's source code (updated every couple of weeks)
 
-<br>The modeler's source code can be found [here](https://github.com/susstevedev/gr8brik)
+<br>The gr8brik modeler's repo can be found [here](https://github.com/susstevedev/gr8brik). Please do not post issues or PRs regarding the modeler here, but refer to that repo instead.
 
 ## Disclaimer
 
-For security, I do not include any user data in this repository.
+For privacy reasons, user data is not included in this repository.

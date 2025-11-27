@@ -1,0 +1,3 @@
+# constants.php includes sensitive database keys/passwords
+# it should NEVER be uploaded to GitHub
+**/constants.php
