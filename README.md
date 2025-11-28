@@ -14,7 +14,7 @@ GR8BRIK's source code (updated every couple of weeks)
 * Community `/com`
 * Community thread `/topic/{id}`
 * User profile page `/user/{id}`
-<br>Account
+<br><br>Account
 * Account settings `/acc`
 * Account notifications `/acc/new`
 * Account creations `/acc/creations`
@@ -23,7 +23,7 @@ GR8BRIK's source code (updated every couple of weeks)
 * Account reported creations `/acc/reported`
 * Account sessions `/acc/logins`
 * Login `/acc/login.php`
-<br> Static:
+<br><br>Static/Info:
 * Terms and Conditions `/terms.php`
 * Privacy Policy `/privacy.php`
 
