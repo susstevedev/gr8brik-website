@@ -11,7 +11,7 @@ GR8BRIK's source code (updated every couple of weeks)
 | Description                | URL path            | Repo path                                              |
 | -------------------------- | ------------------- | ------------------------------------------------------ |
 | Homepage                   | `/`                 | [`/index.php`](/src/index.php)                         |
-| Modeler                    | `/modeler`          | (please see linked repo at top)                        |
+| Modeler                    | `/modeler`          | [`/mod/new/index.html`](/src/mod/new/index.html)       |
 | Creations                  | `/list`             | [`/list.php`](/src/list.php)                           |
 | Build                      | `/build/{id}`       | [`/creation.php`](/src/creation.php)                   |
 | Community                  | `/com`              | [`/com/index.php`](/src/com/index.php)                 |
