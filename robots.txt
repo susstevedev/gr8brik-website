@@ -1,7 +1,9 @@
-#ELONS ROBOTS HAVE INVADED EARTH! This file will keep them from indexing this folder, or help them.
+# ELON'S ROBOTS HAVE INVADED EARTH !!!
+# This file will prevent them from indexing this folder.
 
 User-agent: *
 Disallow: 
 Disallow: /acc/users/
 Disallow: /ajax/
+Disallow /ajax/constants/
 Sitemap: sitemap2.php
