@@ -37,7 +37,7 @@ isLoggedin();
 
 				echo "<article id='sessionModal" . $i . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-round w3-large'>";
                 echo "<span>Last IP " . $row['login_from'] . "</span><br />";
-                echo "<span>On browser " . get_browser_name($row['user_agent']) . "</span><br />";
+                echo "<span>On browser " . get_browser_name($row['user_agent']) . ", " . get_system_name($row['user_agent']) . "</span><br />";
                 echo "Last active <time id='original' style='cursor: pointer;' datetime='" . date('Y-m-d H:i:s', $row['timestamp']) . "'>" . $time . "</time>";
                 echo "<time id='complete' style='display: none; cursor: pointer;' datetime='" . date('Y-m-d H:i:s', $row['timestamp']) . "'> " . date("F j, Y, g:i a", $row['timestamp']) . "</time><br />";
                 if($_COOKIE['token'] != $row['id']) {

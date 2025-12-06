@@ -51,7 +51,7 @@ if(!loggedin()) {
 if (isset($_POST['picture'])) {
     $okay = true;
 
-    if(isset($_POST['deletePfp'])){
+    if(isset($_POST['deletePfp'])) {
         $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
         $pfp = $_SERVER['DOCUMENT_ROOT'] . $users_row['picture'];
         $old = 'https://profile.accounts.firefox.com/v1/avatar/' . substr($users_row['username'], 0, 1);
@@ -132,10 +132,32 @@ if (isset($_POST['picture'])) {
     }
 }
 
+if (isset($_POST['remove_picture'])) {
+    $okay = true;
+
+   	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    $pfp = $_SERVER['DOCUMENT_ROOT'] . $users_row['picture'];
+    $old = 'https://profile.accounts.firefox.com/v1/avatar/' . substr($users_row['username'], 0, 1);
+
+    $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
+    $stmt->bind_param("ss", $old, $id);
+    
+    if ($users_row['picture'] != null && !$conn->connect_error && $stmt->execute()) {
+    	unlink($pfp);
+        ob_start();
+        echo "Profile picture removed";
+        ob_end_flush();
+        header("refresh:3; url=index.php");
+   	} else {
+    	exit('Error removing profile picture');
+    }
+}
+
 if (isset($_POST['banner'])) {
+    $id = $_SESSION['userid'];
     $uploadOkay = 1;
     if(isset($_POST['deleteBanner'])) {
-        $pfp = "../acc/users/banners/" . $id . "..jpg";
+        $pfp = "users/banners/" . $id . "..jpg";
         unlink($pfp);
         header("Location: index.php?deletedBanner=true");
     } else {
@@ -269,6 +291,40 @@ if (isset($_POST['banner'])) {
                     if (jqXHR.status === 403) {
                         appCrash('403', 'Invalid login');
                     }else if (jqXHR.status === 500) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        $(".error").show();
+                        $(".error").text(response.error);
+                    } else {
+                        console.error("AJAX Error:", textStatus, errorThrown);
+                        alert("An error occurred. Please try again later.");
+                    }
+                }
+            });
+        });
+        
+        $("#blog_user_change").click(function(event) {
+            event.preventDefault();
+
+            let blog_user = $("#blog_user_change input[name='user']").val();
+            var token = $.cookie('token');
+            if ($("#blog_user_change input[name='user']").val().trim() === '') {
+                let blog_user = null;
+            }
+
+            $.ajax({
+                url: "../ajax/account_settings",
+                method: "GET",
+                data: { blog_user_change: true, blog_user: blog_user, token: token },
+                success: function(response) {
+                    $(".success").show();
+                    $(".success").text("Short name updated!");
+                },
+
+                error: function(jqXHR, textStatus, errorThrown) {
+                    if (jqXHR.status === 403) {
+                        console.error("AJAX Error:", textStatus, errorThrown);
+                        alert("An error occurred. Please try again later.");
+                    } else if (jqXHR.status === 500) {
                         var response = JSON.parse(jqXHR.responseText);
                         $(".error").show();
                         $(".error").text(response.error);
@@ -449,9 +505,9 @@ if (isset($_POST['banner'])) {
 
     <h2>Frontend</h2>
     <form id="settings" method="get" action="">
-        <p>These settings will effect how your user interface looks. Please note that these are for testing and may not presist between sessions.</p>
-        <p>Font size (in pixels, zero will reset the value): </p><input type="number" min="0" max="100" name="setting_font" value="15" placeholder="Font size" class="w3-input w3-border w3-mobile w3-third" />
-        <input type="submit" name="settings" value="Submit" class="w3-btn w3-blue w3-hover-white w3-third w3-border w3-border-indigo" />
+        <p>These settings will effect how your user interface looks. Please note that these are for testing and <strong>will not</strong> presist between sessions.</p>
+        <p>Font size (in pixels, zero will reset the value): </p><input type="number" min="0" max="100" name="setting_font" value="15" placeholder="Font size" class="w3-input w3-border w3-mobile w3-quarter" />
+        <input type="submit" name="settings" value="Update Font Size" class="w3-btn w3-quarter w3-blue w3-hover-white w3-border w3-border-indigo" />
     </form><br /><br />
 
     <h2>Account</h2>
@@ -475,11 +531,15 @@ if (isset($_POST['banner'])) {
     <form id="pictureForm" method="post" action="" enctype="multipart/form-data">
         <p>We recommend your profile picture be 50x50 pixels</p>
 		<p><input type="file" name="fileToUpload" id="fileToUpload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
-		<input type="submit" value="Upload" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-quarter">
+		<input type="submit" value="Upload" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-col m3">
         <?php
             if($users_row['picture'] != null && $users_row['picture'] != $users_row['id'] . '.jpg' && substr($users_row['picture'], 0, 5) != 'https' && file_exists($_SERVER['DOCUMENT_ROOT'] . $users_row['picture'])) {
+                /*
                 echo '&nbsp;&nbsp;<input type="checkbox" class="w3-check" id="deletePfp" name="deletePfp" value="1">';
                 echo '<label for="deletePfp">Remove</label>';
+                */
+                
+               echo '<span class="w3-col m1">&nbsp;</span><input type="submit" value="Delete" id="remove_picture" name="remove_picture" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink w3-col m3">';
             }
         ?>
     </form>
@@ -487,27 +547,28 @@ if (isset($_POST['banner'])) {
   
 <div class="w3-threequarter">
     <div id="username">
-        <p>Your username can only be 2-50 numbers, letters, underscore, dash, or dot. Make sure it follows the <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.</p>
+        <p>Your username can only be 2-50 numbers, letters, underscore, dash, or dot. Make sure it follows the <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.<br />Some usernames are reserved and cannot be used by anyone.</p>
         <p class="gr8-child"><span id="data-username-available" style="display: none; padding: 5px 5px 5px 5px;"></span></p>
         <input class="w3-input w3-border w3-mobile w3-third" value="<?php echo $user ?>" type="text" id="username-input" name="username" placeholder="<?php echo $combinedString ?>">
-        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="u_change" name="u_change">Change Username</button>
+        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="u_change" name="u_change">Update Username</button>
     </div><br /><br />
 
     <div id="twitter">
-        <input class="w3-input w3-border w3-mobile w3-third" placeholder="@handle" value="<?php echo $users_row['twitter'] ?>" type="text" name="handle">
-        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="twitter_change" name="twitter_change">Change Linked Twitter</button>
+         <p>To link your X/Twitter account, you will need to provide your handle.</p>
+        <input class="w3-input w3-border w3-mobile w3-third" placeholder="@me" value="<?php echo $users_row['twitter'] ?>" type="text" name="handle">
+        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="twitter_change" name="twitter_change">Update Twitter</button>
     </div><br /><br />
     
-    <p>To link your Bluesky account, you will need to use your DID instead of your handle. Your Bluesky DID can be found <a href="https://bsky-did.neocities.org" target="_blank" rel="noopener noreferrer">here</a>.</p>
     <div id="bsky">
+            <p>To link your Bluesky account, you will need to use your DID instead of your handle. Your Bluesky DID can be found <a href="https://bsky-did.neocities.org" target="_blank" rel="noopener noreferrer">here</a>.</p>
         <input class="w3-input w3-border w3-mobile w3-third" placeholder="did:plc:mydid" value="<?php echo $users_row['bsky'] ?>" type="text" name="did">
-        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="bsky_change" name="bsky_change">Change Added DID</button>
+        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="bsky_change" name="bsky_change">Update Bluesky</button>
     </div><br /><br />
 
     <div id="about">
         <p>Your description can be 1-200 characters of anything. Keep it clean and make sure it doesn't violate our <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.</p>
         <textarea id="description" name="description" value="<?php echo htmlspecialchars($about) ?>" placeholder="New about section" class="w3-input w3-border w3-mobile" rows="4" cols="50"><?php echo htmlspecialchars($about) ?></textarea>
-        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="a_change" name="about">Change About</button>
+        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="a_change" name="about">Change Description</button>
     </div><br /><br />
 
         <form id="password" method="post" action="/ajax/account_settings">
@@ -515,14 +576,14 @@ if (isset($_POST['banner'])) {
             <input type="password" name="o_password" placeholder="Old password" class="w3-input w3-border w3-mobile w3-third" />
             <input type="password" name="n_password" placeholder="New password" class="w3-input w3-border w3-mobile w3-third" />
             <input type="password" name="c_password" placeholder="Confirm new password" class="w3-input w3-border w3-mobile w3-third" />
-            <input type="submit" name="change" value="Change Password" class="w3-btn w3-blue w3-hover-white w3-third w3-border w3-border-indigo" />
+            <input type="submit" name="change" value="Update Password" class="w3-btn w3-blue w3-hover-white w3-third w3-border w3-border-indigo" />
         </form><br /><br />
 
-        <form id="email" method="post" action="">
+        <form id="email" method="post" action="/ajax/account_settings">
             <br /><br /><p>Your email to login to your account. Don't share this either. Make sure you own this email incase you ever lose access to your account.</p>
             <input type="email" value="<?php echo htmlspecialchars($email) ?>" name="o_email" style="float:left;width:30%;" placeholder="Old email" class="w3-input w3-border w3-mobile w3-third" />
-            <input type="email" name="n_email" xstyle="float:left;width:30%;" placeholder="New email" class="w3-input w3-border w3-mobile w3-third" />
-            <input type="submit" name="e_change" xstyle="float:left;" value="Change Email" class="w3-btn w3-blue w3-hover-white w3-third w3-border w3-border-indigo" /><br /><br />
+            <input type="email" name="n_email" placeholder="New email" class="w3-input w3-border w3-mobile w3-third" />
+            <input type="submit" name="e_change" value="Update Email Address" class="w3-btn w3-blue w3-hover-white w3-third w3-border w3-border-indigo" /><br /><br />
         </form>
     </div></div><br /><br />
 

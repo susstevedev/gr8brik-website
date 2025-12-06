@@ -60,7 +60,7 @@ if(isset($_POST['unblock'])) {
             exit($conn2->connect_error);
         }
 
-		$sql = "SELECT DISTINCT profileid FROM follow WHERE userid = '" . $token['user'] . "' ORDER BY id DESC";
+		$sql = "SELECT DISTINCT id, profileid FROM follow WHERE userid = '" . $token['user'] . "' ORDER BY id DESC";
         $result = $conn2->query($sql);
 
         echo "<div id='followingtab' class='tab w3-animate-opacity w3-hide'><h4>Who you follow</h4>";
@@ -69,10 +69,10 @@ if(isset($_POST['unblock'])) {
             $profileid = $row['profileid'];
             $sql2 = "SELECT * FROM users WHERE id = '$profileid'";
             $result2 = $conn2->query($sql2);
-            //if($result2->num_rows > 0) {
                 $row2 = $result2->fetch_assoc();
+            	$username = $row2['username'] ?? 'inactive';
 
-                echo "<article class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
+                echo "<article gr8brik-item='follow-" . $row['id'] . "' id='user-" . $profileid . "-name-" . strtolower(urlencode($username)) . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
                 echo "<a href='../user/" . $profileid . "'>" . $row2['username']. '</a><br />';
                 if(!empty($row2['description'])) {
                     echo "<b>" . $row2['description'] . '</b><br />';
@@ -82,12 +82,13 @@ if(isset($_POST['unblock'])) {
                 echo "</article><br />";
 
                 $result2->free();
-            //}
+            	$username = null;
+            	$userid = null;
         }
         $result->free();
         echo "</div>";
 
-        $sql = "SELECT DISTINCT userid FROM follow WHERE profileid = '" . $token['user'] . "' ORDER BY id DESC";
+        $sql = "SELECT DISTINCT id, userid FROM follow WHERE profileid = '" . $_SESSION['userid'] . "' ORDER BY id DESC";
         $result3 = $conn2->query($sql);
 
         echo "<div id='followerstab' class='tab w3-animate-opacity w3-hide'><h4>Who follows you</h4>";
@@ -96,31 +97,32 @@ if(isset($_POST['unblock'])) {
             $userid = $row3['userid'];
             $sql2 = "SELECT * FROM users WHERE id = '$userid'";
             $result4 = $conn2->query($sql2);
-            //if($result4->num_rows > 0) {
                 $row4 = $result4->fetch_assoc();
+            	$username = $row4['username'] ?? 'inactive';
 
-                echo "<article class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
+                echo "<article gr8brik-item='follow-" . $row3['id'] . "' id='user-" . $userid . "-name-" . strtolower(urlencode($username)) . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
                 echo "<a href='../user/" . $userid . "'>" . $row4['username'] . '</a><br />';
                 if(!empty($row4['description'])) {
                     echo "<b>" . $row4['description'] . '</b><br />';
                 }
                 echo "</article><br />";
-            //}
             $result4->free();
+            $username = null;
+            $userid = null;
         }
         $result3->free();
         echo "</div>";
 
-        $result4 = $conn2->query("SELECT DISTINCT profileid FROM user_blocks WHERE userid = '" . $token['user'] . "' ORDER BY id DESC");
+        $result4 = $conn2->query("SELECT DISTINCT id, profileid FROM user_blocks WHERE userid = '" . $token['user'] . "' ORDER BY id DESC");
         echo "<div id='blockedtab' class='tab w3-animate-opacity w3-hide'><h4>Who you blocked</h4>";
 
 		while ($row4 = $result4->fetch_assoc()) {
             $userid = $row4['profileid'];
             $result5 = $conn2->query("SELECT * FROM users WHERE id = '$userid'");
-            //if($result5->num_rows > 0) {
                 $row5 = $result5->fetch_assoc();
+                $username = $row5['username'] ?? 'inactive';
 
-                echo "<article class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
+                echo "<article gr8brik-item='block-" . $row4['id'] . "' id='user-" . $userid . "-name-" . strtolower(urlencode($username)) . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
                 echo "<a href='../user/" . $userid . "'>" . $row5['username'] . '</a><br />';
                 if(!empty($row5['description'])) {
                     echo "<b>" . $row5['description'] . '</b><br />';
@@ -128,8 +130,9 @@ if(isset($_POST['unblock'])) {
                 echo "<form id='unblock' method='post' action='following.php?user=" . $profileid . "'></form>";
                 echo "<input form='unblock' type='submit' value='Unblock' name='unblock' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>";
                 echo "</article><br />";
-            //}
             $result5->free();
+            $username = null;
+            $userid = null;
         }
         $result4->free();
         $conn2->close();
