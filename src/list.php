@@ -119,6 +119,7 @@
                         'model_id' => $row2['id'],
                         'user' => $user['id'],
                         'username' => $truncated_username,
+                        'pfp' => $user['picture'],
                         'title' => $truncated_name,
                         'views' => $row2['views'],
                         'likes' => $row2['likes']

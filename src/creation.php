@@ -136,6 +136,8 @@ if ($_POST['delete_model']) {
     }
     exit;
 }
+
+$model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?model=" . htmlspecialchars($_GET['id']) . "' id='model_embed' title='model_embed' width='300' height='200'></iframe>");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -467,7 +469,7 @@ document.addEventListener("DOMContentLoaded", function () {
 <?php } ?>
 
 <main id="wrapper">
-    <div id="ajax-error" style="display: none;" class="w3-top w3-padding w3-round w3-red"></div>
+    <div id="ajax-error" style="display: none;" class="w3-bottom w3-padding w3-round w3-red"></div>
 
     <center><header class="loader"></header></center>
     <header>
@@ -491,7 +493,7 @@ document.addEventListener("DOMContentLoaded", function () {
     <figure class="data-model-screenshot" style="margin: 20px !important;">
         <p><img id="data-model-screenshot" src="<?php echo $data['screenshot'] ?>" style="width:50vw;height:50vh;border:1px solid;border-radius:15%;display:none;" loading='lazy'></p>
         <p id="data-model-embed">Your browser failed to load the viewer. Please make sure you didn't stop the page from loading, Javascript is enabled, and your browser is up-to-date.</p>
-        <figcaption class="gr8-theme w3-card-2 w3-hover-shadow w3-light-grey w3-padding w3-large w3-round">
+        <figcaption data-testid="description" class="gr8-theme w3-card-2 w3-hover-shadow w3-light-grey w3-padding w3-large w3-round" style="width: 65%">
         <?php if(!empty($data['description'])) { ?>
             <h4><span id="data-description"><?php echo $data['description'] ?></span><br /></h4>
         <?php } ?>
@@ -539,7 +541,9 @@ document.addEventListener("DOMContentLoaded", function () {
         </div>
     <?php } ?>
         
-    <p><span class="w3-large">Embed:</span></p><p><textarea class="w3-card-2 w3-round" rows='2' cols='65' readonly>http://www.gr8brik.rf.gd/new-viewer.html?model=<?php echo htmlspecialchars($data['model']) ?></textarea></p><hr />
+    <p><span class="w3-large">Embed:</span></p>
+    <p><textarea class="w3-card-2 w3-round" rows='2' cols='75' readonly><?php echo $model_embed ?></textarea></p>
+    <hr />
 
     <div class="w3-container">
         <?php if($data['message'] != "OK") { ?>
@@ -576,14 +580,17 @@ document.addEventListener("DOMContentLoaded", function () {
         <?php if(!empty($comment['message'])) { ?>
             <p><div class="gr8-theme w3-light-grey w3-round w3-padding"><?php echo $comment['message'] ?></div></p>
         <?php } ?>
-        <div id="comment<?php echo $comment['id'] ?>" class="w3-row w3-margin-bottom">
-            <div class="w3-col" style="width: 50px;">
-                <img class="w3-bar-item w3-circle w3-card-2" width="50px" height="50px" src="<?php echo $comment['picture'] ?>">
+
+        <div id="comment<?php echo $comment['id'] ?>" data-testid="<?php echo $comment['id'] ?>" class="w3-row w3-section">
+            <div class="w3-col" data-testid="gr8-comment-profilepicture" style="width: 50px;">
+                <img class="w3-bar-item w3-circle w3-card-2" width="50px" height="50px" src="<?php echo $comment['picture'] ? $comment['picture'] : '/img/no_image.png' ?>">
             </div>
-            <div class="w3-hide-small w3-col w3-margin" style="width: 1px;">
-                <i class="w3-large w3-text-white gr8-theme fa fa-play fa-rotate-180" xstyle="font-size: 15px;"></i>
-            </div>
-            <div class="w3-col w3-card-2 w3-hover-shadow" style="width: 75%;">
+            
+            <div data-testid="gr8-comment-divider" class="w3-hide-small w3-col" style="width: max-content; height: max-content;">
+            	<i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
+           	</div>
+            
+            <div class="w3-col w3-card-2 w3-hover-shadow" style="width: 65%;">
                 <article class="gr8-theme w3-light-grey w3-padding" style="min-height: 75px;">
                     <header class="w3-padding-bottom">
                         <?php if($comment['userid'] != 0) { ?>
@@ -596,7 +603,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         <?php } else { ?>
                         	<b title="User has either deleted their account or has been banned"><?php echo $comment['username'] ?></b>
                         <?php } ?>
-                        <b><?php echo $comment['is_op'] ? 'OP' : '' ?></b>
+                        <span data-testid="gr8-comment-op-wrapper"><?php echo $comment['is_op'] ? '<b title="Original Poster" data-testid="gr8-comment-op">OP</b>' : '' ?></span>
                         <span class="w3-mobile w3-right">
                             <time datetime="<?php echo $comment['date'] ?>"><?php echo $comment['date'] ?></time> -
                             <span id="votes"><?php echo $comment['votes'] ?> votes</span>

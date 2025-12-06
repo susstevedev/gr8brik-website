@@ -27,7 +27,7 @@
 <script type="text/javascript" src="/lib/jquery.cookie-1.4.1.min.js"></script>
 <script type="text/javascript" src="/lib/jquery.ihavecookies.min.js"></script>
 <script type="text/javascript" src="/lib/xpull.js"></script>
-<script type="text/javascript" src="/lib/main.js?v=10-11-25"></script>
+<script type="text/javascript" src="/lib/main.js?v=11-04-25"></script>
 <script type="module" async defer src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js?v=<?php echo time(); ?>"></script>
 <script type="text/javascript" src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js?v=<?php echo time(); ?>" crossorigin="anonymous"></script>
 

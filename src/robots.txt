@@ -6,4 +6,5 @@ Disallow:
 Disallow: /acc/users/
 Disallow: /ajax/
 Disallow /ajax/constants/
+Disallow google4cb09ae7ae2edb25.html
 Sitemap: sitemap2.php

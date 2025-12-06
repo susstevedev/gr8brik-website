@@ -170,6 +170,7 @@ if(isset($_POST['ban'])) {
 	$duration = $ban_date - time();
     $start_date = time();
     $end_date = $start_date + $duration;
+    $email = hash('sha256', strtolower($data['email']));
 
     if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
         exit('Invalid user ID!');
@@ -180,7 +181,7 @@ if(isset($_POST['ban'])) {
     }
 		
     if($users_row['admin'] != '0') {
-        $sql = "INSERT INTO bans (user, reason, start_date, end_date) VALUES ($profile_id, '$reason', $start_date, $end_date)";
+        $sql = "INSERT INTO bans (user, email, reason, start_date, end_date) VALUES ($profile_id, '$email', '$reason', $start_date, $end_date)";
         $result = $conn->query($sql);
         if ($result) {
             $sql2 = "DELETE FROM sessions WHERE user = $profile_id";
@@ -455,7 +456,7 @@ if(isset($_POST['delete'])) {
 
     <?php if($admin != 0) { ?>
         <div id="delete" class="w3-modal">
-            <div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
+            <div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-center">
                 <div class="w3-container">
                     <span onclick="document.getElementById('delete').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
                         <form method='post' action=''>
@@ -468,7 +469,7 @@ if(isset($_POST['delete'])) {
         </div>
 
             <div id="ban" class="w3-modal">
-				<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
+				<div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-center">
 					<div class="w3-container">
 						<span onclick='document.getElementById("ban").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
 							<h2>Are you sure you want to ban this user?</h2>
@@ -523,8 +524,7 @@ if(isset($_POST['delete'])) {
                             </select>
                             <br/>
                                 <select class="w3-select" name="year">
-                                <option value="2024" disabled selected>year</option>
-                                <option value="2024">2024</option>
+                                <option value="2026" disabled selected>year</option>
                                 <option value="2025">2025</option>
                                 <option value="2026">2026</option>
                                 <option value="2027">2027</option>

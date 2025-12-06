@@ -14,10 +14,12 @@ if(isset($_POST['new_appeal'])) {
 		
     $sql = "INSERT INTO appeals (user, reason, end_date) VALUES ($id, '$reason', $end_date)";
     $result = $conn->query($sql);
+    
+    // susstevedev 11/28/25 12:08 CST: This is too basic, I'm going to add better success/error handling in the future
     if ($result) {
-        exit("Success!");
+        exit("Success! Your ban appeal has been submitted.");
     } else {
-        exit("Error:" . $conn->error);
+        exit("Error: " . $conn->error . "<br />(if this is unrelated please lmk @ " . DB_MAIL . ")");
     }
 }
 ?>
@@ -28,17 +30,6 @@ if(isset($_POST['new_appeal'])) {
     <?php include 'header.php' ?>
 </head>
 <body class="w3-light-blue w3-container">
-
-<script> 
-    var $buoop = {required:{e:-4,f:-3,o:-3,s:-1,c:-3},insecure:true,api:2024.10 }; 
-    function $buo_f(){ 
-    var e = document.createElement("script"); 
-    e.src = "//browser-update.org/update.min.js"; 
-    document.body.appendChild(e);
-    };
-    try {document.addEventListener("DOMContentLoaded", $buo_f,false)}
-    catch(e){window.attachEvent("onload", $buo_f)}
-</script>
 
 <?php 
     include('navbar.php');

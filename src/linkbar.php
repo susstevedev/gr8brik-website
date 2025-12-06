@@ -42,3 +42,14 @@ if(!loggedin()) {
 		LEGO&#174;, the LEGO&#174; logo, the Minifigure&#8482;, and the Brick&#8482; and Knob&#8482; configurations are trademarks of the LEGO&#174; Group of Companies which does not sponsor, authorize, or endorse this site.
 	</p><hr />
 </div><br />
+
+<script> 
+    var $buoop = {required:{e:-4,f:-3,o:-3,s:-1,c:-3},insecure:true,api:2025.10 }; 
+    function $buo_f(){ 
+    var e = document.createElement("script"); 
+    e.src = "//browser-update.org/update.min.js"; 
+    document.body.appendChild(e);
+    };
+    try {document.addEventListener("DOMContentLoaded", $buo_f,false)}
+    catch(e){window.attachEvent("onload", $buo_f)}
+</script>
