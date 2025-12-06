@@ -10,15 +10,17 @@ if(isset($_GET['ajax'])) {
 
 if(loggedin() === true) {
     if (rand(1, 10) === 1) {
-        regenerate_session();
+        //regenerate_session();
         delete_old_sessions();
-        //update_auth_timestamp();
         delete_inactive_users();
     }
 }
 
 function login() {
-    global $conn, $id, $token, $tokendata, $users_row;
+    global $id, $token, $tokendata, $users_row;
+    
+    // Temporary fix for an error that I don't wanna fix :p
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     if (loggedin() === true) {
         $sessionid = $_COOKIE['token'];
@@ -62,19 +64,6 @@ function login() {
 }
 login();
 
-/*
-function update_auth_timestamp() {
-    global $conn, $token, $tokendata;
-    $time = time();
-    $ip = $_SERVER['REMOTE_ADDR'];
-    $sessionid = $_COOKIE['token'];
-
-    $stmt = $conn->prepare("UPDATE sessions SET timestamp = ?, login_from = ? WHERE id = ?");
-    $stmt->bind_param("sss", $time, $ip, $sessionid);
-    return $stmt->execute();
-}
-*/
-
 function get_warn_status($id) {
     global $conn;
     if(loggedin()) {
@@ -88,8 +77,8 @@ function get_warn_status($id) {
             
             $json = array(
                 'status' => "yes", 
-                'text' => "Your Gr8Brik account has a warning for the following reason",
-                'reason' => htmlspecialchars($warning_row['reason'])
+                'text' => "Your Gr8Brik account has been warned for the following reason:",
+                'reason' => "<em>" . htmlspecialchars($warning_row['reason']) . "</em>"
             );
         } else {
             $json = array(
@@ -103,7 +92,7 @@ function get_warn_status($id) {
 function seen_warn_status($id) {
     global $conn;
     if(loggedin()) {
-    	$warning_stmt = $conn->prepare("UPDATE warnings SET seen = 1 WHERE user = ? LIMIT 1");
+    	$warning_stmt = $conn->prepare("UPDATE warnings SET seen = 1 WHERE user = ?");
         $warning_stmt->bind_param("i", $id);
                 
         if($warning_stmt->execute()) {
@@ -207,7 +196,11 @@ function regenerate_session() {
                     'samesite' => 'Lax'
                 ]);
 
-                return header("Location:" . $_SERVER['REQUEST_URI'] . "?sess_reload=1");
+                if(str_contains($_SERVER['REQUEST_URI'], '?')) {
+                	return header("Location:" . $_SERVER['REQUEST_URI'] . "&sess_reload=true");
+                } else {
+                    return header("Location:" . $_SERVER['REQUEST_URI'] . "?sess_reload=true");
+                }
             } else {
                 echo("mysql error " . $stmt2->error);
                 exit;

@@ -480,6 +480,184 @@ if(isset($_GET['build_comments'])) {
     exit($comment_data);
 }
 
+if(isset($_GET['list_all'])) {
+    header('Content-Type: application/json');
+    error_reporting(1);
+    
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+        $is_search = false;
+
+        $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
+        $offset = ($page - 1) * 12;
+
+        if (isset($_COOKIE['token']) && $tokendata->num_rows != 0) {
+            $stmt = $conn->prepare('SELECT * FROM follow WHERE userid = ?');
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            $followed_users = [];
+
+            if ($result->num_rows != 0) {
+                while ($row = $result->fetch_assoc()) {
+                    $followed_users[] = $row['profileid'];
+                }
+
+                $sql = 'SELECT * FROM model WHERE user IN (' . implode(',', $followed_users) . ') ORDER BY date DESC LIMIT 12 OFFSET ' .  $offset;
+                $better_feed_msg = false;
+              
+              if (
+                isset($_GET['sort']) 
+                && $_GET['sort'] === "Following" 
+                || empty($_GET['sort']) 
+                && empty($_GET['q'])
+              ) {
+                $better_feed_msg = true;
+              } else {
+                  $better_feed_msg = false;
+              }
+              
+            } else {
+                $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 12 OFFSET ' .  $offset;
+                
+                $following_empty = true;
+            }
+        } else {
+            $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 12 OFFSET ' .  $offset;
+        }
+
+        if (isset($_GET['q']) && $_GET['q']) {
+            $is_search = true;
+
+            $query = isset($_GET['q']) ? trim($_GET['q']) : '';
+            $search = "%" . $conn2->real_escape_string(htmlspecialchars($query)) . "%";
+
+            $stmt = $conn2->prepare('SELECT * FROM model WHERE (name LIKE ? OR description LIKE ?) LIMIT 12 OFFSET ' .  $offset);
+            $stmt->bind_param('ss', $search, $search);
+            $stmt->execute();
+            $result2 = $stmt->get_result();
+        }
+
+        if (isset($_GET['sort']) && $_GET['sort']) {
+            if ($_GET['sort'] === 'feature') {
+                $sql  = 'SELECT * FROM model WHERE feature = 1 ORDER BY date DESC LIMIT 12 OFFSET ' .  $offset;
+                $sort = 'Featured creations';
+            }
+            if ($_GET['sort'] === 'views') {
+                $sql  = 'SELECT * FROM model ORDER BY views DESC LIMIT 12 OFFSET ' .  $offset;
+                $sort = 'Most viewed';
+            }
+            if ($_GET['sort'] === 'likes') {
+                $sql  = 'SELECT * FROM model ORDER BY likes DESC LIMIT 12 OFFSET ' .  $offset;
+                $sort = 'Most liked';
+            }
+            if ($_GET['sort'] === 'az') {
+                $sql  = 'SELECT * FROM model ORDER BY name ASC LIMIT 12 OFFSET ' .  $offset;
+                $sort = 'Alphabetical A-Z';
+            }
+            if ($_GET['sort'] === 'za') {
+                $sql  = 'SELECT * FROM model ORDER BY name DESC LIMIT 12 OFFSET ' .  $offset;
+                $sort = 'Alphabetical Z-A';
+            }
+            if ($_GET['sort'] === 'oldest') {
+                $sql  = 'SELECT * FROM model ORDER BY date ASC LIMIT 12 OFFSET ' .  $offset;
+                $sort = 'Oldest creations';
+            }
+            if ($_GET['sort'] === 'newest') {
+                $sql  = 'SELECT * FROM model ORDER BY date DESC LIMIT 12 OFFSET ' .  $offset;
+                $sort = 'Newest creations';
+            }
+            if ($_GET['sort'] === 'all') {
+                $sql  = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 12 OFFSET ' .  $offset;
+                $sort = 'All creations';
+            }
+            if (!empty($sort)) {
+                echo '<p>Sorting by <b>' . $sort . '</b></p>';
+            }
+        }
+
+        if(!$is_search && $page > 0) {
+            $stmt = $conn2->prepare($sql);
+            $stmt->execute();
+            $result2 = $stmt->get_result();
+        }
+        
+        // if there is some creations found from the query
+        if ($result2->num_rows > 0) {
+            $builds = [];
+          
+            $total = $result2->num_rows;
+            while ($row = $result2->fetch_assoc()) {
+              
+                $model_id = $row['id'];
+                $userid = $row['user'];
+
+                /*
+                    Fetch users, like count, and bans
+                    We also check if those are invalid
+                */
+              
+                $stmt = $conn->prepare('SELECT * FROM users WHERE id = ?');
+                $stmt->bind_param('i', $userid);
+                $stmt->execute();
+                $result3 = $stmt->get_result();
+                $user = $result3->fetch_assoc();
+                $username = isset($user['username']) ? $user['username'] : '';
+
+                $stmt = $conn->prepare('SELECT * FROM bans WHERE user = ?');
+                $stmt->bind_param('i', $userid);
+                $stmt->execute();
+                $banResult = $stmt->get_result();
+                $banRow = $banResult->fetch_assoc();
+
+                if (empty($row['name'])) {
+                    $row['name'] = $username . "'s creation";
+                }
+
+                /*if ($result3->num_rows <= 0 || $banResult->num_rows > 0 && $banRow['end_date'] >= time()) {
+                    continue;
+                }*/
+
+                $truncatedName = substr($row['name'], 0, 30);
+                if (strlen($row['name']) >= 30) {
+                    $truncatedName .= '...';
+                }
+
+                /*echo "<div class='w3-display-container w3-left w3-padding'>";
+                echo "<a href='/build/" . $row['id'] . "'><img src='/cre/" . $row['screenshot'] . "' width='320' height='240' loading='lazy' class='gr8-theme w3-card-2 w3-hover-shadow w3-border w3-border-white'></a>";
+                echo "<span class='gr8-theme w3-large w3-display-middle w3-card-2 w3-light-grey w3-padding-small'>" . $truncatedName . '</span>';
+                echo "<span class='gr8-theme w3-display-bottommiddle w3-card-2 w3-light-grey w3-padding-small'>" . $row['views'] . ' views - ' . $likes['count'] . " likes - By ";
+                echo "<a href='/user/" . $row['user'] . "'>" . $username . "</a></span></div>"; */
+
+                $builds[] = [
+                    'id' => $row['id'],
+                    'screenshot' => $row['screenshot'],
+                    'user_id' => htmlspecialchars($row['user']),
+                    'username' => htmlspecialchars($username),
+                    'date' => time_ago($row['date']),
+                    'likes' => $row['likes'],
+                    'views' => $row['views'],
+                    'name' => htmlspecialchars($row['name']),
+                    'total' => $total,
+                    'better_feed_msg' => $better_feed_msg,
+                    'following_empty' => $following_empty,
+                ];
+            }
+            echo json_encode($builds);
+            exit;
+        } else {
+            header("HTTP/1.0 500 Internal Server Error");
+        	echo json_encode(['error' => 'No creations found.']);
+        	exit;
+        }
+        // Foward back buttons
+        $sorting = isset($_GET['sort']) ? $_GET['sort'] : "following";
+        $searching = isset($_GET['q']) ? $_GET['q'] : "";
+        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" href="?p=' . ($page - 1) . '&sort=' . $sorting . '&q=' . $searching . '">Back</a>&nbsp;';
+        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" href="?p=' . ($page + 1) . '&sort=' . $sorting . '&q=' . $searching . '">Forward</a>';
+}
+
 if(isset($_POST['comment'])) {
     header('Content-Type: application/json');
     error_reporting(0);

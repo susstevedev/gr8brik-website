@@ -104,6 +104,7 @@ function login_user($user, $pwd) {
             $login_from = $_SERVER['REMOTE_ADDR'];
             $tokenid = uniqid();
             $time = time();
+            $user_agent = $_SERVER['HTTP_USER_AGENT'];
 
             // Rehash legacy password
             if($db_hashed_pwd !== null) {
@@ -144,9 +145,8 @@ function login_user($user, $pwd) {
             }
 
             // Create login session
-            $sql = "INSERT INTO sessions (id, login_from, user, password, timestamp) VALUES ('$tokenid', '$login_from', '$userid', '$db_hashed_pwd', '$time') LIMIT 1";
+            $sql = "INSERT INTO sessions (id, login_from, user_agent, user, password, timestamp) VALUES ('$tokenid', '$login_from', '$user_agent', '$userid', '$db_hashed_pwd', '$time') LIMIT 1";
             if (mysqli_query($conn, $sql)) {
-                //setcookie('token', $tokenid, $time + (10 * 365 * 24 * 60 * 60), "/", ".gr8brik.rf.gd");
                 setcookie('token', $tokenid, [
                     'expires' => $time + (60 * 60 * 24 * 400),
                     'path' => '/',

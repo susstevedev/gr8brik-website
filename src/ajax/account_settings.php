@@ -267,32 +267,217 @@ if (isset($_POST['change'])) {
     }
 }
 
-if(isset($_GET['email_change'])){
+if(isset($_POST['e_change'])) {
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
     $id = $token['user'];
-    $new = $_POST['email'];
+    $new = htmlspecialchars($_POST['n_email']);
+    $old = htmlspecialchars($_POST['o_email']);
 
-    $sql = "SELECT * FROM users WHERE id = '$id'";
+    $sql = "SELECT email FROM users WHERE id = '$id'";
     $result = $conn->query($sql);
     $row = $result->fetch_assoc();
 
     if($result->num_rows != 0) {
-        if($row['id'] === $id) {
+        if($row['email'] === $old) {
             $sql2 = "UPDATE users SET email = '$new' WHERE id = '$id'";
             $result2 = $conn->query($sql2);
 
             if ($conn->query($sql2) === TRUE) {
                 header("HTTP/1.0 200 OK");
-                echo json_encode(['success' => 'Email updated']);
+                echo json_encode(['success' => 'Email address updated. Please navigate backwards to continue.']);
                 exit;
             } else {
-                $error_message = "Error changing email";
+                $error_message = "Error changing email address.";
                 header("HTTP/1.0 500 Internal Server Error");
                 echo json_encode(['error' => $error_message]);
                 exit;
             }
+        } else {
+            $error_message = "account_settings.php: " . htmlspecialchars($row['email']) . " is not equal to " . htmlspecialchars($old) . ".";
+            header("HTTP/1.0 500 Internal Server Error");
+            echo json_encode(['error' => $error_message]);
+            exit;
         }
     }
+    exit;
+}
+
+/*
+if(isset($_GET['get_notifications'])) {
+    header('Content-Type: application/json');
+    error_reporting(1);
+    	$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+         if ($conn2->connect_error) {
+         	exit($conn2->connect_error);
+         }
+
+            $sql = "SELECT * FROM notifications WHERE user = " . $token['user'] . " ORDER BY timestamp DESC";
+            $result = $conn2->query($sql);
+    
+    		$stmt_2 = $conn2->prepare("SELECT * FROM notifications WHERE user = ? ORDER BY timestamp DESC");
+    		$stmt_2->bind_param("i", $_SESSION['userid']);
+			$stmt_2->execute();
+    		$result = $stmt_2->get_result();
+
+			while ($row = $result->fetch_assoc()) {
+                $url = null;
+                $post = null;
+                $user = null;
+                $img = null;
+                $profile = $row['profile'];
+                $valid = false;
+
+                $sql2 = "SELECT * FROM users WHERE id = $profile";
+                $result2 = $conn2->query($sql2);
+                $row2 = $result2->fetch_assoc();
+
+                if ($row['category'] === "1") {
+                    $valid = true;
+                    $url = "/profile?id=" . $profile;
+                    $post = "followed you";
+                    $user = $row2['username'];
+                    $img = '../acc/users/pfps/' . $profile;
+                } elseif ($row['category'] === "2") {
+                    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+                    $content = $row['content'];
+                    $result3 = $conn3->query("SELECT * FROM model WHERE id = $content");
+                    $row3 = $result3->fetch_assoc();
+
+                    $valid = true;
+                    $img = '../cre/' . $row3['screenshot'];
+                    $url = "/creation?id=" . $content;
+                    $post = "commented on " . $row3['name'];
+                    $user = $row2['username'];
+
+                    $result3->free();
+                    $conn3->close();
+                } elseif ($row['category'] === "3") {
+                    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+                    $content = $row['content'];
+                    $result3 = $conn3->query("SELECT * FROM messages WHERE id = $content");
+                    $row3 = $result3->fetch_assoc();
+
+                    $valid = true;
+                    $img = '../img/com.jpg';
+                    $url = "/com/view?id=" . $row['content'];
+                    $post = "replied to " . $row3['title'] ?: "[deleted]";
+                    $user = $row2['username'];
+
+                    $result3->free();
+                    $conn3->close();
+                }
+                
+                if (is_numeric($row['timestamp'])) {
+                    $time = time_ago(date("Y-m-d H:i:s", $row['timestamp']));
+                } else {
+                    $time = "A long time ago";
+                }
+
+                if($valid == true) {
+                    echo "<article class='w3-card-2 w3-hover-shadow gr8-theme w3-light-grey w3-padding w3-large'>";
+                    echo "<a href='" . $url . "'><img src='" . $img . "' style='width: 150px; height: 150px; border-radius: 2px;' alt='" . $img . "' title='" . $img . "'>";
+                    echo "<span style='display: inline-block; vertical-align: top; padding: 5px 5px 5px 5px;'>";
+                    echo htmlspecialchars($user) . "&nbsp;" . htmlspecialchars($post) . "</span></a>";
+                    echo "<time class='w3-right w3-text-grey' datetime=''>" . $time . "</time>";
+                    echo "</article><br />";
+                }
+                
+                if($valid == true) {
+            		echo json_encode(['url' => $url, 'img' => $img, 'user' => $user, 'post' => $post, 'time' => $time]);
+            		exit;
+                }
+
+                $result2->free();
+            }
+            $result->free();
+            $conn2->close();
+}
+*/
+
+if (isset($_GET['get_notifications'])) {
+    header('Content-Type: application/json');
+    error_reporting(1);
+
+    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    if ($conn2->connect_error) {
+        exit($conn2->connect_error);
+    }
+
+    $stmt_2 = $conn2->prepare("SELECT * FROM notifications WHERE user = ? ORDER BY timestamp DESC");
+    $stmt_2->bind_param("i", $_SESSION['userid']);
+    $stmt_2->execute();
+    $result = $stmt_2->get_result();
+
+    $notifications = [];
+
+    while($row = $result->fetch_assoc()) {
+
+        $profile = $row['profile'];
+
+        $stmtUser = $conn2->prepare("SELECT username FROM users WHERE id = ?");
+        $stmtUser->bind_param("i", $profile);
+        $stmtUser->execute();
+        $userRow = $stmtUser->get_result()->fetch_assoc();
+
+        $user = $userRow['username'];
+
+        if($row['category'] == 1) {
+            $url = "/user/" . $profile;
+            $post = "followed you";
+            $img  = "../acc/users/pfps/" . $profile;
+
+        } elseif ($row['category'] == 2){
+
+            $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+            $stmt3 = $conn3->prepare("SELECT name, screenshot FROM model WHERE id = ?");
+            $stmt3->bind_param("i", $row['content']);
+            $stmt3->execute();
+            $row3 = $stmt3->get_result()->fetch_assoc();
+            $conn3->close();
+
+            if($row3) {
+                $img = $row3['screenshot'];
+                $url = "/build/" . $row['content'];
+                $post = "commented on " . $row3['name'];
+            }
+
+        } elseif($row['category'] == 3) {
+
+            $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+            $stmt3 = $conn3->prepare("SELECT title FROM messages WHERE id = ?");
+            $stmt3->bind_param("i", $row['content']);
+            $stmt3->execute();
+            $row3 = $stmt3->get_result()->fetch_assoc();
+            $conn3->close();
+
+            $title = $row3['title'] ?? "[deleted]";
+            $img = "/img/com.jpg";
+            $url = "/com/" . $row['content'];
+            $post = "replied to " . $title;
+        }
+
+        if (is_numeric($row['timestamp'])) {
+            $time = time_ago(date("Y-m-d H:i:s", $row['timestamp']));
+        } else {
+            $time = "A long time ago";
+        }
+        
+        if($_SERVER['HTTPS'] != 'off') {
+            $proto = "https";
+        } else {
+            $proto = "http";
+        }
+
+        $notifications[] = [
+        	"url"  => $proto . "://" . $_SERVER['HTTP_HOST'] . $url,
+        	"img"  => $proto . "://" . $_SERVER['HTTP_HOST'] . $img,
+            "message" => $user . " " . $post,
+        	"time" => $time
+       	];
+    }
+
+    echo json_encode($notifications);
+    exit;
 }
 
 if(isset($_GET['clear_notifications'])) {
@@ -380,7 +565,7 @@ if (isset($_POST['deactive_account'])) {
 
 if(isset($_GET['export_acc_row'])) {
     if(loggedin()) {
-        $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt = $conn->prepare("SELECT id, username, email, alert, picture, description, twitter, bsky, age FROM users WHERE id = ?");
         $stmt->bind_param("i", $_SESSION['userid']);
         $stmt->execute();
         $result = $stmt->get_result();

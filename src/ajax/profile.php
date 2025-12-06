@@ -287,13 +287,13 @@ function fetch_profile($profile_id, $csrf) {
         ]);
     }
     
-    if (!loggedin()) {
+    /*if (!loggedin()) {
         header("HTTP/1.0 403 Forbidden");
         return json_encode([
             "message" => "Sign in to view " . htmlspecialchars($row['username']) . "'s creations, posts, and comments.",
             "error" => 'USR_SESS_NUL'
         ]);
-    }
+    }*/
 
     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
     if ($conn2->connect_error) {
@@ -330,14 +330,22 @@ function fetch_profile($profile_id, $csrf) {
     $following = $stmt->get_result()->fetch_assoc()['following'];
     $stmt->close();
     
-    $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ? AND profileid = ?");
-    $stmt->bind_param("ss", $_SESSION['userid'], $profile_id);
-    $stmt->execute();
-    $is_following = $stmt->get_result()->fetch_assoc()['following'];
-    $stmt->close();
+    if (loggedin()) {
+    	$stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ? AND profileid = ?");
+    	$stmt->bind_param("ss", $_SESSION['userid'], $profile_id);
+    	$stmt->execute();
+    	$is_following = $stmt->get_result()->fetch_assoc()['following'];
+    	$stmt->close();
+    } else {
+        $is_following = false;
+    }
 
     if(isset($_GET['user'])) {
         header("HTTP/1.0 200 OK");
+    }
+    
+    if($users_row['admin'] == '1') {
+    	$dataemail = htmlspecialchars($row['email']);
     }
 
     $message = null;
@@ -356,7 +364,8 @@ function fetch_profile($profile_id, $csrf) {
         'likes' => htmlspecialchars($likes),
         'blockedUser' => (bool)$is_blocking,
         'isFollowing' => (bool)$is_following,
-        'message' => $message
+        'message' => $message,
+        'email' => $dataemail ?? ''
     ];
 
     return json_encode($data);
