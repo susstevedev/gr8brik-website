@@ -20,6 +20,11 @@ if ("serviceWorker" in navigator) {
 }
 
 $(document).ready(function() {
+    
+    if(!window.fetch) {
+        alert("Your browser does not support the fetch API. Gr8Brik will not work.");
+    }
+    
     var cookie_options = {
         link: "/privacy.php",
         delay: "250",
@@ -104,7 +109,7 @@ $(document).ready(function() {
                         <span>
                         	${builds.views} views - ${builds.likes} likes - 
                             <a href='/user/${builds.user}'>
-                            	<img src="/acc/users/pfps/${builds.user}.jpg?v=a" class="w3-circle" width="25px" height="25px">
+                            	<img src="${builds.pfp}?v=a" class="w3-circle" width="25px" height="25px">
                                 ${builds.username}
                             </a>
                         </span>
