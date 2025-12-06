@@ -208,7 +208,7 @@ if(isset($_POST['comment'])){
         echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>';
     }
 
-    $words = ['Spark something about flying cows', 'Start a MOC contest', 'Pigs! Its all about pigs!', 'Undefined!' , 'Dont use Javascript on the server side!', 'Oops I think I changed the padding on that button by ~1 megagiga pixel!'];
+    $words = ['Spark something about flying cows', 'Start a MOC contest', 'Pigs! Its all about pigs!', 'Undefined!' , 'Dont use Javascript on the server side!', 'Oops I think I changed the padding on that button by ~1 megagiga pixel!', 'Moderation! Amazing!'];
     $randomKeys = array_rand($words);
     $randomWord = $words[$randomKeys];
 
