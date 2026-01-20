@@ -63,6 +63,10 @@ $(document).ready(function() {
 
         $("#" + tab).removeClass("w3-hide");
     }
+    
+    window.escapeHtml = function(text) {
+        return text.innerText;
+    }
 
     window.mode = function() {
         var theme = 'light';
@@ -109,7 +113,7 @@ $(document).ready(function() {
                         <span>
                         	${builds.views} views - ${builds.likes} likes - 
                             <a href='/user/${builds.user}'>
-                            	<img src="${builds.pfp}?v=a" class="w3-circle" width="25px" height="25px">
+                            	<img src="${builds.pfp}" class="w3-round" width="25px" height="25px">
                                 ${builds.username}
                             </a>
                         </span>
@@ -128,10 +132,10 @@ $(document).ready(function() {
             type: 'GET',
             data: { get_warn_status: true },
             success: function(res) {
-                console.log(res);
-                    if(res.status == "yes") {
+                console.log(res);                
+                if(res.status == "yes") {
                         console.log("status is true");
-                        popup = `<div id="popup" class="w3-modal w3-show">
+                        	popup = `<div id="popup" class="w3-modal w3-show">
                                         <div class="gr8-theme w3-modal-content w3-light-grey w3-card-2 w3-animate-top w3-center w3-padding-small">
                                             <header class="w3-container">
                                                 <span onclick="document.getElementById('popup').classList.remove('w3-show'); setTimeout(getWarnStatus, 60000); seenWarnStatus();" 
@@ -145,12 +149,12 @@ $(document).ready(function() {
                                             </div>
                                         </div>
                                     </div>`
-                        $("#popup-wrapper-global").append(popup);
-                        mode();
-                        console.log(popup);
-                    } else {
-                        setTimeout(getWarnStatus, 60000);
-                    }
+                    $("#popup-wrapper-global").append(popup);
+                   	mode();
+                	console.log(popup);
+                } else {
+                	setTimeout(getWarnStatus, 60000);
+            	}
             }
         });
     }
