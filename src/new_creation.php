@@ -27,14 +27,6 @@ if($data['message'] != "OK") {
     $data['username'] = 'User';
 }
 
-if(loggedin() && $users_row['new_build_ui'] == true && isset($_GET['id'])) {
-    header('Location:/n/build/' . $_GET['id']);
-    exit;
-} elseif(isset($_COOKIE['newcreui']) && $_COOKIE['newcreui'] == true && isset($_GET['id'])) {
-    header('Location:/n/build/' . $_GET['id']);
-    exit;
-}
-
 if ($_POST['report']) {
     header('Content-Type: application/json');
 
@@ -276,6 +268,7 @@ document.addEventListener("DOMContentLoaded", function () {
         function fetchCSRFToken(callback) {
             $.get("/ajax/config.php", { get_csrf_token: 1 }, function(data) {
                 $("#csrf_token").val(data.csrf_token);
+                window.csrf_token = data.csrf_token;
                 callback();
             }, "json");
         }
@@ -360,12 +353,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 method: "POST",
                 data: { downvote: true, model_id: embed_model },
                 success: function(res) {
-                    /*if(res.success) {
-                        console.log(res.success); */
-                        btn.replaceWith(`<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>Like</button>`);
-                    /*} else if(res.error) {
-                        alert(res.error);
-                    }*/
+               		btn.replaceWith(`<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>Like</button>`);
                 },
                 error: (jqXHR, textStatus, errorThrown) => {
                     console.error("error:", textStatus, errorThrown, jqXHR);
@@ -422,10 +410,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
             fetchCSRFToken(function() {
                 const btn = $(this);
-                const commentBox = $("#comment-form textarea[name='comment-box']").val();
+                //const commentBox = $("#comment-form #comment-box").val();
+                const commentBox = $("[data-testid='gr8-comment-box--comment-value']").val();
+                console.log(commentBox);
                 const commentBtnText = $("#comment-btn-text");
                 const errorElm = $("#ajax-error");
-                const csrf = $("#comment-form input[name='csrf_token']").val();
+                const csrf = window.csrf_token;
 
                 commentBtnText.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
                 btn.prop("disabled", true);
@@ -480,91 +470,99 @@ document.addEventListener("DOMContentLoaded", function () {
     <div id="ajax-error" style="display: none;" class="w3-bottom w3-padding w3-round w3-red"></div>
 
     <center><header class="loader"></header></center>
-    <header>
-        <h2 id="data-name"><?php echo $data['name'] ?></h2>
-        <h4 id="data-stats">
-            <i class="fa fa-clock-o" aria-hidden="true"></i>Posted&nbsp;<span title="<?php echo $data['date'] ?>"><?php echo time_ago($data['date']) ?></span><br />
-            <i class="fa fa-user-o" aria-hidden="true"></i>By
-            	<?php if($data['userid'] === 0) { ?>
-            		<span id="data-user-link"><?php echo $data['username'] ?></span>
-                <?php } elseif($data['model_admin'] === '1') { ?>
-                	<a id="data-user-link" class="w3-text-red w3-hover-text-yellow" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?></a>
-                <?php } else { ?>
-                	<a id="data-user-link" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?></a>
-                <?php } ?>
-            <br />
-            <i class="fa fa-arrow-circle-o-up" aria-hidden="true"></i><?php echo $data['likes'] ?>&nbsp;likes<br />
-            <i class="fa fa-eye" aria-hidden="true"></i><?php echo $data['views'] ?>&nbsp;views<br />
-        </h4>
-    </header>
 
     <figure class="data-model-screenshot" style="margin: 20px !important;">
         <p><img id="data-model-screenshot" src="<?php echo $data['screenshot'] ?>" style="width:50vw;height:50vh;border:1px solid;border-radius:15%;display:none;" loading='lazy'></p>
         <p id="data-model-embed">Your browser failed to load the viewer. Please make sure you didn't stop the page from loading, Javascript is enabled, and your browser is up-to-date.</p>
-        <figcaption data-testid="description" class="gr8-theme w3-card-2 w3-hover-shadow w3-light-grey w3-padding w3-large w3-round" style="width: 65%">
-        <?php if(!empty($data['description'])) { ?>
-            <h4><span id="data-description"><?php echo $data['description'] ?></span><br /></h4>
-        <?php } ?>
-        </figcaption>
-    </figure>
-
-    <div class="w3-dropdown-click" style="z-index: 999;">
-        <div class="tooltip">
-            <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Download a model to save it</span>
-            <button onclick="dropdown()" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Download...</button>
-        </div>
-        <div id="gr8-dropdown" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
-            <a id="data-build-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['model'] ?>" download="<?php echo htmlspecialchars($data['name']) ?>.gr8">creation</a>
-            <a id="data-screenshot-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?>.png">screenshot</a>
-        </div>
-    </div>
-
-    <?php if($loggedin === true) { ?>
-        <?php if ($data['voted'] === true) { ?>
-            <div class="tooltip" id="data-unlike-creation">
-                <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Remove your vote from this creation</span>
-                &nbsp;<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-down"></span>Unlike</button>&nbsp;
-            </div>
-        <?php } else { ?>
-            <div class="tooltip" id="data-like-creation">
-                <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Vote on this creation and support the creator</span>
-                &nbsp;<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>Like</button>&nbsp;
-            </div>
-        <?php } ?>
-
-        <?php if(trim($token['user']) === trim($data['userid'])) { ?>
-            <div class="tooltip" id="data-delete-model">
-                <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Delete this creation</span>
-                <button onclick=document.getElementById("delete-model").style.display="block" name="delete" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />
-                    <i class="fa fa-trash" aria-hidden="true"></i>Delete
-                </button>&nbsp;
-            </div>
-        <?php } ?>
-
-        <div class="tooltip" id="data-report-model">
-            <span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Report this creation to moderators</span>
-            <button onclick=document.getElementById("report").style.display="block" name="flag" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />
-                <i class="fa fa-flag" aria-hidden="true"></i>Report
-            </button>&nbsp;
-        </div>
-    <?php } ?>
         
-    <p><span class="w3-large">Embed:</span></p>
-    <p><textarea class="w3-card-2 w3-round" rows='2' cols='75' readonly><?php echo $model_embed ?></textarea></p>
-    <hr />
+        <figcaption data-testid="description" class="gr8-theme w3-hover-shadow w3-light-grey w3-padding-large w3-round-large" style="width: 65%">
+            
+            <header>
+                <h2 id="data-name"><?php echo $data['name'] ?></h2>
+                
+                <h4><i class="fa fa-user-o" aria-hidden="true"></i>
+                	<?php if($data['userid'] === 0) { ?>
+                    	<span id="data-user-link"><?php echo $data['username'] ?></span>
+                    <?php } elseif($data['model_admin'] === '1') { ?>
+                    	<span><a id="data-user-link" class="w3-text-red w3-hover-text-yellow" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?></a></span>
+                    <?php } else { ?>
+                    	<a id="data-user-link" href="/user/<?php echo $data['userid'] ?>"><?php echo $data['username'] ?></a>
+                   	<?php } ?>
+                </h4>
+                
+                <h4 id="data-stats">
+                    <span title="<?php echo $data['date'] ?>">Published <?php echo time_ago($data['date']) ?></span>
+                    <span>|</span>
+                    <span><?php echo $data['views'] ?> views</span>
+                </h4>
+            </header><hr />
+            
+        	<?php if(!empty($data['description'])) { ?>
+          		<h4><span id="data-description" class="w3-large"><?php echo $data['description'] ?></span><br /></h4><hr />
+            <?php } ?>
 
-    <div class="w3-container">
+           	<div class="w3-right">
+            	<div class="w3-dropdown-click w3-round-large" style="z-index: 999;">
+            		<div class="tooltip">
+           	 			<span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Download a model to save it</span>
+            			<button onclick="dropdown()" class="w3-btn w3-blue w3-hover-opacity w3-round-large w3-padding-small w3-border w3-border-indigo">Download...</button>
+            		</div>
+            		<div id="gr8-dropdown" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
+            			<a id="data-build-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['model'] ?>" download="<?php echo htmlspecialchars($data['name']) ?>.gr8">creation</a>
+            			<a id="data-screenshot-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?>.png">screenshot</a>
+            		</div>
+            	</div>
+
+                <?php if($loggedin === true) { ?>
+                	<?php if ($data['voted'] === true) { ?>
+                		<div class="tooltip" id="data-unlike-creation">
+                			<span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Remove your vote from this creation</span>
+                			&nbsp;<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-round-large w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-down"></span>
+                            	<span>Unlike (<?php echo $data['likes'] ?>)</span>
+                            </button>&nbsp;
+                		</div>
+                	<?php } else { ?>
+                 		<div class="tooltip" id="data-like-creation">
+                 			<span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Vote on this creation and support the creator</span>
+                 			&nbsp;<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-round-large w3-padding-small w3-border w3-border-orange"><span class="fa fa-arrow-up"></span>
+                            	<span>Like (<?php echo $data['likes'] ?>)</span>
+                            </button>&nbsp;
+                 		</div>
+                 	<?php } ?>
+
+                   <?php if(trim($token['user']) === trim($data['userid'])) { ?>
+                   		<div class="tooltip" id="data-delete-model">
+                   			<span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Delete this creation</span>
+                   			<button onclick=document.getElementById("delete-model").style.display="block" name="delete" class="w3-btn w3-red w3-hover-opacity w3-round-large w3-padding-small w3-border w3-border-pink" />
+                   				<i class="fa fa-trash" aria-hidden="true"></i>Delete
+                   			</button>&nbsp;
+                   		</div>
+                   <?php } ?>
+                   		<div class="tooltip" id="data-report-model">
+                        	<span class="w3-tag w3-round w3-blue tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Report this creation to moderators</span>
+                            <button onclick=document.getElementById("report").style.display="block" name="flag" class="w3-btn w3-red w3-hover-opacity w3-round-large w3-padding-small w3-border w3-border-pink" />
+                                <i class="fa fa-flag" aria-hidden="true"></i>Report
+                            </button>&nbsp;
+                        </div>
+				<?php } ?>
+			</div>
+           <p><span class="w3-large">Embed:</span></p>
+           <p><textarea class="w3-card-2 w3-round" rows='2' cols='75' readonly><?php echo $model_embed ?></textarea></p><hr />
+    </figcaption></figure>
+
+    <div class="w3-container w3-margin">
         <?php if($data['message'] != "OK") { ?>
             <p><div class="gr8-theme w3-light-grey w3-round w3-padding"><?php echo $data['message'] ?></div></p>
         <?php } elseif($loggedin === true) { ?>
-            <div id='comment-form'>
+            <div id='comment-form w3-half'>
                 <div id='post'>
-                    <textarea name='comment-box' id='comment-box' class='w3-input w3-card-2 w3-hover-shadow w3-mobile w3-half w3-round' placeholder='add a comment... (type @username to mention someone)' rows='4' cols='40'></textarea>
-                </div><br />
-                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf']; ?>">
-                <button id='post-comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo'>
-                    <span id="comment-btn-text">Comment</span>
-                </button>
+                    <textarea data-testid="gr8-comment-box--comment-value" name='comment-box' id='comment-box' class='w3-input w3-half gr8-theme w3-light-grey w3-round' placeholder='Add a comment... (@username mentions someone, BBcode supported)' rows='auto' cols='40'></textarea>
+                </div>
+                <div class="w3-margin-top">
+                    <button id='post-comment' class='w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo'>
+                        <span id="comment-btn-text">Comment</span>
+                    </button>
+                </div>
             </div>
         <?php } else { ?>
             <div>
@@ -604,7 +602,7 @@ document.addEventListener("DOMContentLoaded", function () {
             	<i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
            	</div>
             
-            <div class="w3-col w3-card-2 w3-hover-shadow" style="width: 65%;">
+            <div class="w3-col w3-card-2" style="width: 65%;">
                 <article class="gr8-theme w3-light-grey w3-padding w3-round" style="min-height: 75px;">
                     <header class="w3-padding-bottom">
                         <?php if($comment['userid'] != 0) { ?>
@@ -639,14 +637,20 @@ document.addEventListener("DOMContentLoaded", function () {
                                 <span class="w3-tag w3-round w3-blue tooltiptext">
                                     <i class="fa fa-info-circle" aria-hidden="true"></i>&nbsp;Upvote Comment
                                 </span>
-                                <button data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-arrow-up w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"></button>
+                                <button data-id="<?php echo $comment['id'] ?>" 
+                                        class="upvote-btn fa fa-arrow-up w3-btn w3-yellow w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"
+                                        <?php echo $comment['vote_disable'] ? 'disabled' : '' ?>
+                                        ></button>
                             </div>
                         <?php } elseif ($comment['voted'] === true) { ?>
                             <div class="tooltip">
                                 <span class="w3-tag w3-round w3-blue tooltiptext">
                                     <i class="fa fa-info-circle" aria-hidden="true"></i>&nbsp;Downvote Comment
                                 </span>
-                                <button data-id="<?php echo $comment['id'] ?>" class="downvote-btn fa fa-arrow-down w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"></button>
+                                <button data-id="<?php echo $comment['id'] ?>" 
+                                        class="downvote-btn fa fa-arrow-down w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-orange"
+                                        <?php echo $comment['vote_disable'] === 'true' ? 'disabled' : '' ?>
+                                        ></button>
                             </div>
                         <?php } ?>
                     <?php } ?>

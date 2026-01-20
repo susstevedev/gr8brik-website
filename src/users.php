@@ -18,7 +18,7 @@
 
 <div class="w3-card-2 w3-light-grey gr8-theme w3-padding-small w3-center">
 
-    <h5>If you wish us to remove any personal details we hold about you, please email us at <i class="fa fa-envelope"><a href="mailto:evanrutledge226@gmail.com">evanrutledge226[at]gmail[dot]com</a></i></h5>
+    <h5>If you wish us to remove any personal details we hold about you, please email us at <i class="fa fa-envelope"><a href="mailto:<?php echo DB_MAIL ?>"><?php echo DB_MAIL ?></a></i></h5>
 
 </div><br />
 
@@ -33,7 +33,6 @@
             <option value="username_a">A-Z</option>
             <option value="username_d">Z-A</option>
             <option value="age">Creation date</option>
-            <option value="verified">Important Accounts</option>
             <option value="admin">Moderator Accounts</option>
         </select>
         <input class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Apply">
@@ -48,21 +47,16 @@
             if (isset($_GET['sort']) && $_GET['sort']) {
                 if($_GET['sort'] === 'desc') {
                     $sql = "SELECT * FROM users ORDER BY id DESC";
-                }
-                if($_GET['sort'] === 'username_a') {
+                } elseif($_GET['sort'] === 'username_a') {
                     $sql = "SELECT * FROM users ORDER BY username ASC";
-                }
-                if($_GET['sort'] === 'username_d') {
+                } elseif($_GET['sort'] === 'username_d') {
                     $sql = "SELECT * FROM users ORDER BY username DESC";
-                }
-                if($_GET['sort'] === 'age') {
+                } elseif($_GET['sort'] === 'age') {
                     $sql = "SELECT * FROM users ORDER BY age DESC";
-                }
-                if($_GET['sort'] === 'verified') {
-                    $sql = "SELECT * FROM users WHERE verified = '1' ORDER BY age DESC";
-                }
-                if($_GET['sort'] === 'admin') {
+                } elseif($_GET['sort'] === 'admin') {
                     $sql = "SELECT * FROM users WHERE admin = '1' ORDER BY age DESC";
+                } else {
+                    $sql = "SELECT * FROM users ORDER BY id DESC";
                 }
             } else {
                 $sql = "SELECT * FROM users ORDER BY id DESC";

@@ -37,13 +37,13 @@
         var slideIndex = 1;
         showDivs(slideIndex);
 
-        function plusDivs(n) {
-            showDivs(slideIndex += n);   
+        window.plusDivs = function(n) {
+            showDivs(slideIndex += n);
         }
 
         setInterval(function() {
             plusDivs(1);
-        }, 3000);
+        }, 5000);
 
         function showDivs(n) {
             var x = $(".mySlides");
@@ -61,15 +61,15 @@
 
     <div class="w3-container w3-light-grey w3-card-2 w3-text-grey"><h1>GR8BRIK</h1><h2>.rf.gd</h2></div><br />
 
-    <div class="w3-content w3-card-2 w3-light-grey w3-padding-small w3-left" style="max-width: 525px;position: relative;">
+    <div class="w3-content w3-card-2 w3-light-grey w3-padding-small w3-left w3-round" style="max-width: 525px;position: relative;">
 
         <a href="#feed"><img class="mySlides" src="img/feed.jpg" style="width:500px;height:250px;display:none;" class="w3-animate-right"></a>
         <a href="#community"><img class="mySlides" src="img/com.jpg" style="width:500px;height:250px;display:none;" class="w3-animate-right"></a>
         <a href="#creations"><img class="mySlides" src="img/creations.jpg" style="width:500px;height:250px;display:none;" class="w3-animate-right"></a>
         <a href="#uploads"><img class="mySlides" src="img/upload.jpg" style="width:500px;height:250px;display:none;" class="w3-animate-right"></a>
 
-        <a class="w3-btn-floating w3-blue w3-xlarge w3-hover-white" style="position:absolute;top:45%;left:0" onclick="plusDivs(-1)"><i class="fa fa-arrow-left" aria-hidden="true"></i></a>
-        <a class="w3-btn-floating w3-blue w3-xlarge w3-hover-white" style="position:absolute;top:45%;right:0" onclick="plusDivs(1)"><i class="fa fa-arrow-right" aria-hidden="true"></i></a>
+        <a class="w3-btn w3-blue w3-round w3-padding w3-large w3-hover-white" style="position:absolute;top:45%; left:10px;" onclick="plusDivs(-1)"><i class="fa fa-arrow-left" aria-hidden="true"></i></a>
+        <a class="w3-btn w3-blue w3-round w3-padding w3-large w3-hover-white" style="position:absolute; top:45%; right:10px;" onclick="plusDivs(1)"><i class="fa fa-arrow-right" aria-hidden="true"></i></a>
 
     </div>
 
@@ -81,15 +81,15 @@
 
         <br /><b>Or...</b><br />
 
-        <a href="/acc/login.php">Login</a><br />
+        <a href="/acc/login">Login</a><br />
 
-        <a href="/acc/register.php">Create Account</a><br />
+        <a href="/acc/register">Create Account</a><br />
 
-        <a href="/com/view.php?id=17">Rules</a><br />
+        <a href="/com/view?id=17">Rules</a><br />
 
-        <a href="/terms.php">Terms and Conditions</a><br />
+        <a href="/terms">Terms and Conditions</a><br />
 
-        <a href="/privacy.php">Privacy Policy</a><br />
+        <a href="/privacy">Privacy Policy</a><br />
 
     </div>
 

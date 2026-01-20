@@ -173,7 +173,7 @@
         </div>
 
         <input class="w3-input w3-border w3-threequarter" type="text" value="<?php if (isset($_GET['q'])) { echo $_GET['q']; } ?>" id="search-input-2" placeholder="Search for...">
-        <button class="w3-btn w3-large w3-white w3-hover-blue w3-mobile w3-border w3-quarter" id="search-button-2"><i class="fa fa-search" aria-hidden="true"></i></button><br /><br />
+        <button style="height: 40px" class="w3-btn w3-large w3-white w3-hover-blue w3-mobile w3-border w3-quarter" id="search-button-2"><i class="fa fa-search" aria-hidden="true"></i></button><br /><br />
 
         <script>
             function checkCookieExists(n) {
@@ -211,7 +211,63 @@
         <form method="get">
             <label for="sort"><span>Sort by&nbsp;</span></label>
             <select name="sort" id="sort">
-                <option selected>Following</option>
+                <option disabled>Select...</option>
+                <?php                	
+            		if ($_GET['sort'] === "follow" || empty($_GET['sort'])) {
+                        echo "<option value='follow' selected>Following</option>";
+                    } else {
+                        echo "<option value='follow'>Following</option>";
+                    }
+                    
+                    if ($_GET['sort'] === "feature") {
+                        echo "<option value='feature' selected>Featured</option>";
+                    } else {
+                        echo "<option value='feature'>Featured</option>";
+                    }
+                    
+                    if ($_GET['sort'] === "all") {
+                        echo "<option value='all' selected>All</option>";
+                    } else {
+                        echo "<option value='all'>All</option>";
+                    }
+                    
+                    if ($_GET['sort'] === "views") {
+                        echo "<option value='views' selected>Most viewed</option>";
+                    } else {
+                        echo "<option value='views'>Most viewed</option>";
+                    }
+                    
+                    if ($_GET['sort'] === "likes") {
+                        echo "<option value='likes' selected>Most liked</option>";
+                    } else {
+                        echo "<option value='likes'>Most liked</option>";
+                    }
+                    
+                    if ($_GET['sort'] === "az") {
+                        echo "<option value='az' selected>Alphabetical A-Z</option>";
+                    } else {
+                        echo "<option value='az'>Alphabetical A-Z</option>";
+                    }
+                    
+                    if ($_GET['sort'] === "za") {
+                        echo "<option value='za' selected>Alphabetical Z-A</option>";
+                    } else {
+                        echo "<option value='za'>Alphabetical Z-A</option>";
+                    }
+                    
+                    if ($_GET['sort'] === "oldest") {
+                        echo "<option value='oldest' selected>Oldest</option>";
+                    } else {
+                        echo "<option value='oldest'>Oldest</option>";
+                    }
+                    
+                    if ($_GET['sort'] === "newest") {
+                        echo "<option value='newest' selected>Newest</option>";
+                    } else {
+                        echo "<option value='newest'>Newest</option>";
+                    }
+               	?>
+                <!-- <option value="follow">Following</option>
                 <option value="feature">Featured</option>
                 <option value="all">All</option>
                 <option value="views">Most viewed</option>
@@ -219,9 +275,9 @@
                 <option value="az">Alphabetical A-Z</option>
                 <option value="za">Alphabetical Z-A</option>
                 <option value="oldest">Oldest</option>
-                <option value="newest">Newest</option>
+                <option value="newest">Newest</option> -->
             </select>
-            <input class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo" type="submit" value="Apply Filters">
+            <input class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Apply!">
         </form><br />
         
         <?php
@@ -250,7 +306,7 @@
               
               if (
                 isset($_GET['sort']) 
-                && $_GET['sort'] === "Following" 
+                && $_GET['sort'] === "follow" 
                 || empty($_GET['sort']) 
                 && empty($_GET['q'])
               ) {
@@ -268,13 +324,6 @@
         } else {
             $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 12 OFFSET ' .  $offset;
         }
-
-        /*$stmt = $conn2->prepare('SELECT COUNT(*) as count FROM model');
-        $stmt->execute();
-        $model_count_sql = $stmt->get_result();
-
-        $model_count = $model_count_sql->fetch_assoc();
-        echo '<h4><i class="fa fa-info-circle w3-padding-small" aria-hidden="true"></i>' . $model_count['count'] . ' total creations</h4>'; */
 
         if (isset($_GET['q']) && $_GET['q']) {
             $is_search = true;

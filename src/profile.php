@@ -5,14 +5,20 @@ if(loggedin()) {
     $userid = $token['user'];
 }
 
+$use_username = false;
+
 if(!isset($_GET['id'])) {
-    header("HTTP/1.0 404 Not Found");
-    exit;
+    if(!isset($_GET['name'])) {
+    	header("HTTP/1.0 404 Not Found");
+    	exit;
+    } else {
+        $use_username = true;
+    }
 }
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
-$data = json_decode(fetch_profile($_GET['id'], $_SESSION['csrf']), true);
+$data = json_decode(fetch_profile($use_username, $_GET['id'] ?? $_GET['name'], $_SESSION['csrf']), true);
 
 if ($data === null) {
     exit('An unknown error occured');
@@ -22,6 +28,10 @@ if($data['message'] != null | !empty($data['message'])) {
     $error = $data['message'];
     $data['username'] = 'User';
 }
+
+$_GET['id'] = $data['userid'];
+
+$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
 if (isset($_POST['follow'])) {
     if(!isset($token['user'])) {
@@ -198,6 +208,29 @@ if(isset($_POST['ban'])) {
     }
 }
 
+if(isset($_POST['warn'])) {
+    $profile_id = (int)$_GET['id'];
+    $reason = mysqli_real_escape_string($conn, $_POST['reason']);
+    $start_date = time();
+
+    if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
+        exit('Invalid user ID!');
+    }
+		
+    if($users_row['admin'] != '0') {
+        $sql = "INSERT INTO warnings (user, reason, timestamp) VALUES ($profile_id, '$reason', $start_date)";
+        $result = $conn->query($sql);
+        if ($result) {
+           	header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
+        	exit;
+        } else {
+            exit('An SQL error occured!');
+        }
+    } else {
+        exit('User is not an administrator!');
+    }
+}
+
 if(isset($_POST['delete'])) {
     if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
         exit('Invalid user ID!');
@@ -323,10 +356,31 @@ if(isset($_POST['delete'])) {
         });
     </script>
 
-    <div id="user-card" class="w3-light-grey w3-card-2 gr8-theme w3-padding-small">
+    <div id="user-card" class="w3-light-grey w3-card-2 w3-padding w3-round gr8-theme">
     <?php if(file_exists("acc/users/banners/" . htmlspecialchars($_GET['id']) . "..jpg")) { ?>
+        <style>
+        [data-testid="user-profile-card-banner"] {
+            display: inline-block;
+            background: #000;
+            width: 100%;
+            height: auto;
+        }
+        [data-testid="user-profile-card-banner_image"] {
+            background-image: url('/acc/users/banners/<?php echo htmlspecialchars($_GET['id']) ?>..jpg');
+            width: 75vw;
+            height: 50vh;
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-position: 50% 50%;
+            background-color: #000;
+            display: inline-block;
+        }
+        </style>
         <center>
-            <img id="banner" style="width: 100%; height: 25vh; border-radius: 0px;" src="/acc/users/banners/<?php echo htmlspecialchars($_GET['id']) ?>..jpg" />
+            <div data-testid="user-profile-card-banner">
+            	<!-- <img data-testid="user-profile-card-banner_image" id="banner" style="width: 200px; height: fit-content; border-radius: 2px; border: 1px solid #ddd;" src="/acc/users/banners/<?php echo htmlspecialchars($_GET['id']) ?>..jpg" /> -->
+                <span data-testid="user-profile-card-banner_image" id="banner"></span>
+            </div>
         </center>
     <?php } ?>
         
@@ -339,7 +393,7 @@ if(isset($_POST['delete'])) {
                 <span id="username"><?php echo $data['username'] ?></span>
             <?php } ?>
             
-            <?php if(trim($token['user']) === trim($_GET['id'])) { ?>
+            <?php if(isset($token) && trim($token['user']) === trim($_GET['id'])) { ?>
                 <span><a href="/acc/index"><i class="fa fa-pencil w3-xlarge" aria-hidden="true"></i></a></span>
             <?php } ?>
 
@@ -360,10 +414,9 @@ if(isset($_POST['delete'])) {
             <b>-</b>
             <span id="twitter-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">
                 <a id="twitter-link" href="https://twitter.com/<?php echo $data['twitter'] ?>" target="_blank">
-                    <!-- <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-twitter-x" viewBox="0 0 16 16">
-                        <path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
-                    </svg> -->
-                    <i class="fa fa-twitter" aria-hidden="true"></i>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-twitter-x" viewBox="0 0 16 16">
+  						<path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
+					</svg>
                     <?php echo $data['twitter'] ?>
                 </a>
             </span>
@@ -373,10 +426,9 @@ if(isset($_POST['delete'])) {
             <b>-</b>
             <span id="bsky-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">
                 <a id="bsky-link" href="https://bsky.app/profile/" target="_blank">
-                    <svg style="width: 16px; height: 16px; fill: #fff;" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <title>Bluesky</title>
-                        <path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364.136-.02.275-.039.415-.056-.138.022-.276.04-.415.056-3.912.58-7.387 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a8.741 8.741 0 0 1-.415-.056c.14.017.279.036.415.056 2.67.297 5.568-.628 6.383-3.364.246-.828.624-5.79.624-6.478 0-.69-.139-1.861-.902-2.206-.659-.298-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8Z"></path>
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-bluesky" viewBox="0 0 16 16">
+  						<path d="M3.468 1.948C5.303 3.325 7.276 6.118 8 7.616c.725-1.498 2.698-4.29 4.532-5.668C13.855.955 16 .186 16 2.632c0 .489-.28 4.105-.444 4.692-.572 2.04-2.653 2.561-4.504 2.246 3.236.551 4.06 2.375 2.281 4.2-3.376 3.464-4.852-.87-5.23-1.98-.07-.204-.103-.3-.103-.218 0-.081-.033.014-.102.218-.379 1.11-1.855 5.444-5.231 1.98-1.778-1.825-.955-3.65 2.28-4.2-1.85.315-3.932-.205-4.503-2.246C.28 6.737 0 3.12 0 2.632 0 .186 2.145.955 3.468 1.948"/>
+					</svg>
                 </a>
             </span>
         <?php } ?>
@@ -400,7 +452,7 @@ if(isset($_POST['delete'])) {
                     <div class="w3-dropdown-content gr8-theme w3-bar-block w3-padding-small w3-border w3-border-gray w3-round-small">
                         <?php if($data['blockedUser'] === false) { ?>
                             <button onclick='document.getElementById("block").style.display="block"' name="block" class="w3-bar-item w3-button" />
-                                Block User
+                                Block
                             </button>
                         <?php } elseif($data['blockedUser'] === true) { ?>
                             <input id="button-unblock" form="unblockUser" class="w3-bar-item w3-button" type="submit" value="Unblock User" name="unblock">
@@ -408,10 +460,13 @@ if(isset($_POST['delete'])) {
 
                         <?php if($users_row['admin'] != (int)'0') { ?>
                             <button id="button-ban-user" onclick='document.getElementById("ban").style.display="block"' name="ban" class="w3-bar-item w3-button" />
-                                Ban User
+                                Ban
+                            </button>
+        					<button id="button-warn-user" onclick='document.getElementById("warn").style.display="block"' name="warn" class="w3-bar-item w3-button" />
+                                Warn
                             </button>
                             <button id="button-delete-user" onclick='document.getElementById("delete").style.display="block"' name="delete" class="w3-bar-item w3-button" />
-                                Deactivate Profile
+                                Deactivate this account
                             </button>
                         <?php } ?>
                     </div>
@@ -427,7 +482,32 @@ if(isset($_POST['delete'])) {
 
     </span></div>
 
-    
+	<script>
+        window.openTab = function(tab) {
+            var amount;
+            var tabGroup = document.getElementsByClassName("tab");
+            for (amount = 0; amount < tabGroup.length; amount++) {
+                //tabGroup[amount].classList.add("w3-hide");
+                tabGroup[amount].style.display = 'none';
+            }
+            var tabElement = document.getElementById(tab);
+            //tabElement.classList.remove("w3-hide");
+            tabElement.style.display = 'block';
+        }
+        $(document).ready(function() {
+            openTab('creationstab');
+        });
+        </script>
+
+        <div class="w3-navbar w3-margin-top w3-half w3-center" style="flex-direction:row;">
+            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey' onclick="openTab('creationstab')">Creations</a>
+            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey' onclick="openTab('poststab')">Posts</a>
+            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey' onclick="openTab('commentstab')">Comments</a>
+            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey w3-padding-small' onclick="openTab('likestab')">Likes</a>
+        </div>
+
+		<h2 id="text" style="text-transform: capitalize;"></h2>
+        
     <div id="unfollow" class="w3-modal">
 		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
 			<div class="w3-container">
@@ -461,12 +541,25 @@ if(isset($_POST['delete'])) {
                     <span onclick="document.getElementById('delete').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
                         <form method='post' action=''>
                         <h2>Are you sure you want to delete this user?</h2>
-                        <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span> 
+                        <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span>
                         <input type="submit" value="Yes" name="delete" class="w3-btn w3-large w3-white w3-hover-red">
                     </form>
                 </div>
             </div>
         </div>
+
+            <div id="warn" class="w3-modal">
+				<div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-round w3-padding w3-center">
+					<div class="w3-container">
+						<span onclick='document.getElementById("warn").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
+							<h2>Are you sure you want to warn this user?</h2>
+                            <textarea name="reason" placeholder="Moderator note about this warning (required)" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea><br />
+                            <span name="close" class="w3-btn w3-large w3-white w3-hover-blue w3-round" onclick='document.getElementById("warn").style.display="none"'>No</span>
+							<input type="submit" value="Yes" name="warn" class="w3-btn w3-large w3-white w3-hover-red w3-round">
+						</form>
+					</div>
+				</div>
+			</div><br />
 
             <div id="ban" class="w3-modal">
 				<div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-center">
@@ -525,7 +618,6 @@ if(isset($_POST['delete'])) {
                             <br/>
                                 <select class="w3-select" name="year">
                                 <option value="2026" disabled selected>year</option>
-                                <option value="2025">2025</option>
                                 <option value="2026">2026</option>
                                 <option value="2027">2027</option>
                                 <option value="2028">2028</option>
@@ -557,8 +649,8 @@ if(isset($_POST['delete'])) {
 
     <span id="data-user-actions">
 	    <a href="#creations" id="creations"></a>
-			<h3>Creations</h3>
-		    <div class="w3-row">
+		    <div class="w3-row tab" id="creationstab">
+            <h3>Creations</h3>
 			<?php
                 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 
@@ -585,7 +677,7 @@ if(isset($_POST['delete'])) {
                     echo "<div class='w3-display-container w3-left w3-padding'>";
                     echo "<a href='/build/" . $creation['id'] . "'><img src='" . $creation['screenshot'] . "' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
                     echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
-                    echo "<span>By <a href='/user/" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($creation['date'])) . "</span>";
+                    echo "<span>By <a href='/user/" . $_GET['id'] . "'>" . $data['username'] . "</a> " . time_ago(date("Y-m-d H:i:s", strtotime($creation['date']))) . "</span>";
                     echo "</div></div>";
                 }
 
@@ -593,10 +685,10 @@ if(isset($_POST['delete'])) {
                 $conn->close();
             ?>
 			</div>
-			<hr />
+        
 			<a href="#posts" id="posts"></a>
-				<h3>Posts</h3>
-				<div class="w3-row">
+			<div class="w3-row tab" id="poststab">
+            <h3>Posts</h3>
 			<?php
 				$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
 				if ($conn->connect_error) {
@@ -623,8 +715,9 @@ if(isset($_POST['delete'])) {
             ?>
 
 			</div>
-			<hr />
+        
 		<a href="#comments" id="comments"></a>
+        <div class="tab" id="commentstab">
             <div class="w3-row">
 			<h3>Comments</h3>
             <?php
@@ -661,7 +754,9 @@ if(isset($_POST['delete'])) {
                 $sql = "SELECT * FROM messages WHERE userid = $profileid AND parent != 0 ORDER BY timestamp DESC";
                 $result = $conn2->query($sql);
 
-                echo "</div><div class='w3-row'><h4>Replies to posts</h4><br />";
+                echo "</div>";
+                echo "<div class='w3-row'><h4>Replies to posts</h4><br />";
+                
                 if ($result->num_rows === 0) {
                     echo "<b>Nothing here yet</b>";
                 }
@@ -681,6 +776,66 @@ if(isset($_POST['delete'])) {
                 $conn2->close();
             ?>
         </div>
+        </div>
+        
+		<a href="#likes" id="likes"></a>
+			<div class="w3-row tab" id="likestab">
+            <h3>Likes</h3>
+			<?php
+				$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+                $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+				if ($conn->connect_error) {
+					exit($conn->connect_error);
+				}
+                
+                $profileid = $_GET['id'];
+                
+                $stmt = $conn->prepare('SELECT * FROM votes WHERE user = ?');
+                $stmt->bind_param('i', $profileid);
+                $stmt->execute();
+                $result = $stmt->get_result();
+
+                $liked = [];
+
+                if ($result->num_rows != 0) {
+                    while ($row = $result->fetch_assoc()) {
+                        $liked[] = $row['creation'];
+                    }
+                
+                	$stmt2 = $conn->prepare("SELECT * FROM model WHERE id IN (" . implode(',', $liked) . ") ORDER BY date DESC");
+                	$stmt2->execute();
+                	$result2 = $stmt2->get_result();
+                    
+                    if ($result2->num_rows != 0) {
+                    	while ($row2 = $result2->fetch_assoc()) {
+                            $model_user = $row2['user'];
+                            
+                            $stmt3 = $conn2->prepare("SELECT username FROM users WHERE id = ?");
+                    		$stmt3->bind_param("s", $model_user);
+                    		$stmt3->execute();
+                    		$result3 = $stmt3->get_result();
+                            $username = $result3->fetch_assoc()['username'] ?? "[deleted]";
+                            
+                            if (empty($row2['name'])) {
+                                $row2['name'] = $row2['username'] . "'s creation";
+                            }
+
+                            $truncatedName = htmlspecialchars(substr($row2['name'], 0, 30));
+                            if (strlen($row2['name']) >= 30) {
+                                $truncatedName .= '...';
+                            }
+
+                            echo "<div class='w3-display-container w3-left w3-padding'>";
+                            echo "<a href='/build/" . $row2['id'] . "'><img src='" . $row2['screenshot'] . "' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
+                            echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
+                            echo "<span>By <a href='/user/" . $row2['user'] . "'>" . $username . "</a> " . time_ago(date("Y-m-d H:i:s", strtotime($row2['date']))) . "</span>";
+                            echo "</div></div>";
+                        }
+                    }
+                }
+            	$conn->close();
+            ?>
+		</div>
     </span>
 
     <?php include('linkbar.php') ?>

@@ -25,16 +25,33 @@
                     </span>
                 </button>
                 <div class='gr8-theme w3-light-grey w3-card-2 w3-dropdown-content'>
-                    <a href='/acc' class='w3-bar-item w3-button'>
-                    <i class='fa fa-cog' aria-hidden='true'></i>&nbsp;Account Settings</a>
-                    <a href="/user/<?php echo $token['user'] ?>" class='w3-bar-item w3-button'><i class='fa fa-user' aria-hidden='true'></i>&nbsp;Profile</a>
-                    <a href='/acc/new' class='w3-bar-item w3-button'><i class='fa fa-inbox' aria-hidden='true'></i>&nbsp;
-                        Notifications&nbsp;<span class='w3-red w3-tag w3-round'><?php echo (int)$users_row['alert'] ?></span>
+                    <a href='/acc/index' class='w3-bar-item w3-button'>
+                        <span><i class='fa fa-sliders w3-padding-small' aria-hidden='true'></i>Account Settings</span>
                     </a>
-                    <a href='/acc/creations' class='w3-bar-item w3-button'><i class='fa fa-building' aria-hidden='true'></i>&nbsp;My Creations</a>
-                    <a href='/acc/following' class='w3-bar-item w3-button'><i class='fa fa-user-plus' aria-hidden='true'></i>&nbsp;People</a>
-                    <a href='/acc/logins' class='w3-bar-item w3-button'><i class='fa fa-lock' aria-hidden='true'></i>&nbsp;Sessions</a>
-                    <a href='/acc/login?status=logout' class='w3-bar-item w3-button'><i class='fa fa-sign-out' aria-hidden='true'></i>&nbsp;Logout</a>
+                    
+                    <a href="/user/<?php echo $token['user'] ?>" class='w3-bar-item w3-button'>
+                        <span><i class='fa fa-user-o w3-padding-small' aria-hidden='true'></i>My Profile</span>
+                    </a>
+                    
+                    <a href='/acc/notifications' class='w3-bar-item w3-button'>
+                        <span><i class='fa fa-bell-o w3-padding-small' aria-hidden='true'></i>Notifications <span class='w3-red w3-tag w3-round'><?php echo (int)$users_row['alert'] ?></span></span>
+                    </a>
+                    
+                    <a href='/acc/creations' class='w3-bar-item w3-button'>
+                        <span><i class='fa fa-th w3-padding-small' aria-hidden='true'></i>My Creations</span>
+                    </a>
+                    
+                    <a href='/acc/following' class='w3-bar-item w3-button'>
+                        <span><i class='fa fa-bullhorn w3-padding-small' aria-hidden='true'></i>Social</span>
+                    </a>
+                    
+                    <a href='/acc/logins' class='w3-bar-item w3-button'>
+                        <span><i class='fa fa-shield w3-padding-small' aria-hidden='true'></i>Sessions</span>
+                    </a>
+                    
+                    <a href='/acc/login?status=logout' class='w3-bar-item w3-button'>
+                        <span><i class='fa fa-sign-out w3-padding-small' aria-hidden='true'></i>Logout</span>
+                    </a>
                 </div>
             </div>
         <?php } else { ?>
@@ -62,12 +79,6 @@
         });
         
         window.loadFeaturedCreations();
-  
-        $('.w3-main').xpull({
-           'callback': function () {
-              window.location.reload();
-           }
-        });
     });
 </script>
 
@@ -81,30 +92,26 @@
 </div>
 
 <!-- VERY IMPORTANT -->
-<div style="overscroll-behavior: none;" class="xpull-main w3-main gr8-main"><br />
-
-<div class="xpull">
-    <div class="xpull__start-msg">
-        <div class="xpull__arrow"></div>
-    </div>
-    <div class="xpull__spinner">
-        <div class="xpull__spinner-circle"></div>
-    </div>
-</div>
+<div class="w3-main gr8-main">
     
-<?php if(isset($users_row) && $users_row['verify_token'] != null) { ?>
-    <div class="w3-card-2 w3-light-grey w3-padding">
+	<!-- <div data-testid="age-verification" class="w3-card-2 w3-light-grey w3-padding w3-round gr8-theme">
+    	<h4 data-testid="age-verification-header">Gr8brik will not comply with any of the current age verification laws.</h4>
+        <p data-testid="age-verification-text">We don't have any money and as such it would be impossible to sue us. We also don't host any content harmful to minors and we try not to collect any unneeded data.</p>
+	</div><br /> -->
+    
+	<?php if(loggedin() && isset($users_row) && $users_row['verify_token'] != null) { ?>
+    <div class="w3-card-2 w3-light-grey w3-padding w3-round gr8-theme">
         <i class="fa fa-lock" aria-hidden="true"></i>
         <b>Verify your account to unlock all features of Gr8Brik</b>
         <form action="/ajax/auth.php" method="GET">
             <altcha-widget 
             style="--altcha-border-width:0px;" 
-            strings='{"verified":"I am not a robot","label":"I am not a robot","verifying": "I am not a robot","waitAlert": "An error occurred"}' 
+            strings='{"verified":"I am not a robot","label":"I am not a robot","verifying": "I am not a robot","waitAlert": "An error has occurred"}' 
             challengeurl='https://us.altcha.org/api/v1/challenge?apiKey=ckey_01d9f4ad018c16287ca6f3938a0f'
             ></altcha-widget>
             <input type="submit" value="Verify" id="verify_account" name="verify_account" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
         </form>
     </div><br />
-<?php } ?>
-        
-<span id="popup-wrapper-global"></span>
+	<?php } ?>
+            
+	<span id="popup-wrapper-global"></span>
