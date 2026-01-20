@@ -72,7 +72,7 @@ function login_user($user, $pwd) {
         return ['error' => "Database connection failed"];
     }       
 
-    $user = mysqli_real_escape_string($conn, $user);
+    $user = mysqli_real_escape_string($conn, htmlspecialchars(urldecode($user)));
     $pwd = mysqli_real_escape_string($conn, $pwd);
 
     if (empty($user)) {
@@ -122,14 +122,14 @@ function login_user($user, $pwd) {
             // For account deactivation (soft deletion until a certain date)
             if (!empty($row['deactive'])) {
                 if ($_SERVER['REQUEST_TIME'] - 2592000 < strtotime($row['deactive'])) {
-                    $sql = "INSERT INTO sessions (id, user, password, timestamp) VALUES ('$tokenid', '$userid', '$pwd', '$time') LIMIT 1";
+                    $sql = "INSERT INTO sessions (id, user, timestamp) VALUES ('$tokenid', '$userid', '$time') LIMIT 1";
                     if (mysqli_query($conn, $sql)) {
                         header('HTTP/1.0 500 Internal Server Error');
-                        return ['popup' => "Do you want to reactivate your account?", 'error' => "See modal for more info", 'goto' => "http://www.gr8brik.rf.gd/acc/index?reactive=1&token=" . $tokenid];
+                        return ['popup' => "Do you want to reactivate your account?", 'error' => "See modal for more info", 'goto' => "/acc/index?reactive=1&token=" . $tokenid];
                     }
                 } else {
                     header('HTTP/1.0 500 Internal Server Error');
-                    return ['error' => "This account has been deactivated"];
+                    return ['error' => "This account has been deactivated more than 30 days ago and cannot be reactivated."];
                 }
             }
 
@@ -183,10 +183,11 @@ function register_user($username, $password, $email) {
         return ['error' => "Database connection failed"];
     }
 
-    $username = mysqli_real_escape_string($conn, htmlspecialchars($username));
+    $username = mysqli_real_escape_string($conn, htmlspecialchars((urldecode($username))));
     $email = mysqli_real_escape_string($conn, trim($email ?? ''));
     $salt = uniqid();	
     $created = date("Y-m-d");
+    $bloguser = md5(uniqid(true));
     $tokenid = uniqid();
     $login_from = $_SERVER['REMOTE_ADDR'];
 
@@ -203,7 +204,16 @@ function register_user($username, $password, $email) {
         }
     }
     
-    $picture = 'https://profile.accounts.firefox.com/v1/avatar/' . substr($username, 0, 1);
+    //$picture = 'https://profile.accounts.firefox.com/v1/avatar/' . substr($username, 0, 1);
+    
+    $letter = htmlspecialchars(substr(strtolower($username), 0, 1));
+    $valid = array('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z');
+    
+   	if(!in_array($letter, $valid)) {
+		$letter = "?";
+    }
+    
+    $picture = '/ajax/pfp?method=default&letter=' . $letter;
 
     if(strlen($password) > 255) {
         header("HTTP/1.0 400 Bad Request");
@@ -215,7 +225,9 @@ function register_user($username, $password, $email) {
         return ['error' => "Password cannot be less than 4 characters"];
     }
 
-    $password = md5($password . $salt);
+    // Don't yell at me because I used to use MD5
+    //$password = md5($password . $salt);
+    $password = password_hash($password, PASSWORD_DEFAULT);
 
     // Prevents re-registration for banned or deactivated accounts
     // Allow list replaced with not allowed list to avoid some issues with school emails
@@ -256,7 +268,7 @@ function register_user($username, $password, $email) {
         header("HTTP/1.0 400 Bad Request");
         return ['error' => "Username or email already in use"];
     } else {
-        $sql = "INSERT INTO users (username, password, salt, email, age, picture, verify_token) VALUES ('$username', '$password', '$salt', '$email', '$created', '$picture', '$tokenid') LIMIT 1";
+        $sql = "INSERT INTO users (blog_user_id, username, password, email, age, picture, verify_token) VALUES ('$bloguser', '$username', '$password', '$email', '$created', '$picture', '$tokenid') LIMIT 1";
         if (mysqli_query($conn, $sql)) {
             $sql = "SELECT id FROM users WHERE username = '$username'";
             $result = mysqli_query($conn, $sql);
@@ -266,9 +278,8 @@ function register_user($username, $password, $email) {
             $time = time();
 
             // Create session token
-            $sql = "INSERT INTO sessions (id, login_from, user, password, timestamp) VALUES ('$tokenid', '$login_from', '$userid', '$password', '$time') LIMIT 1";
+            $sql = "INSERT INTO sessions (id, login_from, user, timestamp) VALUES ('$tokenid', '$login_from', '$userid', '$time') LIMIT 1";
             if (mysqli_query($conn, $sql)) {
-                //setcookie('token', $tokenid, $time + (60 * 60 * 24 * 400), "/", ".gr8brik.rf.gd");
                 setcookie('token', $tokenid, [
                     'expires' => $time + (60 * 60 * 24 * 400),
                     'path' => '/',

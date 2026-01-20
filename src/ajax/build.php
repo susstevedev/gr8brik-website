@@ -125,14 +125,21 @@ if (isset($_POST['save_build'])) {
 
         if (strpos($screenshot_data, 'data:image/png;base64,') === 0) {
             $screenshot_data = base64_decode(substr($screenshot_data, strlen('data:image/png;base64,')));
-            $screenshot_path = "../cre/" . $file_id . ".png";
-            $db_screenshot = "/cre/" . $file_id . ".png";
+        } elseif(strpos($screenshot_data, 'data:image/webp;base64,') === 0) {
+            $screenshot_data = base64_decode(substr($screenshot_data, strlen('data:image/webp;base64,')));
+        } else {
+            header("HTTP/1.1 500 Internal Server Error");
+            echo json_encode(['error' => "Screenshot must be encoded in WebP or PNG."]);
+            exit;
+        }
+        
+        $screenshot_path = "../cre/" . $file_id . ".webp";
+        $db_screenshot = "/cre/" . $file_id . ".webp";
 
-            if (!file_put_contents($screenshot_path, $screenshot_data)) {
-                header("HTTP/1.1 500 Internal Server Error");
+        if (!file_put_contents($screenshot_path, $screenshot_data)) {
+       		header("HTTP/1.1 500 Internal Server Error");
                 echo json_encode(['error' => "Failed to save screenshot."]);
                 exit;
-            }
         }
     }
 
@@ -346,9 +353,10 @@ function fetch_comments($model_id, $csrf) {
         ]);
     }
 
-    $id = $token['user'];
+    $id = $_SESSION['userid'];
+    $message = null;
 
-	$sql = "SELECT DISTINCT * FROM comments WHERE model = $model_id ORDER BY id ASC";
+	$sql = "SELECT * FROM comments WHERE model = $model_id AND hidden = 0 ORDER BY id ASC";
 	$comResult = $conn->query($sql);
 
     $count_result = $conn->query("SELECT COUNT(*) as reply_count FROM comments WHERE model = $model_id");
@@ -371,48 +379,74 @@ function fetch_comments($model_id, $csrf) {
             }
         }
         
+        /*$is_voted = false;
+        if (loggedin()) {
+        	$voted_query = $conn->query("SELECT * FROM comment_votes WHERE comment_id = '$comment_id' AND user_id = '$id'");
+            while ($voted_row = $voted_query->fetch_assoc()) {
+                if ((int)$voted_row['user_id'] === (int)$id) {
+                    $is_voted = true;
+                }
+            }
+        }
+        $comment_votes = $row['votes'];*/
+        
         $c_user = $row['user'];
         $userResult = $conn2->query("SELECT * FROM users WHERE id = '$c_user'");
         $userRow = $userResult->fetch_assoc();
 
-        $banResult = $conn2->query("SELECT * FROM bans WHERE user = '$c_user' LIMIT 1");
+        $banResult = $conn2->query("SELECT * FROM bans WHERE user = '$c_user'");
         $banRow = $banResult->fetch_assoc();
 
         $youBlocked = false;
         $theyBlocked = false;
         $blockResult = $conn2->query("SELECT * FROM user_blocks WHERE (userid = '$c_user' AND profileid = '$id') OR (userid = '$id' AND profileid = '$c_user')");
         if ($blockResult && $blockResult->num_rows > 0) {
-            while ($row = $blockResult->fetch_assoc()) {
-                if ($row['userid'] == $id && $row['profileid'] == $c_user) {
+            while ($row_block = $blockResult->fetch_assoc()) {
+                if ($row_block['userid'] == $id && $row_block['profileid'] == $c_user) {
                     $youBlocked = true;
-                } elseif ($row['userid'] == $c_user && $row['profileid'] == $id) {
+                } elseif ($row_block['userid'] == $c_user && $row_block['profileid'] == $id) {
                     $theyBlocked = true;
                 }
             }
             if ($youBlocked && $theyBlocked) {
-                $message = "You blocked @" . $userRow['username'] . ", and they blocked you.";
+                $message = "You blocked @" . $userRow['username'] . ", and they blocked you. Their comments and profile will not be visible.";
             } elseif ($youBlocked) {
-                $message = "You blocked @" . $userRow['username'];
+                $message = "You blocked @" . $userRow['username'] . ". Your comments and profile will not be visible to them.";
             } elseif ($theyBlocked) {
-                $message = "You're blocked from @" . $userRow['username'];
+                $message = "You're blocked from @" . $userRow['username'] . ". Their comments and profile will not be visible.";
             }
-            continue;
         }
 
         $username = $userRow['username'];
+        $picture = $userRow['picture'];
+        $vote_disable = false;
 
-        if (!empty($userRow['deactive']) || $banResult->num_rows > 0 && $banRow['end_date'] >= time()) {
+        if (!empty($userRow['deactive']) || $banResult->num_rows > 0 && $banRow['end_date'] >= time() || $theyBlocked) {
             $c_user = 0;
+            $picture = "/img/no_image.png";
+            $vote_disable = true;
+        }
+        
+        if($banResult->num_rows > 0 && $banRow['end_date'] >= time()) {
+            $message = "@" . $userRow['username'] . " is banned from Gr8brik. Some of their profile data might not load.";
         }
 
         if ($userResult->num_rows === 0 || empty($userRow['id'])) {
             $username = "[deleted]";
             $c_user = 0;
+            $picture = "/img/no_image.png";
+            $vote_disable = true;
         }
 
         if (!is_numeric($row['date'])) {
             $row['date'] = 0;
         }
+        
+         if(!$theyBlocked) { 
+             $wcomment = $bbcode->toHTML(nl2br(htmlspecialchars($row['comment'])));
+         } else {
+             $wcomment = null;
+         }
 
         $count++;
 
@@ -422,14 +456,16 @@ function fetch_comments($model_id, $csrf) {
             'userid' => $c_user,
             'user_admin' => htmlspecialchars($userRow['admin']),
             'username' => htmlspecialchars($username),
-            'picture' => $userRow['picture'],
-            'comment' => $bbcode->toHTML(nl2br(htmlspecialchars($row['comment']))),
+            'picture' => $picture,
+            'comment' => $wcomment,
             'date' => time_ago(date('Y-m-d H:i:s', $row['date'])),
             'is_op' => $row['is_op'],
             'votes' => $comment_votes,
             'voted' => $is_voted,
+            'vote_disable' => $vote_disable,
             'message' => $message
         ];
+        $message = null;
     }
     $comResult->free();
     return json_encode($comments); 
@@ -768,7 +804,7 @@ function delete_build($model_id) {
         return 'Error: Unauthorized';
     }
 
-    $model_path = '../cre/' . $build_row['model'];
+    $model_path = $build_row['model'];
     if (file_exists($model_path)) {
         unlink($model_path);
     }
@@ -828,6 +864,18 @@ if ($loggedin === true) {
         }
 
         $model_id = (int)$_POST['model_id'];
+        
+        $stmt = $conn->prepare("SELECT COUNT(*) FROM votes WHERE creation = ? AND user = ?");
+        $stmt->bind_param("ii", $model_id, $id);
+        $stmt->execute();
+        $stmt->bind_result($vote_count);
+        $stmt->fetch();
+        $stmt->close();
+
+        if ($vote_count === 0) {
+            echo json_encode(['error' => 'You have already unliked this!']);
+            exit;
+        }
 
         $stmt = $conn->prepare("UPDATE model SET likes = likes - 1 WHERE id = ?");
         $stmt->bind_param("i", $model_id);
@@ -904,26 +952,67 @@ if ($loggedin === true) {
             echo json_encode(['error' => 'invalid comment']);
             exit;
         }
+        
         $id = $token['user'];
         $username = $users_row['username'];
         $comment_id = (int) $_POST['comment_id'];
+        
+        $stmt = $conn->prepare("SELECT id, user FROM comments WHERE id = ? LIMIT 1");
+        $stmt->bind_param("i", $comment_id);
+        $stmt->execute();
+        $stmt->bind_result($comment_id, $comment_user);
+        $stmt->fetch();
+        $stmt->close();
+
+        if ($comment_id === 0) {
+            echo json_encode(['error' => 'comment does not exist in database']);
+            exit;
+        }
 
         $stmt = $conn->prepare("SELECT COUNT(*) FROM comment_votes WHERE comment_id = ? AND user_id = ?");
         $stmt->bind_param("ii", $comment_id, $id);
         $stmt->execute();
-        $stmt->bind_result($vote_count);
+        $stmt->bind_result($count);
         $stmt->fetch();
         $stmt->close();
 
-        if ($vote_count > 0) {
+        if ($count > 0) {
             echo json_encode(['error' => 'already voted on this comment']);
             exit;
         }
+                
+        $banResult = $conn2->query("SELECT * FROM bans WHERE user = '$comment_user'");
+        $banRow = $banResult->fetch_assoc();
+
+        $youBlocked = false;
+        $theyBlocked = false;
+        $blockResult = $conn2->query("SELECT * FROM user_blocks WHERE (userid = '$comment_user' AND profileid = '$id') OR (userid = '$id' AND profileid = '$comment_user')");
+        if ($blockResult && $blockResult->num_rows > 0) {
+            while ($row_block = $blockResult->fetch_assoc()) {
+                if ($row_block['userid'] == $id && $row_block['profileid'] == $comment_user) {
+                    $youBlocked = true;
+                } elseif ($row_block['userid'] == $comment_user && $row_block['profileid'] == $id) {
+                    $theyBlocked = true;
+                }
+            }
+        }
+
+        if ($banResult->num_rows > 0 && $banRow['end_date'] >= time() || $theyBlocked) {
+            echo json_encode(['error' => 'could not vote on this comment because voting is disabled for the selected comment']);
+            exit;
+        }
+        
+        $comm_data_arr = array(
+            'comment_user' => $comment_user,
+            'theyBlocked' => $theyBlocked,
+            'ban_end_date' => $banRow['end_date'] ?? null,
+            'comment_id' => $comment_id
+        );
 
         $stmt = $conn->prepare("INSERT INTO comment_votes (comment_id, user_id, user_name) VALUES (?, ?, ?)");
         $stmt->bind_param("iis", $comment_id, $id, $username);
         if ($stmt->execute()) {
-            echo json_encode(['success' => 'comment upvoted']);
+            echo json_encode(['success' => 'comment upvoted', 'API_INTERNAL_COMM_DATA' => $comm_data_arr]);
         } else {
             echo json_encode(['error' => 'failed to insert upvote']);
         }

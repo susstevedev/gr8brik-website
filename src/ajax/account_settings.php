@@ -23,6 +23,32 @@ function check_username_available($new) {
 
     $available = '1';
     $reason = '0';
+    
+    $reserved_names = array(
+        'administrator', 
+        'god', 
+        'admin',
+        'susstevedev',
+        'sussteve',
+        'sussteve226',
+        'evan',
+        'saverino',
+        'the_an0nym',
+        'the_anonym'
+    );
+    
+    /* I will not add some words as the project is open source and github/contibutors might get mad */
+    /* If someone has somehow registered an account with one of these names, report their account or one of their models */
+    $banned_words = array(
+        'ZnVjaw',
+        'c2hpdA',
+        'ZGFtbg',
+        'ZnVja2luZw',
+        'ZGFtbWl0',
+        'bW90aGVyZnVja2Vy',
+        'ZmFnZw',
+        'bmlnZw'
+    );
 
     if(empty($new) || $new === null) {
         $available = '0';
@@ -55,6 +81,18 @@ function check_username_available($new) {
     if($result->num_rows != 0) {
         $available = '0';
         $reason = 'Username has been taken. Please choose another.';
+    }
+    
+    if (in_array($new, $reserved_names)) {
+        $available = '0';
+        $reason = 'This username has been reserved and cannot be used.';
+    }
+    
+    foreach($banned_words as $banned_word) {
+        if (strpos(base64_encode($new), $banned_word) !== false) {
+            $available = '0';
+        	$reason = 'This username has been blacklisted and cannot be used.';
+        }
     }
 
     if (!empty($users_row['changed'])) {
@@ -158,9 +196,11 @@ function about_change($new) {
     global $users_row;
     $id = (int)$users_row['id'];
 
-    if(strlen($new) > 200) {
+    // used to be 200
+    // 1k as of 1/1/2026
+    if(strlen($new) > 1000) {
         header("HTTP/1.0 500 Internal Server Error");
-        return ['error' => 'About section can only be 200 characters.'];
+        return ['error' => 'About section can only be 1,000 characters.'];
     }
 
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);

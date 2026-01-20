@@ -1,5 +1,5 @@
 <?php
-error_reporting(0);
+//error_reporting(0);
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
@@ -173,7 +173,7 @@ if(isset($_GET['who_follows_you'])) {
 function user_blocks($profileid, $userid, $username) {
     $you = false;
     $them = false;
-    $message = "OK";
+    $message = false;
 
     $block_result = $conn2->query("SELECT * FROM user_blocks WHERE (userid = '$userid' AND profileid = '$profileid') OR (userid = '$profileid' AND profileid = '$userid')");
 
@@ -198,7 +198,7 @@ function user_blocks($profileid, $userid, $username) {
     }
 }
 
-function fetch_profile($profile_id, $csrf) {
+function fetch_profile($use_name, $profile_id, $csrf) {
     global $token, $users_row;
     $userid = $token['user'] ?? null;
 
@@ -215,7 +215,7 @@ function fetch_profile($profile_id, $csrf) {
     if (empty($profile_id) || $profile_id === null) {
         header("HTTP/1.0 403 Forbidden");
         return json_encode([
-            "message" => 'No user ID provided!',
+            "message" => 'No user ID/name provided!',
             "error" => 'USR_ID_NUL'
         ]);
     }
@@ -225,9 +225,14 @@ function fetch_profile($profile_id, $csrf) {
         exit($conn->connect_error);
     }
 
-    $sql = "SELECT * FROM users WHERE id = ? LIMIT 1";
+    if($use_name === true) {
+        $sql = "SELECT * FROM users WHERE username = ?";
+    } else {
+         $sql = "SELECT * FROM users WHERE id = ?";
+    }
+   	
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $profile_id);
+    $stmt->bind_param("s", $profile_id);
     $stmt->execute();
     $result = $stmt->get_result();
     if ($result->num_rows === 0 || !$result) {
@@ -238,6 +243,7 @@ function fetch_profile($profile_id, $csrf) {
         ]);
     }
     $row = $result->fetch_assoc();
+    $profile_id = $row['id'];
     $stmt->close();
 
     if (!empty($row['deactive'])) {
@@ -260,7 +266,7 @@ function fetch_profile($profile_id, $csrf) {
         if ($ban_data['end_date'] >= time()) {
             header("HTTP/1.0 403 Forbidden");
             return json_encode([
-                "message" => htmlspecialchars($row['username']) . " has been banned until " . gmdate("M d, Y H:i", $ban_data['end_date']) . ". " . htmlspecialchars($ban_data['reason']) . ".",
+                "message" => htmlspecialchars($row['username']) . " has been banned until " . date("D, M d, Y \@\ H:i A", $ban_data['end_date']) . ". " . htmlspecialchars($ban_data['reason']) . ".",
                 "error" => 'ACC_BAN'
             ]);
         }
@@ -274,7 +280,7 @@ function fetch_profile($profile_id, $csrf) {
 
     $sql = "SELECT * FROM user_blocks WHERE userid = ? AND profileid = ? LIMIT 1";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ii", $profile_id, $id);
+    $stmt->bind_param("ii", $profile_id, $users_row['id']);
     $stmt->execute();
     $result3 = $stmt->get_result();
     $stmt->close();
@@ -282,7 +288,7 @@ function fetch_profile($profile_id, $csrf) {
     if ($result3->num_rows > 0) {
         header("HTTP/1.0 403 Forbidden");
         return json_encode([
-            "message" => htmlspecialchars($row['username']) . " has blocked you.",
+            "message" => htmlspecialchars($row['username']) . " has blocked you, as such you can't view their profile. Additionally, their comments will not be visible.",
             "error" => 'ACC_BLOCKED_USR'
         ]);
     }
@@ -344,12 +350,15 @@ function fetch_profile($profile_id, $csrf) {
         header("HTTP/1.0 200 OK");
     }
     
-    if($users_row['admin'] == '1') {
-    	$dataemail = htmlspecialchars($row['email']);
+    if (loggedin()) {
+        if($users_row['admin'] == '1') {
+            $dataemail = htmlspecialchars($row['email']);
+        }
     }
 
     $message = null;
     $data = [
+        'userid' => $profile_id,
         'username' => htmlspecialchars($row['username']),
         'admin' => (string)$row['admin'],
         'description' => isset($row['description']) ? $bbcode->toHTML($row['description']) : '', 
@@ -374,7 +383,7 @@ function fetch_profile($profile_id, $csrf) {
 if(isset($_GET['user'])) {
     header('Content-Type: application/json');
     $profile_id = htmlspecialchars($_GET['user']);
-    $data = fetch_profile($profile_id, $_SESSION['csrf']);
+    $data = fetch_profile(false, $profile_id, $_SESSION['csrf']);
     echo $data;
 }
 ?>

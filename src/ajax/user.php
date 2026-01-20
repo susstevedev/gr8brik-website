@@ -10,7 +10,7 @@ if(isset($_GET['ajax'])) {
 
 if(loggedin() === true) {
     if (rand(1, 10) === 1) {
-        //regenerate_session();
+        regenerate_session();
         delete_old_sessions();
         delete_inactive_users();
     }
@@ -44,18 +44,20 @@ function login() {
                 global $user, $pwd, $email, $about, $x, $admin, $alert, $age, $changed, $loggedin;
 
                 $users_row = $user_res->fetch_assoc();
-                $user = $users_row['username'];
-                $pwd = $users_row['password'];
-                $email = $users_row['email'];
-                $about = $users_row['description'];
-                $x = $users_row['twitter'];
-                $admin = (string)$users_row['admin'];
-                $alert = (int)$users_row['alert'];
-                $age = $users_row['age'];
-               	$changed = $users_row['changed'];
+                $user = $users_row['username'] ?? '';
+                $pwd = $users_row['password'] ?? '';
+                $email = $users_row['email'] ?? '';
+                $about = $users_row['description'] ?? '';
+                $x = $users_row['twitter'] ?? '';
+                $admin = (string)$users_row['admin'] ?? '';
+                $alert = (int)$users_row['alert'] ?? '';
+                $age = $users_row['age'] ?? '';
+               	$changed = $users_row['changed'] ?? '';
                 $loggedin = loggedin();
 
                 return true;
+            } else {
+                return false;
             }
         }
     }
@@ -63,6 +65,40 @@ function login() {
     return false;
 }
 login();
+
+function newBuildUI() {
+    global $conn, $users_row;
+    
+    if(loggedin()) {
+        if(!isset($_COOKIE['newcreui'])) {
+            if(!isset($users_row['new_build_ui']) || $users_row['new_build_ui'] == null || $users_row['new_build_ui'] == false) {
+                if (mt_rand(1, 10) > 5) {
+                    $val = 1;
+                } else {
+                    $val = 0;
+                }
+
+                $stmt_ui = $conn->prepare("UPDATE users SET new_build_ui = ?");
+                $stmt_ui->bind_param("i", $val);
+
+                if ($stmt_ui->execute()) {
+                    setcookie("newcreui", $val, strtotime("14 January 2038"), "/", ".gr8brik.rf.gd", true);
+                }
+             }
+        } else {
+            setcookie("newcreui", $users_row['new_build_ui'], strtotime("14 January 2038"), "/", ".gr8brik.rf.gd", true);
+        }
+    } else {
+        if(!isset($_COOKIE['newcreui'])) {
+            if (mt_rand(1, 10) > 5) {
+                setcookie("newcreui", true, strtotime("14 January 2038"), "/", ".gr8brik.rf.gd", true);
+            } else {
+                setcookie("newcreui", false, strtotime("14 January 2038"), "/", ".gr8brik.rf.gd", true);
+            }
+        }
+    }
+}
+newBuildUI();
 
 function get_warn_status($id) {
     global $conn;
@@ -121,9 +157,10 @@ if(isset($_GET['ajax'])) {
     if(loggedin() === true) {
         $logindata = json_encode([
             'success' => true, 
-            'id' => $id,  
-            'user' => $user, 
-            'alert' => $alert, 
+            'id' => $_SESSION['userid'],  
+            'pfp' => $users_row['picture'], 
+            'user' => $users_row['username'], 
+            'alert' => $users_row['alert'], 
         ]);
         echo $logindata;
         exit;
@@ -178,23 +215,26 @@ function regenerate_session() {
 
         if($res->num_rows > 0) {
             $row = $res->fetch_assoc();
-            $newid = uniqid();
+            //$newid = uniqid();
             $user_ip = $_SERVER['REMOTE_ADDR'];
             $expires =  time()+(60 * 60 * 24 * 400);
             $active = time();
             $user_agent = htmlspecialchars($_SERVER['HTTP_USER_AGENT']);
 
-            $stmt2 = $conn->prepare("UPDATE sessions SET id = ?, timestamp = ?, login_from = ?, user_agent = ? WHERE id = ?");
-            $stmt2->bind_param("sisss", $newid, $active, $user_ip, $user_agent, $oldid);
+            //$stmt2 = $conn->prepare("UPDATE sessions SET id = ?, timestamp = ?, login_from = ?, user_agent = ? WHERE id = ?");
+            //$stmt2->bind_param("sisss", $newid, $active, $user_ip, $user_agent, $oldid);
+            
+            $stmt2 = $conn->prepare("UPDATE sessions SET timestamp = ?, login_from = ?, user_agent = ? WHERE id = ?");
+            $stmt2->bind_param("isss", $active, $user_ip, $user_agent, $oldid);
             if ($stmt2->execute()) {
-                setcookie('token', $newid, [
+                /*setcookie('token', $newid, [
                     'expires' => $expires,
                     'path' => '/',
                     'domain' => '.gr8brik.rf.gd',
                     'secure' => false,
                     'httponly' => true,
                     'samesite' => 'Lax'
-                ]);
+                ]);*/
 
                 if(str_contains($_SERVER['REQUEST_URI'], '?')) {
                 	return header("Location:" . $_SERVER['REQUEST_URI'] . "&sess_reload=true");
@@ -208,6 +248,15 @@ function regenerate_session() {
         }
     }
     return false;
+}
+if(isset($_GET['regen_sess'])) {
+    header('Content-type: application/json');
+    if(loggedin() === true) {
+        $result = regenerate_session();
+        $logindata = json_encode($result);
+        echo $logindata;
+        exit;
+    }
 }
 
 function delete_old_sessions() {
@@ -576,9 +625,8 @@ function loggedin() {
                         return false;
                     }
                 }
+                return true;
             }
-
-            return true;
         }
     }
 
