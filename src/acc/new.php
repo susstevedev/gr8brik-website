@@ -43,6 +43,12 @@ isLoggedIn();
             });
         });
         </script>
+    
+    	<div data-testid="notification-newpage--banner-warning">
+            <div class="w3-padding-small w3-round-small w3-card-2 w3-yellow w3-text-black">
+                <p data-testid="notification-newpage--banner-warning--text">This is the old notifications page. The new one is located at <a href="/acc/notifications">https://gr8brik.rf.gd/acc/notifications</a></p>
+            </div>
+    	</div><hr />
 
         <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="clearBtn" name="clearBtn">Clear inbox</button>
 

@@ -1,6 +1,11 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
+if(isset($_GET['desktop']) && loggedin()) {
+    echo "<p>The following key can be used to authenticate Gr8brik desktop. <b>" . base64_encode($users_row['username']) . "</b>&nbsp;.<br />Close this window after copying the key to continue.</p>";
+    exit;
+}
+
 if(isset($_GET['status']) && $_GET['status'] === 'logout') {
     $tokenid = htmlspecialchars($_COOKIE['token']);
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -43,6 +48,16 @@ isLoggedin();
     <script>
         $(document).ready(function() {
             $("#error").hide();
+            
+            if(location.search == "?desktop=true") {
+                $("#navbar").hide();
+                $("#linkbar").hide();
+                $("#linkbar").hide();
+                $(".w3-hide-small.w3-show-medium.w3-padding.w3-card-2.w3-bottom.w3-blue.w3-text-white").hide();
+                $("#loginForm span a").hide();
+                document.title = "Gr8brik Desktop Authentication"
+            }
+            
             $("#loginBtn").click(function(event) {
                 event.preventDefault();
 
@@ -55,7 +70,11 @@ isLoggedin();
                     data: { login: true, mail: mail, pwd: pwd },
                     success: function(response) {
                         if(response.success === true) {
-                            window.location.href = "/";
+                            if(location.search == "?desktop=true") {
+                                window.location.reload();
+                            } else {
+                                window.location.href = "/";
+                            }
                         } else {
                             $("#error").show()
                             $("#error-text").text(response.error || "An error occured. Please try again later.");
@@ -89,15 +108,15 @@ isLoggedin();
     </script>
 
     <div id="popup" class="w3-modal w3-card-2">
-        <div class="w3-modal-content">
-            <header class="w3-container w3-teal"> 
+        <div class="gr8-theme w3-round w3-light-grey w3-modal-content">
+            <header class="w3-container w3-round w3-teal"> 
                 <span onclick="document.getElementById('popup').style.display='none'" 
                 class="w3-button w3-display-topright">&times;</span>
                 <h2>Important Modal</h2>
             </header>
             <div class="w3-container">
                 <p id="popup-text"></p>
-                <a href="" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo" id="popup-btn">Yes</a>
+                <a href="" class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo" id="popup-btn">Yes</a>
             </div>
         </div>
     </div>

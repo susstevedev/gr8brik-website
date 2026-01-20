@@ -14,34 +14,24 @@ if(isset($_POST['deactive'])) {
 }
 
 if(isset($_GET['reactive'])) {
-    $token = $conn->real_escape_string($_GET['token']);
+    $new_token = $conn->real_escape_string($_GET['token']);
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     $stmt = $conn->prepare("SELECT * FROM sessions WHERE id = ? LIMIT 1");
-    $stmt->bind_param("s", $token);
+    $stmt->bind_param("s", $new_token);
     $stmt->execute();
-    $tokendata = $stmt->get_result();
-    $tokenrow = $tokendata->fetch_assoc();
-    $user = (int)$tokenrow['user'];
+    $new_tokendata = $stmt->get_result();
+    $new_tokenrow = $new_tokendata->fetch_assoc();
+    $user = (int)$new_tokenrow['user'];
     
     $stmt_2 = $conn->prepare("UPDATE users SET deactive = NULL WHERE id = ? LIMIT 1");
     $stmt_2->bind_param("i", $user);
     if ($stmt_2->execute()) {
-        setcookie('token', $token, time() + (10 * 365 * 24 * 60 * 60), "/");
+        setcookie('token', $new_token, time() + (10 * 365 * 24 * 60 * 60), "/");
+        echo "<h2>Account has been reactivated, please login after this.</h2>";
         header('Location: index.php');
         exit;
     }
-}
-
-if(isset($_GET['settings'])) {
-    $_SESSION['settings'] = true;
-    if((int)$_GET['setting_font'] === 0) {
-        $_SESSION['setting_font'] = null;
-    } else {
-        $_SESSION['setting_font'] = (int)$_GET['setting_font'] . "px";
-    }
-    header('Location:index.php?done=true');
-    exit;
 }
 
 if(!loggedin()) {
@@ -53,8 +43,10 @@ if (isset($_POST['picture'])) {
 
     if(isset($_POST['deletePfp'])) {
         $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        
+        $letter = htmlspecialchars(substr($users_row['username'], 0, 1));
         $pfp = $_SERVER['DOCUMENT_ROOT'] . $users_row['picture'];
-        $old = 'https://profile.accounts.firefox.com/v1/avatar/' . substr($users_row['username'], 0, 1);
+        $old = 'https://profile.accounts.firefox.com/v1/avatar/' . $letter;
 
         $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
         $stmt->bind_param("ss", $old, $id);
@@ -134,10 +126,17 @@ if (isset($_POST['picture'])) {
 
 if (isset($_POST['remove_picture'])) {
     $okay = true;
-
    	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    
+    $letter = htmlspecialchars(substr(strtolower($users_row['username']), 0, 1));
+    $valid = array('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z');
+    
+   	if(!in_array($letter, $valid)) {
+		$letter = "?";
+    }
+    
     $pfp = $_SERVER['DOCUMENT_ROOT'] . $users_row['picture'];
-    $old = 'https://profile.accounts.firefox.com/v1/avatar/' . substr($users_row['username'], 0, 1);
+    $old = '/ajax/pfp?method=default&letter=' . $letter;
 
     $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
     $stmt->bind_param("ss", $old, $id);
@@ -485,7 +484,7 @@ if (isset($_POST['banner'])) {
     			if(file_exists("users/banners/" . $users_row['id'] . "..jpg")) { 
                     echo "users/banners/" . $users_row['id'] . "..jpg";
                 } else { 
-                    echo "https://profile.accounts.firefox.com/v1/avatar/" . substr($users_row['username'], 0, 1);
+                    echo "/ajax/pfp?method=default&letter=" . substr(strtolower($users_row['username']), 0, 1);
                 }
             ?>');
             width: 25vw;
@@ -502,13 +501,6 @@ if (isset($_POST['banner'])) {
 
     <p class="success w3-light-grey w3-card-2 w3-padding-small"></p>
     <p class="error w3-red w3-card-2 w3-padding-small"></p>
-
-    <h2>Frontend</h2>
-    <form id="settings" method="get" action="">
-        <p>These settings will effect how your user interface looks. Please note that these are for testing and <strong>will not</strong> presist between sessions.</p>
-        <p>Font size (in pixels, zero will reset the value): </p><input type="number" min="0" max="100" name="setting_font" value="15" placeholder="Font size" class="w3-input w3-border w3-mobile w3-quarter" />
-        <input type="submit" name="settings" value="Update Font Size" class="w3-btn w3-quarter w3-blue w3-hover-white w3-border w3-border-indigo" />
-    </form><br /><br />
 
     <h2>Account</h2>
     
@@ -534,11 +526,6 @@ if (isset($_POST['banner'])) {
 		<input type="submit" value="Upload" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-col m3">
         <?php
             if($users_row['picture'] != null && $users_row['picture'] != $users_row['id'] . '.jpg' && substr($users_row['picture'], 0, 5) != 'https' && file_exists($_SERVER['DOCUMENT_ROOT'] . $users_row['picture'])) {
-                /*
-                echo '&nbsp;&nbsp;<input type="checkbox" class="w3-check" id="deletePfp" name="deletePfp" value="1">';
-                echo '<label for="deletePfp">Remove</label>';
-                */
-                
                echo '<span class="w3-col m1">&nbsp;</span><input type="submit" value="Delete" id="remove_picture" name="remove_picture" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink w3-col m3">';
             }
         ?>

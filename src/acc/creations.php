@@ -25,9 +25,10 @@ if ($conn2->connect_error) {
     
 	<center>
         <div class="w3-row">
+            <span data-testid="gr8-my-creations-text-sb"><p data-testid="gr8-my-creations-text-sb--text">Creations are sorted by newest by default.</p></span>
             <table class="w3-table-all" style="color:black;">
             <?php
-                $stmt = $conn2->prepare('SELECT * FROM model WHERE user = ?');
+                $stmt = $conn2->prepare('SELECT * FROM model WHERE user = ? ORDER BY date DESC');
                 $stmt->bind_param('i', $token['user']);
                 $stmt->execute();
                 $result = $stmt->get_result();

@@ -37,14 +37,8 @@ isLoggedIn();
                 });
             }
             clear_notifications();
-            $("#clearBtn").click(function(event) {
-                event.preventDefault();
-                clear_notifications();
-            });
         });
         </script>
-
-        <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="clearBtn" name="clearBtn">Clear inbox</button><br /><br />
 
 		<?php
             $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -72,7 +66,7 @@ isLoggedIn();
                     $url = "/profile?id=" . $profile;
                     $post = "followed you";
                     $user = $row2['username'];
-                    $img = '../acc/users/pfps/' . $profile;
+                    $img = $row2['pfp'];
                 } elseif ($row['category'] === "2") {
                     $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
                     $content = $row['content'];
@@ -80,7 +74,7 @@ isLoggedIn();
                     $row3 = $result3->fetch_assoc();
 
                     $valid = true;
-                    $img = '../cre/' . $row3['screenshot'];
+                    $img = $row3['screenshot'];
                     $url = "/creation?id=" . $content;
                     $post = "commented on " . $row3['name'];
                     $user = $row2['username'];
@@ -104,17 +98,17 @@ isLoggedIn();
                 }
                 
                 if (is_numeric($row['timestamp'])) {
-                    $time = time_ago(date("Y-m-d H:i:s", $row['timestamp']));
+                    $time = time_ago(date("Y-m-d H:i:s", (int)$row['timestamp']));
                 } else {
                     $time = "A long time ago";
                 }
 
-                if($valid == true) {
-                    echo "<article class='w3-card-2 w3-hover-shadow gr8-theme w3-light-grey w3-padding w3-large'>";
-                    echo "<a href='" . $url . "'><img src='" . $img . "' style='width: 150px; height: 150px; border-radius: 2px;' alt='" . $img . "' title='" . $img . "'>";
-                    echo "<span style='display: inline-block; vertical-align: top; padding: 5px 5px 5px 5px;'>";
+                if($valid === true) {
+                    echo "<article class='w3-card-2 w3-animate-right w3-hover-shadow gr8-theme w3-padding w3-round w3-large'>";
+                    echo "<a href='" . $url . "'><img src='" . $img . "' style='background: #ddd; width: 150px; height: 150px; border-radius: 6px;' alt='" . $img . "' title='" . $img . "'>";
+                    echo "<span style='display: inline-block; vertical-align: top; padding: 10px 10px 10px 10px;'>";
                     echo htmlspecialchars($user) . "&nbsp;" . htmlspecialchars($post) . "</span></a>";
-                    echo "<time class='w3-right w3-text-grey' datetime=''>" . $time . "</time>";
+                    echo "<time class='w3-right' datetime=''>" . $time . "</time>";
                     echo "</article><br />";
                 }
 
