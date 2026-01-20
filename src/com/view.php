@@ -1,7 +1,9 @@
 <?php
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-
+if(loggedin()) {
+    $id = $token['user'];
+}
 
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
 
@@ -18,6 +20,7 @@ $userid = $row['userid'];
 $title = $row['title'];
 $post = $row['content'];
 $date = $row['timestamp'];
+$views = $row['views'];
 if(!empty($row['edited'])) {
     $edit_date = $row['edited'];
 } else {
@@ -39,6 +42,17 @@ $result = $conn2->query($sql);
 $row = $result->fetch_assoc();
 $username = $row['username'];
 
+if (!isset($_SESSION['viewed_post_ids'])) {
+        $_SESSION['viewed_post_ids'] = [];
+}
+
+if (!in_array($post_id, $_SESSION['viewed_post_ids'])) {
+        $view_stmt = $conn->prepare("UPDATE messages SET views = views + 1 WHERE id = ?");
+        $view_stmt->bind_param("i", $post_id);
+        $view_stmt->execute();
+        $_SESSION['viewed_creation_ids'][] = $post_id;
+}
+
 if(isset($_POST['comment'])){
 	
 	$comment = $_POST['commentbox'];
@@ -57,40 +71,50 @@ if(isset($_POST['comment'])){
         $sql = "INSERT INTO messages (userid, parent, content, timestamp) VALUES (?, ?, ?, ?)";
         $stmt2 = $conn2->prepare($sql);
         $stmt2->bind_param("iiss", $id, $post_id, $comment, $date);
-
-        if ($stmt2->execute()) {
+    
+        if(!$stmt2->execute()) {
+            echo "An error has occured. Please try again later.";
+            exit;
+        }
+        $stmt2->close();
+    
+    	$time = time();
+        $sql = "UPDATE messages SET last_active_time = ? WHERE id = ?";
+        $stmt3 = $conn2->prepare($sql);
+        $stmt3->bind_param("ss", $time, $post_id);
+    
+    	if ($stmt3->execute()) {
             $goto = $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING'];
             header('Location: ' . $goto);
         } else {
             echo "An error has occured. Please try again later.";
             exit;
         }
-        $stmt2->close();
+        $stmt3->close();
 
-        if($id != $userid) {
+        //if($id != $userid) {
             $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
             $time = time();
             $content = $post_id;
             $category = 3;
             $sql = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
 
-            $stmt = $conn->prepare($sql);
+            $stmt = $conn2->prepare($sql);
             $stmt->bind_param("iisii", $userid, $id, $time, $content, $category);
             $stmt->execute();
             $stmt->close();
 
             $date = time();
-            $sql = "SELECT alert FROM users WHERE id = ?";
+            /*$sql = "SELECT alert FROM users WHERE id = ?";
             $stmt3 = $conn2->prepare($sql);
             $stmt3->bind_param("i", $userid);
             $stmt3->bind_result($alert);
             $stmt3->execute();
-            $stmt3->close();
+            $stmt3->close();*/
 
-            $alertnum = $alert + 1;
-            $stmt4 = $conn2->prepare("UPDATE users SET alert = ? WHERE id = ?");
-            $stmt4->bind_param("si", $alertnum, $userid);
-        }
+            $stmt4 = $conn2->prepare("UPDATE users SET alert = alert + 1 WHERE id = ?");
+            $stmt4->bind_param("i", $userid);
+        //}
 }
 
 ?>
@@ -139,7 +163,7 @@ if(isset($_POST['comment'])){
 
     echo "<div class='gr8-theme w3-container w3-light-grey w3-card-4'>";
     echo "<h2>" . $title . "</h2>";
-    echo "<h4>By <a href='/user/" . $userid . "'>@" . $username . "</a> on " . $date . ", edited " . $edit_date . "</h4>";
+    echo "<h4>By <a href='/user/" . $userid . "'>@" . $username . "</a> on " . $date . ", edited " . $edit_date . ". " . $views . " total views.</h4>";
     echo '<h4>' . $reply_count . ' replies, ' . $total_pages . ' pages, on page ' . $page . ', in ' . $category_row['status'] . '</h4></div><br />';
 
     $post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$userid'");

@@ -127,15 +127,15 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
 			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
                 
-				$sql = "SELECT id, userid, title, content, timestamp, last_posted
+				$sql = "SELECT id, userid, title, content, timestamp, last_posted, last_active_time
                         FROM messages
-                        WHERE (status = 'general' OR status = 'locked') AND parent IS NULL OR parent = 0
-                        ORDER BY timestamp DESC
+                        WHERE (status = 'general' OR status = 'locked') AND (parent IS NULL OR parent = 0)
+                        ORDER BY last_active_time DESC
                         LIMIT $limit OFFSET $offset";
                 
 				$stmt = $conn->prepare($sql);
 				$stmt->execute();
-				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted);
+				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted, $last_active);
                 
 				while ($stmt->fetch()) {	
                     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
