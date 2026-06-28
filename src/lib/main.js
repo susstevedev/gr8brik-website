@@ -1,6 +1,6 @@
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", function() {
-        navigator.serviceWorker.register("/lib/serviceWorker.js?v=3")
+        navigator.serviceWorker.register("/lib/serviceWorker.js?v=42826")
         .then(reg => {
             console.log("sw registered");
 
@@ -104,7 +104,6 @@ $(document).ready(function() {
             data: { feature_v2: true },
             success: function(res) {
                 let parsed_res = res['builds'];
-                console.log(parsed_res);
                 featured = parsed_res.map(function(builds) { return `
                     <div class='gr8-theme w3-card-2 w3-padding'>
                         <span>
@@ -132,8 +131,7 @@ $(document).ready(function() {
             type: 'GET',
             data: { get_warn_status: true },
             success: function(res) {
-                console.log(res);                
-                if(res.status == "yes") {
+                if(res.status == "yes" && res.success == true) {
                         console.log("status is true");
                         	popup = `<div id="popup" class="w3-modal w3-show">
                                         <div class="gr8-theme w3-modal-content w3-light-grey w3-card-2 w3-animate-top w3-center w3-padding-small">
@@ -144,14 +142,16 @@ $(document).ready(function() {
                                             <div class="w3-container">
                                                 <p id="popup-text">${res.text}</p>
                                                 <p id="popup-reason">${res.reason}</p>
+                                                <p id="popup-reason-additional">${res.additional}</p>
                                                 <button onclick="document.getElementById('popup').classList.remove('w3-show'); setTimeout(getWarnStatus, 60000); seenWarnStatus();" 
-                                                class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Got it</button>
+                                                class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">${res.button}</button>
                                             </div>
                                         </div>
                                     </div>`
                     $("#popup-wrapper-global").append(popup);
                    	mode();
-                	console.log(popup);
+                } else if(res.success == false) {
+                    throw new Error(res.error || "Error fetching JSON request from /ajax/user?get_warn_status=true");
                 } else {
                 	setTimeout(getWarnStatus, 60000);
             	}

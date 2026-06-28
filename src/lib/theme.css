@@ -157,6 +157,10 @@ input {
     position: relative;
 }
 
+#comment-text img {
+    max-width: 100%;
+}
+
 .fullScreen {
     width: 95vw;
     height: 95vh;
