@@ -215,7 +215,7 @@ function fetch_profile($use_name, $profile_id, $csrf) {
     if (empty($profile_id) || $profile_id === null) {
         header("HTTP/1.0 403 Forbidden");
         return json_encode([
-            "message" => 'No user ID/name provided!',
+            "message" => 'User was banned or had deleted their account.',
             "error" => 'USR_ID_NUL'
         ]);
     }
@@ -226,9 +226,11 @@ function fetch_profile($use_name, $profile_id, $csrf) {
     }
 
     if($use_name === true) {
-        $sql = "SELECT * FROM users WHERE username = ?";
+        $profile_id = rawurldecode($profile_id);
+        $sql = "SELECT * FROM users WHERE username = ? AND deactive IS NULL";
     } else {
-         $sql = "SELECT * FROM users WHERE id = ?";
+        $profile_id = (int)$profile_id;
+         $sql = "SELECT * FROM users WHERE id = ? AND deactive IS NULL";
     }
    	
     $stmt = $conn->prepare($sql);
@@ -238,21 +240,13 @@ function fetch_profile($use_name, $profile_id, $csrf) {
     if ($result->num_rows === 0 || !$result) {
         header("HTTP/1.0 403 Forbidden");
         return json_encode([
-            "message" => 'User not found!',
-            "error" => 'NO_USR'
+            "message" => 'User not found.',
+            "error" => 'USR_NOT_FND'
         ]);
     }
     $row = $result->fetch_assoc();
     $profile_id = $row['id'];
     $stmt->close();
-
-    if (!empty($row['deactive'])) {
-        header("HTTP/1.0 403 Forbidden");
-        return json_encode([
-            "message" => htmlspecialchars($row['username']) . ' has deactivated their account.',
-            "error" => 'DEL_ACC'
-        ]);
-    }
 
     $sql = "SELECT * FROM bans WHERE user = ? LIMIT 1";
     $stmt = $conn->prepare($sql);
@@ -292,14 +286,6 @@ function fetch_profile($use_name, $profile_id, $csrf) {
             "error" => 'ACC_BLOCKED_USR'
         ]);
     }
-    
-    /*if (!loggedin()) {
-        header("HTTP/1.0 403 Forbidden");
-        return json_encode([
-            "message" => "Sign in to view " . htmlspecialchars($row['username']) . "'s creations, posts, and comments.",
-            "error" => 'USR_SESS_NUL'
-        ]);
-    }*/
 
     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
     if ($conn2->connect_error) {
@@ -309,7 +295,7 @@ function fetch_profile($use_name, $profile_id, $csrf) {
     $stmt = $conn2->prepare("SELECT COUNT(*) as all_models FROM model WHERE user = ?");
     $stmt->bind_param("s", $profile_id);
     $stmt->execute();
-    $model_count = $stmt->get_result()->fetch_assoc()['all_models'];
+    $model_count = $stmt->get_result()->fetch_assoc()['all_models'] ?? 0;
     $stmt->close();
 
     $stmt = $conn2->prepare("SELECT SUM(views) as total_views FROM model WHERE user = ?");
@@ -327,13 +313,13 @@ function fetch_profile($use_name, $profile_id, $csrf) {
     $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
     $stmt->bind_param("s", $profile_id);
     $stmt->execute();
-    $followers = $stmt->get_result()->fetch_assoc()['following'];
+    $followers = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
     $stmt->close();
 
     $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ?");
     $stmt->bind_param("s", $profile_id);
     $stmt->execute();
-    $following = $stmt->get_result()->fetch_assoc()['following'];
+    $following = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
     $stmt->close();
     
     if (loggedin()) {
@@ -352,7 +338,7 @@ function fetch_profile($use_name, $profile_id, $csrf) {
     
     if (loggedin()) {
         if($users_row['admin'] == '1') {
-            $dataemail = htmlspecialchars($row['email']);
+            $adm_email = htmlspecialchars($row['email']);
         }
     }
 
@@ -374,7 +360,7 @@ function fetch_profile($use_name, $profile_id, $csrf) {
         'blockedUser' => (bool)$is_blocking,
         'isFollowing' => (bool)$is_following,
         'message' => $message,
-        'email' => $dataemail ?? ''
+        'email' => $adm_email ?? ''
     ];
 
     return json_encode($data);

@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
 session_start();
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 $loggedin = loggedin();
@@ -23,7 +24,12 @@ function login() {
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     if (loggedin() === true) {
-        $sessionid = $_COOKIE['token'];
+        if(!isset($_SESSION['tokenid'])) {
+            $sessionid = $_COOKIE['token'];
+            $_SESSION['tokenid'] = $sessionid;
+        } else {
+            $sessionid = $_SESSION['tokenid'];
+        }
 
         $session_stmt = $conn->prepare("SELECT user, timestamp FROM sessions WHERE id = ?");
         $session_stmt->bind_param("s", $sessionid);
@@ -40,25 +46,21 @@ function login() {
             $user_stmt->execute();
             $user_res = $user_stmt->get_result();
 
-            if($user_res->num_rows != 0) {
-                global $user, $pwd, $email, $about, $x, $admin, $alert, $age, $changed, $loggedin;
+            global $user, $pwd, $email, $about, $x, $admin, $alert, $age, $changed, $loggedin;
 
-                $users_row = $user_res->fetch_assoc();
-                $user = $users_row['username'] ?? '';
-                $pwd = $users_row['password'] ?? '';
-                $email = $users_row['email'] ?? '';
-                $about = $users_row['description'] ?? '';
-                $x = $users_row['twitter'] ?? '';
-                $admin = (string)$users_row['admin'] ?? '';
-                $alert = (int)$users_row['alert'] ?? '';
-                $age = $users_row['age'] ?? '';
-               	$changed = $users_row['changed'] ?? '';
-                $loggedin = loggedin();
+            $users_row = $user_res->fetch_assoc();
+            $user = $users_row['username'] ?? '';
+            $pwd = $users_row['password'] ?? '';
+            $email = $users_row['email'] ?? '';
+            $about = $users_row['description'] ?? '';
+            $x = $users_row['twitter'] ?? '';
+            $twitter = $users_row['twitter'] ?? '';
+            $admin = (string)$users_row['admin'] ?? '';
+            $alert = (int)$users_row['alert'] ?? '';
+            $age = $users_row['age'] ?? '';
+            $changed = $users_row['changed'] ?? '';
 
-                return true;
-            } else {
-                return false;
-            }
+            return true;
         }
     }
 
@@ -66,13 +68,13 @@ function login() {
 }
 login();
 
-function newBuildUI() {
+/*function newBuildUI() {
     global $conn, $users_row;
     
     if(loggedin()) {
         if(!isset($_COOKIE['newcreui'])) {
             if(!isset($users_row['new_build_ui']) || $users_row['new_build_ui'] == null || $users_row['new_build_ui'] == false) {
-                if (mt_rand(1, 10) > 5) {
+                if (mt_rand(1, 10) > 5 || !get_browser_name(UA) == "Pale Moon") {
                     $val = 1;
                 } else {
                     $val = 0;
@@ -98,29 +100,208 @@ function newBuildUI() {
         }
     }
 }
-newBuildUI();
+newBuildUI();*/
 
-function get_warn_status($id) {
+function is_username_available($new) {
+    global $users_row;
     global $conn;
+    global $id;
+
+    $available = '1';
+    $reason = '0';
+    
+    $reserved_names = array(
+        'administrator', 
+        'god', 
+        'admin',
+        'susstevedev',
+        'sussteve',
+        'sussteve226',
+        'evan',
+        'saverino',
+        'the_an0nym',
+        'the_anonym',
+        'missbricker',
+        'gr8brik'
+    );
+    
+    /* I will not add some words as the project is open source and github/contibutors might get mad */
+    /* If someone has somehow registered an account with one of these names, report their account or one of their models */
+    $banned_words = array(
+        'ZnVjaw',
+        'c2hpdA',
+        'ZGFtbg',
+        'ZnVja2luZw',
+        'ZGFtbWl0',
+        'bW90aGVyZnVja2Vy',
+        'ZmFnZw',
+        'bmlnZw'
+    );
+
+    if(empty($new) || $new === null) {
+        $available = '0';
+        $reason = 'Please provide a username.';
+    }
+
+    if(trim($new) === trim($users_row['username'])) {
+        $available = '0';
+        $reason = 'This is your current username.';
+    }
+
+    if(!ctype_alnum(str_replace(array('-', '_', '.'), '', $new))) {
+        $available = '0';
+        $reason = 'Username cannot contain anything other than A-Z, any number, or dash underscore and dot.';
+    }
+
+    if(strlen($new) > 15) {
+        $available = '0';
+        $reason = 'Username must be under 15 characters.';
+    }
+
+    if(strlen($new) < 2) {
+        $available = '0';
+        $reason = 'Username must be more than 2 characters.';
+    }
+
+    $result = $conn->query("SELECT * FROM users WHERE username = '$new'");
+    $row = $result->fetch_assoc();
+
+    if($result->num_rows != 0) {
+        $available = '0';
+        $reason = 'Username has been taken. Please choose another.';
+    }
+    
+    if (in_array($new, $reserved_names)) {
+        $available = '0';
+        $reason = 'This username has been reserved and cannot be used.';
+    }
+    
+    foreach($banned_words as $banned_word) {
+        if (strpos(base64_encode($new), $banned_word) !== false) {
+            $available = '0';
+        	$reason = 'This username has been blacklisted and cannot be used.';
+        }
+    }
+
+    if (!empty($users_row['changed'])) {
+        $remaining = $users_row['changed'] - time();
+        if ($remaining < 86400) {
+            $hours_remaining = ceil($remaining / 3600);
+            $reason = "You can change your username " . time_ago($remaining);
+            $available = '0';
+        }
+    }
+
+    return ['available' => $available, 'reason' => $reason];
+}
+
+class ScreenNameUtils {
+    public function generateRandomScreenName() {
+        $words = ['Brick', 'Minifig', 'Stud', 'Build', 'Block', 'Stack', 'Baseplate', 'Roadplate', 'Fanatic', 'Craftsman', 'Awesome', 'Great' , 'Master', 'Creator', 'Modeler'];
+        $randomKeys = array_rand($words, 2);
+        $randomWord1 = $words[$randomKeys[0]];
+        $randomWord2 = $words[$randomKeys[1]];
+        $randomNumber = rand(100, 999);
+
+        $randomScreenName = $randomWord1 . $randomWord2 . $randomNumber;
+        return $randomScreenName;
+    }
+}
+
+function getSession($csrf) {
+    global $conn, $_COOKIE, $_SESSION;
+    
+    if($csrf !== $_SESSION['csrf']) {
+        $json = array(
+      		'error' => "Invalid CSRF token provided!",
+       		'success' => false
+       );
+    }
+    
     if(loggedin()) {
+        $json = array(
+      		'tokenid' => $_COOKIE['token'],
+       		'success' => true
+       );
+    } else {
+        $json = array(
+    		'error' => "User not authenticated.",
+      		'success' => false
+   		);
+    }
+    
+    return $json;
+}
+
+if(isset($_GET['getSession']) && isset($_GET['csrf']) && basename($_SERVER['PHP_SELF']) === "user.php") {
+    header("Content-type: application/json");
+    
+   	$csrf = $_GET['csrf'];
+    echo json_encode(getSession($csrf));
+	exit;
+}
+
+function get_warn_status() {
+    global $conn, $_SESSION;
+
+    if(loggedin()) {
+        $id = (int)$_SESSION['userid'] ?? '';
+		$acc_issue = false;
+        
     	$warning_stmt = $conn->prepare("SELECT * FROM warnings WHERE user = ? AND seen = 0 LIMIT 1");
         $warning_stmt->bind_param("i", $id);
         $warning_stmt->execute();
         $warning_stmt = $warning_stmt->get_result();
-                
+        
+        $ban_stmt = $conn->prepare("SELECT * FROM bans WHERE user = ? LIMIT 1");
+        $ban_stmt->bind_param("i", $id);
+        $ban_stmt->execute();
+        $ban_res = $ban_stmt->get_result();
+
         if($warning_stmt->num_rows != 0) {
             $warning_row = $warning_stmt->fetch_assoc();
-            
+        	
+        	$acc_issue = true;
+        	$text = "Your Gr8Brik account has been warned for the following reason:";
+            $reason = $warning_row['reason'];
+            $additional = false;
+        	$button = "Got it";
+        }
+        
+        if ($ban_res->num_rows !== 0) {
+       		$ban_data = $ban_res->fetch_assoc();
+            if ($ban_data['end_date'] !== null && $ban_data['end_date'] >= time()) {
+            	$acc_issue = true;
+                $text = "Your Gr8Brik account has been banned for the following reason:";
+                $reason = $ban_data['reason'];
+                $additional = "Banned until " . date("M d, Y H:i", $ban_data['end_date']);
+                $button = "Logout";
+                
+                logout(false);
+            }
+        }
+                
+        if($acc_issue == true) {            
             $json = array(
                 'status' => "yes", 
-                'text' => "Your Gr8Brik account has been warned for the following reason:",
-                'reason' => "<em>" . htmlspecialchars($warning_row['reason']) . "</em>"
+                'text' => htmlspecialchars($text),
+                'reason' => htmlspecialchars($reason),
+                'additional' => $additional,
+                'button' => htmlspecialchars($button),
+                'success' => true
             );
         } else {
             $json = array(
-                'status' => "no", 
+                'status' => "no",
+                'success' => true
             );
         }
+        return $json;
+    } else {
+        $json = array(
+            'error' => "Invalid session token.",
+        	'success' => false
+        );
         return $json;
     }
 }
@@ -128,6 +309,15 @@ function get_warn_status($id) {
 function seen_warn_status($id) {
     global $conn;
     if(loggedin()) {
+        $warning_stmt = $conn->prepare("SELECT * FROM warnings WHERE user = ? AND seen = 1 LIMIT 1");
+        $warning_stmt->bind_param("i", $id);
+        $warning_stmt->execute();
+        $warning_stmt = $warning_stmt->get_result();
+        
+        if($warning_stmt->num_rows != 0) {
+            return false;
+        }
+        
     	$warning_stmt = $conn->prepare("UPDATE warnings SET seen = 1 WHERE user = ?");
         $warning_stmt->bind_param("i", $id);
                 
@@ -140,8 +330,7 @@ function seen_warn_status($id) {
 
 if(isset($_GET['get_warn_status']) && basename($_SERVER['PHP_SELF']) === "user.php") {
     header("Content-type: application/json");
-    $id = (int)$_SESSION['userid'];
-    echo json_encode(get_warn_status($id));
+    echo json_encode(get_warn_status());
 	exit;
 }
 
@@ -155,12 +344,34 @@ if(isset($_GET['seen_warn_status']) && basename($_SERVER['PHP_SELF']) === "user.
 if(isset($_GET['ajax'])) {
     header('Content-type: application/json');
     if(loggedin() === true) {
+        $your_followers_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE profileid = ? LIMIT 1");
+        $your_followers_stmt->bind_param("i", $id);
+        $your_followers_stmt->execute();
+        $your_followers_res = $your_followers_stmt->get_result();
+        
+        if($your_followers_res->num_rows != 0) {
+            $your_followers_row = $your_followers_res->fetch_assoc()['count'];        
+        }
+        
+        $who_youre_following_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE userid = ? LIMIT 1");
+        $who_youre_following_stmt->bind_param("i", $id);
+        $who_youre_following_stmt->execute();
+        $who_youre_following_res = $who_youre_following_stmt->get_result();
+        
+        if($who_youre_following_res->num_rows != 0) {
+            $who_youre_following_row = $who_youre_following_res->fetch_assoc()['count'];
+        }
+            
         $logindata = json_encode([
             'success' => true, 
             'id' => $_SESSION['userid'],  
             'pfp' => $users_row['picture'], 
             'user' => $users_row['username'], 
             'alert' => $users_row['alert'], 
+            'stats' => [
+                'followers' => $your_followers_row ?? 0,
+                'following' => $who_youre_following_row ?? 0,
+            ]
         ]);
         echo $logindata;
         exit;
@@ -172,7 +383,7 @@ if(isset($_GET['ajax'])) {
 
 function logout($redirect) {
     global $conn, $token;
-    $sessionid = $token['id'];
+    $sessionid = $token['id'] ?? $_SESSION['tokenid'];
 
     if (isset($sessionid)) {
         $stmt = $conn->prepare("DELETE FROM sessions WHERE id = ? LIMIT 1");
@@ -206,36 +417,22 @@ function regenerate_session() {
     global $conn;
 
     if (loggedin()) {
-        $oldid = $_COOKIE['token'];
+        $sessid = $_SESSION['tokenid'];
 
-        $stmt = $conn->prepare("SELECT timestamp FROM sessions WHERE id = ? LIMIT 1");
-        $stmt->bind_param("s", $oldid);
+        $stmt = $conn->prepare("SELECT timestamp FROM sessions WHERE id = ? AND remember = 1");
+        $stmt->bind_param("s", $sessid);
         $stmt->execute();
         $res = $stmt->get_result();
 
-        if($res->num_rows > 0) {
+        if($res->num_rows > 0 && $res->num_rows != null) {
             $row = $res->fetch_assoc();
-            //$newid = uniqid();
             $user_ip = $_SERVER['REMOTE_ADDR'];
-            $expires =  time()+(60 * 60 * 24 * 400);
             $active = time();
             $user_agent = htmlspecialchars($_SERVER['HTTP_USER_AGENT']);
-
-            //$stmt2 = $conn->prepare("UPDATE sessions SET id = ?, timestamp = ?, login_from = ?, user_agent = ? WHERE id = ?");
-            //$stmt2->bind_param("sisss", $newid, $active, $user_ip, $user_agent, $oldid);
             
             $stmt2 = $conn->prepare("UPDATE sessions SET timestamp = ?, login_from = ?, user_agent = ? WHERE id = ?");
-            $stmt2->bind_param("isss", $active, $user_ip, $user_agent, $oldid);
+            $stmt2->bind_param("isss", $active, $user_ip, $user_agent, $sessid);
             if ($stmt2->execute()) {
-                /*setcookie('token', $newid, [
-                    'expires' => $expires,
-                    'path' => '/',
-                    'domain' => '.gr8brik.rf.gd',
-                    'secure' => false,
-                    'httponly' => true,
-                    'samesite' => 'Lax'
-                ]);*/
-
                 if(str_contains($_SERVER['REQUEST_URI'], '?')) {
                 	return header("Location:" . $_SERVER['REQUEST_URI'] . "&sess_reload=true");
                 } else {
@@ -262,9 +459,16 @@ if(isset($_GET['regen_sess'])) {
 function delete_old_sessions() {
     global $conn;
     if (loggedin()) {
-        $expiry = time() - (60 * 60 * 24 * 30);
-        $old_sessions_stmt = $conn->prepare("DELETE FROM sessions WHERE timestamp < ?");
-        $old_sessions_stmt->bind_param("i", $expiry);
+        $expiry_1day = time() - (60 * 60 * 24 * 1);
+		$expiry_30day = time() - (60 * 60 * 24 * 30);
+        
+        $old_sessions_stmt = $conn->prepare("DELETE FROM sessions WHERE timestamp < ? AND remember = 0");
+        $old_sessions_stmt->bind_param("i", $expiry_1day);
+        $old_sessions_stmt->execute();
+        $old_sessions_stmt->close();
+        
+        $old_sessions_stmt = $conn->prepare("DELETE FROM sessions WHERE timestamp < ? AND remember = 1");
+        $old_sessions_stmt->bind_param("i", $expiry_30day);
         $old_sessions_stmt->execute();
         $old_sessions_stmt->close();
         return true;
@@ -406,6 +610,45 @@ function delete_inactive_users() {
                     }
                 }
             }
+            
+            $extensions = ['jpg', 'png', 'jpeg', 'webp', 'gif'];
+            foreach ($extensions as $ext) {
+                $file = "../acc/users/banners/{$user_delete_id}..$ext";
+                if (file_exists($file)) {
+                    if (@unlink($file)) {
+                        error_log("deleted pfp for $user_delete_id $file\n");
+                    } else {
+                        error_log("failed to delete pfp for $user_delete_id $file");
+                    }
+                }
+            }
+            
+            $stmt_direct_msgs = $conn->prepare("DELETE FROM direct_message WHERE userid = ?");
+            if ($stmt_direct_msgs) {
+                $stmt_direct_msgs->bind_param("i", $user_delete_id);
+                $stmt_direct_msgs->execute();
+                $stmt_direct_msgs->close();
+            } else {
+                error_log($conn->error);
+            }
+            
+            $stmt_direct_groups_uid = $conn->prepare("DELETE FROM message_group WHERE userid = ?");
+            if ($stmt_direct_groups_uid) {
+                $stmt_direct_groups_uid->bind_param("i", $user_delete_id);
+                $stmt_direct_groups_uid->execute();
+                $stmt_direct_groups_uid->close();
+            } else {
+                error_log($conn->error);
+            }
+            
+            $stmt_direct_groups_pid = $conn->prepare("DELETE FROM message_group WHERE profileid = ?");
+            if ($stmt_direct_groups_pid) {
+                $stmt_direct_groups_pid->bind_param("i", $user_delete_id);
+                $stmt_direct_groups_pid->execute();
+                $stmt_direct_groups_pid->close();
+            } else {
+                error_log($conn->error);
+            }
 
             $stmt_sessions = $conn->prepare("DELETE FROM sessions WHERE user = ?");
             if ($stmt_sessions) {
@@ -444,217 +687,30 @@ function delete_inactive_users() {
     }
 }
 
-/* function delete_inactive_users() {
-    global $conn;
-    $stmt = $conn->prepare("SELECT * FROM users WHERE deactive IS NOT NULL AND deactive < NOW() - INTERVAL 30 DAY");
-    
-    if ($stmt->execute()) {
-        $res = $stmt->get_result();
-        $stmt->close();
-        echo $res->fetch_assoc();
-        exit;
-        return true;
-    } else {
-        error_log("failed to delete inactive users " . $stmt->error);
-        $stmt->close();
-        return false;
-    }
-} */
-
-/* function delete_inactive_users() {
-    global $conn;
-    $stmt = $conn->prepare("SELECT * FROM users WHERE deactive IS NOT NULL AND deactive < NOW() - INTERVAL 30 DAY");
-    
-    if ($stmt->execute()) {
-
-        header('Content-Type: application/json');
-        header("HTTP/1.0 500 Internal Server Error");
-
-        echo json_encode(['error' => 'To delete your account, please email us at ' . DB_MAIL]);
-        exit;
-
-        $id = $token['user'];
-        if(!$id) {
-            header("HTTP/1.0 500 Internal Server Error");
-            echo json_encode(['error' => 'Error fetching userid. It may be plausible you were logged out from our systems or the session API is down.']);
-            exit;
-        }
-
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-        $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-
-        if ($conn->connect_error) {
-            header("HTTP/1.0 500 Internal Server Error");
-            echo json_encode(['error' => $conn->connect_error]);
-            exit;
-        }
-
-        $stmt_check = $conn->prepare("SELECT id FROM users WHERE id = ?");
-        $stmt_check->bind_param("i", $id);
-        $stmt_check->execute();
-        $stmt_check->store_result();
-
-        if (isset($_COOKIE['token']) && $tokendata->num_rows != 0 && $stmt_check->num_rows != 0) {
-            $stmt_check->close();
-
-            $stmt_forum = $conn3->prepare("UPDATE posts, replies SET posts.user = 0, replies.user = 0 WHERE posts.user = ? OR replies.user = ?");
-            $stmt_forum->bind_param("ii", $id, $id);
-            $stmt_forum->execute();
-            $stmt_forum->close();
-
-            $stmt_forum = $conn3->prepare("UPDATE messages SET userid = 0 WHERE userid = ?");
-            $stmt_forum->bind_param("i", $id);
-            $stmt_forum->execute();
-            $stmt_forum->close();
-
-            $stmt_models = $conn2->prepare("DELETE FROM model WHERE user = ?");
-            $stmt_models->bind_param("i", $id);
-            $stmt_models->execute();
-            $stmt_models->close();
-
-            $stmt_comments = $conn2->prepare("DELETE FROM comments WHERE user = ?");
-            $stmt_comments->bind_param("i", $id);
-            $stmt_comments->execute();
-            $stmt_comments->close();
-
-            $stmt_follows = $conn->prepare("DELETE FROM follow WHERE userid = ? OR profileid = ?");
-            $stmt_follows->bind_param("ii", $id, $id);
-            $stmt_follows->execute();
-            $stmt_follows->close();
-
-            $stmt_blocks = $conn->prepare("DELETE FROM user_blocks WHERE userid = ? OR profileid = ?");
-            $stmt_blocks->bind_param("ii", $id, $id);
-            $stmt_blocks->execute();
-            $stmt_blocks->close();
-
-            $stmt_notif = $conn->prepare("DELETE FROM notifications WHERE user = ? OR profile = ?");
-            $stmt_notif->bind_param("ii", $id, $id);
-            $stmt_notif->execute();
-            $stmt_notif->close();
-
-            $stmt_bans = $conn->prepare("DELETE FROM bans WHERE user = ?");
-            $stmt_bans->bind_param("i", $id);
-            $stmt_bans->execute();
-            $stmt_bans->close();
-
-            $stmt_appeals = $conn->prepare("DELETE FROM appeals WHERE user = ?");
-            $stmt_appeals->bind_param("i", $id);
-            $stmt_appeals->execute();
-            $stmt_appeals->close();
-
-            $extensions = ['jpg', 'png', 'jpeg', 'webp', 'gif'];
-            foreach ($extensions as $ext) {
-                $file = "../acc/users/pfps/$id.$ext";
-                if (file_exists($file)) {
-                    @unlink($file);
-                }
-            }
-
-            $stmt_users = $conn->prepare("DELETE FROM users WHERE id = ?");
-            $stmt_users->bind_param("i", $id);
-            
-            $stmt_sessions = $conn->prepare("DELETE FROM sessions WHERE user = ?");
-            $stmt_sessions->bind_param("i", $id);
-            $stmt_sessions->execute();
-            $stmt_sessions->close();
-
-            $_SESSION = [];
-            session_unset();
-            session_destroy();
-            setcookie(session_name(), '', time() - 3600, '/');
-            setcookie('token', '', time() - 3600, '/');
-
-            if ($stmt_users->execute()) {
-                header("HTTP/1.0 200 OK");
-                setcookie("token", "", time() - 3600, "/");
-                echo json_encode(['success' => 'Your account has been permanently deleted from our servers.']);
-            } else {
-                header("HTTP/1.0 500 Internal Server Error");
-                echo json_encode(['error' => 'Something went wrong while deleting your account. ' . $stmt_users->error]);
-            }
-            $stmt_users->close();
-        } else {
-            header("HTTP/1.0 404 Not Found");
-            setcookie("token", "", time() - 3600, "/");
-            $stmt_check->close();
-            echo json_encode(['error' => "Hmm, we couldn't find your account."]);
-        }
-        $conn->close();
-        $conn2->close();
-    } else {
-        echo("failed to delete inactive users " . $stmt->error);
-        $stmt->close();
-        return false;
-    }
-} */
-
 function loggedin() {
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-    if (isset($_COOKIE['token'])) {
+    if (isset($_COOKIE['token']) || isset($_SESSION['tokenid'])) {
+        $session = $_SESSION['tokenid'] ?? $_COOKIE['token'];
+        
         $session_stmt = $conn->prepare("SELECT * FROM sessions WHERE id = ?");
-        $session_stmt->bind_param("s", $_COOKIE['token']);
+        $session_stmt->bind_param("s", $session);
         $session_stmt->execute();
         $session_res = $session_stmt->get_result();
 
         if($session_res->num_rows !== 0) {
-            $session = $session_res->fetch_assoc();
-            $userid = $session['user'];
-
-            $user_stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
-            $user_stmt->bind_param("i", $userid);
-            $user_stmt->execute();
-            $user_res = $user_stmt->get_result();
-
-            if($user_res->num_rows !== 0) {
-                $user_data = $user_res->fetch_assoc();
-
-                if(!empty($user_row['deactive'])) {
-                    return false;
-                }
-
-                $ban_stmt = $conn->prepare("SELECT * FROM bans WHERE user = ? LIMIT 1");
-                $ban_stmt->bind_param("i", $userid);
-                $ban_stmt->execute();
-                $ban_res = $ban_stmt->get_result();
-
-                if ($ban_res->num_rows !== 0) {
-                    $ban_data = $ban_res->fetch_assoc();
-                    if ($ban_data['end_date'] !== null && $ban_data['end_date'] >= time()) {
-                        return false;
-                    }
-                }
-                return true;
-            }
+            return true;
         }
     }
 
     return false;
 }
 
-// will remove soon
 function isLoggedin() {
-    global $tokendata;
-
-    if (isset($_COOKIE['token'])) {
-        if ($tokendata && $tokendata->num_rows != 0) {
-            if ($_SERVER['PHP_SELF'] === '/acc/login.php' || $_SERVER['PHP_SELF'] === '/acc/register.php' || $_SERVER['PHP_SELF'] === '/index.php') {
-                header('Location: /list');
-                exit;
-            }
-        } else {
-            setcookie("token", "", time() - 3600, "/");
-            if ($_SERVER['PHP_SELF'] != '/acc/login.php' && $_SERVER['PHP_SELF'] != '/acc/register.php' && $_SERVER['PHP_SELF'] != '/index.php') {
-                header('Location: /acc/login.php');
-                exit;
-            }
-        }
+    if(loggedin()) {
+        return true;
     } else {
-        if ($_SERVER['PHP_SELF'] != '/acc/login.php' && $_SERVER['PHP_SELF'] != '/acc/register.php' && $_SERVER['PHP_SELF'] != '/index.php') {
-            header('Location: /acc/login.php');
-            exit;
-        }
+        return false;
     }
 }
 ?>

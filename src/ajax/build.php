@@ -1,5 +1,5 @@
 <?php
-error_reporting(0);
+error_reporting(1);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/filesize.php';
@@ -51,138 +51,171 @@ if(isset($_GET['storage'])) {
 if (isset($_POST['save_build'])) {
     header('Content-Type: application/json');
 
-    $modelJson = $_POST['creation'];
-
-    if (empty($modelJson)) {
-        header("HTTP/1.1 400 Bad Request");
-        echo json_encode(['error' => "Request is empty."]);
-        exit;
-    }
-
-    $decoded_json = json_decode($modelJson, true);
-    if ($modelJson === null && json_last_error() !== JSON_ERROR_NONE) {
-        header("HTTP/1.1 400 Bad Request");
-        echo json_encode(['error' => "Invalid creation format."]);
-        exit;
-    }
-
-    if (!isset($token['user'])) {
-        header("HTTP/1.1 401 Unauthorized");
-        echo json_encode(['error' => "Please login to save models."]);
-        exit;
-    }
-
-    $user = $token['user'];
-
-    $sql = "SELECT * FROM users WHERE id = '$user'";
-    $result = $conn2->query($sql);
-
-    if ($result->num_rows < 0) {
-        header("HTTP/1.1 401 Unauthorized");
-        echo json_encode(['error' => "Error fetching user account."]);
-        exit;
-    }
-
-    $row = $result->fetch_assoc();
-
-    $sql2 = "SELECT * FROM bans WHERE user = '$user' LIMIT 1";
-    $result2 = $conn2->query($sql2);
-
-    if ($result2->num_rows > 0) {
-        $row2 = $result2->fetch_assoc();
-        if ($row2['end_date'] >= time()) {
-            header("HTTP/1.0 403 Forbidden");
-            echo json_encode(['error' => "User account has been banned, as such you cannot post new models."]);
-            exit;
-        }
-    }
-
-    $stmt = $conn->prepare("SELECT SUM(size) as total_used FROM model WHERE user = ?");
-    $stmt->bind_param("i", $user);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $total = $result->fetch_assoc()['total_used'] ?? 0;
-    $stmt->close();
-
-    $file_id = uniqid();
-    $file_name = "../cre/" . $file_id . ".json";
-    $db_file_name = "/cre/" . $file_id . ".json";
-    $desc = htmlspecialchars($_POST['desc']);
-    $name = htmlspecialchars($_POST['name']);
-    $date = date("Y-m-d H:i:s");
-    $screenshot_path = null;
-    $db_screenshot = null;
-    $db_file_size = strlen($modelJson);
+    if(!isset($_POST['build_id']) || $_POST['build_id'] === null) {
     
-    if (($total + $db_file_size) > MODEL_STORAGE_LIMIT) {
-        header("HTTP/1.0 413 Payload Too Large");
-        echo json_encode(['error' => "Storage limit of " . size_unit(MODEL_STORAGE_LIMIT) . " was reached. Please delete older creations to save new ones."]);
-        exit;
-    }
+        $modelJson = $_POST['creation'];
 
-    if (!empty($_POST['screenshot'])) {
-        $screenshot_data = $_POST['screenshot'];
-
-        if (strpos($screenshot_data, 'data:image/png;base64,') === 0) {
-            $screenshot_data = base64_decode(substr($screenshot_data, strlen('data:image/png;base64,')));
-        } elseif(strpos($screenshot_data, 'data:image/webp;base64,') === 0) {
-            $screenshot_data = base64_decode(substr($screenshot_data, strlen('data:image/webp;base64,')));
-        } else {
-            header("HTTP/1.1 500 Internal Server Error");
-            echo json_encode(['error' => "Screenshot must be encoded in WebP or PNG."]);
+        if (empty($modelJson)) {
+            header("HTTP/1.1 400 Bad Request");
+            echo json_encode(['error' => "Request is empty."]);
             exit;
         }
-        
-        $screenshot_path = "../cre/" . $file_id . ".webp";
-        $db_screenshot = "/cre/" . $file_id . ".webp";
 
-        if (!file_put_contents($screenshot_path, $screenshot_data)) {
-       		header("HTTP/1.1 500 Internal Server Error");
-                echo json_encode(['error' => "Failed to save screenshot."]);
-                exit;
+        $decoded_json = json_decode($modelJson, true);
+        if ($modelJson === null && json_last_error() !== JSON_ERROR_NONE) {
+            header("HTTP/1.1 400 Bad Request");
+            echo json_encode(['error' => "Invalid creation format."]);
+            exit;
         }
-    }
 
-    if (file_put_contents($file_name, $modelJson) === false) {
-        header("HTTP/1.1 500 Internal Server Error");
-        echo json_encode(['error' => "Failed to save model JSON to filesystem."]);
+        if (!isset($token['user'])) {
+            header("HTTP/1.1 401 Unauthorized");
+            echo json_encode(['error' => "Please login to save models."]);
+            exit;
+        }
+
+        $user = $token['user'];
+
+        $sql = "SELECT * FROM users WHERE id = '$user'";
+        $result = $conn2->query($sql);
+
+        if ($result->num_rows < 0) {
+            header("HTTP/1.1 401 Unauthorized");
+            echo json_encode(['error' => "Error fetching user account."]);
+            exit;
+        }
+
+        $row = $result->fetch_assoc();
+
+        $sql2 = "SELECT * FROM bans WHERE user = '$user' LIMIT 1";
+        $result2 = $conn2->query($sql2);
+
+        if ($result2->num_rows > 0) {
+            $row2 = $result2->fetch_assoc();
+            if ($row2['end_date'] >= time()) {
+                header("HTTP/1.0 403 Forbidden");
+                echo json_encode(['error' => "User account has been banned, as such you cannot post new models."]);
+                exit;
+            }
+        }
+
+        $stmt = $conn->prepare("SELECT SUM(size) as total_used FROM model WHERE user = ?");
+        $stmt->bind_param("i", $user);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $total = $result->fetch_assoc()['total_used'] ?? 0;
+        $stmt->close();
+
+        $file_id = uniqid();
+        $file_name = "../cre/" . $file_id . ".json";
+        $db_file_name = "/cre/" . $file_id . ".json";
+        $desc = htmlspecialchars($_POST['desc']);
+        $name = htmlspecialchars($_POST['name']);
+        $date = date("Y-m-d H:i:s");
+        $screenshot_path = null;
+        $db_screenshot = null;
+        $db_file_size = strlen($modelJson);
+
+        if (($total + $db_file_size) > MODEL_STORAGE_LIMIT) {
+            header("HTTP/1.0 413 Payload Too Large");
+            echo json_encode(['error' => "Storage limit of " . size_unit(MODEL_STORAGE_LIMIT) . " was reached. Please delete older creations to save new ones."]);
+            exit;
+        }
+
+        if (!empty($_POST['screenshot'])) {
+            $screenshot_data = $_POST['screenshot'];
+
+            if (strpos($screenshot_data, 'data:image/png;base64,') === 0) {
+                $screenshot_data = base64_decode(substr($screenshot_data, strlen('data:image/png;base64,')));
+            } elseif(strpos($screenshot_data, 'data:image/webp;base64,') === 0) {
+                $screenshot_data = base64_decode(substr($screenshot_data, strlen('data:image/webp;base64,')));
+            } else {
+                header("HTTP/1.1 500 Internal Server Error");
+                echo json_encode(['error' => "Screenshot must be encoded in WebP or PNG."]);
+                exit;
+            }
+
+            $screenshot_path = "../cre/" . $file_id . ".webp";
+            $db_screenshot = "/cre/" . $file_id . ".webp";
+
+            if (!file_put_contents($screenshot_path, $screenshot_data)) {
+                header("HTTP/1.1 500 Internal Server Error");
+                    echo json_encode(['error' => "Failed to save screenshot."]);
+                    exit;
+            }
+        }
+
+        if (file_put_contents($file_name, $modelJson) === false) {
+            header("HTTP/1.1 500 Internal Server Error");
+            echo json_encode(['error' => "Failed to save model JSON to filesystem."]);
+            exit;
+        }
+
+        $db_file_size = filesize($file_name);
+
+        if ($conn->connect_error) {
+            header("HTTP/1.1 500 Internal Server Error");
+            echo json_encode(['error' => "Database connection failed."]);
+            exit;
+        }
+
+        $stmt = $conn->prepare("INSERT INTO model (user, model, description, name, date, size, screenshot) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        if (!$stmt) {
+            header("HTTP/1.1 500 Internal Server Error");
+            echo json_encode(['error' => "Failed to save your creation to the database."]);
+            exit;
+        }
+        $stmt->bind_param("issssis", $user, $db_file_name, $desc, $name, $date, $db_file_size, $db_screenshot);
+
+        if (!$stmt->execute()) {
+            header("HTTP/1.1 500 Internal Server Error");
+            echo json_encode(['error' => "Failed to save your creation to the database."]);
+            exit;
+        }
+
+        $_SESSION['last_request'] = time();
+        $stmt->close();
+        $conn->close();
+
+        echo json_encode(['success' => "Your creation was saved successfully!", 'screenshot' => $screenshot_path]);
+        exit;
+    } else {
+        echo json_encode(['success' => "Could not save: {0}", 'screenshot' => null]);
         exit;
     }
-
-    $db_file_size = filesize($file_name);
-
-    if ($conn->connect_error) {
-        header("HTTP/1.1 500 Internal Server Error");
-        echo json_encode(['error' => "Database connection failed."]);
-        exit;
-    }
-
-    $stmt = $conn->prepare("INSERT INTO model (user, model, description, name, date, size, screenshot) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    if (!$stmt) {
-        header("HTTP/1.1 500 Internal Server Error");
-        echo json_encode(['error' => "Failed to save your creation to the database."]);
-        exit;
-    }
-    $stmt->bind_param("issssis", $user, $db_file_name, $desc, $name, $date, $db_file_size, $db_screenshot);
-
-    if (!$stmt->execute()) {
-        header("HTTP/1.1 500 Internal Server Error");
-        echo json_encode(['error' => "Failed to save your creation to the database."]);
-        exit;
-    }
-
-    $_SESSION['last_request'] = time();
-    $stmt->close();
-    $conn->close();
-
-    echo json_encode(['success' => "Your creation was saved successfully!", 'screenshot' => $screenshot_path]);
-    exit;
 }
 
 function truncateStr($mystr) {
     $truncatedName = substr($mystr, 0, 30);
     if (strlen($mystr) >= 30) {
         $truncatedName .= '...';
+    }
+}
+
+// Model screenshot to PNG
+function convert_webp_to_png($source_webp_file) {
+    clearstatcache();
+    $webp_file = str_replace('/cre/', '', $source_webp_file);
+    if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/cre/' . $webp_file) && exif_imagetype($_SERVER['DOCUMENT_ROOT'] . '/cre/' . $webp_file) === IMAGETYPE_WEBP) {
+        $image = imagecreatefromwebp($_SERVER['DOCUMENT_ROOT'] . '/cre/' . $webp_file);
+        
+        if ($image !== false) {
+            imagepalettetotruecolor($image);
+            imagealphablending($image, true);
+            imagesavealpha($image, true);
+            
+            ob_start();
+			imagepng($image);
+			$image_data = ob_get_contents();
+			ob_end_clean();
+             
+            $base64_data = base64_encode($image_data);
+            return $base64_data;
+        } else {
+            return false;
+        }
+    } else {
+        return "Not found";
     }
 }
 
@@ -255,6 +288,12 @@ function fetch_build($model_id, $csrf) {
         $userid = 0;
     }
     
+    $stmt = $conn2->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
+    $stmt->bind_param("s", $userid);
+    $stmt->execute();
+    $followers = $stmt->get_result()->fetch_assoc()['following'];
+    $stmt->close();
+    
     $result3 = $conn2->query("SELECT * FROM bans WHERE user = $userid");
     $row3 = $result3->fetch_assoc();
 
@@ -305,24 +344,43 @@ function fetch_build($model_id, $csrf) {
         $view_stmt->execute();
         $_SESSION['viewed_creation_ids'][] = $model_id;
     }
+    
+    $model_tags = [];
+    $Tag_stmt = $conn->prepare("SELECT * FROM tags WHERE model_id = ?");
+    $Tag_stmt->bind_param("i", $model_id);
+    $Tag_stmt->execute();
+    $Tag_result = $Tag_stmt->get_result();
+    
+    while ($tags_row = $Tag_result->fetch_assoc()) {
+        $model_tags[] = [
+            'name' => $tags_row['tag_name'],
+            'display' => true
+        ];
+    }
+    $Tag_stmt->close();
 
     header("HTTP/1.0 200 OK");
     $message = "OK";
     $data = [
-        'userid' => $userid, 
-        'modelid' => $model_id, 
-        'model' => $row2['model'], 
-        'description' => $decoded_description, 
-        'name' => $row2['name'], 
-        'date' => $row2['date'], 
-        'screenshot' => $row2['screenshot'], 
-        'views' => $views, 
-        'isRemoved' => $row2['removed'], 
-        'voted' => $voted, 
-        'likes' => $votes, 
+        'success' => true,
+        'userid' => $userid,
+        'modelid' => $model_id,
+        'model' => $row2['model'],
+        'description' => $decoded_description,
         'decoded_description' => $decoded_description,
-        'username' => $username, 
-        'model_admin' => $row['admin'], 
+        'tags' => $model_tags,
+        'name' => $row2['name'],
+        'date' => date("F j, Y, g:i a", strtotime($row2['date'])),
+        'screenshot' => $row2['screenshot'],
+        'screenshot_png' => convert_webp_to_png($row2['screenshot']),
+        'views' => $views,
+        'isRemoved' => $row2['removed'],
+        'voted' => $voted,
+        'likes' => $votes,
+        'username' => $username,
+        'screenname' => "@" . strtolower($username),
+        'followers' => $followers,
+        'model_admin' => $row['admin'],
         'message' => $message
     ];
     return json_encode($data);
@@ -997,7 +1055,7 @@ if ($loggedin === true) {
             }
         }
 
-        if ($banResult->num_rows > 0 && $banRow['end_date'] >= time() || $theyBlocked) {
+        if ($comment_user === 0 || $banResult->num_rows > 0 && $banRow['end_date'] >= time() || $theyBlocked) {
             echo json_encode(['error' => 'could not vote on this comment because voting is disabled for the selected comment']);
             exit;
         }
