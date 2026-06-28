@@ -236,6 +236,12 @@
                     } else {
                         echo "<option value='views'>Most viewed</option>";
                     }
+                
+                	if ($_GET['sort'] === "size") {
+                        echo "<option value='size' selected>File size<option>";
+                    } else {
+                        echo "<option value='size'>File size</option>";
+                    }
                     
                     if ($_GET['sort'] === "likes") {
                         echo "<option value='likes' selected>Most liked</option>";
@@ -338,6 +344,70 @@
 
             echo '<p>Search results for <b>' . htmlspecialchars($query) . '</b></p><br />';
         }
+    
+   		if (isset($_GET['t']) && $_GET['t']) {
+            $is_search = true;
+			$result2 = [];
+            
+            /*$query = isset($_GET['t']) ? trim($_GET['t']) : '';
+            $search = "%" . $conn2->real_escape_string(htmlspecialchars($query)) . "%";
+
+            $stmt = $conn2->prepare('SELECT model_id FROM tags WHERE tag_name LIKE ? LIMIT 12 OFFSET ' .  $offset);
+            $stmt->bind_param('s', $search);
+            $stmt->execute();
+            $result1 = $stmt->get_result();
+            if($result1->num_rows != 0) {
+                $model = $result1->fetch_assoc()['model_id'];
+                $stmt = $conn2->prepare('SELECT * FROM model WHERE id = ? LIMIT 12 OFFSET ' .  $offset);
+            	$stmt->bind_param('i', $model);
+           		$stmt->execute();
+                $resultbefore = $stmt->get_result();
+                
+                while ($row = $resultbefore->fetch_assoc()) {
+                    $result2[] = $row;
+                }
+            } */
+            
+            /*$query = trim($_GET['t'] ?? '');
+            $search = "%$query%";
+
+            $stmt = $conn2->prepare('SELECT model_id FROM tags WHERE tag_name LIKE ? LIMIT 12 OFFSET ' . $offset);
+            $stmt->bind_param('s', $search);
+            $stmt->execute();
+            $result1 = $stmt->get_result();
+
+            while ($row = $result1->fetch_assoc()) {
+                $model = $row['model_id'];
+
+                $stmt2 = $conn2->prepare('SELECT * FROM model WHERE id = ?');
+                $stmt2->bind_param('i', $model);
+                $stmt2->execute();
+                $resultbefore = $stmt2->get_result();
+
+                while ($row2 = $resultbefore->fetch_assoc()) {
+                    $result2[] = $row2;
+                }
+            }*/
+            
+            $query = trim($_GET['t'] ?? '');
+            $search = "%$query%";
+
+            $sql = "
+                SELECT m.*
+                FROM model m
+                JOIN tags t ON m.id = t.model_id
+                WHERE t.tag_name LIKE ?
+                LIMIT 12 OFFSET $offset
+            ";
+
+            $stmt = $conn2->prepare($sql);
+            $stmt->bind_param('s', $search);
+            $stmt->execute();
+
+            $result2 = $stmt->get_result();
+            
+            echo '<p>Models tagged <b>' . htmlspecialchars($query) . '</b></p><br />';
+        }
 
         if (isset($_GET['sort']) && $_GET['sort']) {
             if ($_GET['sort'] === 'feature') {
@@ -347,6 +417,10 @@
             if ($_GET['sort'] === 'views') {
                 $sql  = 'SELECT * FROM model ORDER BY views DESC LIMIT 12 OFFSET ' .  $offset;
                 $sort = 'Most viewed';
+            }
+            if ($_GET['sort'] === 'size') {
+                $sql  = 'SELECT * FROM model ORDER BY size DESC LIMIT 12 OFFSET ' .  $offset;
+                $sort = 'Biggest in size';
             }
             if ($_GET['sort'] === 'likes') {
                 //$sql = 'SELECT model.*, COUNT(*) AS vote_count FROM model LEFT JOIN votes ON model.id = votes.creation WHERE model.removed = 0 GROUP BY model.id ORDER BY vote_count DESC LIMIT 12 OFFSET ' .  $offset;
@@ -385,13 +459,13 @@
         }
         
         // if there is some creations found from the query
-        if ($result2->num_rows > 0) {
+        //if ($result2->num_rows > 0 || $result2) {
+    	if ($result2 != null || !isset($result2)) {
           
             echo '<h4><i class="fa fa-info-circle w3-padding-small" aria-hidden="true"></i>' . $result2->num_rows . ' total creations</h4>';
           
             echo "<table class='w3-table-all' style='color:black;'>";
             while ($row = $result2->fetch_assoc()) {
-              
                 $model_id = $row['id'];
                 $userid = $row['user'];
 

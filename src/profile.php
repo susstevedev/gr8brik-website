@@ -29,7 +29,9 @@ if($data['message'] != null | !empty($data['message'])) {
     $data['username'] = 'User';
 }
 
-$_GET['id'] = $data['userid'];
+if(isset($data) && isset($data['userid'])) {
+	$_GET['id'] = $data['userid'];
+}
 
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
@@ -96,14 +98,14 @@ if (isset($_POST['follow'])) {
 if(isset($_POST['unfollow'])) {
     if(!isset($token['user'])) {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to follow this user.";
+        $error = "Please login to unfollow this user.";
     }
 
     $profile_id = (int)$_GET['id'];
 
     if((int)$token['user'] === $profile_id) {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "You cannot follow yourself.";
+        $error = "You cannot unfollow yourself.";
     }
 
     $sql = "DELETE FROM follow WHERE userid = '$userid' AND profileid = '$profile_id'";
@@ -120,7 +122,7 @@ if(isset($_POST['unfollow'])) {
 if (isset($_POST['block'])) {
     if(!isset($token['user'])) {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to follow this user.";
+        $error = "Please login to block this user.";
     }
 
     $profile_id = (int)$_GET['id'];
@@ -128,7 +130,23 @@ if (isset($_POST['block'])) {
 
     if((int)$token['user'] === $profile_id) {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "You cannot follow yourself.";
+        $error = "You cannot block yourself.";
+    }
+    
+    $stmt = $conn->prepare("SELECT * FROM follow WHERE userid = ? AND profileid = ?");
+    $stmt->bind_param("ii", $userid, $profile_id);
+    $result = $stmt->execute();
+    $stmt->close();
+    if($result) {
+    	$stmt = $conn->prepare("DELETE FROM follow WHERE userid = ? AND profileid = ?");
+    	$stmt->bind_param("ii", $userid, $profile_id);
+    	$result = $stmt->execute();
+    	$stmt->close();
+
+    	if (!$result) {
+        	header("HTTP/1.0 500 Internal Server Error");
+        	$error = "An error occured while blocking this user.";
+    	}
     }
 
     $sql_block = "INSERT INTO user_blocks (userid, profileid, date) VALUES (?, ?, ?)";
@@ -237,10 +255,12 @@ if(isset($_POST['delete'])) {
     }
 
     $profile_id = (int)$_GET['id'];
-    $today = date("Y-m-d H:i:s");
+    $date = new DateTime('9998-12-31');
+    $dateStr = $date->format('Y-m-d');
+    $random = uniqid();
 		
     if($users_row['admin'] != '0') {
-        $sql = "UPDATE users SET username = NULL, blog_user_id = NULL, deactive = '$today' WHERE id = $profile_id";
+        $sql = "UPDATE users SET username = NULL, blog_user_id = NULL, deactive = '$dateStr', verify_token = '$random' WHERE id = $profile_id";
         $result = $conn->query($sql);
         if ($result) {
             $sql2 = "DELETE FROM sessions WHERE user = $profile_id";
@@ -460,13 +480,13 @@ if(isset($_POST['delete'])) {
 
                         <?php if($users_row['admin'] != (int)'0') { ?>
                             <button id="button-ban-user" onclick='document.getElementById("ban").style.display="block"' name="ban" class="w3-bar-item w3-button" />
-                                Ban
+                                Ban until...
                             </button>
         					<button id="button-warn-user" onclick='document.getElementById("warn").style.display="block"' name="warn" class="w3-bar-item w3-button" />
                                 Warn
                             </button>
                             <button id="button-delete-user" onclick='document.getElementById("delete").style.display="block"' name="delete" class="w3-bar-item w3-button" />
-                                Deactivate this account
+                                Hard ban
                             </button>
                         <?php } ?>
                     </div>
@@ -540,7 +560,7 @@ if(isset($_POST['delete'])) {
                 <div class="w3-container">
                     <span onclick="document.getElementById('delete').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
                         <form method='post' action=''>
-                        <h2>Are you sure you want to delete this user?</h2>
+                        <h2>Are you sure you want to hard ban this user?</h2>
                         <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span>
                         <input type="submit" value="Yes" name="delete" class="w3-btn w3-large w3-white w3-hover-red">
                     </form>
@@ -565,7 +585,7 @@ if(isset($_POST['delete'])) {
 				<div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-center">
 					<div class="w3-container">
 						<span onclick='document.getElementById("ban").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
-							<h2>Are you sure you want to ban this user?</h2>
+							<h2>Are you sure you want to soft ban this user?</h2>
                             <p><div class="w3-row-padding"><select class="w3-select" name="day">
                                 <option value="01" disabled selected>day</option>
                                 <option>01</option>

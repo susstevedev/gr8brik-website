@@ -2,11 +2,11 @@
 if(!loggedin()) {
     echo '
     <div data-testid="gr8-loginAdPopup" class="w3-hide-small w3-show-medium w3-padding w3-card-2 w3-bottom w3-blue w3-text-white">
-        <img src="/img/logo/384.png" width="50px" height="50px" data-testid="gr8-loginAdPopup--logo" class="w3-circle w3-left" />
+        <!-- <img src="/img/logo/192.png" width="50px" height="50px" data-testid="gr8-loginAdPopup--logo" class="w3-circle w3-left" /> -->
         <span class="w3-left w3-padding">
-            <span><a href="/acc/login">Login</a> or <a href="/acc/register">Register</a> to upload your own Lego-like creations to the cloud.</span>
-            <br />
-            <span><a href="/terms">Terms of Service</a> | <a href="/privacy">Privacy Policy</a></span> | <a href="/rules">Community Guidelines</a></span>
+            <span><a href="/acc/login">Login</a> or <a href="/acc/register">Register</a> to share & save your own Lego-like creations online.</span>
+           	<br />
+            <span>Read the <a href="/terms">Terms of Service</a>, <a href="/privacy">Privacy Policy</a></span>, and <a href="/rules">Community Guidelines</a></span>
     </div>
     ';
 }
@@ -64,7 +64,7 @@ if(!loggedin()) {
         
     </p>
 	<p class="w3-small gr8-theme">
-		LEGO&#174;, the LEGO&#174; logo, the Minifigure&#8482;, and the Brick&#8482; and Knob&#8482; configurations are trademarks of the LEGO&#174; Group of Companies which does not sponsor, authorize, or endorse this site.
+		Lego&#174;, the Lego&#174; logo, the Minifigure&#8482;, and the Brick&#8482; and Knob&#8482; configurations are trademarks of the Lego&#174; company, which does not sponsor, authorize, or endorse this site.
 	</p>
 </div><br />
 
