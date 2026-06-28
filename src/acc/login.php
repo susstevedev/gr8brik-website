@@ -33,7 +33,8 @@ isLoggedin();
         .w3-input {
             width: 50%;
         }
-        @media only screen and (max-width: 768px) {
+        
+        /*@media only screen and (max-width: 768px) {
             #linkbar, #mobilenav, #toggleModeMenu, #toggleLight, #toggleDark, #welcome-large, #loginForm {
                 display: none;
             }
@@ -43,7 +44,7 @@ isLoggedin();
             .w3-input {
                 width: 100%;
             }
-        }
+        }*/
     </style>
     <script>
         $(document).ready(function() {
@@ -63,12 +64,20 @@ isLoggedin();
 
                 var mail = $("#loginForm input[name='mail']").val();
                 var pwd = $("#loginForm input[name='pwd']").val();
+                var remember = $("#loginForm input[name='remember']").prop("checked");
+                var prevBtnText = $("#loginBtn").html();
+                
+                $("#loginBtn").html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
+                $("#loginBtn").prop("disabled", true);
 
                 $.ajax({
                     url: '/ajax/auth',
                     method: "POST",
-                    data: { login: true, mail: mail, pwd: pwd },
+                    data: { login: true, mail: mail, pwd: pwd, remember: remember },
                     success: function(response) {
+                        $("#loginBtn").html(prevBtnText);
+                		$("#loginBtn").prop("disabled", false);
+                        
                         if(response.success === true) {
                             if(location.search == "?desktop=true") {
                                 window.location.reload();
@@ -77,26 +86,31 @@ isLoggedin();
                             }
                         } else {
                             $("#error").show()
-                            $("#error-text").text(response.error || "An error occured. Please try again later.");
-                            $("#error").delay(5000).fadeOut(2500);
+                            $("#error-text").text(response.error);
+                            $("#error").delay(5000).fadeOut(2500, function() {
+                        		$("#error-text").text('');
+                        	});
                         }
                     },
 
                     error: function(jqXHR, textStatus, errorThrown) {
+                        $("#loginBtn").html(prevBtnText);
+                		$("#loginBtn").prop("disabled", false);
+                        
                         var response = JSON.parse(jqXHR.responseText);
                         console.error('Server status code: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
+                        
                         if(response.popup) {
                             $("#popup").show();
                             $("#popup-text").text(response.popup);
                             $("#popup-btn").attr("href", response.goto)
                         }
+                        
                         $("#error").show()
-                        if(!response.error) {
-                            $("#error-text").text("An error occured. Please try again later.");
-                        } else if(response.error) {
-                            $("#error-text").text(response.error);
-                        }
-                        $("#error").delay(5000).fadeOut(2500);
+                        $("#error-text").text(response.error);
+                        $("#error").delay(5000).fadeOut(2500, function() {
+                        	$("#error-text").text('');
+                        });
                     }
                 });
             });
@@ -108,8 +122,8 @@ isLoggedin();
     </script>
 
     <div id="popup" class="w3-modal w3-card-2">
-        <div class="gr8-theme w3-round w3-light-grey w3-modal-content">
-            <header class="w3-container w3-round w3-teal"> 
+        <div class="gr8-theme w3-round-small w3-light-grey w3-modal-content">
+            <header class="w3-container w3-round-small w3-blue"> 
                 <span onclick="document.getElementById('popup').style.display='none'" 
                 class="w3-button w3-display-topright">&times;</span>
                 <h2>Important Modal</h2>
@@ -121,26 +135,30 @@ isLoggedin();
         </div>
     </div>
 
-    <div id="error" style="display: none;" class="w3-red w3-card-2 w3-padding w3-round"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span>&nbsp;<span id="error-text"></span></div>
+    <div id="error" style="display: none;" class="w3-red w3-card-2 w3-padding-small w3-round-small"><span class="fa fa-times-circle-o" aria-hidden="true"></span>&nbsp;<span id="error-text"></span></div>
     <div id="welcome-large">
         <h2>Login</h2>
     </div>
-    <center>
+    <!--<center>
         <div id="welcome-mobile">
             <img src="/img/logo.jpg" style="width: 15%; height: 15%; border-radius: 50%;">
             <p class="w3-large">Welcome to Gr8brik!</p>
-            <p>The second most trending Lego modeler on the web!</p>
             <a href="/acc/register" class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo">Create account</a><br />
             <button class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" id="showLogin" name="showLogin">Sign in</button><hr />
             <a href="/list" class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo">View without sign in</a>
         </div>
-    </center>
+    </center>-->
     <div id="loginForm" class="w3-container">
         <span>Don't have an account? <a href="register">Register</a></span><br />
-        <input class="w3-input w3-border" type="email" name="mail" placeholder="Email or username"><br />
-        <input class="w3-input w3-border" type="password" name="pwd" placeholder="Password"><br />
+        
+        <p><input class="w3-border" type="email" name="mail" size="50px" placeholder="Email or username"></p>
+        <p><input class="w3-border" type="password" name="pwd" size="50px" placeholder="Password"></p>
+        
+        <input type="checkbox" name="remember">
+		<label for="remember">Remember my session</label><br />
+        
         <span><small>Your session will be remembered, so you don't need to re-login everytime you visit our services.</small></span><br />
-        <button class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo" id="loginBtn" name="login">Login</button>
+        <button class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small w3-border w3-border-indigo" id="loginBtn" name="login">Login</button>
     </div>
     <?php include '../linkbar.php' ?>
 </body>

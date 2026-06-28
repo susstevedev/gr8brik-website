@@ -29,29 +29,27 @@ isLoggedin();
 
             $sessionAmount = mysqli_num_rows($result);
 
-            echo "<h4>" . $sessionAmount . " active sessions. You are currently on a " . UA . " browser.</h4>";
+            echo "<h4><span id='session-amount'>" . $sessionAmount . "</span> active sessions. You are currently on " . UA . ".</h4>";
 
             $i = 0;
 			while ($row = $result->fetch_assoc()) {
                 $time = time_ago(date('Y-m-d H:i:s', $row['timestamp']));
 
-				echo "<article id='sessionModal" . $i . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-round w3-large'>";
+				echo "<article id='sessionModal" . $i . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-margin-bottom w3-round w3-large'>";
                 echo "<span>Last IP " . $row['login_from'] . "</span><br />";
                 echo "<span>On browser " . get_browser_name($row['user_agent']) . ", " . get_system_name($row['user_agent']) . "</span><br />";
                 echo "Last active <time id='original' style='cursor: pointer;' datetime='" . date('Y-m-d H:i:s', $row['timestamp']) . "'>" . $time . "</time>";
                 echo "<time id='complete' style='display: none; cursor: pointer;' datetime='" . date('Y-m-d H:i:s', $row['timestamp']) . "'> " . date("F j, Y, g:i a", $row['timestamp']) . "</time><br />";
-                if($_COOKIE['token'] != $row['id']) {
-                    echo "<button data-id='" . $row['id'] . "' class='revoke-session w3-btn w3-red w3-hover-opacity w3-round w3-padding w3-border w3-border-pink'>
-                        <i class='fa fa-times' aria-hidden='true'></i>
+                if($_SESSION['tokenid'] != $row['id']) {
+                    echo "<button data-id='" . $row['id'] . "' class='revoke-session w3-btn w3-red w3-hover-opacity w3-padding-small w3-round w3-border w3-border-pink'>
                         Revoke Session
                     </button>";
                 } else {
-                    // echo "<span><i class='fa fa-info-circle w3-padding-tiny' aria-hidden='true'></i>This is your current session.</span>";
-                    echo '<div class="w3-padding-small w3-yellow w3-text-black"><span>This is your current session.</span><br />';
-                    echo '<span>To log out on desktop, go to the sidebar, hover over your username, email, or display name, and click "Logout".</span><br />';
-                    echo '<span>To log out on mobile, click your profile picture or the profile icon on the bottom menu, scroll all the way down and click "Logout". Then confirm.</span></div>';
+                    echo '<div class="w3-padding-small w3-round w3-amber w3-text-black"><span>This is your current session.</span><br />';
+                    echo '<span>To logout on desktop, go to the sidebar, hover over your username or email and click "Logout".</span><br />';
+                    echo '<span>To logout on mobile, the profile icon on the bottom menu, scroll all the way down to "Danger zone" and click "Logout". Then confirm.</span></div>';
                 }
-                echo "</article><br />";
+                echo "</article>";
                 $i++;
             }
             $result->free();
@@ -66,6 +64,8 @@ isLoggedin();
                 let session = $(this).data("id");
                 let btn = $(this);
                 let form = $(this).parent();
+                
+                btn.text = "...";
                     
                 $.ajax({
                     url: "/ajax/auth",
@@ -74,7 +74,8 @@ isLoggedin();
                     success: function(response) {
                         console.log(response.success);
                         form.remove();
-                        alert('Session deleted!');
+                        var amount = parseInt($('#session-amount').text());
+                        $('#session-amount').text(amount - 1);
                     },
                     error: (jqXHR, textStatus, errorThrown) => {
                         console.error("error:", textStatus, errorThrown, jqXHR);
@@ -83,6 +84,9 @@ isLoggedin();
                     }
                 });
             });
+            
+            console.log($('#session-amount').text());
+            console.log(parseInt($('#session-amount').text()) - 1);
             
             /*$(document).on("click", "#sessionModal #original", function() {
                 $(this).hide();

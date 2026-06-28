@@ -1,13 +1,14 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+
 if(!loggedin()) {
-    header('Location: login.php');
+    header('Location: http://www.youtube.com/watch?v=2dZy3cd9KFY');
 }
 
 if(isset($token['user'])) {
     if($users_row['admin'] != '1'){
-        header('Location: index.php');
+        header('Location: http://www.youtube.com/watch?v=2dZy3cd9KFY');
     }
 }
 

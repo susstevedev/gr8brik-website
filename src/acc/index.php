@@ -42,23 +42,7 @@ if (isset($_POST['picture'])) {
     $okay = true;
 
     if(isset($_POST['deletePfp'])) {
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        
-        $letter = htmlspecialchars(substr($users_row['username'], 0, 1));
-        $pfp = $_SERVER['DOCUMENT_ROOT'] . $users_row['picture'];
-        $old = 'https://profile.accounts.firefox.com/v1/avatar/' . $letter;
-
-        $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
-        $stmt->bind_param("ss", $old, $id);
-        if ($users_row['picture'] != null && !$conn->connect_error && $stmt->execute()) {
-            unlink($pfp);
-            ob_start();
-            echo "Profile picture removed";
-            ob_end_flush();
-            header("refresh:3; url=index.php");
-        } else {
-            exit('Error removing profile picture');
-        }
+        exit('Please use the new enpoint for deleting profile pictures!');
     } else {
         if($users_row['verify_token'] != NULL) {
             echo "Please verify your account to upload or edit your profile picture.";
@@ -68,8 +52,8 @@ if (isset($_POST['picture'])) {
 
         $mime = mime_content_type($_FILES["fileToUpload"]["tmp_name"]);
 
-        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif'])) {
-            echo "Only JPEG, PNG, and GIF files are allowed.";
+        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'])) {
+            echo "Only JPEG, PNG, GIF, and WEBP files are allowed.";
             $okay = false;
             exit;
         }
@@ -128,27 +112,25 @@ if (isset($_POST['remove_picture'])) {
     $okay = true;
    	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
     
-    $letter = htmlspecialchars(substr(strtolower($users_row['username']), 0, 1));
-    $valid = array('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z');
+    $old_pfp = $_SERVER['DOCUMENT_ROOT'] . $users_row['picture'];
+    $new_pfp = '/img/no_image.png';
     
-   	if(!in_array($letter, $valid)) {
-		$letter = "?";
-    }
+    // check if the picture is null or if it is not equal to the default can be done with one line which also checks for legacy pfps (eg ://examplesite.com/anyimage.jpeg)
+    //if ($users_row['picture'] != null && $users_row['picture'] != '/img/no_image.png' && strpos($users_row['picture'], '/acc/users/pfps/') !== false) {
+    if (strpos($users_row['picture'], '/acc/users/pfps/') !== false) {
+    	unlink($old_pfp);
+   	}
     
-    $pfp = $_SERVER['DOCUMENT_ROOT'] . $users_row['picture'];
-    $old = '/ajax/pfp?method=default&letter=' . $letter;
-
     $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
-    $stmt->bind_param("ss", $old, $id);
+    $stmt->bind_param("ss", $new_pfp, $id);
     
-    if ($users_row['picture'] != null && !$conn->connect_error && $stmt->execute()) {
-    	unlink($pfp);
+    if (!$conn->connect_error && $stmt->execute()) {
         ob_start();
         echo "Profile picture removed";
         ob_end_flush();
         header("refresh:3; url=index.php");
    	} else {
-    	exit('Error removing profile picture');
+    	exit('Error removing profile picture. Please try again later.');
     }
 }
 
@@ -222,8 +204,7 @@ if (isset($_POST['banner'])) {
 				<form method='post' action='/ajax/account_settings.php'>
 					<h2>Are you sure you want to deactivate your account?</h2>
                     <p><input type="password" name="password" placeholder="Password" class="w3-input w3-border w3-mobile" required /></p>
-                    <p>You can restore your account until 30 days after you deactivate. After 30 days, your account will be deleted and all data anonymized.</p>
-                    <p><b class="w3-red">Your data may not be recoverable after 30 days.</b></p>
+                    <p>You can restore your account until 14 days after you deactivate. After 14 days, your account will be deleted and all data anonymized.</p>
 					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('deactive').style.display='none'">No</span>&nbsp;
 					<input type="submit" value="Yes" name="deactive_account" class="w3-btn w3-large w3-white w3-hover-red">
 				</form>
@@ -483,8 +464,8 @@ if (isset($_POST['banner'])) {
             background-image: url('<?php 
     			if(file_exists("users/banners/" . $users_row['id'] . "..jpg")) { 
                     echo "users/banners/" . $users_row['id'] . "..jpg";
-                } else { 
-                    echo "/ajax/pfp?method=default&letter=" . substr(strtolower($users_row['username']), 0, 1);
+                } else {
+                    echo "/img/no_image.png";
                 }
             ?>');
             width: 25vw;
@@ -508,7 +489,7 @@ if (isset($_POST['banner'])) {
         <p>We recommend your banner be 250x500 pixels</p>
 		<p><input type="file" name="fileToupload" id="fileToupload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-banner"></p>
         <?php 
-            if(file_exists('users/banners/' . $id . '..jpg')){
+            if(file_exists('users/banners/' . $id . '..jpg')) {
                 echo '<input type="checkbox" class="w3-check" id="deleteBanner" name="deleteBanner" value="1">';
                 echo '<label for="deleteBanner">Remove banner</label>';
             }
@@ -525,8 +506,9 @@ if (isset($_POST['banner'])) {
 		<p><input type="file" name="fileToUpload" id="fileToUpload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
 		<input type="submit" value="Upload" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-col m3">
         <?php
-            if($users_row['picture'] != null && $users_row['picture'] != $users_row['id'] . '.jpg' && substr($users_row['picture'], 0, 5) != 'https' && file_exists($_SERVER['DOCUMENT_ROOT'] . $users_row['picture'])) {
-               echo '<span class="w3-col m1">&nbsp;</span><input type="submit" value="Delete" id="remove_picture" name="remove_picture" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink w3-col m3">';
+            if($users_row['picture'] != null && file_exists($_SERVER['DOCUMENT_ROOT'] . $users_row['picture'])) {
+               echo '<span class="w3-col m1">&nbsp;</span>';
+               echo '<input type="submit" value="Delete" id="remove_picture" name="remove_picture" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink w3-col m3">';
             }
         ?>
     </form>

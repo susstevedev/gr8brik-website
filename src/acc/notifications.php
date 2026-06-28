@@ -66,7 +66,7 @@ isLoggedIn();
                     $url = "/profile?id=" . $profile;
                     $post = "followed you";
                     $user = $row2['username'];
-                    $img = $row2['pfp'];
+                    $img = $row2['picture'];
                 } elseif ($row['category'] === "2") {
                     $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
                     $content = $row['content'];
@@ -95,6 +95,20 @@ isLoggedIn();
 
                     $result3->free();
                     $conn3->close();
+                } elseif ($row['category'] === "4") {
+                    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+                    $content = $row['content'];
+                    $result3 = $conn3->query("SELECT * FROM warnings WHERE id = $content");
+                    $row3 = $result3->fetch_assoc();
+
+                    $valid = true;
+                    $img = '../img/com.jpg';
+                    $url = "#no";
+                    $post = " got warned: " . $row3['reason'] ?: "[no reason]";
+                    $user = $row2['username'];
+
+                    $result3->free();
+                    $conn3->close();
                 }
                 
                 if (is_numeric($row['timestamp'])) {
@@ -107,7 +121,7 @@ isLoggedIn();
                     echo "<article class='w3-card-2 w3-animate-right w3-hover-shadow gr8-theme w3-padding w3-round w3-large'>";
                     echo "<a href='" . $url . "'><img src='" . $img . "' style='background: #ddd; width: 150px; height: 150px; border-radius: 6px;' alt='" . $img . "' title='" . $img . "'>";
                     echo "<span style='display: inline-block; vertical-align: top; padding: 10px 10px 10px 10px;'>";
-                    echo htmlspecialchars($user) . "&nbsp;" . htmlspecialchars($post) . "</span></a>";
+                    echo "@" . htmlspecialchars($user) . "&nbsp;" . htmlspecialchars($post) . "</span></a>";
                     echo "<time class='w3-right' datetime=''>" . $time . "</time>";
                     echo "</article><br />";
                 }
