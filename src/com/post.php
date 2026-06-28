@@ -6,12 +6,13 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
         $title = $conn->real_escape_string($_POST['title']) ?: "Unnamed Topic";
         $post = $conn->real_escape_string($_POST['description']);
         $date = date("Y-m-d H:i:s");
+        $now = time();
         $category = 'general';
 
         if(isset($users_row['id'])) {
             if(isset($post)) {
                 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-                $sql = "INSERT INTO messages (userid, title, status, content, timestamp) VALUES ('$id', '$title', '$category', '$post', '$date')";
+                $sql = "INSERT INTO messages (userid, title, last_active_time, status, content, timestamp) VALUES ('$id', '$title', '$now', '$category', '$post', '$date')";
                 $stmt = $conn->prepare($sql);
                 if (!$stmt) {
                     $msg = $conn->error;

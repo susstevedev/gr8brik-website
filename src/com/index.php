@@ -74,13 +74,13 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
             <?php
 			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
 			
-				$sql = "SELECT id, userid, title, content, timestamp, last_posted
+				$sql = "SELECT id, userid, title, content, timestamp, last_posted, last_page
                         FROM messages
                         WHERE status = 'pinned' OR status = 'pinnedLocked'
                         ORDER BY timestamp DESC LIMIT $limit OFFSET $offset;";
 				$stmt = $conn->prepare($sql);
 				$stmt->execute();
-				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted);
+				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted, $last_page);
 				
 				while ($stmt->fetch()) {
 					$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -105,6 +105,10 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                           $last_posted = $post_user;
                           $last_post_username = $username;
                         }
+                    
+                    	if($last_page <= 0) {
+                          $last_page = 1;
+                        }
 
                         $conn2->close();
 
@@ -117,7 +121,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                             $shortTitle = 'Untitled';
                         }
 
-                        echo "<tr><td><a href='/topic/" . $id . "'><i class='fa fa-map-pin w3-padding-small w3-text-grey' aria-hidden='true' title='Pinned Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
+                        echo "<tr><td><a href='/topic/" . $id . "?p=" . $last_page . "'><i class='fa fa-map-pin w3-padding-small w3-text-grey' aria-hidden='true' title='Pinned Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                         echo "<td>" . $date . "</td>";
                         echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
                         echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";
@@ -127,7 +131,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
 			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
                 
-				$sql = "SELECT id, userid, title, content, timestamp, last_posted, last_active_time
+				$sql = "SELECT id, userid, title, content, timestamp, last_posted, last_active_time, last_page
                         FROM messages
                         WHERE (status = 'general' OR status = 'locked') AND (parent IS NULL OR parent = 0)
                         ORDER BY last_active_time DESC
@@ -135,7 +139,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                 
 				$stmt = $conn->prepare($sql);
 				$stmt->execute();
-				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted, $last_active);
+				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted, $last_active, $last_page);
                 
 				while ($stmt->fetch()) {	
                     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -160,6 +164,10 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                       $last_posted = $post_user;
                       $last_post_username = $username;
                     }
+                    
+                    if($last_page <= 0) {
+                          $last_page = 1;
+                    }
 
                     $conn2->close();
 
@@ -172,7 +180,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                         $shortTitle = 'Untitled';
                     }
 
-                    echo "<tr><td><a href='/topic/" . $id . "'><i class='fa fa-users w3-padding-small w3-text-grey' aria-hidden='true' title='General Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
+                    echo "<tr><td><a href='/topic/" . $id . "?p=" . $last_page . "'><i class='fa fa-users w3-padding-small w3-text-grey' aria-hidden='true' title='General Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                     echo "<td>" . $date . "</td>";
                     echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
                     echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";

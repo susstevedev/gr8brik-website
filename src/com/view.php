@@ -7,7 +7,7 @@ if(loggedin()) {
 
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
 
-$post_id = $_GET['id'];
+$post_id = htmlspecialchars($_GET['id']);
 
 if ($conn->connect_error) {
 	die("Error: " . $conn->connect_error);
@@ -21,6 +21,8 @@ $title = $row['title'];
 $post = $row['content'];
 $date = $row['timestamp'];
 $views = $row['views'];
+$category = $row['status'];
+
 if(!empty($row['edited'])) {
     $edit_date = $row['edited'];
 } else {
@@ -36,11 +38,18 @@ if ($result->num_rows === 0) {
 }
 		
 $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);	
-		
-$sql = "SELECT * FROM users WHERE id = $userid";
-$result = $conn2->query($sql);
-$row = $result->fetch_assoc();
-$username = $row['username'];
+
+if(!$row['username']) { // check for anonymous posting
+    $sql = "SELECT * FROM users WHERE id = $userid";
+    $result = $conn2->query($sql);
+    $row = $result->fetch_assoc();
+    $username = $row['username'] ?? '[deleted]';
+    $picture = $row['picture'] ?? '/img/user.png';
+} else {
+    $username = $row['username'];
+    $picture = '/img/no_image.png';
+    $userid = 0;
+}
 
 if (!isset($_SESSION['viewed_post_ids'])) {
         $_SESSION['viewed_post_ids'] = [];
@@ -53,9 +62,35 @@ if (!in_array($post_id, $_SESSION['viewed_post_ids'])) {
         $_SESSION['viewed_creation_ids'][] = $post_id;
 }
 
+if(isset($_POST['comment_delete'])) {
+	$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+    if ($conn2->connect_error) {
+	    exit($conn2->connect_error);
+    }
+    
+    $commentid = $conn2->real_escape_string($_POST['commentid']);
+    $sql = "SELECT * FROM messages WHERE id = '$commentid' AND (parent IS NOT NULL OR parent != 0)";
+	$result = $conn->query($sql);
+    if (!$result) {
+        exit('Message with that ID does not exist.');
+    }
+    $mrow = $result->fetch_assoc();
+    
+    if(!isset($mrow['userid']) && trim($mrow['userid']) !== trim($_SESSION['userid'])) {
+        exit('Not logged in or user is not allowed to delete messages.');
+    }
+
+	$sql = "DELETE FROM messages WHERE id = '$commentid' LIMIT 1"; 
+    $result = $conn2->query($sql);
+    if ($result) {
+        $goto = $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING'];
+        header('Location: ' . $goto);
+        exit;
+    }
+}
+
 if(isset($_POST['comment'])){
-	
-	$comment = $_POST['commentbox'];
+		$comment = $_POST['commentbox'];
 		
 		$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
 		if ($conn2->connect_error) {
@@ -66,11 +101,30 @@ if(isset($_POST['comment'])){
             echo "Message shall contain text.";
             exit;
         }
-		
-		$date = date("Y-m-d H:i:s");
-        $sql = "INSERT INTO messages (userid, parent, content, timestamp) VALUES (?, ?, ?, ?)";
-        $stmt2 = $conn2->prepare($sql);
-        $stmt2->bind_param("iiss", $id, $post_id, $comment, $date);
+    
+		$username = htmlspecialchars($_POST['username']);
+    
+    	if($username) {
+            $_SESSION['forum_anonymous_username'] = $username;
+        }
+    	
+    	if(isset($category) && $category == "nolist" && loggedin() === false) {
+            if(!$username) {
+                exit('No username provided.');
+            }
+            $date = date("Y-m-d H:i:s");
+            $sql = "INSERT INTO messages (username, parent, content, timestamp) VALUES (?, ?, ?, ?)";
+            $stmt2 = $conn2->prepare($sql);
+            $stmt2->bind_param("siss", $username, $post_id, $comment, $date);
+        } else {
+            if(!$loggedin) {
+                exit('Please login to post messages.');
+            }
+            $date = date("Y-m-d H:i:s");
+            $sql = "INSERT INTO messages (userid, parent, content, timestamp) VALUES (?, ?, ?, ?)";
+            $stmt2 = $conn2->prepare($sql);
+            $stmt2->bind_param("iiss", $id, $post_id, $comment, $date);
+        }
     
         if(!$stmt2->execute()) {
             echo "An error has occured. Please try again later.";
@@ -78,10 +132,16 @@ if(isset($_POST['comment'])){
         }
         $stmt2->close();
     
+        $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
+        $offset = ($page - 1) * 10;
+        $count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE parent = '$post_id'");
+        $reply_count = $count_result->fetch_assoc()['reply_count'];
+        $total_pages = ceil($reply_count / 10);
+    
     	$time = time();
-        $sql = "UPDATE messages SET last_active_time = ? WHERE id = ?";
+        $sql = "UPDATE messages SET last_active_time = ?, last_page = ?, last_posted = ? WHERE id = ?";
         $stmt3 = $conn2->prepare($sql);
-        $stmt3->bind_param("ss", $time, $post_id);
+        $stmt3->bind_param("iiii", $time, $total_pages, $id, $post_id);
     
     	if ($stmt3->execute()) {
             $goto = $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING'];
@@ -92,29 +152,19 @@ if(isset($_POST['comment'])){
         }
         $stmt3->close();
 
-        //if($id != $userid) {
-            $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-            $time = time();
-            $content = $post_id;
-            $category = 3;
-            $sql = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
+        $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $time = time();
+       	$content = $post_id;
+        $category = 3;
+       	$sql = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
 
-            $stmt = $conn2->prepare($sql);
-            $stmt->bind_param("iisii", $userid, $id, $time, $content, $category);
-            $stmt->execute();
-            $stmt->close();
+        $stmt = $conn2->prepare($sql);
+        $stmt->bind_param("iisii", $userid, $id, $time, $content, $category);
+        $stmt->execute();
+        $stmt->close();
 
-            $date = time();
-            /*$sql = "SELECT alert FROM users WHERE id = ?";
-            $stmt3 = $conn2->prepare($sql);
-            $stmt3->bind_param("i", $userid);
-            $stmt3->bind_result($alert);
-            $stmt3->execute();
-            $stmt3->close();*/
-
-            $stmt4 = $conn2->prepare("UPDATE users SET alert = alert + 1 WHERE id = ?");
-            $stmt4->bind_param("i", $userid);
-        //}
+        $stmt4 = $conn2->prepare("UPDATE users SET alert = alert + 1 WHERE id = ?");
+        $stmt4->bind_param("i", $userid);
 }
 
 ?>
@@ -157,8 +207,11 @@ if(isset($_POST['comment'])){
         echo "<b id='commentboxcontainer'>This conversation has been removed because it violated our <a href='/rules'>rules</a>.</b><br />";
         exit;
     }
+        
+    if ($category === "nolist") {
+        echo "<b id='unlistedwarning'>This forum is unlisted, only people with the link can view it.</b><br />";
+    }
 
-    $username = htmlspecialchars($row['username']);
     $isAdmin = $row['admin'] === '1' ? "w3-red" : "";
 
     echo "<div class='gr8-theme w3-container w3-light-grey w3-card-4'>";
@@ -172,12 +225,13 @@ if(isset($_POST['comment'])){
 
     echo '<div class="w3-row" style="display:flex;width:100%;">';
     echo '<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-margin-right" style="flex-shrink: 1; width: 20%;">';
-    echo '<img id="pfp" src="' . $row['picture'] . '">';
+    echo '<img id="pfp" src="' . $picture . '">';
     echo '<br /><a href="../user/' . $userid . '"><span class="' . $isAdmin . '" style="text-overflow: ellipsis;">' . $username . '</span></a>';
     echo '<br /><time title="' . $date . '" datetime="' . $date . '">Posted ' . time_ago($date) . '</time>';
     echo '<br /><span>' . $post_count . ' total posts</span></div>';
     echo '<span class="gr8-theme w3-card-2 w3-light-grey w3-padding-small" style="flex-shrink: 1; width: 80%;"><pre>';
-    echo $bbcode->toHTML($decoded_post) . '</pre></span></div><br /><hr />';
+    echo $bbcode->toHTML($decoded_post) . '</pre></span>';
+    echo "</div><br /><hr />";
 
     $sql = "SELECT * FROM messages WHERE parent = $post_id ORDER BY timestamp ASC LIMIT $limit OFFSET $offset";
     $comResult = $conn->query($sql);
@@ -205,10 +259,17 @@ if(isset($_POST['comment'])){
             	$c_username = htmlspecialchars($userRow['username']);
             	$isAdmin = $userRow['admin'] === 1 ? "w3-red" : "";
                 $pfp = $userRow['picture'] ?: '/img/no_image.png';
+                $show_user_link = true;
+            } else if($row['username']) {
+                $c_username = $row['username'];
+                $isAdmin = false;
+                $pfp = '/img/no_image.png';
+                $show_user_link = false;
             } else {
                 $c_username = "[deleted]";
                 $isAdmin = "";
                 $pfp = '/img/no_image.png';
+                $show_user_link = false;
             }
 
             $user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user'");
@@ -217,12 +278,25 @@ if(isset($_POST['comment'])){
 
             echo '<div class="w3-row" style="display:flex;width:100%;">';
             echo '<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-margin-right" style="flex-shrink: 1; width: 20%;">';
-            echo '<img id="pfp" src="' . $pfp . '">';
-            echo '<br /><a href="../user/' . $c_user . '"><span class="' . $isAdmin . '" style="text-overflow: ellipsis;">' . $c_username . '</span></a>';
+            echo '<img id="pfp" src="' . $pfp . '"><br />';
+            if($show_user_link) {
+           		echo '<a href="../user/' . $c_user . '">';
+            }
+            echo '<span class="' . $isAdmin . '" style="text-overflow: ellipsis;">' . $c_username . '</span></a>';
             echo '<br /><time title="' . $c_date . '" datetime="' . $c_date . '">Posted ' . time_ago($c_date) . '</time>';
             echo '<br /><span>' . $user_post_count . ' total posts</span></div>';
             echo '<span class="gr8-theme w3-card-2 w3-light-grey w3-padding-small" style="flex-shrink: 1; width:80%;"><pre>';
-            echo $bbcode->toHTML($decoded_comment) . '</pre></span></div><br />';
+            echo $bbcode->toHTML($decoded_comment) . '</pre></span>';
+            if(loggedin()) {
+                if(trim($_SESSION['userid']) === trim($c_user)) {
+                    echo "<form id='delete_comment' method='post'></form>";
+                   	echo "<button form='delete_comment' type='submit' name='comment_delete' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>
+                    	<i class='fa fa-trash' aria-hidden='true'></i>
+                    </button>";
+
+                }
+            }
+           	echo "</div><br />";
         }
 
         echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>&nbsp;';
@@ -251,6 +325,14 @@ if(isset($_POST['comment'])){
 
     if ($category === "pinnedLocked" || $category === "locked") {
         echo "<b id='commentboxcontainer'>This conversation is locked. New replies cannot be posted.</b><br />";
+    } else if($category === "nolist") {
+        $forum_anonymous_username = $users_row ? $users_row['username'] : $_SESSION['forum_anonymous_username'];
+        echo "<b>You can only post anonymous comments on unlisted forums.</b>";
+        echo "<br /><form id='commentboxcontainer' method='post' action=''>";
+        echo "<input type='text' value='" . $forum_anonymous_username . "' placeholder='Name' name='username' /><br />";
+        echo "<textarea name='commentbox' placeholder='" . $randomWord . "' rows='4' cols='50'></textarea><br />";
+        echo "<input type='submit' value='Reply' name='comment' class='w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo' />";
+       	echo "</form><br />";
 	} else {
         if(isset($_SESSION['username']) || isset($token['user'])) {
             echo "<br /><form id='commentboxcontainer' method='post' action=''>";
