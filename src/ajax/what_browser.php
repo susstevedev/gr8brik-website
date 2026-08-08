@@ -37,7 +37,26 @@ function get_system_name($user_agent) {
     return 'unknown';
 }
 
+function ip_subnet_same(string $ip1, string $ip2): bool {
+    if ($ip1 === $ip2) { 
+        return true;
+    }
+
+    if (filter_var($ip1, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && filter_var($ip2, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+        $parts1 = explode('.', $ip1);
+        $parts2 = explode('.', $ip2);
+        return ($parts1[0] === $parts2[0] && $parts1[1] === $parts2[1] && $parts1[2] === $parts2[2]);
+    }
+
+    if (filter_var($ip1, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) && filter_var($ip2, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+        $hex1 = explode(':', $ip1);
+        $hex2 = explode(':', $ip2);
+        return ($hex1[0] === $hex2[0] && $hex1[1] === $hex2[1] && $hex1[2] === $hex2[2] && $hex1[3] === $hex2[3]);
+    }
+
+    return false;
+}
+
 define("UA", get_browser_name($ua_global) . ", " . get_system_name($ua_global));
 $user_agent = UA;
-
 ?>

@@ -1,442 +1,458 @@
 <?php
-if(!isset($_GET['show_errors'])) {
-    header('Content-type: application/json');
-    error_reporting(0);
-}
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/auth.php';
 
-$response = ['error' => 'An unknown error has occurred.'];
-
-include $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-include $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-if(!loggedin()) {
-    header("HTTP/1.0 403 Forbidden");
-    echo json_encode(['error' => 'Invalid session token provided', 'code' => '403', 'version' => 'LEGACY']);
-    exit;
-}
+class ScreenNameUtils {
+    public function generateRandomScreenName() {
+        $words = ['Brick', 'Minifig', 'Stud', 'Build', 'Block', 'Stack', 'Baseplate', 'Roadplate', 'Fanatic', 'Craftsman', 'Awesome', 'Great' , 'Master', 'Creator', 'Modeler'];
+        $randomKeys = array_rand($words, 2);
+        $randomWord1 = $words[$randomKeys[0]];
+        $randomWord2 = $words[$randomKeys[1]];
+        $randomNumber = rand(100, 999);
 
-function check_username_available($new) {
-    global $users_row;
-    global $conn;
-    global $id;
-
-    $available = '1';
-    $reason = '0';
-    
-    $reserved_names = array(
-        'administrator', 
-        'god', 
-        'admin',
-        'susstevedev',
-        'sussteve',
-        'sussteve226',
-        'evan',
-        'saverino',
-        'the_an0nym',
-        'the_anonym'
-    );
-    
-    /* I will not add some words as the project is open source and github/contibutors might get mad */
-    /* If someone has somehow registered an account with one of these names, report their account or one of their models */
-    $banned_words = array(
-        'ZnVjaw',
-        'c2hpdA',
-        'ZGFtbg',
-        'ZnVja2luZw',
-        'ZGFtbWl0',
-        'bW90aGVyZnVja2Vy',
-        'ZmFnZw',
-        'bmlnZw'
-    );
-
-    if(empty($new) || $new === null) {
-        $available = '0';
-        $reason = 'Please provide a username.';
+        $randomScreenName = $randomWord1 . $randomWord2 . $randomNumber;
+        return $randomScreenName;
     }
 
-    if(trim($new) === trim($users_row['username'])) {
-        $available = '0';
-        $reason = 'This is your current username.';
-    }
+    public function check_username_available(string $new) {
+        global $current_user;
+        global $conn;
 
-    if(!ctype_alnum(str_replace(array('-', '_', '.'), '', $new))) {
-        $available = '0';
-        $reason = 'Username cannot contain anything other than A-Z, any number, or dash underscore and dot.';
-    }
+        $available = '1';
+        $reason = null;
+        
+        $reserved_names = array(
+            'administrator', 
+            'admin',
+            'susstevedev',
+            'evan',
+            'the_an0nym',
+            'missbricker',
+            'gr8brik'
+        );
+        
+        /* I will not add some words as the project is open source and github/contibutors might get mad */
+        /* If someone has somehow registered an account with one of these names, report their account or one of their creations */
+        $banned_words = array(
+            'ZnVjaw',
+            'c2hpdA',
+            'ZGFtbg',
+            'ZnVja2luZw',
+            'ZGFtbWl0',
+            'bW90aGVyZnVja2Vy',
+            'ZmFnZw',
+            'bmlnZw'
+        );
 
-    if(strlen($new) > 15) {
-        $available = '0';
-        $reason = 'Username must be under 15 characters.';
-    }
-
-    if(strlen($new) < 2) {
-        $available = '0';
-        $reason = 'Username must be more than 2 characters.';
-    }
-
-    $result = $conn->query("SELECT * FROM users WHERE username = '$new'");
-    $row = $result->fetch_assoc();
-
-    if($result->num_rows != 0) {
-        $available = '0';
-        $reason = 'Username has been taken. Please choose another.';
-    }
-    
-    if (in_array($new, $reserved_names)) {
-        $available = '0';
-        $reason = 'This username has been reserved and cannot be used.';
-    }
-    
-    foreach($banned_words as $banned_word) {
-        if (strpos(base64_encode($new), $banned_word) !== false) {
-            $available = '0';
-        	$reason = 'This username has been blacklisted and cannot be used.';
+        if(empty($new) || $new === null) {
+            return ['available' => false, 'reason' => 'Please provide a username.'];
         }
-    }
 
-    if (!empty($users_row['changed'])) {
-        $remaining = $users_row['changed'] - time();
-        if ($remaining < 86400) {
-            $hours_remaining = ceil($remaining / 3600);
-            $reason = "You can change your username " . time_ago($remaining);
-            $available = '0';
+        if(loggedin()) {
+            if($current_user->verify_token != NULL) {
+                return ['available' => false, 'reason' => "Please verify your account to continue this action."];
+            }
+
+            if (!empty($current_user->changed)) {
+                $remaining = $current_user->changed - time();
+                if ($remaining < 86400) {
+                    return ['available' => false, 'reason' => "You can change your username " . time_ago($remaining)];
+                }
+            }
+
+            if(trim((strtolower($new))) == trim((strtolower($current_user->username)))) {
+                return ['available' => '0', 'reason' => null];
+            }
         }
-    }
 
-    return ['available' => $available, 'reason' => $reason];
+        if(!ctype_alnum(str_replace(array('-', '_', '.'), '', $new))) {
+            return ['available' => false, 'reason' => 'Username cannot contain anything other than A-Z, any number, or dash underscore and dot.'];
+        }
+
+        if(strlen($new) > 15) {
+            return ['available' => false, 'reason' => 'Username must be at most 15 characters.'];
+        }
+
+        if(strlen($new) < 3) {
+            return ['available' => false, 'reason' => 'Username must be at least 3 characters.'];
+        }
+
+        $isBanned = AccountManager::isBanned($conn, null, $new);
+        if($isBanned !== false) {
+            return ['available' => 0];
+        }
+
+        $result = $conn->query("SELECT * FROM users WHERE username = '$new' AND deactive IS NULL");
+        if($result->num_rows != 0 || in_array($new, $reserved_names)) {
+            return ['available' => false, 'reason' => 'This username has been taken. Please choose another.'];
+        }
+        
+        foreach($banned_words as $banned_word) {
+            if (!$reason && strpos(base64_encode($new), $banned_word) !== false) {
+                return ['available' => false, 'reason' => 'This username is unavailable. Please choose another.'];
+            }
+        }
+
+        return ['available' => true, 'reason' => 'Username is available'];
+    }
 }
 
 if(isset($_GET['check_username_available'])) {
     $username = urldecode(htmlspecialchars($_GET['username']));
-    $result = check_username_available($username);
+    $utils = new ScreenNameUtils();
+    $result = $utils->check_username_available($username);
     header("HTTP/1.0 200 OK");
     echo json_encode($result);
     exit;
 }
 
-function username_change($new) {
-    global $users_row;
-    global $conn;
-    global $id;
-    
-    $result = check_username_available($new);
-    if ($result['available'] === '0') {
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => $result['reason']]);
+// new thingy
+class AccountSettings {    
+    public function username_change($new) {
+        if(!loggedin()) {
+            header("HTTP/1.0 403 Forbidden");
+            return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
+        }
+
+        global $conn;
+        global $current_user;
+        $id = $current_user->id;
+
+        $utils = new ScreenNameUtils();
+        $result = $utils->check_username_available($new);
+        if ($result['available'] === '0') {
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => $result['reason']];
+        }
+
+        $changed = time();
+
+        $stmt = $conn->prepare("UPDATE users SET username = ?, changed = ? WHERE id = ?");
+        $stmt->bind_param("sss", $new, $changed, $id);
+        if ($stmt->execute()) {
+            return ['success' => 'Username updated'];
+        }
+    }
+
+    public function twitter_change($new) {
+        if(!loggedin()) {
+            header("HTTP/1.0 403 Forbidden");
+            return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
+        }
+
+        global $current_user;
+        $id = $current_user->id;
+
+        if($current_user->verify_token != NULL) {
+            $error_message = "Please verify your account to continue this action.";
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => $error_message];
+        }
+
+        if(strlen($new) > 15) {
+            $error_message = "The handle of the linked Twitter account can only be 15 characters.";
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => $error_message];
+        }
+
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+        $stmt_2 = $conn->prepare("UPDATE users SET twitter = ? WHERE id = ?");
+        $stmt_2->bind_param("ss", $new, $id);
+        if ($stmt_2->execute()) {
+            return ['success' => 'Your profile has been updated with the new Twitter account.', 'code' => '200', 'version' => 'NEW'];
+        }
+    }
+
+    public function bsky_change($new) {
+        if(!loggedin()) {
+            header("HTTP/1.0 403 Forbidden");
+            return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
+        }
+
+        global $current_user;
+        $id = $current_user->id;
+
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+        if($current_user->verify_token != NULL) {
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => "Please verify your account to continue this action."];
+        }
+
+        $stmt_2 = $conn->prepare("UPDATE users SET bsky = ? WHERE id = ?");
+        $stmt_2->bind_param("ss", $new, $id);
+        if ($stmt_2->execute()) {
+            return ['success' => 'Your profile has been updated with the new Bluesky account.', 'code' => '200', 'version' => 'NEW'];
+        }
+    }
+
+    public function about_change($new) {
+        global $current_user;
+
+        if(!loggedin()) {
+            header("HTTP/1.0 403 Forbidden");
+            return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
+        }
+
+        $id = $current_user->id;
+
+        if($current_user->verify_token != NULL) {
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => "Please verify your account to continue this action."];
+        }
+
+        // used to be 200
+        // 1k as of 1/1/2026
+        if(strlen($new) > 1000) {
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => 'About section can only be 1,000 characters.'];
+        }
+
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $stmt_2 = $conn->prepare("UPDATE users SET description = ? WHERE id = ?");
+
+        $stmt_2->bind_param("si", $new, $id);
+        if ($stmt_2->execute()) {
+            return ['success' => 'About section was changed successfully!'];
+        } else {
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => 'Error changing about section.'];
+        }
+
+        $stmt->close();
+    }
+
+    public function password_change($oldPassword, $newPassword, $confirmPassword) {
+        global $current_user;
+
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+        if(!loggedin()) {
+            header("HTTP/1.0 403 Forbidden");
+            return ['error' => 'Not authenticated, please sign in using traditional means.', 'code' => '403', 'version' => 'NEW'];
+        }
+
+        $userid = $current_user->id;
+
+        if ($newPassword !== $confirmPassword) {
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => "New passwords do not match"];
+        }
+
+        $stmt = $conn->prepare("SELECT password, salt FROM users WHERE id = ?");
+        $stmt->bind_param("i", $userid);
+        $stmt->execute();
+        $stmt->bind_result($storedHash, $salt);
+        $stmt->fetch();
+        $stmt->close();
+
+        if ($storedHash) {
+            if ($storedHash === md5($oldPassword . $salt)) {
+                $newSalt = uniqid();
+                $newHashedPassword = md5($newPassword . $newSalt);
+
+                $stmt = $conn->prepare("UPDATE users SET password = ?, salt = ? WHERE id = ?");
+                $stmt->bind_param("ssi", $newHashedPassword, $newSalt, $userid);
+
+                if ($stmt->execute()) {
+                    header("HTTP/1.0 200 OK");
+                    return ['success' => 'Congrats! Your password was updated with success!'];
+                } else {
+                    header("HTTP/1.0 500 Internal Server Error");
+                    return ['error' => "Unknown error changing password."];
+                }
+            } else {
+                header("HTTP/1.0 500 Internal Server Error");
+                return ['error' => "Incorrect old password."];
+            }
+        } else {
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => "Invalid password hash stored in database."];
+        }
+    }
+
+    public function mail_change($new, $old) {
+        global $current_user;
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+        if(!loggedin()) {
+            header("HTTP/1.0 403 Forbidden");
+            return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
+        }
+
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $id = $current_user->id;
+
+        $sql = "SELECT email FROM users WHERE id = '$id'";
+        $result = $conn->query($sql);
+        $row = $result->fetch_assoc();
+
+        if($result->num_rows != 0) {
+            if($row['email'] === $old) {
+                $sql2 = "UPDATE users SET email = '$new' WHERE id = '$id'";
+
+                if ($conn->query($sql2) === TRUE) {
+                    header("HTTP/1.0 200 OK");
+                    echo json_encode(['success' => 'Email address updated. Please navigate backwards to continue.']);
+                    exit;
+                } else {
+                    $error_message = "Error changing email address.";
+                    header("HTTP/1.0 500 Internal Server Error");
+                    echo json_encode(['error' => $error_message]);
+                    exit;
+                }
+            } else {
+                $error_message = htmlspecialchars($row['email']) . " is not equal to " . htmlspecialchars($old) . ".";
+                header("HTTP/1.0 500 Internal Server Error");
+                echo json_encode(['error' => $error_message]);
+                exit;
+            }
+        }
         exit;
     }
-
-    $changed = time();
-
-	$stmt = $conn->prepare("UPDATE users SET username = ?, changed = ? WHERE id = ?");
-    $stmt->bind_param("sss", $new, $changed, $id);
-    if ($stmt->execute()) {
-        return ['success' => 'Username updated'];
-    }
 }
+
+$account_settings = new AccountSettings();
 
 if(isset($_GET['username_change'])) {
     $username = urldecode(htmlspecialchars($_GET['username']));
-    $result = username_change($username);
-    header("HTTP/1.0 200 OK");
+    $result = $account_settings->username_change($username);
     echo json_encode($result);
     exit;
-}
-
-function twitter_change($new) {
-    global $users_row;
-    $id = (int)$users_row['id'];
-
-    if(strlen($new) > 15) {
-        $error_message = "Twitter handle's can only be 15 characters.";
-        header("HTTP/1.0 500 Internal Server Error");
-        return ['error' => $error_message];
-    }
-
-	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-	$stmt_2 = $conn->prepare("UPDATE users SET twitter = ? WHERE id = ?");
-    $stmt_2->bind_param("ss", $new, $id);
-    if ($stmt_2->execute()) {
-        return ['success' => 'Your profile has been updated with the new Twitter account.', 'code' => '200', 'version' => 'NEW'];
-    }
-}
-
-function bsky_change($new) {
-    global $users_row;
-    $id = (int)$users_row['id'];
-
-	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-	$stmt_2 = $conn->prepare("UPDATE users SET bsky = ? WHERE id = ?");
-    $stmt_2->bind_param("ss", $new, $id);
-    if ($stmt_2->execute()) {
-        return ['success' => 'Your profile has been updated with the new Bluesky account.', 'code' => '200', 'version' => 'NEW'];
-    }
 }
 
 if(isset($_GET['twitter_change'])) {
     $handle = urldecode(htmlspecialchars($_GET['handle']));
-    $result = twitter_change($handle);
-    header("HTTP/1.0 200 OK");
+    $result = $account_settings->twitter_change($handle);
     echo json_encode($result);
     exit;
 }
 
 if(isset($_GET['bsky_change'])) {
     $handle = urldecode(htmlspecialchars($_GET['handle']));
-    $result = bsky_change($handle);
-    header("HTTP/1.0 200 OK");
+    $result = $account_settings->bsky_change($handle);
     echo json_encode($result);
     exit;
-}
-
-function about_change($new) {
-    global $users_row;
-    $id = (int)$users_row['id'];
-
-    // used to be 200
-    // 1k as of 1/1/2026
-    if(strlen($new) > 1000) {
-        header("HTTP/1.0 500 Internal Server Error");
-        return ['error' => 'About section can only be 1,000 characters.'];
-    }
-
-	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-	$stmt_2 = $conn->prepare("UPDATE users SET description = ? WHERE id = ?");
-
-    $stmt_2->bind_param("si", $new, $id);
-    if ($stmt_2->execute()) {
-        return ['success' => 'About section was changed successfully!'];
-    } else {
-        header("HTTP/1.0 500 Internal Server Error");
-        return ['error' => 'Error changing about section.'];
-    }
-
-    $stmt->close();
 }
 
 if(isset($_GET['about_change'])){
     $new = urldecode(htmlspecialchars($_GET['description'], ENT_NOQUOTES));
-    $result = about_change($new);
-    header("HTTP/1.0 200 OK");
+    $result = $account_settings->about_change($new);
     echo json_encode($result);
     exit;
 }
 
-if(isset($_GET['change'])) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+if(isset($_POST['change'])){
+    $new = urldecode($_POST['n_password']);
+    $old = urldecode($_POST['o_password']);
+    $confirm = urldecode($_POST['c_password']);
 
-    $old = md5($_GET['o_password']);
-    $new = md5($_GET['n_password']);
-    $confirm = md5($_GET['c_password']);
-    $id = $token['user'];
-
-    if($new == $confirm) {
-        $sql = "SELECT * FROM users WHERE id = '$id'";
-        $result = $conn->query($sql);
-        $row = $result->fetch_assoc();
-
-        if($result->num_rows != 0) {
-            if($row['id'] === $id) {
-                $sql2 = "UPDATE users SET password = '$new' WHERE id = '$id'";
-                $result2 = $conn->query($sql2);
-
-                if ($conn->query($sql2) === TRUE) {
-                    header("HTTP/1.0 200 OK");
-                    echo json_encode(['success' => 'Password updated']);
-                    exit;
-                } else {
-                    $error_message = "Error changing password";
-                    header("HTTP/1.0 500 Internal Server Error");
-                    echo json_encode(['error' => $error_message]);
-                    exit;
-                }
-            }
-        }
-    }
-}
-
-if (isset($_POST['change'])) {
-    $oldPassword = $_POST['o_password'];
-    $newPassword = $_POST['n_password'];
-    $confirmPassword = $_POST['c_password'];
-    $userid = $token['user'];
-
-    if ($newPassword !== $confirmPassword) {
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => "New passwords do not match"]);
-        exit;
-    }
-
-    $stmt = $conn->prepare("SELECT password, salt FROM users WHERE id = ?");
-    $stmt->bind_param("i", $userid);
-    $stmt->execute();
-    $stmt->bind_result($storedHash, $salt);
-    $stmt->fetch();
-    $stmt->close();
-
-    if ($storedHash) {
-        if ($storedHash === md5($oldPassword . $salt)) {
-            $newSalt = uniqid();
-            $newHashedPassword = md5($newPassword . $newSalt);
-
-            $stmt = $conn->prepare("UPDATE users SET password = ?, salt = ? WHERE id = ?");
-            $stmt->bind_param("ssi", $newHashedPassword, $newSalt, $userid);
-
-            if ($stmt->execute()) {
-                header("HTTP/1.0 200 OK");
-                echo json_encode(['success' => 'Congrats! Your password was updated with success!']);
-                exit;
-            } else {
-                header("HTTP/1.0 500 Internal Server Error");
-                echo json_encode(['error' => "Unknown error changing password."]);
-                exit;
-            }
-            $stmt->close();
-        } else {
-            header("HTTP/1.0 500 Internal Server Error");
-            echo json_encode(['error' => "Incorrect old password."]);
-            exit;
-        }
-    } else {
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => "Account not found."]);
-        exit;
-    }
-}
-
-if(isset($_POST['e_change'])) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $id = $token['user'];
-    $new = htmlspecialchars($_POST['n_email']);
-    $old = htmlspecialchars($_POST['o_email']);
-
-    $sql = "SELECT email FROM users WHERE id = '$id'";
-    $result = $conn->query($sql);
-    $row = $result->fetch_assoc();
-
-    if($result->num_rows != 0) {
-        if($row['email'] === $old) {
-            $sql2 = "UPDATE users SET email = '$new' WHERE id = '$id'";
-            $result2 = $conn->query($sql2);
-
-            if ($conn->query($sql2) === TRUE) {
-                header("HTTP/1.0 200 OK");
-                echo json_encode(['success' => 'Email address updated. Please navigate backwards to continue.']);
-                exit;
-            } else {
-                $error_message = "Error changing email address.";
-                header("HTTP/1.0 500 Internal Server Error");
-                echo json_encode(['error' => $error_message]);
-                exit;
-            }
-        } else {
-            $error_message = "account_settings.php: " . htmlspecialchars($row['email']) . " is not equal to " . htmlspecialchars($old) . ".";
-            header("HTTP/1.0 500 Internal Server Error");
-            echo json_encode(['error' => $error_message]);
-            exit;
-        }
-    }
+    $result = $account_settings->password_change($old, $new, $confirm);
+    echo json_encode($result);
     exit;
 }
 
-/*
-if(isset($_GET['get_notifications'])) {
-    header('Content-Type: application/json');
-    error_reporting(1);
-    	$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-         if ($conn2->connect_error) {
-         	exit($conn2->connect_error);
-         }
+$default_pfp = '/img/no_image.png';
+if (isset($_POST['picture'])) {
+    $okay = true;
 
-            $sql = "SELECT * FROM notifications WHERE user = " . $token['user'] . " ORDER BY timestamp DESC";
-            $result = $conn2->query($sql);
-    
-    		$stmt_2 = $conn2->prepare("SELECT * FROM notifications WHERE user = ? ORDER BY timestamp DESC");
-    		$stmt_2->bind_param("i", $_SESSION['userid']);
-			$stmt_2->execute();
-    		$result = $stmt_2->get_result();
+    if ($current_user->verify_token !== NULL) {
+        $error = "Please verify your account to upload or edit your profile picture.";
+        $okay = false;
+    }
 
-			while ($row = $result->fetch_assoc()) {
-                $url = null;
-                $post = null;
-                $user = null;
-                $img = null;
-                $profile = $row['profile'];
-                $valid = false;
+    if (empty($_FILES['fileToUpload']['tmp_name'])) {
+        $error = 'No file selected.';
+        $okay = false;
+    }
 
-                $sql2 = "SELECT * FROM users WHERE id = $profile";
-                $result2 = $conn2->query($sql2);
-                $row2 = $result2->fetch_assoc();
+    if ($okay) {
+        $mime = mime_content_type($_FILES["fileToUpload"]["tmp_name"]);
+        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'])) {
+            $error = "Only JPEG, PNG, GIF, and WEBP files are allowed.";
+            $okay = false;
+        }
 
-                if ($row['category'] === "1") {
-                    $valid = true;
-                    $url = "/profile?id=" . $profile;
-                    $post = "followed you";
-                    $user = $row2['username'];
-                    $img = '../acc/users/pfps/' . $profile;
-                } elseif ($row['category'] === "2") {
-                    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-                    $content = $row['content'];
-                    $result3 = $conn3->query("SELECT * FROM model WHERE id = $content");
-                    $row3 = $result3->fetch_assoc();
+        if ($_FILES["fileToUpload"]["size"] > 5242880 / 2) {
+            $error = 'File too large.';
+            $okay = false;
+        }
+    }
 
-                    $valid = true;
-                    $img = '../cre/' . $row3['screenshot'];
-                    $url = "/creation?id=" . $content;
-                    $post = "commented on " . $row3['name'];
-                    $user = $row2['username'];
+    if ($okay) {
+        $data = file_get_contents($_FILES["fileToUpload"]["tmp_name"]);
+        $image = imagecreatefromstring($data);
+        if (!$image) {
+            $error = "Invalid image file.";
+            $okay = false;
+        }
+    }
 
-                    $result3->free();
-                    $conn3->close();
-                } elseif ($row['category'] === "3") {
-                    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-                    $content = $row['content'];
-                    $result3 = $conn3->query("SELECT * FROM messages WHERE id = $content");
-                    $row3 = $result3->fetch_assoc();
+    if ($okay) {
+        $db_pfp = '/acc/users/pfps/' . $current_user->id . '.webp';
+        $upload = "users/pfps/" . $current_user->id . ".webp";
 
-                    $valid = true;
-                    $img = '../img/com.jpg';
-                    $url = "/com/view?id=" . $row['content'];
-                    $post = "replied to " . $row3['title'] ?: "[deleted]";
-                    $user = $row2['username'];
-
-                    $result3->free();
-                    $conn3->close();
-                }
-                
-                if (is_numeric($row['timestamp'])) {
-                    $time = time_ago(date("Y-m-d H:i:s", $row['timestamp']));
-                } else {
-                    $time = "A long time ago";
-                }
-
-                if($valid == true) {
-                    echo "<article class='w3-card-2 w3-hover-shadow gr8-theme w3-light-grey w3-padding w3-large'>";
-                    echo "<a href='" . $url . "'><img src='" . $img . "' style='width: 150px; height: 150px; border-radius: 2px;' alt='" . $img . "' title='" . $img . "'>";
-                    echo "<span style='display: inline-block; vertical-align: top; padding: 5px 5px 5px 5px;'>";
-                    echo htmlspecialchars($user) . "&nbsp;" . htmlspecialchars($post) . "</span></a>";
-                    echo "<time class='w3-right w3-text-grey' datetime=''>" . $time . "</time>";
-                    echo "</article><br />";
-                }
-                
-                if($valid == true) {
-            		echo json_encode(['url' => $url, 'img' => $img, 'user' => $user, 'post' => $post, 'time' => $time]);
-            		exit;
-                }
-
-                $result2->free();
+        if (imagewebp($image, $upload, 50)) {
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+            if ($conn->connect_error) {
+                http_response_code(500);
+                exit(json_encode(['success' => false, 'error' => 'DB connection failure.']));
             }
-            $result->free();
-            $conn2->close();
+
+            $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
+            $stmt->bind_param("ss", $db_pfp, $id);
+            if ($stmt->execute()) {
+                http_response_code(200);
+                exit(json_encode(['success' => true, 'message' => 'Profile picture updated.', 'image' => $upload]));
+            } else {
+                http_response_code(500);
+                exit(json_encode(['success' => false, 'error' => 'Could not update profile picture row in the database.']));
+            }
+        } else {
+            http_response_code(500);
+            exit(json_encode(['success' => false, 'error' => 'Failed to save image.']));
+        }
+    } else {
+        http_response_code(400);
+        exit(json_encode(['success' => false, 'error' => $error]));
+    }
 }
-*/
+
+if (isset($_POST['remove_picture'])) {
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    if ($conn->connect_error) {
+        http_response_code(500);
+        exit(json_encode(['success' => false, 'error' => 'DB connection failure.']));
+    }
+
+    $old_pfp = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture;
+    $new_pfp = '/img/no_image.png';
+
+    if (strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($old_pfp)) {
+        unlink($old_pfp);
+    } else {
+        http_response_code(400);
+        exit(json_encode(['success' => false, 'error' => 'You do not have an uploaded profile image.']));
+    }
+
+    $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
+    $stmt->bind_param("ss", $new_pfp, $id);
+
+    if ($stmt->execute()) {
+        http_response_code(200);
+        exit(json_encode(['success' => true, 'message' => 'Profile picture removed.', 'image' => $default_pfp]));
+    } else {
+        http_response_code(500);
+        exit(json_encode(['success' => false, 'error' => 'Error removing profile picture. Please try again later.']));
+    }
+}
 
 if (isset($_GET['get_notifications'])) {
     header('Content-Type: application/json');
-    error_reporting(1);
 
     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
     if ($conn2->connect_error) {
@@ -460,6 +476,7 @@ if (isset($_GET['get_notifications'])) {
         $userRow = $stmtUser->get_result()->fetch_assoc();
 
         $user = $userRow['username'];
+        $post = null;
 
         if($row['category'] == 1) {
             $url = "/user/" . $profile;
@@ -522,59 +539,35 @@ if (isset($_GET['get_notifications'])) {
 
 if(isset($_GET['clear_notifications'])) {
     header('Content-Type: application/json');
-    $id = (int)$users_row['id'];
-	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-	$alertnum = 0;
-    if((int)$users_row['alert'] != 0) {
-        $stmt_2 = $conn->prepare("UPDATE users SET alert = ? WHERE id = ? LIMIT 1");
-        $stmt_2->bind_param("ii", $alertnum, $id);
+    if(!loggedin()) {
+        http_response_code(200);
+        exit;
+    }
+
+    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    $id = (int)$current_user->id;
+
+    if((int)$current_user->alert != 0) {
+        $stmt_2 = $conn->prepare("UPDATE users SET alert = 0 WHERE id = ? LIMIT 1");
+        $stmt_2->bind_param("i", $id);
 
         if ($stmt_2->execute()) {
-            header("HTTP/1.0 200 OK");
+            http_response_code(200);
             echo json_encode(['success' => 'Cleared inbox notifications. Would you like to reload the web page?']);
             exit;
         } else {
-            header("HTTP/1.0 500 Internal Server Error");
+            http_response_code(500);
             echo json_encode(['error' => 'Error clearing inbox notifications.']);
             exit;
         }
-        $stmt_2->close();
     } else {
-        header("HTTP/1.0 500 Internal Server Error");
+        http_response_code(200);
         exit;
     }
 }
 
-/* if (isset($_POST['logout']) && isset($_POST['token'])) {
-    header('Content-Type: application/json');
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $sessionid = $_COOKIE['token'];
-    
-    $stmt = $conn->prepare("SELECT * FROM sessions WHERE id = ?");
-    $stmt->bind_param("s", $sessionid);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if($result->num_rows != 0 && $sessionid === $_POST['token']) {
-        $stmt2 = $conn->prepare("DELETE FROM sessions WHERE id = ? LIMIT 1");
-        $stmt2->bind_param("s", $sessionid);
-        $stmt2->execute();
-        $stmt2->close();
-
-        $_SESSION = [];
-        setcookie('token', '', time() - 3600, "/", ".gr8brik.rf.gd");
-
-        header('Location:/list.php?invalid_login=true');
-        exit;
-    } else {
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => 'Invalid session token']);
-        exit;
-    }
-} */
-
 if (isset($_POST['logout'])) {
-    logout(null, false);
+    logout();
 }
 
 if (isset($_POST['deactive_account'])) {
@@ -582,163 +575,18 @@ if (isset($_POST['deactive_account'])) {
         exit('User not authenticated!');
     }
 
-    $profile_id = (int)$token['user'];
+    $profile_id = (int)$current_user->id;
     $today = date("Y-m-d H:i:s");
 
     $stmt = $conn->prepare("UPDATE users SET blog_user_id = NULL, deactive = ? WHERE id = ?");
     $stmt->bind_param("si", $today, $profile_id);
 
     if ($stmt->execute()) {
-        $stmt2 = $conn->prepare("DELETE FROM sessions WHERE user = ?");
-        $stmt2->bind_param("i", $profile_id);
-
-        if ($stmt2->execute()) {
-            header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
-            exit;
-        } else {
-            exit($stmt2->error);
-        }
+        logout();
+        header('Location: /index.php');
+        exit;
     } else {
         exit($stmt->error);
     }
 }
-
-if(isset($_GET['export_acc_row'])) {
-    if(loggedin()) {
-        $stmt = $conn->prepare("SELECT id, username, email, alert, picture, description, twitter, bsky, age FROM users WHERE id = ?");
-        $stmt->bind_param("i", $_SESSION['userid']);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if($result->num_rows != 0) {
-            $export = $result->fetch_assoc();
-            echo json_encode($export);
-            exit;
-        }
-    } else {
-        echo null;
-        exit;
-    }
-}
-
-/* if (isset($_POST['delete_account'])) {
-    header('Content-Type: application/json');
-    header("HTTP/1.0 500 Internal Server Error");
-
-    echo json_encode(['error' => 'To delete your account, please email us at ' . DB_MAIL]);
-    exit;
-
-    $id = $token['user'];
-    if(!$id) {
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => 'Error fetching userid. It may be plausible you were logged out from our systems or the session API is down.']);
-        exit;
-    }
-
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-
-    if ($conn->connect_error) {
-        header("HTTP/1.0 500 Internal Server Error");
-        echo json_encode(['error' => $conn->connect_error]);
-        exit;
-    }
-
-    $stmt_check = $conn->prepare("SELECT id FROM users WHERE id = ?");
-    $stmt_check->bind_param("i", $id);
-    $stmt_check->execute();
-    $stmt_check->store_result();
-
-    if (isset($_COOKIE['token']) && $tokendata->num_rows != 0 && $stmt_check->num_rows != 0) {
-        $stmt_check->close();
-
-        $stmt_forum = $conn3->prepare("UPDATE posts, replies SET posts.user = 0, replies.user = 0 WHERE posts.user = ? OR replies.user = ?");
-        $stmt_forum->bind_param("ii", $id, $id);
-        $stmt_forum->execute();
-        $stmt_forum->close();
-
-        $stmt_forum = $conn3->prepare("UPDATE messages SET userid = 0 WHERE userid = ?");
-        $stmt_forum->bind_param("i", $id);
-        $stmt_forum->execute();
-        $stmt_forum->close();
-
-        $stmt_models = $conn2->prepare("DELETE FROM model WHERE user = ?");
-        $stmt_models->bind_param("i", $id);
-        $stmt_models->execute();
-        $stmt_models->close();
-
-        $stmt_comments = $conn2->prepare("DELETE FROM comments WHERE user = ?");
-        $stmt_comments->bind_param("i", $id);
-        $stmt_comments->execute();
-        $stmt_comments->close();
-
-        $stmt_follows = $conn->prepare("DELETE FROM follow WHERE userid = ? OR profileid = ?");
-        $stmt_follows->bind_param("ii", $id, $id);
-        $stmt_follows->execute();
-        $stmt_follows->close();
-
-        $stmt_blocks = $conn->prepare("DELETE FROM user_blocks WHERE userid = ? OR profileid = ?");
-        $stmt_blocks->bind_param("ii", $id, $id);
-        $stmt_blocks->execute();
-        $stmt_blocks->close();
-
-        $stmt_notif = $conn->prepare("DELETE FROM notifications WHERE user = ? OR profile = ?");
-        $stmt_notif->bind_param("ii", $id, $id);
-        $stmt_notif->execute();
-        $stmt_notif->close();
-
-        $stmt_bans = $conn->prepare("DELETE FROM bans WHERE user = ?");
-        $stmt_bans->bind_param("i", $id);
-        $stmt_bans->execute();
-        $stmt_bans->close();
-
-        $stmt_appeals = $conn->prepare("DELETE FROM appeals WHERE user = ?");
-        $stmt_appeals->bind_param("i", $id);
-        $stmt_appeals->execute();
-        $stmt_appeals->close();
-
-        $extensions = ['jpg', 'png', 'jpeg', 'webp', 'gif'];
-        foreach ($extensions as $ext) {
-            $file = "../acc/users/pfps/$id.$ext";
-            if (file_exists($file)) {
-                @unlink($file);
-            }
-        }
-
-        $stmt_users = $conn->prepare("DELETE FROM users WHERE id = ?");
-        $stmt_users->bind_param("i", $id);
-        
-        $stmt_sessions = $conn->prepare("DELETE FROM sessions WHERE user = ?");
-        $stmt_sessions->bind_param("i", $id);
-        $stmt_sessions->execute();
-        $stmt_sessions->close();
-
-        $_SESSION = [];
-        session_unset();
-        session_destroy();
-        setcookie(session_name(), '', time() - 3600, '/');
-        setcookie('token', '', time() - 3600, '/');
-
-        if ($stmt_users->execute()) {
-            header("HTTP/1.0 200 OK");
-            setcookie("token", "", time() - 3600, "/");
-            echo json_encode(['success' => 'Your account has been permanently deleted from our servers.']);
-        } else {
-            header("HTTP/1.0 500 Internal Server Error");
-            echo json_encode(['error' => 'Something went wrong while deleting your account. ' . $stmt_users->error]);
-        }
-        $stmt_users->close();
-    } else {
-        header("HTTP/1.0 404 Not Found");
-        setcookie("token", "", time() - 3600, "/");
-        $stmt_check->close();
-        echo json_encode(['error' => "Hmm, we couldn't find your account."]);
-    }
-    $conn->close();
-    $conn2->close();
-    exit;
-} */
-echo json_encode($response);
-exit;
 ?>

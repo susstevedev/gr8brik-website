@@ -1,12 +1,22 @@
 <?php
 ob_start();
 
+// TEMPORARY
+header("Access-Control-Allow-Origin: http://localhost");
+header('Access-Control-Allow-Credentials: true');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    exit(0);
+}
+
+//dev only
+error_reporting(E_ALL);
+ini_set('display_errors', '1');
+
 // constants
 require_once 'constants.php';
-
-/* session_name('loginid');
-ini_set('session_save_path', $_SERVER['DOCUMENT_ROOT'] . '/acc/users/sessions/');
-session_start(); */
 
 function sess_open($save_path, $session_name) {
     global $sess_db;
@@ -35,11 +45,15 @@ function sess_read($id) {
 
 function sess_write($id, $data) {
     global $sess_db;
-    $time = time();
-    $ip = $_SERVER['REMOTE_ADDR'];
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
 
-    $stmt = $sess_db->prepare("REPLACE INTO php_sessions (id, data, timestamp, ip) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ssis", $id, $data, $time, $ip);
+    $time = time();
+    $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+    $useragent = UA ?? null; //UA is defined in what_browser.php
+    $userid = $_SESSION['userid'] ?? null;
+
+    $stmt = $sess_db->prepare("REPLACE INTO php_sessions (id, data, timestamp, ip, ua, userid) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("ssissi", $id, $data, $time, $ip, $useragent, $userid);
     return $stmt->execute();
 }
 
@@ -70,7 +84,10 @@ session_set_save_handler(
 register_shutdown_function('session_write_close');
 ini_set('session.gc_maxlifetime', 1000);
 ini_set('session.gc_probability', 5);
-session_start();
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 if (!isset($_SESSION['requests'])) {
     $_SESSION['requests'] = [];
@@ -84,22 +101,27 @@ if (count($_SESSION['requests']) >= 60) {
     $oldest = min($_SESSION['requests']);
     $remaining = 60 - (time() - $oldest);
     $requests = $_SESSION['requests'];
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
+    $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+
+    $isJson = (stripos($contentType, 'application/json') !== false) || (stripos($accept, 'application/json') !== false);
 
     http_response_code(429);
     header("Retry-After: " . $remaining);
-    $error = 'You are sending too many requests. Please wait ' .  $remaining . ' seconds.';
-    if(isset($_GET['ajax'])) {
-        echo json_encode(['error' => $error, 'requests' => $requests]);
+    if (!$isJson) {
+        echo 'You are sending too many requests. Please wait ' .  $remaining . ' seconds.';
     } else {
-        echo 'Error: ' . $error;
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'You are sending too many requests. Please wait ' .  $remaining . ' seconds.']);
     }
     exit;
 }
 
 $_SESSION['requests'][] = time();
 
-if (!isset($_SESSION['csrf'])) {
-    $_SESSION['csrf'] = bin2hex(random_bytes(128));
+if (!isset($_SESSION['csrf']) || !isset($_SESSION['csrf_last_updated']) || $_SESSION['csrf_last_updated'] - time() >= 5) {
+    $_SESSION['csrf'] = bin2hex(random_bytes(32));
+    $_SESSION['csrf_last_updated'] = time();
 }
 
 define('csrf', $_SESSION['csrf']);
@@ -158,7 +180,7 @@ function check_blacklisted_ip() {
         $stmt->close();
     }
     
-    if(isset($id) && $ban_until > date("Y-m-d H:i:s") || $geo_banned === true) {
+    if(isset($id) && isset($ban_until) && $ban_until > date("Y-m-d H:i:s") || $geo_banned === true) {
         http_response_code(403);
         echo "<html><head><title>IP address banned - " . $app_name . "</title><link rel='stylesheet' href='" . $piko_url . "'></head>";
         echo "<body><center><div id='root'><br /><h1>Your IP address has been banned!</h1>";
@@ -172,6 +194,85 @@ function check_blacklisted_ip() {
     }
 }
 check_blacklisted_ip();
+
+class Cookie {
+    public static function controls() {
+        if (isset($_COOKIE['cookieControlPrefs'])) {
+            $saved_prefs = json_decode(stripslashes($_COOKIE['cookieControlPrefs']), true);
+            if (is_array($saved_prefs)) {
+                return $saved_prefs;
+            } else {
+                setcookie("cookieControlPrefs", "", time() - 3600, "/");
+                unset($_COOKIE["cookieControlPrefs"]);
+                return [];
+            }
+        } else {
+            return [];
+        }
+    }
+
+    public static function allow_analytics() {
+        $cookie = Cookie::controls();
+
+        if(in_array('analytics', $cookie)) {
+            if (!isset($_SESSION['last_analytics'])) {
+                $_SESSION['last_analytics'] = time();
+                return true;
+            }
+
+            if($_SESSION['last_analytics'] && time() - $_SESSION['last_analytics'] < 3600) { //every hour
+                return false;
+            }
+
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public static function analytics_user(mixed $db, int $id, int $me) {
+        global $current_user;
+
+        if(!loggedin()) {
+            return false;
+        }
+
+        $usero = User::getUser($id);
+
+        if(!Cookie::allow_analytics()) {
+            return false;
+        }
+
+        $stmt = $db->prepare("INSERT INTO analytics (their_name, my_name, my_user, their_user) VALUES (?, ?, ?, ?)");
+        $user = $usero->username;
+        $me_user = $current_user->username ?? null;
+        $stmt->bind_param("ssii", $user, $me_user, $me, $id);
+        $stmt->execute();
+        return $db->insert_id ?? true;
+    }
+
+    public static function del_old_analytics(mixed $db, int $days = 30) {
+        if ($days <= 0) {
+            return false;
+        }
+
+        if (isset($_SESSION['last_analytics_cleanup']) && (time() - $_SESSION['last_analytics_cleanup'] < 86400)) { //24 hours
+            return false;
+        }
+
+        $_SESSION['last_analytics_cleanup'] = time();
+
+        $stmt = $db->prepare("DELETE FROM analytics WHERE time < NOW() - INTERVAL ? DAY");
+        $stmt->bind_param("i", $days);
+
+        return $stmt->execute();
+    }
+}
+
+if(!in_array('site-prefs', Cookie::controls())) {
+    setcookie("mode", "", time() - 3600, "/");
+    unset($_COOKIE["mode"]);
+}
 
 if (isset($_GET['get_csrf_token'])) {
     echo json_encode(['csrf_token' => $_SESSION['csrf']]);
