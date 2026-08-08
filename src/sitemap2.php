@@ -3,35 +3,11 @@ $base = 'https://gr8brik.rf.gd/';
 $dir = __DIR__;
 
 $exclude = ['sitemap2.php', 'robots.txt', 'google4cb09ae7ae2edb25.html', '.htaccess', '/acc/ajax/constants.php'];
-$exclude_mini = ['/acc/users/sessions/', '/com/old/', '/acc/classes/', '/cre/'];
-
+$exclude_mini = ['/acc/users/sessions/', '/com/old/', '/acc/classes/', '/cre/', '/acc/ajax/constants/'];
 header('Content-Type: application/xml; charset=utf-8');
 
 $files = scandir($dir);
 read($dir, $exclude, $exclude_mini);
-
-/*$filtered = array_filter($files, function($file) use ($excluded) {
-    if(is_file($file) && !in_array($file, $excluded)) {
-        return $file;
-    } elseif(is_dir($file) && !in_array($file, $excluded)) {
-        $files = array_diff(scandir($file));
-    }
-}); */
-
-/* function read() {
-    global $files, $file, $excluded;
-    $all_files = [];
-
-    $filtered = array_filter($files, function($file) use ($excluded) {
-        if(is_file($file) && !in_array($file, $excluded)) {
-            //return $file;
-            $all_files[] = $file;
-        } elseif(is_dir($file) && !in_array($file, $excluded)) {
-            $files = array_diff(scandir($file));
-            read();
-        }
-    });
-} */
 
 function read($dir, $exclude, $exclude_mini) {
     $result = [];

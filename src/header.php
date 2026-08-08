@@ -20,9 +20,9 @@
 <script type="text/javascript" src="/lib/jquery-migrate-1.4.1.min.js"></script>
 <script type="text/javascript" src="/lib/jquery.cookie-1.4.1.min.js"></script>
 <script type="text/javascript" src="/lib/jquery.ihavecookies.min.js"></script>
-<script type="text/javascript" src="/lib/main.js?v=04-15-26"></script>
-<!-- <script type="module" async defer src="https://cdn.jsdelivr.net/npm/altcha/dist/altcha.min.js?v=<?php echo time(); ?>"></script> -->
-<script type="text/javascript" src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js?v=<?php echo time(); ?>" crossorigin="anonymous"></script>
+<script type="text/javascript" src="/lib/preload.js?v=08-05-26"></script>
+<script type="text/javascript" src="/lib/main.js?v=08-05-26"></script>
+<script type="text/javascript" src="https://unpkg.com/twemoji@latest/dist/twemoji.min.js" crossorigin="anonymous"></script>
 
 <meta charset="UTF-8">
 <!-- <meta name="description" content="GR8BRIK is an online lego builder written in ThreeJS and uses the LDraw parts library, made for modern web browsers. No download needed. The GR8BRIK community is a forum of Lego lovers like you that use GR8BRIK and other tools. You can view posts of other and post on there. On GR8BRIK you can scroll view others public creation's for free, and download them in the GR8BRIK .gr8 or .json file format. GR8BRIK's modeler may be one of the best part of our service; where you can model your own creation using Ldraw bricks."> -->

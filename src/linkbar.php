@@ -1,24 +1,26 @@
 <?php
-if(!loggedin()) {
-    echo '
-    <div data-testid="gr8-loginAdPopup" class="w3-hide-small w3-show-medium w3-padding w3-card-2 w3-bottom w3-blue w3-text-white">
-        <!-- <img src="/img/logo/192.png" width="50px" height="50px" data-testid="gr8-loginAdPopup--logo" class="w3-circle w3-left" /> -->
+if(!loggedin() && !isset($_COOKIE['hide_login_ad'])) {
+    ?>
+    <div id="loginAd" class="w3-hide-small w3-show-medium w3-padding w3-card-2 w3-bottom w3-blue w3-text-white w3-col m8">
+        <span id="hideLoginAd" class="w3-display-topright w3-red w3-button">&times;</span>
         <span class="w3-left w3-padding">
             <span><a href="/acc/login">Login</a> or <a href="/acc/register">Register</a> to share & save your own Lego-like creations online.</span>
            	<br />
-            <span>Read the <a href="/terms">Terms of Service</a>, <a href="/privacy">Privacy Policy</a></span>, and <a href="/rules">Community Guidelines</a></span>
+            <span><a href="/terms">Terms of Service</a> • <a href="/privacy">Privacy Policy</a></span> • <a href="/rules">Community Guidelines</a>
+        </span>
     </div>
-    ';
+    <?php
 }
 ?>
+<hr />
 
-<p>
-    <button id="toggleAuto" class="w3-btn w3-large w3-white w3-hover-blue w3-round"><i class="fa fa-sun-o"></i><i class="w3-large">/</i><i class="fa fa-moon-o"></i>Auto Theme</button>
-    <button id="toggleDark" class="w3-btn w3-large w3-white w3-hover-blue w3-round"><i class="fa fa-moon-o" aria-hidden="true"></i>Night Theme</button>
-    <button id="toggleLight" class="w3-btn w3-large w3-white w3-hover-blue w3-round"><i class="fa fa-sun-o" aria-hidden="true"></i>Day Theme</button>
-</p>
+<div>
+    <button id="toggleAuto" class="w3-btn w3-large w3-light-grey w3-hover-opacity w3-round-small w3-border w3-border-grey"><i class="fa fa-sun-o"></i><i class="w3-large">/</i><i class="fa fa-moon-o"></i>Auto Theme</button>
+    <button id="toggleDark" class="w3-btn w3-large w3-light-grey w3-hover-opacity w3-round-small w3-border w3-border-grey"><i class="fa fa-moon-o" aria-hidden="true"></i>Night Theme</button>
+    <button id="toggleLight" class="w3-btn w3-large w3-light-grey w3-hover-opacity w3-round-small w3-border w3-border-grey"><i class="fa fa-sun-o" aria-hidden="true"></i>Day Theme</button>
+</div>
 
-<div id="linkbar" class="gr8-theme w3-navbar w3-card-2 w3-round-large w3-padding-small w3-light-grey w3-center">
+<br /><footer id="linkbar" class="gr8-theme w3-navbar w3-card-2 w3-light-grey w3-round-small w3-padding-small w3-center">
     <p class="w3-large">
 		<span>©2023 - 2026 the Gr8Brik team. All rights reserved.</span>
         <a href="/terms.php">Terms and Conditions</a>.
@@ -63,18 +65,5 @@ if(!loggedin()) {
         </a>
         
     </p>
-	<p class="w3-small gr8-theme">
-		Lego&#174;, the Lego&#174; logo, the Minifigure&#8482;, and the Brick&#8482; and Knob&#8482; configurations are trademarks of the Lego&#174; company, which does not sponsor, authorize, or endorse this site.
-	</p>
-</div><br />
-
-<script> 
-    var $buoop = {required:{e:-4,f:-3,o:-3,s:-1,c:-3},insecure:true,api:2025.10 }; 
-    function $buo_f(){ 
-    var e = document.createElement("script"); 
-    e.src = "//browser-update.org/update.min.js"; 
-    document.body.appendChild(e);
-    };
-    try {document.addEventListener("DOMContentLoaded", $buo_f,false)}
-    catch(e){window.attachEvent("onload", $buo_f)}
-</script>
+	<p class="w3-small">Lego&#174;, the Lego&#174; logo, the Minifigure&#8482;, and the Brick&#8482; and Knob&#8482; configurations are trademarks of the Lego&#174; company, which does not sponsor, authorize, or endorse this site.</p>
+</footer><br />

@@ -11,7 +11,7 @@
 <?php include('navbar.php') ?>
 <center><br /><br />
 
-<h4>Last updated <?php echo gmdate("M d, Y H:i",filemtime('privacy.php')); ?></h4>
+<h4>Last updated <?php echo gmdate("M d, Y",filemtime('privacy.php')); ?></h4>
 
 <p>At Gr8brik, accessible from <a href="http://<?php echo $_SERVER['HTTP_HOST'] ?>"><?php echo $_SERVER['HTTP_HOST'] ?></a>, one of our main priorities is the privacy of our visitors. This Privacy Policy document contains types of information that is collected and recorded by Gr8brik and how we use it.</p>
 
@@ -29,15 +29,23 @@
 
 <h2>3. Children's Information</h2>
 
-<p>Another part of our priority is adding protection for children while using the internet. We encourage parents and guardians to observe, participate in, and/or monitor and guide their online activity.</p>
+<p>Another priority of ours is protection of children on the internet. We encourage parents and guardians to observe, participate in, and/or monitor and guide their online activity.</p>
 
 <p>Gr8brik does not knowingly collect any Personal Identifiable Information from children under the age of 13. If you think that your child provided this kind of information on our website, we strongly encourage you to contact us immediately and we will do our best efforts to promptly remove such information from our records.</p>
     
-<h2>4. Data removal</h2>
-    
-<p>If you have registered an account on Gr8brik, you have the right to remove it and anonymize public information like Creations or forum posts.</p>
+<h2>4. Data Removal and Account Deletion</h2>
 
-<p>To do so you can go to <a href="http://<?php echo $_SERVER['HTTP_HOST'] ?>/acc">http://<?php echo $_SERVER['HTTP_HOST'] ?>/acc</a> and click "Deactivate account" and follow the instruction there, or <a href="mailto:<?php echo DB_MAIL ?>">contact us</a>.</p>
+<p>If you have registered an account on Gr8brik, you have the right to request the erasure of your personal data and the anonymization of your public contributions (such as creations, comments, or forum posts).</p>
+
+<p>To initiate this process, navigate to <a href="http://<?php echo $_SERVER['HTTP_HOST'] ?>/acc">http://<?php echo $_SERVER['HTTP_HOST'] ?>/acc</a>, click "Delete Account," and follow the instructions provided there. Alternatively, you may <a href="mailto:<?php echo DB_MAIL ?>">contact us</a> directly to request a deletion.</p>
+
+Please be aware of the following conditions upon account deletion:
+<ul>
+    <li>Analytics are deleted around once every month.</li>
+    <li>Your username will be permanently blacklisted to prevent impersonation and platform abuse.</li>
+    <li>Publicly available community contributions, including forum threads, comment layouts, and models, will be permanently reassigned to a system-controlled guest profile (ID 0). The text content of these posts will remain visible to preserve the context of public discussions.</li>
+    <li>If you accidentally included personally identifying information (such as your real name, address, or phone number) within the text of a public post or comment, you must email us directly and specify exactly which content blocks you need manually modified or removed.</li>
+</ul>
 
 <h2>5. Consent</h2>
 
