@@ -298,7 +298,7 @@ class UserContent {
         $limit = 9;
         $offset = ($page - 1) * $limit;
 
-        $stmt = $creation_conn->prepare("SELECT * FROM model WHERE user = ? ORDER BY date DESC LIMIT $limit OFFSET $offset;");
+        $stmt = $creation_conn->prepare("SELECT * FROM model WHERE user = ? AND visibility = 'public' AND removed = 0 ORDER BY date DESC LIMIT $limit OFFSET $offset;");
         $stmt->bind_param("i", $userid);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -353,7 +353,7 @@ class UserContent {
                 $liked[] = $row['creation'];
             }
                 
-            $stmt2 = $creation_conn->prepare("SELECT * FROM model WHERE id IN (" . implode(',', $liked) . ") ORDER BY date DESC");
+            $stmt2 = $creation_conn->prepare("SELECT * FROM model WHERE id IN (" . implode(',', $liked) . ") AND visibility = 'public' AND removed = 0 ORDER BY date DESC");
             $stmt2->execute();
             $result2 = $stmt2->get_result();
                     
