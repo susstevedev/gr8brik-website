@@ -229,10 +229,7 @@ function convert_webp_to_png($source_webp_file) {
 }
 
 function fetch_build($model_id, $csrf) {
-    global $users_row;
     global $current_user;
-    global $tokendata;
-    global $token;
     global $conn;
     global $conn2;
 
@@ -257,7 +254,13 @@ function fetch_build($model_id, $csrf) {
         ]);
     }
 
-    $sql = "SELECT * FROM model WHERE id = '$model_id' AND visibility != 'private' AND removed = '0'";
+    $sql = "SELECT * FROM model WHERE id = '$model_id' AND visibility != 'private' AND removed = 0";
+    if(loggedin()) {
+        if($current_user->admin === true) {
+            $sql = "SELECT * FROM model WHERE id = '$model_id'";
+        }
+    }
+
     $result = $conn->query($sql);
     $row2 = $result->fetch_assoc();
 
@@ -272,7 +275,7 @@ function fetch_build($model_id, $csrf) {
     $userid = $row2['user'];
     $views = $row2['views'];
     $votes = $row2['likes'];
-    $decoded_description = $bbcode->toHTML($row2['description'], false, true);
+    $decoded_description = $bbcode->toHTML($row2['description'], true, true);
        
     if ($conn2->connect_error) {
         exit($conn2->connect_error);
@@ -371,11 +374,11 @@ function fetch_build($model_id, $csrf) {
         'model' => $row2['model'],
         'description' => $decoded_description,
         'tags' => $model_tags,
-        'name' => $row2['name'],
+        'name' => htmlspecialchars($row2['name']),
         'date' => date("F j, Y, g:i a", strtotime($row2['date'])),
         'screenshot' => $row2['screenshot'],
         'views' => $views,
-        'isRemoved' => $row2['removed'],
+        'is_removed' => $row2['removed'],
         'did_track' => $did_track,
         'legacy' => $row2['legacy'],
         'voted' => $voted,
