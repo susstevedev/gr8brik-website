@@ -14,6 +14,10 @@ $data = json_decode(fetch_build($model_id, $_SESSION['csrf']), true);
 
 if ($data['message']) {
     $error = $data['message'];
+} else {
+    if($data['is_removed']) {
+        $message = 'This creation has been <b>removed</b> by an admin. This means that it\'s not visible to regular users.';
+    }
 }
 
 if (isset($_POST['report'])) {
@@ -62,56 +66,38 @@ if (isset($_POST['report'])) {
 
 if (isset($_POST['delete_model'])) {
     header('Content-Type: application/json');
+    $model_id = (int)$_POST['model_id'];
 
     if ($_SESSION['csrf'] === $_POST['csrf_token']) {
-        if (loggedin()) {
-            if(trim($current_user->id) === trim($data['userid']) || $current_user->admin === true) {
-                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-                $model_id = (int)$_POST['model_id'];
+        if (loggedin() && $current_user->admin === true) {
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 
-                $sql = "SELECT * FROM model WHERE id = ?";
-                $stmt = $conn->prepare($sql);
-                $stmt->bind_param("i", $model_id);
-                $stmt->execute();
-                $result = $stmt->get_result();
+            $sql = "SELECT id, removed FROM model WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $model_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
 
-                if ($row = $result->fetch_assoc()) {
-                    $modelFile = basename($row['model']);
-                    $screenshotFile = basename($row['screenshot']);
+            if ($row = $result->fetch_assoc()) {
+                $sql2 = "UPDATE model SET removed = 1 WHERE id = ?";
 
-                    if (file_exists($modelFile)) {
-                        @unlink($modelFile);
-                    }
+                if($row['removed']) {
+                    $sql2 = "UPDATE model SET removed = 0 WHERE id = ?";
+                }
 
-                    if (file_exists($screenshotFile)) {
-                        @unlink($screenshotFile);
-                    }
+                $stmt2 = $conn->prepare($sql2);
+                $stmt2->bind_param("i", $model_id);
 
-                    $sql2 = "DELETE FROM model WHERE id = ?";
-                    $stmt2 = $conn->prepare($sql2);
-                    $stmt2->bind_param("i", $model_id);
-
-                    if ($stmt2->execute()) {
-                        $stmtVotes = $conn->prepare("DELETE FROM votes WHERE creation = ?");
-                        $stmtVotes->bind_param("i", $model_id);
-                        $stmtVotes->execute();
-
-                        $stmtComments = $conn->prepare("DELETE FROM comments WHERE model = ?");
-                        $stmtComments->bind_param("i", $model_id);
-                        $stmtComments->execute();
-
-                        echo json_encode(['success' => 'Creation deleted']);
-                    } else {
-                        echo json_encode(['error' => 'Error deleting model listing']);
-                    }
+                if ($stmt2->execute()) {
+                    echo json_encode(['success' => 'Creation updated']);
                 } else {
-                    echo json_encode(['error' => 'Creation not found']);
+                    echo json_encode(['error' => 'Error deleting model listing']);
                 }
             } else {
-                echo json_encode(['error' => 'An authentication error has occured']);
+                echo json_encode(['error' => 'Creation not found']);
             }
         } else {
-            echo json_encode(['error' => 'Not logged in']);
+            echo json_encode(['error' => 'An authentication error has occured']);
         }
     } else {
         echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
@@ -164,14 +150,14 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
             <div class="w3-container">
                 <span onclick="$('#delete-model').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
                 <form id="deleteModelForm">
-                    <h2>Are you sure you want to delete this creation?</h2>
+                    <h2>Are you sure you want to <?php echo $data['is_removed'] ? 'Restore' : 'Delete'; ?> this creation?</h2>
 
                     <input type="hidden" name="model_id" value="<?php echo $model_id; ?>">
                     <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf']; ?>">
                     <input type="hidden" name="delete_model" value="1">
 
-                    <span class="w3-btn w3-large w3-white w3-hover-blue w3-round-small" onclick="$('#delete-model').hide();">Close</span>
-                    <button type="submit" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">Delete</button>
+                    <span class="w3-btn w3-large w3-white w3-hover-blue w3-round-small" onclick="$('#delete-model').hide();">No</span>
+                    <button type="submit" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">Yes</button>
                 </form>
             </div>
         </div>
@@ -180,9 +166,6 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             $(document).ready(function() {
-                /*var embed_model = "";
-                $("#model-embed").html(`<iframe src="/viewer.html?model=${embed_model}" class="gr8-embedded w3-border w3-card-2">`);*/
-
                 $("#otherReasonToggle").change(function() {
                     $("#otherReason").toggleClass("w3-hide", !this.checked);
                 });
@@ -407,12 +390,12 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     <?php include 'navbar.php' ?>
 
     <?php if (isset($error)) { ?>
-        <div class="message w3-padding w3-round w3-red"><?php echo $error ?></div><br /><br />
+        <h4 class="message w3-card-2 w3-padding w3-round w3-red"><?php echo $error ?></h4><br />
         <?php exit; ?>
     <?php } ?>
 
     <?php if (isset($message)) { ?>
-        <div class="message w3-padding w3-round w3-light-grey"><?php echo $message ?></div><br /><br />
+        <h4 class="message w3-card-2 w3-padding w3-round w3-light-grey"><?php echo $message ?></h4><br />
     <?php } ?>
 
     <?php if ($loggedin === true) { ?>
@@ -493,14 +476,26 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </div>
                         <?php } ?>
 
-                        <?php if (trim($current_user->id) === trim($data['userid']) || $current_user->admin === true) { ?>
+                        <?php if ($current_user->admin === true) { ?>
                             <div class="tooltip" id="data-delete-model">
-                                <span class="w3-tag w3-blue tooltiptext">Delete this creation</span>
+                                <span class="w3-tag w3-blue tooltiptext"><?php echo $data['is_removed'] ? 'Restore' : 'Delete'; ?> this creation as an admin</span>
                                 <button onclick='document.getElementById("delete-model").style.display="block"' name="delete" class="w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink" />
-                                <i class="fa fa-trash" aria-hidden="true"></i> Delete
+                                <i class="fa fa-trash" aria-hidden="true"></i> <?php echo $data['is_removed'] ? 'Restore' : 'Delete'; ?>
                                 </button>&nbsp;
                             </div>
                         <?php } ?>
+
+                        <?php if (trim($current_user->id) === trim($data['userid'])) { ?>
+                            <div class="tooltip" id="data-edit-model">
+                                <span class="w3-tag w3-blue tooltiptext">Edit this creation</span>
+                                <a href="/acc/creations?edit=<?php echo $_GET['id'] ?>">
+                                    <button name="edit" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo" />
+                                        <i class="fa fa-pencil" aria-hidden="true"></i> Edit
+                                    </button>
+                                </a>
+                            </div>
+                        <?php } ?>
+
                         <div class="tooltip" id="data-report-model">
                             <span class="w3-tag w3-blue tooltiptext">Report this creation to moderators</span>
                             <button onclick='document.getElementById("report").style.display="block"' name="flag" class="w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink" />

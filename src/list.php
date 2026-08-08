@@ -349,15 +349,15 @@ if (isset($_GET['feature_v3'])) {
 
         if (isset($_GET['sort']) && $_GET['sort']) {
             $sort_options = [
-                'feature' => ['sql' => 'SELECT * FROM model WHERE feature = 1 ORDER BY date DESC', 'label' => 'Featured creations'],
-                'views'   => ['sql' => 'SELECT * FROM model WHERE visibility != "unlisted" ORDER BY views DESC', 'label' => 'Most viewed'],
-                'size'    => ['sql' => 'SELECT * FROM model WHERE visibility != "unlisted" ORDER BY size DESC', 'label' => 'Biggest in size'],
-                'likes'   => ['sql' => 'SELECT * FROM model WHERE visibility != "unlisted" ORDER BY likes DESC', 'label' => 'Most liked'],
-                'az'      => ['sql' => 'SELECT * FROM model WHERE visibility != "unlisted" ORDER BY name ASC', 'label' => 'Alphabetical A-Z'],
-                'za'      => ['sql' => 'SELECT * FROM model WHERE visibility != "unlisted" ORDER BY name DESC', 'label' => 'Alphabetical Z-A'],
-                'oldest'  => ['sql' => 'SELECT * FROM model WHERE visibility != "unlisted" ORDER BY date ASC', 'label' => 'Oldest creations'],
-                'newest'  => ['sql' => 'SELECT * FROM model WHERE visibility != "unlisted" ORDER BY date DESC', 'label' => 'Newest creations'],
-                'all'     => ['sql' => 'SELECT * FROM model WHERE visibility != "unlisted" ORDER BY id DESC', 'label' => 'All creations']
+                'feature' => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" AND feature = 1 ORDER BY date DESC', 'label' => 'Featured creations'],
+                'views'   => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY views DESC', 'label' => 'Most viewed'],
+                'size'    => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY size DESC', 'label' => 'Biggest in size'],
+                'likes'   => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY likes DESC', 'label' => 'Most liked'],
+                'az'      => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY name ASC', 'label' => 'Alphabetical A-Z'],
+                'za'      => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY name DESC', 'label' => 'Alphabetical Z-A'],
+                'oldest'  => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY date ASC', 'label' => 'Oldest creations'],
+                'newest'  => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY date DESC', 'label' => 'Newest creations'],
+                'all'     => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY id DESC', 'label' => 'All creations']
             ];
 
             if (array_key_exists($_GET['sort'], $sort_options)) {
