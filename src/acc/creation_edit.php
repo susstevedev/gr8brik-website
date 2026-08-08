@@ -1,11 +1,11 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 if(!loggedin()) {
-    header('Location:../index.php');
+    header('Location:/index.php');
     exit;
 }
 $model_id = $_GET['id'];
-$user_id = $token['user'];
+$user_id = $current_user->id;
 
 if (isset($_POST['edit'])) {
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
@@ -21,13 +21,14 @@ if (isset($_POST['edit'])) {
     $result = $stmt->execute();
 
     if ($result) {
+        $stmt->close();
         header('Location: ../creation.php?id=' . $model_id);
         exit;
     } else {
+        $stmt->close();
         echo $conn->error;
         exit;
     }
-    $stmt->close();
 }
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"

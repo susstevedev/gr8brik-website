@@ -1,17 +1,10 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/account_settings.php';
 
 if(loggedin() === true) {
     header('Location: index.php');
 }
-
-/*$words = ['Brick', 'Minifig', 'Stud', 'Build', 'Block', 'Stack', 'Baseplate', 'Roadplate', 'Fanatic', 'Craftsman', 'Awesome', 'Great'];
-$randomKeys = array_rand($words, 2);
-$randomWord1 = $words[$randomKeys[0]];
-$randomWord2 = $words[$randomKeys[1]];
-$randomNumber = rand(100, 999);
-
-$combinedString = $randomWord1 . $randomWord2 . $randomNumber;*/
 
 $utils = new ScreenNameUtils();
 $combinedString = $utils->generateRandomScreenName();
@@ -33,32 +26,54 @@ $combinedString = $utils->generateRandomScreenName();
                 var name = $("#loginForm input[name='name']").val();
                 var mail = $("#loginForm input[name='mail']").val();
                 var pwd = $("#loginForm input[name='pwd']").val();
+                var prevBtnText = $("#loginBtn").html();
+
+                $("#loginBtn").html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
+                $("#loginBtn").prop("disabled", true);
 
                 $.ajax({
                     url: "../ajax/auth",
                     method: "POST",
+                    dataType: 'json',
                     data: { register: true, name: name, mail: mail, pwd: pwd },
                     success: function(response) {
+                        $("#loginBtn").html(prevBtnText);
+                		$("#loginBtn").prop("disabled", false);
+
                         if(response.success === true) {
                             window.location.href = "/";
                         } else {
-                            alert(response.error || "An unknown error occurred. Please try again later.")
+                            $("#error").show()
+                            $("#error-text").text(response.error);
+                            $("#error").delay(5000).fadeOut(2500, function() {
+                        		$("#error-text").text('');
+                        	});
                         }
                     },
 
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        if (jqXHR.status === 500 || jqXHR.status === 400) {
-                            var response = JSON.parse(jqXHR.responseText);
-                            alert(response.error);
-                        } else {
-                            console.error("AJAX Error:", textStatus, errorThrown);
-                            alert("An error occurred. Please try again later.");
-                        }
+                    error: function(xhr, text, err) {
+                        $("#loginBtn").html(prevBtnText);
+                		$("#loginBtn").prop("disabled", false);
+
+                        var response = JSON.parse(xhr.responseText);
+                        console.error(text + ' ' + xhr.status + ' ' + err);
+
+                        $("#error").show()
+                        $("#error-text").text(response.error);
+                        $("#error").delay(5000).fadeOut(2500, function() {
+                        	$("#error-text").text('');
+                        });
                     }
                 });
             });
         });
     </script>
+
+    <div id="error" style="display: none;" class="w3-red w3-card-2 w3-padding-small w3-round-small">
+        <i class="fa fa-times-circle-o" aria-hidden="true"></i>
+        <span id="error-text"></span>
+    </div>
+
     <h2>Register Account</h2>
     <div id="loginForm" class="w3-container">
         <p>Already have an account? <a href="login">Login</a></p>

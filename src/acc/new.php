@@ -1,4 +1,9 @@
 <?php
+    header('Location:notifications.php');
+    exit;
+?>
+
+<?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 isLoggedIn();

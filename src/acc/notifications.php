@@ -1,138 +1,224 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
-isLoggedIn();
+
+if (!loggedin()) {
+    header('Location:login.php');
+}
 ?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
+
 <head>
     <title>Notifications</title>
     <?php include '../header.php' ?>
 </head>
+
 <body class="w3-light-blue w3-container">
+    <?php
+        include '../navbar.php';
+        include 'panel.php';
 
-    <?php 
-        include('../navbar.php');
-        include('panel.php');
-    ?>
+        try {
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        } catch (Exception $e) {
+            error_log($e->getMessage());
+            echo "<p>Unable to load notifications at this time.</p>";
+            return;
+        }
 
-        <script>
-        $(document).ready(function() {
-            function clear_notifications() {
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    method: "GET",
-                    data: { clear_notifications: true },
-                    success: function(response) {
-                        window.location.reload();
-                        $("#gr8-notif").hide();
-                    },
+        $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+        if ($page < 1) {
+            $page = 1;
+        }
 
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        console.error('Server status code: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
-                        alert(response.error);
-                    }
-                });
+        $limit = 8;
+        $offset = ($page - 1) * $limit;
+        $pDown = $page - 1;
+        $pUp = $page + 1;
+        $sql = "SELECT * FROM notifications WHERE user = ? ORDER BY timestamp DESC";
+
+        try {
+            $thisuser = $current_user->id;
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $thisuser);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $grouped_notifications = [];
+
+            if ($result->num_rows !== 0 && $current_user->alert > 0) {
+                $alertsql = "UPDATE users SET alert = 0 WHERE id = ?";
+                $alertstmt = $conn->prepare($alertsql);
+                $alertstmt->bind_param("i", $thisuser);
+                if ($alertstmt->execute()) {
+                    $alertstmt->close();
+                } else {
+                    echo $alertstmt->error;
+                    exit;
+                }
             }
-            clear_notifications();
-        });
-        </script>
 
-		<?php
-            $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-            if ($conn2->connect_error) {
-                exit($conn2->connect_error);
+            while ($row = $result->fetch_assoc()) {
+                $profile = $row['profile'];
+                $content = $row['content'];
+                $category = (int)$row['category'];
+                $timestamp = is_numeric($row['timestamp']) ? (int)$row['timestamp'] : time();
+
+                $user_data_o = User::getUser($profile);
+                $username = $user_data_o->username ?: '[unknown]';
+                $userid = $user_data_o->id ?: 0;
+
+                //groups matching content together
+                if ($category === 4) {
+                    $group_key = $category . "_" . $row['content'] . "_" . date("Y-m-d", $timestamp);
+                } else if ($category === 1) {
+                    $group_key = "cat_" . $category . "_" . date("Y-m-d", $timestamp);
+                } else {
+                    $group_key = $category . "_" . $row['content'] . "_" . date("Y-m-d", $timestamp);
+                }
+
+                if (!isset($grouped_notifications[$group_key])) {
+                    $grouped_notifications[$group_key] = [
+                        'category' => $category,
+                        'content' => $content,
+                        'timestamp' => $timestamp,
+                        'users' => [],
+                        'fallback_pic' => $user_data_o->picture ?: '/img/no_image.png'
+                    ];
+                }
+
+                if (!in_array($userid, array_column($grouped_notifications[$group_key]['users'], 'id'))) {
+                    $grouped_notifications[$group_key]['users'][] = [
+                        'name' => $username,
+                        'id'   => $userid
+                    ];
+                }
             }
 
-			$sql = "SELECT * FROM notifications WHERE user = " . $token['user'] . " ORDER BY timestamp DESC";
-            $result = $conn2->query($sql);
+            $total_groups = count($grouped_notifications);
+            $sliced_notifications = array_slice($grouped_notifications, $offset, $limit);
 
-			while ($row = $result->fetch_assoc()) {
+            if ($page > 1) {
+                echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round w3-border w3-border-indigo" href="?page=' . $pDown . '">Back</a>&nbsp;&nbsp;';
+            }
+            if (($offset + $limit) < $total_groups) {
+                echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round w3-border w3-border-indigo" href="?page=' . $pUp . '">Next</a>';
+            }
+            echo '<hr />';
+            $stmt->close();
+
+            foreach ($sliced_notifications as $group) {
                 $url = null;
                 $post = null;
-                $user = null;
                 $img = null;
-                $profile = $row['profile'];
                 $valid = false;
 
-                $sql2 = "SELECT * FROM users WHERE id = $profile";
-                $result2 = $conn2->query($sql2);
-                $row2 = $result2->fetch_assoc();
+                $category = $group['category'];
+                $content = $group['content'];
+                $users = $group['users'];
+                $user_count = count($users);
 
-                if ($row['category'] === "1") {
-                    $valid = true;
-                    $url = "/profile?id=" . $profile;
-                    $post = "followed you";
-                    $user = $row2['username'];
-                    $img = $row2['picture'];
-                } elseif ($row['category'] === "2") {
-                    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-                    $content = $row['content'];
-                    $result3 = $conn3->query("SELECT * FROM model WHERE id = $content");
-                    $row3 = $result3->fetch_assoc();
-
-                    $valid = true;
-                    $img = $row3['screenshot'];
-                    $url = "/creation?id=" . $content;
-                    $post = "commented on " . $row3['name'];
-                    $user = $row2['username'];
-
-                    $result3->free();
-                    $conn3->close();
-                } elseif ($row['category'] === "3") {
-                    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-                    $content = $row['content'];
-                    $result3 = $conn3->query("SELECT * FROM messages WHERE id = $content");
-                    $row3 = $result3->fetch_assoc();
-
-                    $valid = true;
-                    $img = '../img/com.jpg';
-                    $url = "/com/view?id=" . $row['content'];
-                    $post = "replied to " . $row3['title'] ?: "[deleted]";
-                    $user = $row2['username'];
-
-                    $result3->free();
-                    $conn3->close();
-                } elseif ($row['category'] === "4") {
-                    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-                    $content = $row['content'];
-                    $result3 = $conn3->query("SELECT * FROM warnings WHERE id = $content");
-                    $row3 = $result3->fetch_assoc();
-
-                    $valid = true;
-                    $img = '../img/com.jpg';
-                    $url = "#no";
-                    $post = " got warned: " . $row3['reason'] ?: "[no reason]";
-                    $user = $row2['username'];
-
-                    $result3->free();
-                    $conn3->close();
-                }
-                
-                if (is_numeric($row['timestamp'])) {
-                    $time = time_ago(date("Y-m-d H:i:s", (int)$row['timestamp']));
+                if ($user_count === 1) {
+                    $user_string = $users[0]['name'];
+                } elseif ($user_count === 2) {
+                    $user_string = $users[0]['name'] . " and " . $users[1]['name'];
                 } else {
-                    $time = "A long time ago";
+                    $user_string = $users[0]['name'] . " and " . ($user_count - 1) . " others";
                 }
 
-                if($valid === true) {
-                    echo "<article class='w3-card-2 w3-animate-right w3-hover-shadow gr8-theme w3-padding w3-round w3-large'>";
-                    echo "<a href='" . $url . "'><img src='" . $img . "' style='background: #ddd; width: 150px; height: 150px; border-radius: 6px;' alt='" . $img . "' title='" . $img . "'>";
-                    echo "<span style='display: inline-block; vertical-align: top; padding: 10px 10px 10px 10px;'>";
-                    echo "@" . htmlspecialchars($user) . "&nbsp;" . htmlspecialchars($post) . "</span></a>";
-                    echo "<time class='w3-right' datetime=''>" . $time . "</time>";
-                    echo "</article><br />";
+                // --- CATEGORY 1: Follows ---
+                if ($category === 1) {
+                    $valid = true;
+
+                    if ($user_count > 1) {
+                        $url = "/acc/following?p=followerstab";
+                    } else {
+                        $url = "/user/" . $group['users'][0]['id'];
+                    }
+
+                    $post = ($user_count > 1 ? "followed you " : "followed you ");
+                    $img = $group['fallback_pic'];
+                    // --- CATEGORY 2: Model Comments ---
+                } elseif ($category === 2) {
+                    $stmt2 = $conn->prepare("SELECT screenshot, name FROM `" . DB_NAME2 . "`.`model` WHERE id = ?");
+                    $stmt2->bind_param("i", $content);
+                    $stmt2->execute();
+                    $res2 = $stmt2->get_result();
+                    $row2 = $res2->fetch_assoc();
+
+                    $valid = true;
+                    $img = $row2['screenshot'];
+                    $url = "/build/" . urlencode($content);
+                    $post = ($user_count > 1 ? 'commented on ' : 'commented on ') . ($row2['name'] ?: '[unknown]');
+                    $stmt2->close();
+                    // --- CATEGORY 3: DMs / Topic Replies ---
+                } elseif ($category === 3) {
+                    $stmt2 = $conn->prepare("SELECT title FROM `" . DB_NAME3 . "`.`messages` WHERE id = ?");
+                    $stmt2->bind_param("i", $content);
+                    $stmt2->execute();
+                    $res2 = $stmt2->get_result();
+                    $row2 = $res2->fetch_assoc();
+
+                    $valid = true;
+                    $img = '../img/com.jpg';
+                    $url = "/topic/" . urlencode($content);
+                    $title = !empty($row2['title']) ? $row2['title'] : "[unknown]";
+                    $post = ($user_count > 1 ? "replied to " : "replied to ") . $title;
+
+                    $stmt2->close();
+                    // --- CATEGORY 4: Admin Warnings ---
+                } elseif ($category === 4) {
+                    $stmt2 = $conn->prepare("SELECT reason FROM `warnings` WHERE id = ?");
+                    $stmt2->bind_param("i", $content);
+                    $stmt2->execute();
+                    $res2 = $stmt2->get_result();
+                    $row2 = $res2->fetch_assoc();
+
+                    $valid = true;
+                    $img = '../img/com.jpg';
+                    $url = "#";
+                    $reason = !empty($row2['reason']) ? $row2['reason'] : "[unknown]";
+                    $post = "got warned: " . $reason;
+
+                    $stmt2->close();
+                    // --- CATEGORY 5: Model Favorites ---
+                } elseif ($category === 5) {
+                    $stmt2 = $conn->prepare("SELECT screenshot, name FROM `" . DB_NAME2 . "`.`model` WHERE id = ?");
+                    $stmt2->bind_param("i", $content);
+                    $stmt2->execute();
+                    $res2 = $stmt2->get_result();
+
+                    if ($row2 = $res2->fetch_assoc()) {
+                        $valid = true;
+                        $img = $row2['screenshot'];
+                        $url = "/build/" . urlencode($content);
+                        $post = ($user_count > 1 ? "favorited " : "favorited ") . ($row2['name'] ?: '[unknown]');
+                    }
+                    $stmt2->close();
                 }
 
-                $result2->free();
+                $time = time_ago(date("Y-m-d H:i:s", $group['timestamp']));
+
+                if ($valid === true) {
+        ?>
+            <article class='w3-card-4 w3-hover-opacity gr8-theme w3-padding w3-round w3-large'>
+                <a href="<?php echo htmlspecialchars($url); ?>"><img src="<?php echo htmlspecialchars($img); ?>" class="w3-round" style='background: #ddd; width: 150px; height: 150px;' alt='Image' title='Image'></a>
+                <a href="<?php echo htmlspecialchars($url); ?>"><span style='display: inline-block; vertical-align: top; padding: 10px;'>
+                        <strong><?php echo htmlspecialchars($user_string); ?></strong> <?php echo htmlspecialchars($post); ?>
+                    </span></a>
+                <time class='w3-right'><?php echo htmlspecialchars($time); ?></time>
+            </article>
+            <br />
+        <?php
             }
-            $result->free();
-            $conn2->close();
-		
-		?><br /><br />
-		
+        }
+            $conn->close();
+        } catch (Exception $e) {
+            error_log($e->getMessage());
+            echo "<p>Error loading some notifications.</p>";
+        }
+        ?><br /><br />
     <?php include '../linkbar.php' ?>
 </body>
+
 </html>

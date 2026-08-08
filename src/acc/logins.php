@@ -2,7 +2,11 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
-isLoggedin();
+
+if(!loggedin()) {
+    header('Location:login.php');
+    exit;
+}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -37,7 +41,7 @@ isLoggedin();
 
 				echo "<article id='sessionModal" . $i . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-margin-bottom w3-round w3-large'>";
                 echo "<span>Last IP " . $row['login_from'] . "</span><br />";
-                echo "<span>On browser " . get_browser_name($row['user_agent']) . ", " . get_system_name($row['user_agent']) . "</span><br />";
+                echo "<span>On browser " . $row['user_agent'] . "</span><br />";
                 echo "Last active <time id='original' style='cursor: pointer;' datetime='" . date('Y-m-d H:i:s', $row['timestamp']) . "'>" . $time . "</time>";
                 echo "<time id='complete' style='display: none; cursor: pointer;' datetime='" . date('Y-m-d H:i:s', $row['timestamp']) . "'> " . date("F j, Y, g:i a", $row['timestamp']) . "</time><br />";
                 if($_SESSION['tokenid'] != $row['id']) {

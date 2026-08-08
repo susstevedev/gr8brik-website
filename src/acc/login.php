@@ -1,20 +1,16 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
-if(isset($_GET['desktop']) && loggedin()) {
-    echo "<p>The following key can be used to authenticate Gr8brik desktop. <b>" . base64_encode($users_row['username']) . "</b>&nbsp;.<br />Close this window after copying the key to continue.</p>";
-    exit;
+if(loggedin()) {
+    if(isset($_GET['status']) && $_GET['status'] === 'logout') {
+        logout();
+        header('login.php');
+        exit;
+    } else {
+        header('index.php');
+        exit;
+    }
 }
-
-if(isset($_GET['status']) && $_GET['status'] === 'logout') {
-    $tokenid = htmlspecialchars($_COOKIE['token']);
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-    $conn->query("DELETE FROM sessions WHERE id = '$tokenid'");
-	session_destroy();
-    header('login.php');
-}
-isLoggedin();
 
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
@@ -26,39 +22,10 @@ isLoggedin();
 </head>
 <body class="w3-container w3-light-blue">
     <?php include '../navbar.php'; ?>
-    <style>
-        #welcome-mobile {
-            display: none;
-        }
-        .w3-input {
-            width: 50%;
-        }
-        
-        /*@media only screen and (max-width: 768px) {
-            #linkbar, #mobilenav, #toggleModeMenu, #toggleLight, #toggleDark, #welcome-large, #loginForm {
-                display: none;
-            }
-            #welcome-mobile {
-                display: block;
-            }
-            .w3-input {
-                width: 100%;
-            }
-        }*/
-    </style>
     <script>
         $(document).ready(function() {
             $("#error").hide();
-            
-            if(location.search == "?desktop=true") {
-                $("#navbar").hide();
-                $("#linkbar").hide();
-                $("#linkbar").hide();
-                $(".w3-hide-small.w3-show-medium.w3-padding.w3-card-2.w3-bottom.w3-blue.w3-text-white").hide();
-                $("#loginForm span a").hide();
-                document.title = "Gr8brik Desktop Authentication"
-            }
-            
+
             $("#loginBtn").click(function(event) {
                 event.preventDefault();
 
@@ -73,6 +40,7 @@ isLoggedin();
                 $.ajax({
                     url: '/ajax/auth',
                     method: "POST",
+                    dataType: 'json',
                     data: { login: true, mail: mail, pwd: pwd, remember: remember },
                     success: function(response) {
                         $("#loginBtn").html(prevBtnText);
@@ -103,7 +71,8 @@ isLoggedin();
                         if(response.popup) {
                             $("#popup").show();
                             $("#popup-text").text(response.popup);
-                            $("#popup-btn").attr("href", response.goto)
+                            $("#popup-btn").attr("href", response.goto);
+                            $("#popup-btn").text(response.btn);
                         }
                         
                         $("#error").show()
@@ -113,10 +82,6 @@ isLoggedin();
                         });
                     }
                 });
-            });
-            $("#showLogin").click(function(event) {
-                $("#loginForm").show().addClass("w3-animate-right");
-                $("#welcome-mobile").addClass("w3-animate-left").hide();
             });
         });
     </script>
@@ -130,7 +95,7 @@ isLoggedin();
             </header>
             <div class="w3-container">
                 <p id="popup-text"></p>
-                <a href="" class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo" id="popup-btn">Yes</a>
+                <a href="" class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo" id="popup-btn"></a>
             </div>
         </div>
     </div>
@@ -139,26 +104,16 @@ isLoggedin();
     <div id="welcome-large">
         <h2>Login</h2>
     </div>
-    <!--<center>
-        <div id="welcome-mobile">
-            <img src="/img/logo.jpg" style="width: 15%; height: 15%; border-radius: 50%;">
-            <p class="w3-large">Welcome to Gr8brik!</p>
-            <a href="/acc/register" class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo">Create account</a><br />
-            <button class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" id="showLogin" name="showLogin">Sign in</button><hr />
-            <a href="/list" class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo">View without sign in</a>
-        </div>
-    </center>-->
     <div id="loginForm" class="w3-container">
         <span>Don't have an account? <a href="register">Register</a></span><br />
         
-        <p><input class="w3-border" type="email" name="mail" size="50px" placeholder="Email or username"></p>
-        <p><input class="w3-border" type="password" name="pwd" size="50px" placeholder="Password"></p>
+        <p><input class="login-input w3-border" type="email" name="mail" size="50px" placeholder="Email or username"></p>
+        <p><input class="login-input w3-border" type="password" name="pwd" size="50px" placeholder="Password"></p>
         
         <input type="checkbox" name="remember">
 		<label for="remember">Remember my session</label><br />
-        
-        <span><small>Your session will be remembered, so you don't need to re-login everytime you visit our services.</small></span><br />
-        <button class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small w3-border w3-border-indigo" id="loginBtn" name="login">Login</button>
+
+        <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="loginBtn" name="login">Login</button>
     </div>
     <?php include '../linkbar.php' ?>
 </body>

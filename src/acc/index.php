@@ -1,19 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/account_settings.php';
 
-if(isset($_POST['deactive'])) {
-    $id = $conn->real_escape_string($token['user']);
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $date = date("Y-m-d");
-    
-    $stmt_2 = $conn->prepare("UPDATE users SET deactive = ? WHERE id = ? LIMIT 1");
-    $stmt_2->bind_param("si", $date, $id);
-    if ($stmt_2->execute()) {
-        logout();
-    }
-}
-
-if(isset($_GET['reactive'])) {
+if (isset($_GET['reactive'])) {
     $new_token = $conn->real_escape_string($_GET['token']);
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
@@ -23,7 +12,7 @@ if(isset($_GET['reactive'])) {
     $new_tokendata = $stmt->get_result();
     $new_tokenrow = $new_tokendata->fetch_assoc();
     $user = (int)$new_tokenrow['user'];
-    
+
     $stmt_2 = $conn->prepare("UPDATE users SET deactive = NULL WHERE id = ? LIMIT 1");
     $stmt_2->bind_param("i", $user);
     if ($stmt_2->execute()) {
@@ -34,539 +23,460 @@ if(isset($_GET['reactive'])) {
     }
 }
 
-if(!loggedin()) {
+if (!loggedin()) {
     header('Location:login.php');
 }
 
-if (isset($_POST['picture'])) {
-    $okay = true;
-
-    if(isset($_POST['deletePfp'])) {
-        exit('Please use the new enpoint for deleting profile pictures!');
-    } else {
-        if($users_row['verify_token'] != NULL) {
-            echo "Please verify your account to upload or edit your profile picture.";
-            $okay = false;
-            exit;
-        }
-
-        $mime = mime_content_type($_FILES["fileToUpload"]["tmp_name"]);
-
-        if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'])) {
-            echo "Only JPEG, PNG, GIF, and WEBP files are allowed.";
-            $okay = false;
-            exit;
-        }
-
-        if(empty($_FILES['fileToUpload'])) {
-            echo 'No file selected.';
-            $okay = false;
-            exit;
-        }
-
-        $db_pfp = '/acc/users/pfps/' . $users_row['id'] . '.webp';
-        $upload = "users/pfps/" . $users_row['id'] . ".webp";
-
-        if ($_FILES["fileToUpload"]["size"] > 5242880) {
-            echo 'File too large.';
-            $okay = false;
-            exit;
-        }
-        
-        $data = file_get_contents($_FILES["fileToUpload"]["tmp_name"]);
-    	$image = imagecreatefromstring($data);
-        
-    	if (!$image) {
-            $okay = false;
-        	echo "Invalid image file";
-            exit;
-    	}
-
-        if ($okay != false) {
-            if (imagewebp($image, $upload, 80)) {
-                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-                if ($conn->connect_error) {
-                    exit("DB connection failure");
-                }
-
-                $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
-                $stmt->bind_param("ss", $db_pfp, $id);
-                if ($stmt->execute()) {
-                    ob_start();
-                    echo "Profile picture updated";
-                    ob_end_flush();
-                    header("refresh:3; url=index.php");
-                } else {
-                    echo "Could not update profile picture row in the database";
-                    exit;
-                }
-            } else {
-                echo "Failed to save image.";
-            }
-        }
-    }
-}
-
-if (isset($_POST['remove_picture'])) {
-    $okay = true;
-   	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    
-    $old_pfp = $_SERVER['DOCUMENT_ROOT'] . $users_row['picture'];
-    $new_pfp = '/img/no_image.png';
-    
-    // check if the picture is null or if it is not equal to the default can be done with one line which also checks for legacy pfps (eg ://examplesite.com/anyimage.jpeg)
-    //if ($users_row['picture'] != null && $users_row['picture'] != '/img/no_image.png' && strpos($users_row['picture'], '/acc/users/pfps/') !== false) {
-    if (strpos($users_row['picture'], '/acc/users/pfps/') !== false) {
-    	unlink($old_pfp);
-   	}
-    
-    $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
-    $stmt->bind_param("ss", $new_pfp, $id);
-    
-    if (!$conn->connect_error && $stmt->execute()) {
-        ob_start();
-        echo "Profile picture removed";
-        ob_end_flush();
-        header("refresh:3; url=index.php");
-   	} else {
-    	exit('Error removing profile picture. Please try again later.');
-    }
-}
-
 if (isset($_POST['banner'])) {
-    $id = $_SESSION['userid'];
+    $id = $current_user->id;
     $uploadOkay = 1;
-    if(isset($_POST['deleteBanner'])) {
-        $pfp = "users/banners/" . $id . "..jpg";
-        unlink($pfp);
-        header("Location: index.php?deletedBanner=true");
-    } else {
 
-        if(empty($_FILES['fileToUpload'])) {
+    if ($current_user->verify_token !== NULL) {
+        echo "<center>Please verify your account to continue this action.</center>";
+        exit;
+    }
+
+    if (isset($_POST['deleteBanner'])) {
+        $bannerPath = "users/banners/" . $id . "..jpg";
+        if (file_exists($bannerPath)) {
+            unlink($bannerPath);
+        }
+        header("Location: index.php?deletedBanner=true");
+        exit;
+    } else {
+        if (empty($_FILES['fileToUpload']['tmp_name'])) {
             $uploadOkay = 0;
         }
 
-        $dir = "../acc/users/banners/";
-        $target_file = $dir . basename($_FILES['fileToupload']['name']);
-        $upload = $dir . $id . '..jpg';
-        
-        $data = file_get_contents($_FILES["fileToupload"]["tmp_name"]);
-    	$image = imagecreatefromstring($data);
-        
-    	if (!$image) {
-            $uploadOk = 0;
-    	}
+        if ($uploadOkay === 1) {
+            if ($_FILES["fileToUpload"]["size"] > 5242880) {
+                $uploadOkay = 0;
+            }
 
-        if ($_FILES["fileToupload"]["size"] > 5242880) {
-            $uploadOk = 0;
+            if ($uploadOkay === 1) {
+                $data = file_get_contents($_FILES["fileToUpload"]["tmp_name"]);
+                $image = imagecreatefromstring($data);
+                if (!$image) {
+                    $uploadOkay = 0;
+                }
+            }
         }
 
-        if ($uploadOk === 0) {
-            echo 'Sorry, there was an error uploading your file.';
+        if ($uploadOkay === 0) {
+            echo '<center>Sorry, there was an error uploading your file.</center>';
         } else {
-            if (imagewebp($image, $upload, 80)) {
-                $uploadOk = 1;
+            $dir = "../acc/users/banners/";
+            $upload = $dir . $id . '..jpg';
+
+            if (imagewebp($image, $upload, 50)) {
+                echo "<center>Banner updated successfully.</center>";
+                header("refresh:3; url=index.php");
             } else {
-                $uploadOk = 0;
+                echo '<center>Sorry, there was an error saving your banner.</center>';
             }
         }
     }
 }
 ?>
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
+
 <head>
     <title>Settings</title>
     <?php include '../header.php' ?>
 </head>
+
 <body class="w3-light-blue w3-container">
+    <?php
+        include '../navbar.php';
+        include 'panel.php';
 
-    <?php 
-        include('../navbar.php');
-        include('panel.php');
-
-        $words = ['Brick', 'Minifig', 'Stud', 'Build', 'Block', 'Stack', 'Baseplate', 'Roadplate', 'Fanatic', 'Craftsman', 'Awesome', 'Great'];
-        $randomKeys = array_rand($words, 2);
-        $randomWord1 = $words[$randomKeys[0]];
-        $randomWord2 = $words[$randomKeys[1]];
-        $randomNumber = rand(100, 999);
-
-        $combinedString = $randomWord1 . $randomWord2 . $randomNumber;
+        $utils = new ScreenNameUtils();
+        $combinedString = $utils->generateRandomScreenName();
     ?>
 
     <div id="deactive" class="w3-modal">
-		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
-			<div class="w3-container">
-				<span onclick="document.getElementById('deactive').style.display='none'" class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
-				<form method='post' action='/ajax/account_settings.php'>
-					<h2>Are you sure you want to deactivate your account?</h2>
+        <div class="w3-modal-content w3-card-2 w3-light-grey w3-center w3-animate-bottom">
+            <div class="w3-container">
+                <span onclick="document.getElementById('deactive').style.display='none'" class="w3-button w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
+                <form method='post' action='/ajax/account_settings.php'>
+                    <h2>Are you sure you want to delete your account?</h2>
                     <p><input type="password" name="password" placeholder="Password" class="w3-input w3-border w3-mobile" required /></p>
-                    <p>You can restore your account until 14 days after you deactivate. After 14 days, your account will be deleted and all data anonymized.</p>
-					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('deactive').style.display='none'">No</span>&nbsp;
-					<input type="submit" value="Yes" name="deactive_account" class="w3-btn w3-large w3-white w3-hover-red">
-				</form>
-			</div>
-		</div>
-	</div>
+                    <p>You can restore your account up until 7 days after you start the process. After those 7 days, all of your account data will be anonymized or deleted.</p>
+                    <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('deactive').style.display='none'">No</span>&nbsp;
+                    <input type="submit" value="Yes" name="deactive_account" class="w3-btn w3-large w3-white w3-hover-red">
+                </form>
+            </div>
+        </div>
+    </div>
 
     <script>
-    $(document).ready(function() {
-        $(".success").hide();
-        $(".error").hide();
+        $(document).ready(function() {
+            $("#username-input").on("input", function() {
+                var newUsername = $(this).val();
+                $("#u_change").attr('disabled', true);
+                $("#data-username-available").text('');
 
-        $("#username-input").on("input", function() {
-            var newUsername = $(this).val();
-            var token = $.cookie('token');
-            $("#u_change").attr('disabled', true).html('<img src="/img/loading.gif" style="width: 25px; height: 25px;" />');
-
-            $.ajax({
-                url: "../ajax/account_settings",
-                method: "GET",
-                data: { check_username_available: true, username: newUsername, token: $.cookie('token') },
-                success: function(response) {
-                    $("#data-username-available").hide();
-                    setTimeout(function() {
-                        if(response.available === "1") {
-                            $("#u_change").html('Change Username').attr('disabled', false);
-                            $("#data-username-available").show().css("background-color", "green").text('Username available.').delay(10000).fadeOut();
-                        } else if(response.available === "0") {
-                            $("#u_change").html('Change Username');
-                            $("#data-username-available").show().css("background-color", "red").text(response.reason).delay(10000).fadeOut();
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    method: "GET",
+                    dataType: 'json',
+                    data: { check_username_available: true, username: newUsername },
+                    success: function(response) {
+                        if (response.available == true) {
+                            $("#u_change").attr('disabled', false);
+                            $("#data-username-available").removeClass('w3-red').addClass('w3-green');
+                        } else if (response.available == false) {
+                            $("#data-username-available").removeClass('w3-green').addClass('w3-red');
                         }
-                    }, 2500);
-                },
 
-                error: function(jqXHR, textStatus, errorThrown) {
-                    var response = JSON.parse(jqXHR.responseText);
-                    console.error(jqXHR, textStatus, errorThrown);
-                    $(".error").show();
-                    $(".error").text(response.error);
+                        $("#data-username-available").show().text(response.reason).delay(5000).hide(0);
+                    },
+
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        console.error(jqXHR, textStatus, errorThrown);
+                        DOMerror("An error occurred. Please try again later.");
+                    }
+                });
+            });
+
+            $("#u_change").click(function(event) {
+                event.preventDefault();
+
+                var username = $("#username input[name='username']").val();
+                var token = $.cookie('token');
+                if ($("#username input[name='username']").val().trim() === '') {
+                    var username = $("#username input[name='username']").attr('placeholder');
                 }
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    method: "GET",
+                    dataType: 'json',
+                    data: {
+                        username_change: true,
+                        username: username,
+                        token: token
+                    },
+                    success: function(response) {
+                        DOMsuccess(response.success || "Unknown response");
+                        $(".usertext").text(username);
+                    },
+
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        DOMerror(response.error || "An error occurred. Please try again later.");
+                    }
+                });
+            });
+
+            $("#blog_user_change").click(function(event) {
+                event.preventDefault();
+
+                let blog_user = $("#blog_user_change input[name='user']").val();
+                var token = $.cookie('token');
+                if ($("#blog_user_change input[name='user']").val().trim() === '') {
+                    let blog_user = null;
+                }
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    method: "GET",
+                    dataType: 'json',
+                    data: {
+                        blog_user_change: true,
+                        blog_user: blog_user,
+                        token: token
+                    },
+                    success: function(response) {
+                        DOMsuccess(response.success || "Unknown response");
+                    },
+
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        DOMerror(response.error || "An error occurred. Please try again later.");
+                    }
+                });
+            });
+
+            $("#a_change").click(function(event) {
+                event.preventDefault();
+
+                var description = $("#about textarea[name='description']").val();
+                var token = $.cookie('token');
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    method: "GET",
+                    dataType: 'json',
+                    data: {
+                        about_change: true,
+                        description: encodeURIComponent(description),
+                        token: token
+                    },
+                    success: function(response) {
+                        DOMsuccess(response.success || "Unknown response");
+                    },
+
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        DOMerror(response.error || "An error occurred. Please try again later.");
+                    }
+                });
+            });
+
+            $("#twitter_change").click(function(event) {
+                event.preventDefault();
+
+                var handle = $("#twitter input[name='handle']").val();
+                var token = $.cookie('token');
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    method: "GET",
+                    dataType: 'json',
+                    data: {
+                        twitter_change: true,
+                        handle: handle,
+                        token: token
+                    },
+                    success: function(response) {
+                        DOMsuccess(response.success || "Unknown response");
+                    },
+
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        DOMerror(response.error || "An error occurred. Please try again later.");
+                    }
+                });
+            });
+
+            $("#bsky_change").click(function(event) {
+                event.preventDefault();
+
+                var handle = $("#bsky input[name='did']").val();
+                var token = $.cookie('token');
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    method: "GET",
+                    dataType: 'json',
+                    data: {
+                        bsky_change: true,
+                        handle: handle,
+                        token: token
+                    },
+                    success: function(response) {
+                        DOMsuccess(response.success || "Unknown response");
+                    },
+
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        DOMerror(response.error || "An error occurred. Please try again later.");
+                    }
+                });
+            });
+
+            // Source - https://stackoverflow.com/a/23981045
+            // Posted by bloodyKnuckles, modified by community. See post 'Timeline' for change history
+            // Retrieved 2026-08-02, License - CC BY-SA 4.0
+
+            $('#pictureForm #picture').on('click', function(event) {
+                event.preventDefault();
+
+                var file_data = $('#pictureForm #fileToUpload').prop('files')[0];
+                var form_data = new FormData();
+                form_data.append('fileToUpload', file_data);
+                form_data.append('picture', 'true');
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    dataType: 'json',
+                    contentType: false,
+                    processData: false,
+                    data: form_data,
+                    type: 'POST',
+                    success: function(res) {
+                        if (res && res.success && res.image) {
+                            $('#pictureForm #fileToUpload').css('background-image', 'url(' + res.image + ')');
+                        } else if (res && res.error) {
+                            alert(res.error);
+                        } else {
+                            DOMerror('An error occured while uploading the image');
+                        }
+                    },
+                    error: function(xhr, text, error) {
+                        var response = JSON.parse(xhr.responseText);
+                        DOMerror(response.error || "An error occured while uploading the image");
+                    }
+                });
+            });
+
+            $('#pictureForm #remove_picture').on('click', function(event) {
+                event.preventDefault();
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    dataType: 'json',
+                    data: {
+                        remove_picture: true
+                    },
+                    type: 'POST',
+                    success: function(res) {
+                        if (res && res.success && res.image) {
+                            $('#pictureForm #fileToUpload').css('background-image', 'url(' + res.image + ')');
+                        } else if (res && res.error) {
+                            alert(res.error);
+                        } else {
+                            DOMerror('An error occured while removing the image');
+                        }
+                    },
+                    error: function(xhr, text, error) {
+                        var response = JSON.parse(xhr.responseText);
+                        DOMerror(response.error || "An error occured while removing the image");
+                    }
+                });
             });
         });
 
-        $("#u_change").click(function(event) {
-            event.preventDefault();
-
-            var username = $("#username input[name='username']").val();
-            var token = $.cookie('token');
-            if ($("#username input[name='username']").val().trim() === '') {
-                var username = $("#username input[name='username']").attr('placeholder');
+        function DOMerror(error) {
+            $(".error").show();
+            if (error) {
+                $(".error").text(error);
             }
+            $('html, body').animate({
+                scrollTop: 0
+            }, 'slow');
+        }
 
-            $.ajax({
-                url: "../ajax/account_settings",
-                method: "GET",
-                data: { username_change: true, username: username, token: token },
-                success: function(response) {
-                    $(".success").show();
-                    $(".success").text("Username updated!");
-                    $(".usertext").text(username);      
-                },
-
-                error: function(jqXHR, textStatus, errorThrown) {
-                    if (jqXHR.status === 403) {
-                        appCrash('403', 'Invalid login');
-                    }else if (jqXHR.status === 500) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        $(".error").show();
-                        $(".error").text(response.error);
-                    } else {
-                        console.error("AJAX Error:", textStatus, errorThrown);
-                        alert("An error occurred. Please try again later.");
-                    }
-                }
-            });
-        });
-        
-        $("#blog_user_change").click(function(event) {
-            event.preventDefault();
-
-            let blog_user = $("#blog_user_change input[name='user']").val();
-            var token = $.cookie('token');
-            if ($("#blog_user_change input[name='user']").val().trim() === '') {
-                let blog_user = null;
+        function DOMsuccess(message) {
+            $(".success").show();
+            if (message) {
+                $(".success").text(message);
             }
-
-            $.ajax({
-                url: "../ajax/account_settings",
-                method: "GET",
-                data: { blog_user_change: true, blog_user: blog_user, token: token },
-                success: function(response) {
-                    $(".success").show();
-                    $(".success").text("Short name updated!");
-                },
-
-                error: function(jqXHR, textStatus, errorThrown) {
-                    if (jqXHR.status === 403) {
-                        console.error("AJAX Error:", textStatus, errorThrown);
-                        alert("An error occurred. Please try again later.");
-                    } else if (jqXHR.status === 500) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        $(".error").show();
-                        $(".error").text(response.error);
-                    } else {
-                        console.error("AJAX Error:", textStatus, errorThrown);
-                        alert("An error occurred. Please try again later.");
-                    }
-                }
-            });
-        });
-
-        $("#a_change").click(function(event) {
-            event.preventDefault();
-
-            var description = $("#about textarea[name='description']").val();
-            var token = $.cookie('token');
-
-            $.ajax({
-                url: "../ajax/account_settings",
-                method: "GET",
-                data: { about_change: true, description: encodeURIComponent(description), token: token },
-                success: function(response) {
-                    $(".success").show();
-                    $(".success").text(response.success);
-                },
-
-                error: function(jqXHR, textStatus, errorThrown) {
-                    if (jqXHR.status === 403) {
-                        appCrash('403', 'Invalid login');
-                    }else if (jqXHR.status === 500) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        $(".error").show();
-                        $(".error").text(response.error);
-                    } else {
-                        console.error("AJAX Error:", textStatus, errorThrown);
-                        alert("An error occurred. Please try again later.");
-                    }
-                }
-            });
-        });
-        
-        $("#twitter_change").click(function(event) {
-            event.preventDefault();
-
-            var handle = $("#twitter input[name='handle']").val();
-            var token = $.cookie('token');
-
-            $.ajax({
-                url: "../ajax/account_settings",
-                method: "GET",
-                data: { twitter_change: true, handle: handle, token: token },
-                success: function(response) {
-                    $(".success").show();
-                    $(".success").text(response.success || "Object updated");
-                },
-
-                error: function(jqXHR, textStatus, errorThrown) {
-                    if (jqXHR.status === 403) {
-                        alert('Not authed');
-                    } else if (jqXHR.status === 500) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        $(".error").show();
-                        $(".error").text(response.error);
-                    } else {
-                        console.error("AJAX Error:", textStatus, errorThrown);
-                        alert("An error occurred. Please try again later.");
-                    }
-                }
-            });
-        });
-        
-        $("#bsky_change").click(function(event) {
-            event.preventDefault();
-
-            var handle = $("#bsky input[name='did']").val();
-            var token = $.cookie('token');
-
-            $.ajax({
-                url: "../ajax/account_settings",
-                method: "GET",
-                data: { bsky_change: true, handle: handle, token: token },
-                success: function(response) {
-                    $(".success").show();
-                    $(".success").text(response.success || "Object updated");
-                },
-
-                error: function(jqXHR, textStatus, errorThrown) {
-                    if (jqXHR.status === 403) {
-                        alert('Not authed');
-                    } else if (jqXHR.status === 500) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        $(".error").show();
-                        $(".error").text(response.error);
-                    } else {
-                        console.error("AJAX Error:", textStatus, errorThrown);
-                        alert("An error occurred. Please try again later.");
-                    }
-                }
-            });
-        });
-        
-         $("#export_data").click(function(event) {
-            event.preventDefault();
-
-            var token = $.cookie('token');
-
-            $.ajax({
-                url: "../ajax/account_settings",
-                method: "GET",
-                data: { export_acc_row: true, token: token },
-                success: function(response) {
-                    $(".success").show();
-                    $(".success").text("Exporting to JSON file soon. Please do not close this window.");
-                    
-                    const blob = new Blob([JSON.stringify(response, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    const date = new Date();
-                    
-                    a.href = url;
-                    a.download = `export-${response.username}-${date}`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                },
-
-                error: function(jqXHR, textStatus, errorThrown) {
-                    if (jqXHR.status === 403) {
-                        appCrash('403', 'Invalid login');
-                    }else if (jqXHR.status === 500) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        $(".error").show();
-                        $(".error").text(response.error);
-                    } else {
-                        console.error("AJAX Error:", textStatus, errorThrown);
-                        alert("An error occurred. Please try again later.");
-                    }
-                }
-            });
-        });
-    });
+            $('html, body').animate({
+                scrollTop: 0
+            }, 'slow');
+        }
     </script>
 
     <style>
         .file-pfp {
-            background-image: url('<?php echo $users_row['picture'] ?: "../acc/users/pfps/" . $users_row['id'] . ".jpg?" ?>');
-            width: 250px;
-            height: 250px;
-            background-repeat: no-repeat;
-            background-size: cover;
-            background-position: 50% 50%;
-            background-color: #000;
-            cursor: pointer; 
+            background-image: url('<?php echo $current_user->picture ?: "../acc/users/pfps/" . $current_user->id . ".jpg?" ?>');
         }
+
         .file-banner {
-            background-image: url('<?php 
-    			if(file_exists("users/banners/" . $users_row['id'] . "..jpg")) { 
-                    echo "users/banners/" . $users_row['id'] . "..jpg";
-                } else {
-                    echo "/img/no_image.png";
-                }
-            ?>');
-            width: 25vw;
-            height: 25vh;
-            background-repeat: no-repeat;
-            background-size: cover;
-            background-position: 50% 50%;
-            background-color: #000;
-            cursor: pointer; 
+            background-image: url('<?php
+                                    if (file_exists("users/banners/" . $current_user->id . "..jpg")) {
+                                        echo "users/banners/" . $current_user->id . "..jpg";
+                                    } else {
+                                        echo "/img/no_image.png";
+                                    }
+                                    ?>');
         }
     </style>
 
-    <h1>Settings</h1>
+    <h4 class="success w3-light-grey w3-card-2 w3-padding w3-round"></h4>
+    <h4 class="error w3-red w3-card-2 w3-padding w3-round"></h4>
+    <h1>Account settings</h1><hr />
 
-    <p class="success w3-light-grey w3-card-2 w3-padding-small"></p>
-    <p class="error w3-red w3-card-2 w3-padding-small"></p>
-
-    <h2>Account</h2>
-    
-    <form class="pictureForm" method="post" action="" enctype="multipart/form-data">
-        <p>We recommend your banner be 250x500 pixels</p>
-		<p><input type="file" name="fileToupload" id="fileToupload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-banner"></p>
-        <?php 
-            if(file_exists('users/banners/' . $id . '..jpg')) {
+    <h2>Profile</h2>
+    <div class="w3-row">
+        <form class="pictureForm" method="post" action="" enctype="multipart/form-data">
+            <b><legend>Profile banner</legend></b>
+            <p>We recommend your banner be 1200x400</p>
+            <p><input type="file" name="fileToupload" id="fileToupload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-banner"></p>
+            <?php
+            if ($current_user->banner != null) {
                 echo '<input type="checkbox" class="w3-check" id="deleteBanner" name="deleteBanner" value="1">';
                 echo '<label for="deleteBanner">Remove banner</label>';
             }
-        ?>
-		<div class="w3-quarter">
-            <input type="submit" value="Upload" id="banner" name="banner" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-quarter">
-        </div><br />
-    </form>
+            ?>
+            <input type="submit" value="Upload banner" id="banner" name="banner" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
+        </form>
+    </div><br />
 
-<div class="w3-row"><div class="w3-quarter">
+    <div class="w3-row">
+        <div class="w3-quarter">
+            <form id="pictureForm" method="post" action="" enctype="multipart/form-data">
+                <b><legend>Profile picture</legend></b>
+                <p>We recommend your profile picture be 50x50 pixels</p>
+                <p><input type="file" name="fileToUpload" id="fileToUpload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
+                <input type="submit" value="Upload picture" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-col m4">
+                <?php
+                if ($current_user->picture != null) {
+                    echo '<span class="w3-col m1">&nbsp;</span>';
+                    echo '<input type="submit" value="Remove picture" id="remove_picture" name="remove_picture" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink w3-col m4">';
+                }
+                ?>
+            </form>
+        </div><br /><br />
 
-    <form id="pictureForm" method="post" action="" enctype="multipart/form-data">
-        <p>We recommend your profile picture be 50x50 pixels</p>
-		<p><input type="file" name="fileToUpload" id="fileToUpload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
-		<input type="submit" value="Upload" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-col m3">
-        <?php
-            if($users_row['picture'] != null && file_exists($_SERVER['DOCUMENT_ROOT'] . $users_row['picture'])) {
-               echo '<span class="w3-col m1">&nbsp;</span>';
-               echo '<input type="submit" value="Delete" id="remove_picture" name="remove_picture" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink w3-col m3">';
-            }
-        ?>
-    </form>
-</div><br /><br />
-  
-<div class="w3-threequarter">
-    <div id="username">
-        <p>Your username can only be 2-50 numbers, letters, underscore, dash, or dot. Make sure it follows the <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.<br />Some usernames are reserved and cannot be used by anyone.</p>
-        <p class="gr8-child"><span id="data-username-available" style="display: none; padding: 5px 5px 5px 5px;"></span></p>
-        <input class="w3-input w3-border w3-mobile w3-third" value="<?php echo $user ?>" type="text" id="username-input" name="username" placeholder="<?php echo $combinedString ?>">
-        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="u_change" name="u_change">Update Username</button>
-    </div><br /><br />
+        <div class="w3-threequarter">
+            <form id="username" name="username">
+                <b><legend>Username</legend></b>
+                <p>Your username can only be 2-50 numbers, letters, underscore, dash, or dot. Make sure it follows the <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.<br />Some usernames are reserved and cannot be used by anyone.</p>
+                <p class="gr8-child"><span id="data-username-available" style="display: none; padding: 5px 5px 5px 5px;"></span></p>
+                <input class="w3-input w3-border w3-mobile w3-third" value="<?php echo $current_user->username ?>" type="text" id="username-input" name="username" placeholder="<?php echo $combinedString ?>">
+                <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="u_change" name="u_change">Update Username</button>
+            </form><br />
 
-    <div id="twitter">
-         <p>To link your X/Twitter account, you will need to provide your handle.</p>
-        <input class="w3-input w3-border w3-mobile w3-third" placeholder="@me" value="<?php echo $users_row['twitter'] ?>" type="text" name="handle">
-        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="twitter_change" name="twitter_change">Update Twitter</button>
-    </div><br /><br />
-    
-    <div id="bsky">
-            <p>To link your Bluesky account, you will need to use your DID instead of your handle. Your Bluesky DID can be found <a href="https://bsky-did.neocities.org" target="_blank" rel="noopener noreferrer">here</a>.</p>
-        <input class="w3-input w3-border w3-mobile w3-third" placeholder="did:plc:mydid" value="<?php echo $users_row['bsky'] ?>" type="text" name="did">
-        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="bsky_change" name="bsky_change">Update Bluesky</button>
-    </div><br /><br />
+            <form id="twitter" name="twitter">
+                <b><legend>Twitter</legend></b>
+                <p>To link your X/Twitter account, you will need to provide your handle.</p>
+                <input class="w3-input w3-border w3-mobile w3-third" placeholder="@me" value="<?php echo $current_user->twitter ?>" type="text" name="handle">
+                <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="twitter_change" name="twitter_change">Update Twitter</button>
+            </form><br />
 
-    <div id="about">
-        <p>Your description can be 1-200 characters of anything. Keep it clean and make sure it doesn't violate our <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.</p>
-        <textarea id="description" name="description" value="<?php echo htmlspecialchars($about) ?>" placeholder="New about section" class="w3-input w3-border w3-mobile" rows="4" cols="50"><?php echo htmlspecialchars($about) ?></textarea>
-        <button class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo" id="a_change" name="about">Change Description</button>
-    </div><br /><br />
+            <form id="bsky" name="bsky">
+                <b><legend>Bluesky</legend></b>
+                <p>To link your Bluesky account, you will need to use your DID instead of your handle. Your Bluesky DID can be found <a href="https://bsky-did.neocities.org" target="_blank" rel="noopener noreferrer">here</a>.</p>
+                <input class="w3-input w3-border w3-mobile w3-third" placeholder="did:plc:mydid" value="<?php echo $current_user->bsky ?>" type="text" name="did">
+                <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="bsky_change" name="bsky_change">Update Bluesky</button>
+            </form><br />
 
-        <form id="password" method="post" action="/ajax/account_settings">
-            <p>Your password to login to your account. Don't share this with anyone. Keep this saved somewhere, like a secure password manager.</p>
+            <form id="about" name="about">
+                <b><legend>About</legend></b>
+                <p>Your description can be 1-200 characters of anything. Keep it clean and make sure it doesn't violate our <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.</p>
+                <textarea id="description" name="description" value="<?php echo $current_user->description ?>" placeholder="New about section" class="w3-input w3-border w3-mobile" rows="4" cols="50"><?php echo $current_user->description ?></textarea>
+                <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="a_change" name="about">Change Description</button>
+            </form><br />
+        </div>
+    </div><br /><hr />
+
+    <h2>Account</h2>
+    <form id="password" method="post" action="/ajax/account_settings">
+        <b><legend>Password</legend></b>
+        <p>Your password to login to your account. Don't share this with anyone. Keep this saved somewhere, like a secure password manager.</p>
+        <p>
             <input type="password" name="o_password" placeholder="Old password" class="w3-input w3-border w3-mobile w3-third" />
             <input type="password" name="n_password" placeholder="New password" class="w3-input w3-border w3-mobile w3-third" />
             <input type="password" name="c_password" placeholder="Confirm new password" class="w3-input w3-border w3-mobile w3-third" />
-            <input type="submit" name="change" value="Update Password" class="w3-btn w3-blue w3-hover-white w3-third w3-border w3-border-indigo" />
-        </form><br /><br />
+        </p>
+        <input type="submit" name="change" value="Update Password" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" /><br />
+    </form><br />
 
-        <form id="email" method="post" action="/ajax/account_settings">
-            <br /><br /><p>Your email to login to your account. Don't share this either. Make sure you own this email incase you ever lose access to your account.</p>
-            <input type="email" value="<?php echo htmlspecialchars($email) ?>" name="o_email" style="float:left;width:30%;" placeholder="Old email" class="w3-input w3-border w3-mobile w3-third" />
-            <input type="email" name="n_email" placeholder="New email" class="w3-input w3-border w3-mobile w3-third" />
-            <input type="submit" name="e_change" value="Update Email Address" class="w3-btn w3-blue w3-hover-white w3-third w3-border w3-border-indigo" /><br /><br />
-        </form>
-    </div></div><br /><br />
+    <form id="email" method="post" action="/ajax/account_settings">
+        <b><legend>Email address</legend></b>
+        <p>Your email to login to your account. Don't share this either. Make sure you own this email incase you ever lose access to your account.</p>
+        <p>
+            <input type="email" value="<?php echo $current_user->email ?>" name="o_email" placeholder="Old email" class="w3-input w3-border w3-mobile w3-half" />
+            <input type="email" name="n_email" placeholder="New email" class="w3-input w3-border w3-mobile w3-half" />
+        </p>
+        <input type="submit" name="e_change" value="Update Email Address" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" /><br />
+    </form><br />
 
-    <a class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" href="login.php?status=logout">Logout</a>
+    <a class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" href="login.php?status=logout">Logout</a><hr />
 
     <h2>Danger zone</h2>
-    
-    <button id="export_data" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink">Export account row</button>
-    
     <div class="tooltip">
-    <button onclick="document.getElementById('deactive').style.display='block'" name='deactive' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink' />Deactivate Account</button>
-        <span class="w3-tag w3-round w3-blue w3-padding-small tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i>Deactivate your account.</span>
+        <button onclick="document.getElementById('deactive').style.display='block'" name='deactive' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink' />Delete Account</button>
+        <span class="w3-tag w3-round w3-blue w3-padding-small tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i> Begin the process of deleting your account and data</span>
     </div>
 
-    <?php include ('../linkbar.php') ?>
+    <?php include('../linkbar.php') ?>
 </body>
+
 </html>
