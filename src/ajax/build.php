@@ -12,16 +12,17 @@ if(isset($_GET['storage'])) {
     header('Content-Type: application/json');
 
     if(!isset($_GET['user'])) {
-        if (!isset($token['user'])) {
-            header("HTTP/1.1 401 Unauthorized");
+        if (!loggedin()) {
+            http_response_code(401);
             echo json_encode(['success' => false, 'message' => 'Please login to view this data.']);
             exit;
         }
-        $user = $token['user'];
-        $name_user = $users_row['username'];
+
+        $user = $current_user->id;
+        $name_user = $current_user->id;
     } else {
         $user = (int)$_GET['user'];
-        
+
         $query = "SELECT username FROM users WHERE id = ? AND deactive IS NULL";
         $stmt = $conn2->prepare($query);
         $stmt->bind_param("i", $user);
@@ -30,8 +31,8 @@ if(isset($_GET['storage'])) {
         if($result->num_rows > 0) {
         	$name_user = $result->fetch_assoc()['username'];
         } else {
-            header("HTTP/1.1 404 Not Found");
-            echo json_encode(['success' => false, 'message' => '404 not found']);
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'user not found']);
             exit;
         }
     }
@@ -54,20 +55,20 @@ if (isset($_POST['save_build'])) {
         $visible = $_POST['visibility'];
 
         if (empty($modelJson)) {
-            header("HTTP/1.1 400 Bad Request");
+            http_response_code(400);
             echo json_encode(['error' => "Request is empty."]);
             exit;
         }
 
         $decoded_json = json_decode($modelJson, true);
         if ($modelJson === null && json_last_error() !== JSON_ERROR_NONE) {
-            header("HTTP/1.1 400 Bad Request");
+            http_response_code(400);
             echo json_encode(['error' => "Invalid creation format."]);
             exit;
         }
 
         if (!loggedin()) {
-            header("HTTP/1.1 401 Unauthorized");
+            http_response_code(401);
             echo json_encode(['error' => "Please login to save models."]);
             exit;
         }
@@ -77,13 +78,13 @@ if (isset($_POST['save_build'])) {
         $user_file_version = $decoded_json['metadata']['file_version'] ?? '0.0.0.0';
 
         if (version_compare($min_supported_model, $user_file_version, '>')) {
-            header("HTTP/1.1 400 Bad Request");
+            http_response_code(400);
             echo json_encode(['error' => "File version is not supported. Please update your modeler version to at least " . $min_supported_model]);
             exit;
         }
 
         if(!$visible || empty($visible) || $visible != 'public' && $visible != 'unlisted' && $visible != 'private') {
-            header("HTTP/1.1 400 Bad Request");
+            http_response_code(400);
             echo json_encode(['error' => "Visibility must be of string values: public, unlisted, private"]);
             exit;
         }
@@ -91,8 +92,8 @@ if (isset($_POST['save_build'])) {
         $user = $current_user->id ?? 0;
 
         if (User::isDeleted($user)) {
-            header("HTTP/1.1 401 Unauthorized");
-            echo json_encode(['error' => "Error fetching user account"]);
+            http_response_code(401);
+            echo json_encode(['error' => "Invalid login"]);
             exit;
         }
 
@@ -114,7 +115,7 @@ if (isset($_POST['save_build'])) {
         $db_file_size = strlen($modelJson);
 
         if (($total + $db_file_size) > MODEL_STORAGE_LIMIT) {
-            header("HTTP/1.0 413 Payload Too Large");
+            http_response_code(413);
             echo json_encode(['error' => "Storage limit of " . Numbers::filesize(MODEL_STORAGE_LIMIT) . " was reached. Please delete older creations to save new ones."]);
             exit;
         }
@@ -127,14 +128,14 @@ if (isset($_POST['save_build'])) {
             } elseif (strpos($screenshot_data, 'data:image/webp;base64,') === 0) {
                 $base64_str = substr($screenshot_data, strlen('data:image/webp;base64,'));
             } else {
-                header("HTTP/1.1 400 Bad Request");
+                http_response_code(400);
                 echo json_encode(['error' => "Screenshot must be encoded in WebP or PNG."]);
                 exit;
             }
 
             $image = imagecreatefromstring(base64_decode($base64_str, true));
             if (!$image) {
-                header("HTTP/1.1 400 Bad Request");
+                http_response_code(400);
                 echo json_encode(['error' => "Thumbnail is not a valid image."]);
                 exit;
             }
@@ -147,14 +148,14 @@ if (isset($_POST['save_build'])) {
             $saved = imagewebp($image, $screenshot_path, 80);
 
             if (!$saved) {
-                header("HTTP/1.1 500 Internal Server Error");
+                http_response_code(500);
                 echo json_encode(['error' => "Failed to save screenshot."]);
                 exit;
             }
         }
 
         if (file_put_contents($file_name, $modelJson) === false) {
-            header("HTTP/1.1 500 Internal Server Error");
+            http_response_code(500);
             echo json_encode(['error' => "Failed to save creation JSON to filesystem."]);
             exit;
         }
@@ -162,21 +163,21 @@ if (isset($_POST['save_build'])) {
         $db_file_size = filesize($file_name);
 
         if ($conn->connect_error) {
-            header("HTTP/1.1 500 Internal Server Error");
+            http_response_code(500);
             echo json_encode(['error' => "Database connection failed."]);
             exit;
         }
 
         $stmt = $conn->prepare("INSERT INTO model (user, model, description, name, date, size, screenshot, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         if (!$stmt) {
-            header("HTTP/1.1 500 Internal Server Error");
+            http_response_code(500);
             echo json_encode(['error' => "Failed to save your creation to the database."]);
             exit;
         }
         $stmt->bind_param("issssiss", $user, $db_file_name, $desc, $name, $date, $db_file_size, $db_screenshot, $visible);
 
         if (!$stmt->execute()) {
-            header("HTTP/1.1 500 Internal Server Error");
+            http_response_code(500);
             echo json_encode(['error' => "Failed to save your creation to the database."]);
             exit;
         }
@@ -188,7 +189,7 @@ if (isset($_POST['save_build'])) {
         echo json_encode(['success' => "Your creation was saved successfully!", 'screenshot' => $screenshot_path]);
         exit;
     } else {
-        header("HTTP/1.1 500 Internal Server Error");
+        http_response_code(500);
         echo json_encode(['error' => "Could not save: {0}"]);
         exit;
     }
@@ -265,7 +266,7 @@ function fetch_build($model_id, $csrf) {
     $row2 = $result->fetch_assoc();
 
     if($result->num_rows === 0 || empty($row2['id'])) {
-        header('HTTP/1.0 500 Internal Server Error');
+        http_response_code(404);
         return json_encode([
             "message" => 'Creation not found',
             "error" => '404'
@@ -302,7 +303,7 @@ function fetch_build($model_id, $csrf) {
 
     while ($row3 = $result3->fetch_assoc()) {
         if ($result3->num_rows > 0 && $row3['end_date'] >= time()) {
-            header('HTTP/1.0 500 Internal Server Error');
+            http_response_code(400);
             return json_encode([
                 "message" => 'Creation could not load as the account that made it has been banned',
                 "error" => 'ACC_BANNED'
@@ -321,9 +322,9 @@ function fetch_build($model_id, $csrf) {
         $stmt->close();
 
         if ($result4->num_rows > 0) {
-            header("HTTP/1.0 403 Forbidden");
+            http_response_code(403);
             return json_encode([
-                "message" => htmlspecialchars($row['username']) . " has blocked you.",
+                "message" => htmlspecialchars($row->username) . " has blocked you.",
                 "error" => 'ACC_BLOCKING'
             ]);
         }
@@ -366,7 +367,7 @@ function fetch_build($model_id, $csrf) {
     }
     $Tag_stmt->close();
 
-    header("HTTP/1.0 200 OK");
+    http_response_code(200);
     $data = [
         'success' => true,
         'userid' => $userid,
@@ -489,44 +490,6 @@ function fetch_comments($model_id, $csrf) {
     return json_encode($comments); 
 }
 
-function get_user_storage($name) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-    $stmt = $conn->prepare("SELECT id, username FROM users WHERE username = ?");
-    $stmt->bind_param("s", $name);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $row = $result->fetch_assoc();
-    $user_id = $row['id'] ?? 0;
-    $name = $row['username'];
-    $stmt->close();
-
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-
-    $stmt = $conn->prepare("SELECT SUM(size) as total_used FROM model WHERE user = ?");
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $total_used = $result->fetch_assoc()['total_used'] ?? 0;
-    $stmt->close();
-
-    header("HTTP/1.0 200 OK");
-    $data[] = [
-        'userid' => $user_id,
-        'username' => $name,
-        'total_used' => $total_used
-    ];
-    return $data;
-}
-
-if(isset($_GET['getUserStorage'])) {
-    header('Content-Type: application/json');
-    $name = htmlspecialchars($_GET['name']);
-    $usedStorage = get_user_storage($name);
-    echo json_encode($usedStorage);
-    exit;
-}
-
 if(isset($_GET['build_comments'])) {
     header('Content-Type: application/json');
     $model_id = htmlspecialchars((int)$_GET['buildId']);
@@ -641,32 +604,6 @@ if(isset($_POST['comment'])) {
     }
 }
 
-if(isset($_GET['picture'])) {
-    $model_id = $_GET['id'];
-    $sql = "SELECT screenshot FROM model WHERE id = '$model_id' AND removed = '0'";
-    $result = $conn->query($sql);
-    $row = $result->fetch_assoc();
-
-    $name = $row['screenshot'];
-    $imagePath = '../cre/' . $name;
-
-    if(!file_exists($imagePath)) {
-        $imagePath = '../img/no_image.png';
-    }
-
-    $fp = fopen($imagePath, 'rb');
-    $contents = file_get_contents($imagePath);
-    $data = 'data:image/png;base64,'. base64_encode($contents);
-
-    if ($_GET['method'] === 'image') {
-        header("Content-Type: image/jpg");
-        header("Content-Length: " . filesize($imagePath));
-        fpassthru($fp);
-        echo $data;
-        exit;
-    }
-}
-
 if (loggedin()) {
     $id = $current_user->id;
 
@@ -752,7 +689,7 @@ if (loggedin()) {
         }
 
         if($current_user->verify_token != NULL) {
-            header("HTTP/1.0 500 Internal Server Error");
+            http_response_code(401);
             echo json_encode(['error' => "Please verify your account to continue this action."]);
             exit;
         }
@@ -837,7 +774,7 @@ if (loggedin()) {
         }
         
         if($current_user->verify_token != NULL) {
-            header("HTTP/1.0 500 Internal Server Error");
+            http_response_code(401);
             echo json_encode(['error' => "Please verify your account to continue this action."]);
             exit;
         }

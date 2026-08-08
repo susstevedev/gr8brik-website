@@ -193,7 +193,42 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     if (!isset($usero) || User::isDeleted($profile_id) || AccountManager::isBanned($conn, $email, $username)) {
         return delete_mini_message();
     }
-    
+
+    $bsky = null;
+    if (!isset($_SESSION['viewed_bskys'])) {
+        $_SESSION['viewed_bskys'] = [];
+    }
+
+    if ($usero->bsky) {
+        $actor_did = $usero->bsky;
+        if (array_key_exists($actor_did, $_SESSION['viewed_bskys'])) {
+            $bsky = $_SESSION['viewed_bskys'][$actor_did];
+        } else {
+            $ch = curl_init();
+            $url = "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=" . urlencode($usero->bsky);
+            
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36');
+
+            $response = curl_exec($ch);
+
+            if (!curl_errno($ch)) {
+                $data = json_decode($response, true);
+
+                if (json_last_error() === JSON_ERROR_NONE && isset($data['handle'])) {
+                    $bsky = $data['handle'] ?? null;
+
+                    if ($bsky !== null) {
+                        $_SESSION['viewed_bskys'][$actor_did] = $bsky;
+                    }
+                }
+            }
+            curl_close($ch);
+        }
+    }
+
     $is_blocking = false;
     $is_following = false;
     if(loggedin()) {
@@ -259,7 +294,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         'admin' => (string)$usero->admin,
         'description' => isset($usero->description) ? $bbcode->toHTML($usero->description) : '', 
         'twitter' => htmlspecialchars($usero->twitter),
-        'bsky' => htmlspecialchars($usero->bsky),
+        'bsky' => $bsky,
         'age' => htmlspecialchars($usero->age),
         'picture' => htmlspecialchars($usero->picture),
         'model_count' => (int)$model_count,
@@ -481,6 +516,42 @@ class UserContent {
 
         return $arr;
     }
+
+    public function returnForums($userid, $page) {
+        $conn_forum = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+
+        $limit = 12;
+        $offset = ($page - 1) * $limit;
+
+        $posts = [];
+
+        if ($conn_forum->connect_error) {
+            echo $conn_forum->connect_error;
+            exit;
+        }
+
+        $profile_stmt = $conn_forum->prepare("SELECT * FROM messages WHERE userid = ? AND (parent = 0 OR parent IS NULL) ORDER BY id DESC LIMIT $limit OFFSET $offset;");
+        $profile_stmt->bind_param("s", $userid);
+        $profile_stmt->execute();
+        $result = $profile_stmt->get_result();
+
+        while ($p = $result->fetch_assoc()) {
+            $p2 = [];
+            $user = User::getUser($userid);
+
+            $p2['id'] = $p['id'];
+            $p2['username'] = $user->username ?? null;
+            $p2['userid'] = $user->id ?? null;
+            $p2['title'] = mb_strimwidth($p['title'], 0, 33, '...');
+            $p2['date'] = time_ago(date("D, M d, Y", strtotime($p['timestamp'])));
+
+            $posts[] = $p2;
+        }
+
+        $conn_forum->close();
+
+        return $posts;
+    }
 }
 
 if(isset($_GET['getUserBuilds'])) {
@@ -500,6 +571,26 @@ if(isset($_GET['getUserBuilds'])) {
     $creations = $UserContent->returnModels($_GET['userid'], $page);
 
     echo json_encode(['success' => true, 'creations' => $creations]);
+    exit;
+}
+
+if(isset($_GET['getUserForums'])) {
+    header('Content-Type: application/json');
+
+    if(!isset($_GET['userid'])) {
+        echo "User id is missing";
+        exit;
+    }
+
+    $page = $_GET['page'];
+    if(!isset($page) || $page === null || $page < 1) {
+        $page = 1;
+    }
+    
+    $UserContent = new UserContent();
+    $posts = $UserContent->returnForums($_GET['userid'], $page);
+
+    echo json_encode(['success' => true, 'posts' => $posts]);
     exit;
 }
 
