@@ -13,28 +13,48 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
         <div class="w3-center">
 		
-			<p>Wanna ask a question about Gr8Brik, or post a meme?</p>&nbsp;<a href="post" class="w3-btn w3-blue w3-hover-opacity w3-padding w3-round w3-border w3-border-indigo">Create a Topic</a><br /><br />
+			<a href="post">
+                <button class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo">Create a Topic</button>
+            </a><br /><br />
 			
-            <input class="w3-input w3-border w3-threequarter" value="<?php if (isset($_GET['q'])) { echo $_GET['q']; } ?>" type="text" id="search-input-2" placeholder="search for...">
-            <button class="w3-btn w3-large w3-white w3-hover-blue w3-mobile w3-border w3-quarter" id="search-button-2"><i class="fa fa-search" aria-hidden="true"></i></button><br /><br />
+            <input value="<?php if (isset($_GET['q'])) { echo $_GET['q']; } ?>" type="text" id="search-input-2" placeholder="search for...">
+            <button id="search-button-2" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo"><i class="fa fa-search" aria-hidden="true"></i></button>
 
             <?php
 			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
                 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
                 $limit = 8;
                 $offset = ($page - 1) * $limit;
-                $pDown = $page - 1;
+
+                if($page - 1 < 1) { 
+                    $pDown = 1; 
+                } else { 
+                    $pDown = $page - 1; 
+                }
                 $pUp = $page + 1;
 
                 $count_result = $conn->query("SELECT COUNT(*) as post_count FROM messages WHERE parent IS NULL OR parent = 0");
-                $count_row = $count_result->fetch_assoc();
-                $post_count = $count_row['post_count'];
-                $total_pages = ceil($post_count / $limit);
+                $post_count = $count_result->fetch_assoc()['post_count'];
+                $reply_count_result = $conn->query("SELECT COUNT(*) as post_count FROM messages WHERE parent IS NOT NULL");
 
-                echo '<h3>' . $post_count . ' posts, ' . $total_pages . ' pages, on page ' . $page . '</h3>';
-                echo '<a class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-round-small w3-border w3-border-indigo" href="?page=' . $pDown . '">Back</a>&nbsp;&nbsp;';
-                echo '<a class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-round-small w3-border w3-border-indigo" href="?page=' . $pUp . '">Next</a><hr />';
+                $stats = array(
+                    'post_count' => $post_count,
+                    'reply_count' => $reply_count_result->fetch_assoc()['post_count'],
+                    'total_pages' => ceil($post_count / $limit)
+                );
             ?>
+
+            <ul>
+                <?php
+                    echo "<li>" . $stats['post_count'] . " posts</li>";
+                    echo "<li>" . $stats['reply_count'] . " replies</li>";
+                    echo "<li>" . $stats['total_pages'] . " total page</li>";
+                    echo "<li>On page " . $page . "</li>";
+                ?>
+            </ul>
+            
+            <a href="?page=<?php echo $pDown ?>"><button class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo">Back</button></a>
+            <a href="?page=<?php echo $pUp ?>"><button class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo">Foward</button></a><hr />
 
             <script>
             $(document).ready(function() {
@@ -83,24 +103,13 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted, $last_page);
 				
 				while ($stmt->fetch()) {
-					$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-                        $sql = "SELECT username FROM users WHERE id = ?";
-                        $stmt2 = $conn2->prepare($sql);
-                        $stmt2->bind_param("i", $post_user);
-                        $stmt2->execute();
-                        $stmt2->bind_result($username);
-                        $stmt2->fetch();
-                        $stmt2->close();
+					    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+                        $user_row = User::getUser($post_user);
+                        $username = $user_row->username;
                   
                         if($last_posted != 0) {
-                          $sql = "SELECT username FROM users WHERE id = ?";
-                          $stmt2 = $conn2->prepare($sql);
-                          $stmt2->bind_param("i", $last_posted);
-                          $stmt2->execute();
-                          $stmt2->bind_result($last_post_username);
-                          $stmt2->fetch();
-                          $stmt2->close();
+                          $user_row = User::getUser($last_posted);
+                          $last_post_username = $user_row->username;
                         } else {
                           $last_posted = $post_user;
                           $last_post_username = $username;
@@ -144,22 +153,12 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 				while ($stmt->fetch()) {	
                     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-                    $sql = "SELECT username FROM users WHERE id = ?";
-                    $stmt2 = $conn2->prepare($sql);
-                    $stmt2->bind_param("i", $post_user);
-                    $stmt2->execute();
-                    $stmt2->bind_result($username);
-                    $stmt2->fetch();
-                    $stmt2->close();
+                    $user_row = User::getUser($post_user);
+                    $username = $user_row->username;
                     
                     if($last_posted != 0) {
-                        $sql = "SELECT username FROM users WHERE id = ?";
-                        $stmt2 = $conn2->prepare($sql);
-                        $stmt2->bind_param("i", $last_posted);
-                        $stmt2->execute();
-                        $stmt2->bind_result($last_post_username);
-                        $stmt2->fetch();
-                        $stmt2->close();
+                        $user_row = User::getUser($last_posted);
+                        $last_post_username = $user_row->username;
                     } else {
                       $last_posted = $post_user;
                       $last_post_username = $username;
@@ -182,7 +181,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
                     echo "<tr><td><a href='/topic/" . $id . "?p=" . $last_page . "'><i class='fa fa-users w3-padding-small w3-text-grey' aria-hidden='true' title='General Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                     echo "<td>" . $date . "</td>";
-                    echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
+                    if(User::isDeleted($post_user)) {
+                        echo "<td><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</td>";
+                    } else {
+                        echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
+                    }
                     echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";
                     $username = null;
                     $last_post_username = null;
@@ -221,7 +224,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
                         echo "<tr><td><a href='http://blog.gr8brik.rf.gd/t/" . $id . "' target='_blank'><i class='fa fa-pencil-square w3-padding-small w3-text-grey' aria-hidden='true' title='Blog Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                         echo "<td>" . $date . "</td>";
-                        echo "<td><a href='http://blog.gr8brik.rf.gd/u/" . base64_encode($username) . "' target='_blank'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td></tr>";
+                        echo "<td><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</td></tr>";
                         $username = '';
                 }
 

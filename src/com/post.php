@@ -1,57 +1,52 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+if ($_POST) {
+    $id = $current_user->id;
+    $title = trim($_POST['title'] ?? '');
+    $post = trim($_POST['description'] ?? '');
+    $date = date("Y-m-d H:i:s");
+    $now = time();
+    $category = 'general';
+    $notif_category = 3;
 
-    if($_POST) {
-        $id = $users_row['id'];
-        $title = $conn->real_escape_string($_POST['title']) ?: "Unnamed Topic";
-        $post = $conn->real_escape_string($_POST['description']);
-        $date = date("Y-m-d H:i:s");
-        $now = time();
-        $category = 'general';
-
-        if(isset($users_row['id'])) {
-            if(isset($post)) {
-                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-                $sql = "INSERT INTO messages (userid, title, last_active_time, status, content, timestamp) VALUES ('$id', '$title', '$now', '$category', '$post', '$date')";
-                $stmt = $conn->prepare($sql);
-                if (!$stmt) {
-                    $msg = $conn->error;
-                }
-                if (!$stmt->execute()) {
+    if (loggedin()) {
+        if (!empty($post) && !empty($title)) {
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+            $sql = "INSERT INTO messages (userid, title, last_active_time, status, content, timestamp) VALUES (?, ?, ?, ?, ?, ?)";
+            $stmt = $conn->prepare($sql);
+            if ($stmt) {
+                $stmt->bind_param("isisss", $id, $title, $now, $category, $post, $date);
+                if ($stmt->execute()) {
+                    $topicid = $conn->insert_id;
+                    $stmt_sub = $conn->prepare("INSERT IGNORE INTO " . DB_NAME . ".subscriptions (userid, content, category, timestamp) VALUES (?, ?, ?, ?)");
+                    $stmt_sub->bind_param("iii", $id, $topicid, $notif_category, $now);
+                    $stmt_sub->execute();
+                    $msg = "Topic posted.";
+                } else {
                     $msg = $stmt->error;
                 }
                 $stmt->close();
-                $msg = "Topic posted.";
             } else {
-                $msg = "Post body is empty.";
+                $msg = $conn->error;
             }
+            $conn->close();
         } else {
-            $msg = "Please login to post.";
+            $msg = "Post body or title is empty.";
         }
+    } else {
+        $msg = "Please login to post.";
     }
+}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <title>Post A New Topic</title>
+    <title>Post topic</title>
     <?php include '../header.php' ?>
 </head>
 <body class="w3-light-blue w3-container">
     <?php include '../navbar.php' ?>
-    <style>
-        .altcha-footer, .altcha-logo {
-            display: none !important;
-        }
-        [name=title], [name=description] {
-            border: 0px !important;
-            width: 45% !important;
-            border-radius: 0px !important;
-            border: 0 !important;
-            outline: 0 !important;
-            padding: 5px 5px 5px 5px;
-        }
-    </style>
     <center>
         <h1>Post</h1>
         <form method="post" action="">
@@ -59,45 +54,33 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                 if(isset($_POST['title'])) {
                     $title = $_POST['title'];
                 } else {
-                    $title = "Title";
+                    $title = "";
                 }
                 if(isset($_POST['description'])) {
                     $description = $_POST['description'];
                 } else {
-                    $description = "Description";
+                    $description = "";
                 }
             ?>
 
-            <p>
-                <span class="error"><?php echo $msg ?: "Post a message to the community forums" ?></p>
-            </p>
+            <p><b><?php echo $msg ?? "Post a message to the community forums" ?></b></p>
 
 			<p>
 				<label for="title">Title&nbsp;</label>
-				<input type="text" name="title" value="<?php echo $title ?: "Title" ?>" size="50" />
+				<input type="text" name="title" placeholder="Title" value="<?php echo $title ?>" size="50" />
 			</p>
 
             <p>
-				<label for="description">Post&nbsp;</label><br />
-				<textarea name="description" rows="4" cols="50" required><?php echo $description ?: "Description" ?></textarea>
+				<label for="description">Post body&nbsp;</label><br />
+				<textarea name="description" rows="4" cols="50" placeholder="Post body"><?php echo $description ?></textarea>
 			</p>
-
-            <p>
-                <altcha-widget
-                    style="--altcha-border-width:0px;"
-                    challengeurl='https://us.altcha.org/api/v1/challenge?apiKey=ckey_01d9f4ad018c16287ca6f3938a0f'>
-                </altcha-widget>
-            </p>
 
 			<p>
-                <input type="submit" value="Post topic" name="post" class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo" />
-                <button class="w3-btn w3-blue w3-hover-white w3-border w3-border-indigo" onclick="history.go(-1)">Back</button>
+                <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" onclick="history.go(-1)">Back</button>
+                <input type="submit" value="Post topic" name="post" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" />
             </p>
-
         </form>
     </center><br /><br />
-    
     <?php include '../linkbar.php' ?>
-
 </body>
 </html>

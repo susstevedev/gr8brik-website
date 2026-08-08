@@ -46,11 +46,6 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
           
          <input class="w3-input w3-border w3-threequarter" value="<?php if (isset($_GET['q'])) { echo $_GET['q']; } ?>" type="text" id="search-input-2" placeholder="search for...">
             <button class="w3-btn w3-large w3-white w3-hover-blue w3-mobile w3-border w3-quarter" id="search-button-2"><i class="fa fa-search" aria-hidden="true"></i></button><br /><br />
-					
-			<!-- <form method="get" action="">
-				<input list="searchOptions" class="w3-input w3-border w3-threequarter" type="text" value="<?php if (isset($_GET['q'])) { echo $_GET['q']; } ?>" name="q">
-				<input class="w3-btn w3-large w3-white w3-hover-blue w3-mobile w3-border w3-quarter" type="submit" value="&#128270;">
-			</form><br /><br /> -->
 
             <table class="gr8-theme w3-table w3-card-2 w3-light-grey w3-text-black">
             <thead>
@@ -77,6 +72,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                 // Update @10-11-25 4:24pm
                 // What the fuck is this shit
                 // Refactor later please
+
+                // Update @07-22-26 6:45pm
+                // Okay yeah I'm refactoring
                 if (isset($_GET['q']) && $_GET['q']) {
                     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
                     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -106,9 +104,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                         $topic_user_id = $row['userid'];
 
                         $result2 = $conn2->query("SELECT id, username FROM users WHERE id = $topic_user_id");
-                        while ($row2 = $result2->fetch_assoc()) {
-                            $username = htmlspecialchars($conn->real_escape_string($row2['username']));
-                        }
+                        $row2 = $result2->fetch_assoc();
+                        $username = htmlspecialchars($conn->real_escape_string($row2['username']));
                       
                         if($row['parent'] == 0) {
                           $display = truncateStr(htmlspecialchars($row['title']));
