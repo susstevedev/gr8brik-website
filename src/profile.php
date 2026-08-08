@@ -1,12 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
 
-if(loggedin()) {
-    $userid = $token['user'];
-}
-
 $use_username = false;
-
 if(!isset($_GET['id'])) {
     if(!isset($_GET['name'])) {
     	header("HTTP/1.0 404 Not Found");
@@ -18,15 +13,14 @@ if(!isset($_GET['id'])) {
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
-$data = json_decode(fetch_profile($use_username, $_GET['id'] ?? $_GET['name'], $_SESSION['csrf']), true);
-
-if ($data === null) {
-    exit('An unknown error occured');
+if(loggedin()) {
+    $userid = $current_user->id;
 }
+
+$data = fetch_profile($_GET['id'] ?? urldecode($_GET['name']), $_SESSION['csrf'], $use_username);
 
 if($data['message'] != null | !empty($data['message'])) {
     $error = $data['message'];
-    $data['username'] = 'User';
 }
 
 if(isset($data) && isset($data['userid'])) {
@@ -36,101 +30,105 @@ if(isset($data) && isset($data['userid'])) {
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
 if (isset($_POST['follow'])) {
-    if(!isset($token['user'])) {
+    if(!isset($userid)) {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to follow this user.";
+        $error = "Please login to follow this user";
     }
 
     $profile_id = (int)$_GET['id'];
     $time = time();
 
-    if((int)$token['user'] === $profile_id) {
+    if((int)$userid === $profile_id) {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "You cannot follow yourself.";
+        $error = "You cannot follow yourself";
     }
 
-    $sql_follow = "INSERT INTO follow (userid, profileid, date) VALUES (?, ?, ?)";
-    $stmt_follow = $conn->prepare($sql_follow);
-    $stmt_follow->bind_param("iii", $userid, $profile_id, $time);
-    $result = $stmt_follow->execute();
-    $stmt_follow->close();
+    if(!User::isVerified()) {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "User account is not verified";
+    }
 
-    if ($userid != $profile_id) {
-        $content = $profile_id;
-        $category = 1;
+    if(!isset($error)) {
+        $sql_follow = "INSERT INTO follow (userid, profileid, date) VALUES (?, ?, ?)";
+        $stmt_follow = $conn->prepare($sql_follow);
+        $stmt_follow->bind_param("iii", $userid, $profile_id, $time);
+        $result = $stmt_follow->execute();
+        $stmt_follow->close();
 
-        $sql_notification = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
-        $stmt_notification = $conn->prepare($sql_notification);
-        $stmt_notification->bind_param("iisii", $profile_id, $userid, $time, $content, $category);
-        $stmt_notification->execute();
-        $stmt_notification->close();
+        if ($userid != $profile_id) {
+            $content = $profile_id;
+            $category = 1;
 
-        $sql_alert_select = "SELECT alert FROM users WHERE id = ?";
-        $stmt_alert_select = $conn->prepare($sql_alert_select);
-        $stmt_alert_select->bind_param("i", $profile_id);
-        $stmt_alert_select->execute();
-        $stmt_alert_select->bind_result($alert);
-        $stmt_alert_select->fetch();
-        $stmt_alert_select->close();
+            $sql_notification = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
+            $stmt_notification = $conn->prepare($sql_notification);
+            $stmt_notification->bind_param("iisii", $profile_id, $userid, $time, $content, $category);
+            $stmt_notification->execute();
+            $stmt_notification->close();
 
-        if($alert === null) {
-            $alertnum = 1;
-        } else {
-            $alertnum = $alert + 1;
+            $sql_alert_select = "SELECT alert FROM users WHERE id = ?";
+            $stmt_alert_select = $conn->prepare($sql_alert_select);
+            $stmt_alert_select->bind_param("i", $profile_id);
+            $stmt_alert_select->execute();
+            $stmt_alert_select->bind_result($alert);
+            $stmt_alert_select->fetch();
+            $stmt_alert_select->close();
+
+            if($alert === null) {
+                $alertnum = 1;
+            } else {
+                $alertnum = $alert + 1;
+            }
+
+            $sql_alert_update = "UPDATE users SET alert = ? WHERE id = ?";
+            $stmt_alert_update = $conn->prepare($sql_alert_update);
+            $stmt_alert_update->bind_param("ii", $alertnum, $profile_id);
+            $stmt_alert_update->execute();
+            $stmt_alert_update->close();
         }
 
-        $sql_alert_update = "UPDATE users SET alert = ? WHERE id = ?";
-        $stmt_alert_update = $conn->prepare($sql_alert_update);
-        $stmt_alert_update->bind_param("ii", $alertnum, $profile_id);
-        $stmt_alert_update->execute();
-        $stmt_alert_update->close();
-    }
-
-    if ($result) {
-        header("HTTP/1.0 200 OK");
-        $message = "Followed this user with success!";
-    } else {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "An error occured while following this user.";
+        if ($result) {
+            header("HTTP/1.0 200 OK");
+            $message = "Followed this user with success";
+        } else {
+            header("HTTP/1.0 500 Internal Server Error");
+            $error = "An error occured while following this user";
+        }
     }
 }
 
 if(isset($_POST['unfollow'])) {
-    if(!isset($token['user'])) {
+    if(!isset($userid)) {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to unfollow this user.";
+        $error = "Please login to unfollow this user";
     }
 
     $profile_id = (int)$_GET['id'];
 
-    if((int)$token['user'] === $profile_id) {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "You cannot unfollow yourself.";
-    }
-
-    $sql = "DELETE FROM follow WHERE userid = '$userid' AND profileid = '$profile_id'";
-    $result = $conn->query($sql);
-    if ($result) {
-        header("HTTP/1.0 200 OK");
-        $message = "Unfollowed this user with success!";
-    } else {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "An error occured while unfollowing this user.";
+    if(!isset($error)) {
+        $sql = "DELETE FROM follow WHERE userid = '$userid' AND profileid = '$profile_id'";
+        $result = $conn->query($sql);
+        if ($result) {
+            header("HTTP/1.0 200 OK");
+            $message = "Unfollowed this user with success";
+        } else {
+            header("HTTP/1.0 500 Internal Server Error");
+            $error = "An error occured while unfollowing this user";
+        }
     }
 }
 
 if (isset($_POST['block'])) {
-    if(!isset($token['user'])) {
+    if(!isset($userid)) {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to block this user.";
+        $error = "Please login to block this user";
     }
 
     $profile_id = (int)$_GET['id'];
     $time = time();
 
-    if((int)$token['user'] === $profile_id) {
+    if((int)$userid === $profile_id) {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "You cannot block yourself.";
+        $error = "You cannot block yourself";
     }
     
     $stmt = $conn->prepare("SELECT * FROM follow WHERE userid = ? AND profileid = ?");
@@ -145,7 +143,7 @@ if (isset($_POST['block'])) {
 
     	if (!$result) {
         	header("HTTP/1.0 500 Internal Server Error");
-        	$error = "An error occured while blocking this user.";
+        	$error = "An error occured while blocking this user";
     	}
     }
 
@@ -157,34 +155,29 @@ if (isset($_POST['block'])) {
 
     if ($result) {
         header("HTTP/1.0 200 OK");
-        $message = "Blocked this user with success!";
+        $message = "Blocked this user with success";
     } else {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "An error has happened while blocking this user.";
+        $error = "An error has happened while blocking this user";
     }
 }
 
 if(isset($_POST['unblock'])) {
-    if(!isset($token['user'])) {
+    if(!isset($userid)) {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to follow this user.";
+        $error = "Please login to unblock this user";
     }
 
     $profile_id = (int)$_GET['id'];
-
-    if((int)$token['user'] === $profile_id) {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "You cannot follow yourself.";
-    }
 
     $sql = "DELETE FROM user_blocks WHERE userid = '$userid' AND profileid = '$profile_id'";
     $result = $conn->query($sql);
     if ($result) {
         header("HTTP/1.0 200 OK");
-        $message = "Unblocked this user with success!";
+        $message = "Unblocked this user with success";
     } else {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "An error has happened while unblocking this user.";
+        $error = "An error has happened while unblocking this user";
     }
 }
 
@@ -208,7 +201,7 @@ if(isset($_POST['ban'])) {
         exit('Ban date must be in the future!');
     }
 		
-    if($users_row['admin'] != '0') {
+    if($$current_user->admin != false) {
         $sql = "INSERT INTO bans (user, email, reason, start_date, end_date) VALUES ($profile_id, '$email', '$reason', $start_date, $end_date)";
         $result = $conn->query($sql);
         if ($result) {
@@ -235,7 +228,7 @@ if(isset($_POST['warn'])) {
         exit('Invalid user ID!');
     }
 		
-    if($users_row['admin'] != '0') {
+    if($$current_user->admin != false) {
         $sql = "INSERT INTO warnings (user, reason, timestamp) VALUES ($profile_id, '$reason', $start_date)";
         $result = $conn->query($sql);
         if ($result) {
@@ -255,20 +248,15 @@ if(isset($_POST['delete'])) {
     }
 
     $profile_id = (int)$_GET['id'];
-    $date = new DateTime('9998-12-31');
+    $date = new DateTime('9999-12-31');
     $dateStr = $date->format('Y-m-d');
-    $random = uniqid();
-		
-    if($users_row['admin'] != '0') {
-        $sql = "UPDATE users SET username = NULL, blog_user_id = NULL, deactive = '$dateStr', verify_token = '$random' WHERE id = $profile_id";
+
+    if($$current_user->admin != false) {
+        $sql = "UPDATE users SET deactive = '$dateStr' WHERE id = $profile_id";
         $result = $conn->query($sql);
         if ($result) {
-            $sql2 = "DELETE FROM sessions WHERE user = $profile_id";
-            $result2 = $conn->query($sql2);
-            if($result2) {
-                header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
-                exit;
-            }
+            header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
+            exit;
         } else {
             exit('An SQL error occured!');
         }
@@ -280,12 +268,12 @@ if(isset($_POST['delete'])) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title><?php echo $data['username'] ?>'s page</title>
+    <title><?php echo $data['username'] ?? 'This user' ?>'s page</title>
     <?php include 'header.php' ?>
 </head>
-<body class="w3-container w3-light-blue">
+<body class="w3-container">
 
-    <?php include('navbar.php'); ?>
+    <?php include 'navbar.php' ?>
 
     <?php if(isset($error)) { ?>
         <div class="message w3-padding w3-round w3-red"><?php echo $error ?></div><br /><br />
@@ -298,137 +286,293 @@ if(isset($_POST['delete'])) {
 
     <script>
         const userid = '<?php echo $_GET['id'] ?>';
-        const bsky = '<?php echo $data['bsky'] ?>';
-                               
+
         $(document).ready(function() {
-            function followed() {
+            $.ajax({
+                url: "/ajax/profile",
+                method: "GET",
+                data: { followed_by: userid },
+                success: function(response) {
+                    let followedBy = "";
+                    if (response.length > 0) {
+                        if (response.length <= 3) {
+                            followedBy = response.map(user => `
+                            <a href="${user.url}">
+                            <img src="${user.pfp}" width="15px" height="15px" />
+                            ${user.username}</a>`).join(", ");
+                        } else {
+                            let first = response.slice(0, 3);
+                            let others = response.length - 3;
+                            followedBy = first.map(user => `<a href="${user.url}">
+                            <img src="${user.pfp}" width="17px" height="17px" class="w3-circle" />
+                            ${user.username}</a>`).join(", ");
+                            followedBy += ` and ${others} others you know`;
+                        }
+                    } else {
+                        followedBy = "nobody you know";
+                    }
+                    $("#followedby-wrapper").html(`Followed by ${followedBy}`);
+                    $("#followedby-wrapper").css({
+                        "display": "inline",
+                        "font-size": "15px",
+                        "text-shadow": "0px 0px 0px #fff"
+                    })
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    var response = JSON.parse(jqXHR.responseText);
+                    console.error('Server status code: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
+                }
+            });
+
+            window.params = new URL(window.location.href);
+            window.pages = {};
+
+            window.getUserBuilds = function(page) {
                 $.ajax({
                     url: "/ajax/profile",
                     method: "GET",
-                    //data: { follow: userid },
-                    data: { followed_by: userid },
+                    data: { getUserBuilds:true,userid:userid,page:page },
+                    dataType: "json",
                     success: function(response) {
-                        let followedBy = "";
-                        if (response.length > 0) {
-                            if (response.length <= 3) {
-                                followedBy = response.map(user => `
-                                    <a href="${user.url}">
-                                        <img src="${user.pfp}" width="15px" height="15px" />
-                                    ${user.username}</a>`).join(", ");
-                            } else {
-                                let first = response.slice(0, 3);
-                                let others = response.length - 3;
-                                followedBy = first.map(user => `<a href="${user.url}">
-                                    <img src="${user.pfp}" width="15px" height="15px" />
-                                ${user.username}</a>`).join(", ");
-                                followedBy += ` and ${others} others you know`;
-                            }
+                        window.pages.c = page;
+
+                        let elm = $('#creationstab div')
+                        elm.children().not('#gr8-creation-template').remove();
+
+                        if(response.success === true && response.creations) {
+                            response.creations.forEach(function(r) {
+                                let $clone = $($('#gr8-creation-template').html());
+
+                                $clone.find(".creation-title").text(r.name);
+                                $clone.find(".creation-link").attr("href", "/build/" + r.id);
+                                $clone.find(".meta-author a").text(r.username);
+                                $clone.find(".meta-author a").attr("href", "/@" + r.username);
+                                $clone.find(".meta-author span").text(r.date);
+                                $clone.find(".creation-thumbnail").attr("src", r.screenshot);
+
+                                elm.append($clone);
+                                window.mode();
+                            });
+                        } else if(response.creations === null) {
+                            $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div>`).appendTo(elm);
+                        } else if(response.error) {
+                            console.error(response.error);
+                            $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div>`).appendTo(elm);
                         } else {
-                            followedBy = "nobody you know";
+                            console.log(response);
                         }
-                        $("#followedby-wrapper").html(`Followed by ${followedBy}`);
-                        $("#followedby-wrapper").css({
-                            "display": "inline",
-                            "font-size": "15px",
-                            "text-shadow": "0px 0px 0px #fff"
-                        })
                     },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        console.error('Server status code: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
+                    error: function(xhr, stat, err) {
+                        console.error(stat, xhr.status, err);
                     }
                 });
             }
-            window.followed = followed();
-            
-            function bsky_fetch() {
-                    var token = $.cookie('token');
 
-                    $.ajax({
-                        url: `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${bsky}`,
-                        method: "GET",
-                        success: function(response) {
-                            console.log(response.handle);
-                            $("#bsky-link").append(response.handle);
-                            var link = $("#bsky-link").attr("href");
-                            link = link + response.handle;
-                            $("#bsky-link").attr("href", link);
-                        },
+            window.getUserLiked = function() {
+                $.ajax({
+                    url: "/ajax/profile",
+                    method: "GET",
+                    data: { getUserLiked:true,userid:userid },
+                    dataType: "json",
+                    success: function(response) {
+                        let elm = $('#likestab div')
+                        elm.children().not('#gr8-likes-template').remove();
 
-                        error: function(jqXHR, textStatus, errorThrown) {
-                            if (jqXHR.status === 403) {
-                                console.log('Not authed');
-                            } else if (jqXHR.status === 500) {
-                                var response = JSON.parse(jqXHR.responseText);
-                                console.log(response);
-                            } else {
-                                console.error("AJAX Error: " + textStatus, errorThrown);
-                            }
+                        if(response.success === true && response.creations) {
+                            response.creations.forEach(function(r) {
+                                let $clone = $($('#gr8-likes-template').html());
+
+                                $clone.find(".creation-title").text(r.name);
+                                $clone.find(".creation-link").attr("href", "/build/" + r.id);
+                                $clone.find(".meta-author a").text(r.username);
+                                $clone.find(".meta-author a").attr("href", "/@" + r.username);
+                                $clone.find(".meta-author span").text(r.date);
+                                $clone.find(".creation-thumbnail").attr("src", r.screenshot);
+
+                                elm.append($clone);
+                                window.mode();
+                            });
+                        } else if(response.creations === null) {
+                            $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div>`).appendTo(elm);
+                        } else if(response.error) {
+                            console.error(response.error);
+                            $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div>`).appendTo(elm);
+                        } else {
+                            console.log(response);
                         }
-                    });
+                    },
+                    error: function(xhr, stat, err) {
+                        console.error(stat, xhr.status, err);
+                    }
+                });
             }
-            window.bsky_fetch = bsky_fetch();
-        });
-        
-        document.addEventListener("DOMContentLoaded", function() {
-            followed();
-            bsky_fetch();
+
+            window.getUserForums = function(page) {
+                $.ajax({
+                    url: "/ajax/profile",
+                    method: "GET",
+                    data: { getUserForums:true,userid:userid,page:page },
+                    dataType: "json",
+                    success: function(response) {
+                        window.pages.f = page;
+
+                        var elm = $('#poststab .w3-row')
+                        elm.children().not('#gr8-posts-template').remove();
+
+                        if(response.success === true && response.posts) {
+                            response.posts.forEach(function(r) {
+                                let $clone = $($('#gr8-posts-template').html());
+
+                                $clone.find(".text").text(r.title);
+                                $clone.find(".user").text(r.username);
+                                $clone.find(".user").attr("href", "/@" + r.username);
+                                $clone.find(".time").text(r.date);
+                                $clone.find(".link-name").attr("href", "/topic/" + r.id);
+
+                                elm.append($clone);
+                            });
+                        } else if(response.posts === null) {
+                            $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div><br />`).appendTo(elm);
+                        } else if(response.error) {
+                            console.error(response.error);
+                            $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div><br />`).appendTo(elm);
+                        } else {
+                            console.log(response);
+                        }
+                    },
+                    error: function(xhr, stat, err) {
+                        console.error(stat, xhr.status, err);
+                    }
+                });
+            }
+
+            window.getUserComments = function(page) {
+                $.ajax({
+                    url: "/ajax/profile",
+                    method: "GET",
+                    data: { getUserComments:true,userid:userid,page:page },
+                    dataType: "json",
+                    success: function(response) {
+                        window.pages.r = page;
+
+                        var elm = $('#commentstab .w3-row')
+                        elm.children().not('#gr8-comment-template').remove();
+
+                        if(response.success === true && response.comments) {
+                            response.comments.forEach(function(r) {
+                                let $clone = $($('#gr8-comment-template').html());
+
+                                $clone.find(".text").text(r.content);
+                                $clone.find(".title").text(r.parent_name);
+                                $clone.find(".user").text(r.username);
+                                $clone.find(".user").attr("href", "/user/" + r.userid);
+                                $clone.find(".time").text(r.date);
+
+                                if(r.type === 'forum') {
+                                    $clone.find(".link-name").attr("href", "/topic/" + r.parent);
+                                    $clone.find(".title").attr("href", "/topic/" + r.parent);
+                                } else if(r.type === 'model') {
+                                    $clone.find(".link-name").attr("href", "/build/" + r.parent);
+                                    $clone.find(".title").attr("href", "/build/" + r.parent);
+                                }
+
+                                elm.append($clone);
+                            });
+                        } else if(response.comments === null) {
+                            $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div><br />`).appendTo(elm);
+                        } else if(response.error) {
+                            console.error(response.error);
+                            $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div><br />`).appendTo(elm);
+                        } else {
+                            console.log(response);
+                        }
+                    },
+                    error: function(xhr, stat, err) {
+                        console.error(stat, xhr.status, err);
+                    }
+                });
+            }
+
+            var tabPages = {
+                '#creationstab': { page: parseInt(window.pages.c || 0), fetch: getUserBuilds },
+                '#commentstab': { page: parseInt(window.pages.r || 0), fetch: getUserComments },
+                '#poststab': { page: parseInt(window.pages.f || 0), fetch: getUserForums }
+            };
+
+            $(".foward-button, .back-button").on("click", function() {
+                var $tab = $(this).closest("#creationstab, #commentstab, #poststab");
+                var tabId = `#${$tab.attr('id')}`;
+                var tabConfig = tabPages[tabId];
+
+                if (!tabConfig) {
+                    return;
+                }
+
+                tabConfig.page += $(this).hasClass("foward-button") ? 1 : -1;
+                tabConfig.fetch(tabConfig.page);
+            });
+
+            window.openTab = function(tab) {
+                var tabGroup = $('.tab'); 
+                    
+                tabGroup.each(function() {
+                    $(this).hide();
+                });
+
+                var tabElement = $(`#${tab}`);
+                tabElement.show();
+                $('html, body').animate({ scrollTop: 0 }, 'slow');
+            }
+
+            openTab('creationstab');
+            getUserBuilds(1);
+            getUserForums(1);
+            getUserComments(1);
+            getUserLiked();
         });
     </script>
 
-    <div id="user-card" class="w3-light-grey w3-card-2 w3-padding w3-round gr8-theme">
-    <?php if(file_exists("acc/users/banners/" . htmlspecialchars($_GET['id']) . "..jpg")) { ?>
-        <style>
-        [data-testid="user-profile-card-banner"] {
-            display: inline-block;
-            background: #000;
-            width: 100%;
-            height: auto;
-        }
-        [data-testid="user-profile-card-banner_image"] {
-            background-image: url('/acc/users/banners/<?php echo htmlspecialchars($_GET['id']) ?>..jpg');
-            width: 75vw;
-            height: 50vh;
-            background-repeat: no-repeat;
-            background-size: cover;
-            background-position: 50% 50%;
-            background-color: #000;
-            display: inline-block;
-        }
-        </style>
-        <center>
+    <div class="w3-navbar w3-top w3-row w3-margin-top w3-center" style="flex-direction:row;">
+        <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('creationstab')">Creations</a>
+        <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('poststab')">Posts</a>
+        <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('commentstab')">Comments</a>
+        <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('likestab')">Likes</a>
+    </div><br /><br />
+
+    <article id="user-card" class="gr8-theme w3-light-grey w3-card-2 w3-padding w3-round">
+        <?php if(file_exists("acc/users/banners/" . htmlspecialchars($_GET['id']) . "..jpg")) { ?>
+            <style>
+                [data-testid="user-profile-card-banner_image"] {
+                    background-image: url('/acc/users/banners/<?php echo htmlspecialchars($_GET['id']) ?>..jpg');
+                }
+            </style>
+
             <div data-testid="user-profile-card-banner">
-            	<!-- <img data-testid="user-profile-card-banner_image" id="banner" style="width: 200px; height: fit-content; border-radius: 2px; border: 1px solid #ddd;" src="/acc/users/banners/<?php echo htmlspecialchars($_GET['id']) ?>..jpg" /> -->
                 <span data-testid="user-profile-card-banner_image" id="banner"></span>
             </div>
-        </center>
-    <?php } ?>
+        <?php } ?>
         
         <span style="font-size: 30px; display: inline-block; vertical-align: top; max-width: 100%;">
-            <img id="picture" style="width: 50px; height: 50px; border-radius: 50px;" src="<?php echo $data['picture'] ?>" />
+            <img id="picture" width="50px" height="50px" class="w3-round" src="<?php echo $data['picture'] ?>" />
 
             <?php if(!empty($data['admin'])) { ?>
                 <span id="username" class="w3-text-red"><?php echo $data['username'] ?></span>
             <?php } else { ?>
                 <span id="username"><?php echo $data['username'] ?></span>
             <?php } ?>
-            
-            <?php if(isset($token) && trim($token['user']) === trim($_GET['id'])) { ?>
-                <span><a href="/acc/index"><i class="fa fa-pencil w3-xlarge" aria-hidden="true"></i></a></span>
-            <?php } ?>
 
             <span style="font-size:20px;">
-                <span><b id="data-model-count"><?php echo $data['model_count'] ?></b>&nbsp;creations</span>
-                <span><b id="data-follower-count"><?php echo $data['followers'] ?></b>&nbsp;followers</span>
-                <span><b id="data-following-count"><?php echo $data['following'] ?></b>&nbsp;following</span>
-                <span><b id="data-view-count"><?php echo $data['views'] ?></b>&nbsp;views</span>
-                <span><b id="data-like-count"><?php echo $data['likes'] ?></b>&nbsp;likes</span>
+                <span><b id="model-count"><?php echo $data['model_count'] ?></b>&nbsp;creations</span>
+                <span><b id="follower-count"><?php echo $data['followers'] ?></b>&nbsp;followers</span>
+                <span><b id="following-count"><?php echo $data['following'] ?></b>&nbsp;following</span>
+                <span><b id="view-count"><?php echo $data['views'] ?></b>&nbsp;views</span>
+                <span><b id="like-count"><?php echo $data['likes'] ?></b>&nbsp;likes</span>
             </span>
         </span>
 
-        <pre id="description"><?php echo $data['description'] ?></pre>
+        <div><p id="description"><?php echo $data['description'] ?></p></div>
 
-        <span id="joined-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">Registered <?php echo time_ago($data['age']) ?></span>
+        <span id="joined-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">Became a member <?php echo time_ago($data['age']) ?></span>
         
         <?php if(!empty($data['twitter'])) { ?>
             <b>-</b>
@@ -445,10 +589,11 @@ if(isset($_POST['delete'])) {
         <?php if(!empty($data['bsky'])) { ?>
             <b>-</b>
             <span id="bsky-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">
-                <a id="bsky-link" href="https://bsky.app/profile/" target="_blank">
+                <a id="bsky-link" href="https://bsky.app/profile/<?php echo $data['bsky'] ?>" target="_blank">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-bluesky" viewBox="0 0 16 16">
   						<path d="M3.468 1.948C5.303 3.325 7.276 6.118 8 7.616c.725-1.498 2.698-4.29 4.532-5.668C13.855.955 16 .186 16 2.632c0 .489-.28 4.105-.444 4.692-.572 2.04-2.653 2.561-4.504 2.246 3.236.551 4.06 2.375 2.281 4.2-3.376 3.464-4.852-.87-5.23-1.98-.07-.204-.103-.3-.103-.218 0-.081-.033.014-.102.218-.379 1.11-1.855 5.444-5.231 1.98-1.778-1.825-.955-3.65 2.28-4.2-1.85.315-3.932-.205-4.503-2.246C.28 6.737 0 3.12 0 2.632 0 .186 2.145.955 3.468 1.948"/>
 					</svg>
+                    <?php echo $data['bsky'] ?>
                 </a>
             </span>
         <?php } ?>
@@ -457,35 +602,35 @@ if(isset($_POST['delete'])) {
         <span id="followedby-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff"></span><br />
 
         <?php if(loggedin()) { ?>
-            <?php if($token['user'] != trim($_GET['id'])) { ?>
+            <?php if($current_user->id != trim($_GET['id'])) { ?>
             <span id="action-buttons">
-                <?php if($data['isFollowing'] === true) { ?>
-                    <button onclick='document.getElementById("unfollow").style.display="block"' name="unfollow" class="button-unfollow w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" />
+                <?php if($data['is_following'] === true) { ?>
+                    <button onclick='document.getElementById("modal-unfollow").style.display="block"' name="unfollow" class="button-unfollow w3-btn w3-red w3-hover-opacity w3-round-small w3-border w3-border-pink" />
                         Unfollow
                     </button>&nbsp;
-                <?php } elseif($data['isFollowing'] === false) { ?>
-                    <input id="button-follow" form="followUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit" value="Follow" name="follow">&nbsp;
+                <?php } elseif($data['is_following'] === false) { ?>
+                    <input id="button-follow" form="followUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" type="submit" value="Follow" name="follow">&nbsp;
                 <?php } ?>
 
-                <div class="w3-dropdown-hover">
-                    <button class="gr8-theme w3-btn w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-gray">More...</button>
-                    <div class="w3-dropdown-content gr8-theme w3-bar-block w3-padding-small w3-border w3-border-gray w3-round-small">
-                        <?php if($data['blockedUser'] === false) { ?>
-                            <button onclick='document.getElementById("block").style.display="block"' name="block" class="w3-bar-item w3-button" />
+                <div class="w3-dropdown-click">
+                    <button onclick="dropdown('user-interactions')" class="gr8-theme w3-btn w3-hover-opacity w3-round-small w3-border w3-border-gray">More...</button>
+                    <div id="user-interactions" class="w3-dropdown-content gr8-theme w3-bar-block w3-border w3-border-gray w3-round-small">
+                        <?php if($data['is_blocking'] === false) { ?>
+                            <button onclick='document.getElementById("modal-block").style.display="block"' name="block" class="w3-bar-item w3-button" />
                                 Block
                             </button>
-                        <?php } elseif($data['blockedUser'] === true) { ?>
+                        <?php } elseif($data['is_blocking'] === true) { ?>
                             <input id="button-unblock" form="unblockUser" class="w3-bar-item w3-button" type="submit" value="Unblock User" name="unblock">
                         <?php } ?>
 
-                        <?php if($users_row['admin'] != (int)'0') { ?>
-                            <button id="button-ban-user" onclick='document.getElementById("ban").style.display="block"' name="ban" class="w3-bar-item w3-button" />
+                        <?php if($current_user->admin != false) { ?>
+                            <button id="button-ban-user" onclick='document.getElementById("modal-ban").style.display="block"' name="ban" class="w3-bar-item w3-button" />
                                 Ban until...
                             </button>
-        					<button id="button-warn-user" onclick='document.getElementById("warn").style.display="block"' name="warn" class="w3-bar-item w3-button" />
+        					<button id="button-warn-user" onclick='document.getElementById("modal-warn").style.display="block"' name="warn" class="w3-bar-item w3-button" />
                                 Warn
                             </button>
-                            <button id="button-delete-user" onclick='document.getElementById("delete").style.display="block"' name="delete" class="w3-bar-item w3-button" />
+                            <button id="button-delete-user" onclick='document.getElementById("modal-delete").style.display="block"' name="delete" class="w3-bar-item w3-button" />
                                 Hard ban
                             </button>
                         <?php } ?>
@@ -496,42 +641,16 @@ if(isset($_POST['delete'])) {
                 <form id="unblockUser" action="" method="post"></form>
             </span>
             <?php } else { ?>
-                <a href="/acc/index" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" />Edit Profile</a>&nbsp;
+                <a href="/acc">Edit Profile</a>&nbsp;
             <?php } ?>
         <?php } ?>
 
-    </span></div>
-
-	<script>
-        window.openTab = function(tab) {
-            var amount;
-            var tabGroup = document.getElementsByClassName("tab");
-            for (amount = 0; amount < tabGroup.length; amount++) {
-                //tabGroup[amount].classList.add("w3-hide");
-                tabGroup[amount].style.display = 'none';
-            }
-            var tabElement = document.getElementById(tab);
-            //tabElement.classList.remove("w3-hide");
-            tabElement.style.display = 'block';
-        }
-        $(document).ready(function() {
-            openTab('creationstab');
-        });
-        </script>
-
-        <div class="w3-navbar w3-margin-top w3-half w3-center" style="flex-direction:row;">
-            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey' onclick="openTab('creationstab')">Creations</a>
-            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey' onclick="openTab('poststab')">Posts</a>
-            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey' onclick="openTab('commentstab')">Comments</a>
-            <a class='w3-btn w3-light-grey w3-quarter w3-hover-blue w3-border w3-border-grey w3-padding-small' onclick="openTab('likestab')">Likes</a>
-        </div>
-
-		<h2 id="text" style="text-transform: capitalize;"></h2>
+    </span></article>
         
-    <div id="unfollow" class="w3-modal">
+    <div id="modal-unfollow" class="w3-modal">
 		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
 			<div class="w3-container">
-				<span onclick="document.getElementById('unfollow').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
+				<span onclick="document.getElementById('modal-unfollow').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
 				    <form method='post' action=''>
 					<h2>Are you sure you want to unfollow this user?</h2>
 					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('unfollow').style.display='none'">No</span> 
@@ -541,10 +660,10 @@ if(isset($_POST['delete'])) {
 		</div>
 	</div>
 
-    <div id="block" class="w3-modal">
+    <div id="modal-block" class="w3-modal">
 		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
 			<div class="w3-container">
-				<span onclick="document.getElementById('block').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
+				<span onclick="document.getElementById('modal-block').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
 				    <form method='post' action=''>
 					<h2>Are you sure you want to block this user?</h2>
 					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('block').style.display='none'">No</span> 
@@ -554,11 +673,11 @@ if(isset($_POST['delete'])) {
 		</div>
 	</div>
 
-    <?php if($admin != 0) { ?>
-        <div id="delete" class="w3-modal">
+    <?php if(loggedin() && $current_user->admin != false) { ?>
+        <div id="modal-delete" class="w3-modal">
             <div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-center">
                 <div class="w3-container">
-                    <span onclick="document.getElementById('delete').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
+                    <span onclick="document.getElementById('modal-delete').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
                         <form method='post' action=''>
                         <h2>Are you sure you want to hard ban this user?</h2>
                         <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span>
@@ -568,10 +687,10 @@ if(isset($_POST['delete'])) {
             </div>
         </div>
 
-            <div id="warn" class="w3-modal">
+            <div id="modal-warn" class="w3-modal">
 				<div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-round w3-padding w3-center">
 					<div class="w3-container">
-						<span onclick='document.getElementById("warn").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
+						<span onclick='document.getElementById("modal-warn").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
 							<h2>Are you sure you want to warn this user?</h2>
                             <textarea name="reason" placeholder="Moderator note about this warning (required)" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea><br />
                             <span name="close" class="w3-btn w3-large w3-white w3-hover-blue w3-round" onclick='document.getElementById("warn").style.display="none"'>No</span>
@@ -581,10 +700,10 @@ if(isset($_POST['delete'])) {
 				</div>
 			</div><br />
 
-            <div id="ban" class="w3-modal">
+            <div id="modal-ban" class="w3-modal">
 				<div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-center">
 					<div class="w3-container">
-						<span onclick='document.getElementById("ban").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
+						<span onclick='document.getElementById("modal-ban").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
 							<h2>Are you sure you want to soft ban this user?</h2>
                             <p><div class="w3-row-padding"><select class="w3-select" name="day">
                                 <option value="01" disabled selected>day</option>
@@ -657,6 +776,8 @@ if(isset($_POST['delete'])) {
                                 <option value="2042">2042</option>
                                 <option value="2043">2043</option>
                                 <option value="2044">2044</option>
+                                <option value="2045">2045</option>
+                                <option value="2046">2046</option>
                             </select></div></p>
                             <textarea name="reason" placeholder="Moderator note about this ban (required)" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea>
                             <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick='document.getElementById("ban").style.display="none"'>No</span>
@@ -667,195 +788,91 @@ if(isset($_POST['delete'])) {
 			</div><br />
         <?php } ?>
 
-    <span id="data-user-actions">
-	    <a href="#creations" id="creations"></a>
-		    <div class="w3-row tab" id="creationstab">
-            <h3>Creations</h3>
-			<?php
-                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+    <div ignore>
+        <br />
+        <br />
+    </div>
 
-                if ($conn->connect_error) {
-                    die("Connection failed: " . $conn->connect_error);
-                }
-                
-                $profileid = $_GET['id'];
-                $stmt = $conn->prepare("SELECT * FROM model WHERE user = ? ORDER BY date DESC");
-                $stmt->bind_param("i", $profileid);
-                $stmt->execute();
-                $result = $stmt->get_result();
+    <span id="data-user-actions" class="w3-animate-bottom">
+        <div class="tab" id="creationstab">
+            <a href="#creations" id="creations"></a>
+            <div class="w3-row-padding">
+                <template id="gr8-creation-template">
+                    <div class="w3-col l4 m6 s12 w3-margin-bottom">
+                        <div class="gr8-theme creation w3-card-2 w3-light-grey w3-padding creation-card">
+                            <a href="/build/" class="creation-link">
+                                <img src="" loading="lazy" class="cre-image w3-hover-opacity w3-card-2 w3-grey creation-thumbnail">
+                                <h4 class="creation-title"></h4>
+                            </a>
+                            <div class="creation-meta">
+                                <span class="meta-author">
+                                    By <b><a href=""></a></b> <span></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
+            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button><hr />
+        </div>
 
-                while ($creation = $result->fetch_assoc()) {
-                    if (empty($creation['name'])) {
-                        $creation['name'] = $data['username'] . "'s creation";
-                    }
-
-                    $truncatedName = htmlspecialchars(substr($creation['name'], 0, 30));
-                    if (strlen($creation['name']) >= 30) {
-                        $truncatedName .= '...';
-                    }
-
-                    echo "<div class='w3-display-container w3-left w3-padding'>";
-                    echo "<a href='/build/" . $creation['id'] . "'><img src='" . $creation['screenshot'] . "' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
-                    echo "<span>By <a href='/user/" . $_GET['id'] . "'>" . $data['username'] . "</a> " . time_ago(date("Y-m-d H:i:s", strtotime($creation['date']))) . "</span>";
-                    echo "</div></div>";
-                }
-
-                $stmt->close();
-                $conn->close();
-            ?>
-			</div>
-        
-			<a href="#posts" id="posts"></a>
-			<div class="w3-row tab" id="poststab">
-            <h3>Posts</h3>
-			<?php
-				$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-				if ($conn->connect_error) {
-					exit($conn->connect_error);
-				}
-
-                $profileid = $_GET['id'];
-                $sql = "SELECT * FROM messages WHERE userid = $profileid AND parent = 0 ORDER BY timestamp DESC";
-                $result = $conn->query($sql);
-
-                while ($topic = $result->fetch_assoc()) {
-                    $truncatedName = htmlspecialchars(substr($topic['title'], 0, 30));
-                    if (strlen($topic['title']) >= 30) {
-                        $truncatedName .= '...';
-                    }
-
-                    echo "<div class='w3-display-container w3-left w3-padding'>";
-                    echo "<a href='/com/view.php?id=" . $topic['id'] . "'><img src='/img/com.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
-                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($topic['timestamp'])) . "</span>";
-                    echo "</div></div>";
-                }
-                $conn->close();
-            ?>
-
-			</div>
-        
-		<a href="#comments" id="comments"></a>
-        <div class="tab" id="commentstab">
+        <div class="tab" id="poststab">
+            <a href="#posts" id="posts"></a>
             <div class="w3-row">
-			<h3>Comments</h3>
-            <?php
-                $conn1 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-                $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-                if ($conn2->connect_error || $conn1->connect_error) {
-                    echo $conn2->connect_error;
-                    echo $conn2->connect_error;
-                    exit;
-                }
-
-                // comments and replies
-                $profileid = $_GET['id'];
-                $sql = "SELECT * FROM comments WHERE user = $profileid ORDER BY id DESC";
-                $result = $conn1->query($sql);
-
-                echo "<h4>Replies to creations</h4><br />";
-                if ($result->num_rows === 0) {
-                    echo "<b>Nothing here yet</b>";
-                }
-                while ($comment = $result->fetch_assoc()) {
-                    $truncatedPost = htmlspecialchars(substr($comment['comment'], 0, 30));
-                    if (strlen($comment['comment']) >= 30) {
-                        $truncatedPost .= '...';
-                    }
-
-                    echo "<div class='w3-display-container w3-left w3-padding'>";
-                    echo "<a href='/creation.php?id=" . $comment['model'] . "#comment" . $comment['id'] . "'><img src='/img/creations.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedPost . "</h4>";
-                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", (int)$comment['date']) . "</span>";
-                    echo "</div></div>";
-                }
-
-                $sql = "SELECT * FROM messages WHERE userid = $profileid AND parent != 0 ORDER BY timestamp DESC";
-                $result = $conn2->query($sql);
-
-                echo "</div>";
-                echo "<div class='w3-row'><h4>Replies to posts</h4><br />";
-                
-                if ($result->num_rows === 0) {
-                    echo "<b>Nothing here yet</b>";
-                }
-                while ($reply = $result->fetch_assoc()) {
-                    $truncatedPost = htmlspecialchars(substr($reply['content'], 0, 30));
-                    if (strlen($reply['content']) >= 30) {
-                        $truncatedPost .= '...';
-                    }
-
-                    echo "<div class='w3-display-container w3-left w3-padding'>";
-                    echo "<a href='/com/view.php?id=" . $reply['parent'] . "#reply" . $reply['id'] . "'><img src='/img/com.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedPost . "</h4>";
-                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($reply['timestamp'])) . "</span>";
-                    echo "</div></div>";
-                }
-                $conn1->close();
-                $conn2->close();
-            ?>
+                <template id="gr8-posts-template">
+                    <div class='posts w3-display-container w3-left w3-padding' width="50%">
+                        <div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>
+                            <a class='link-name' href=''>
+                                <h4 class='text'></h4>
+                            </a>
+                            <span><a class='user' href='/user/'></a> replied to <a class='title' href=''></a> <span class='time'></span></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
+            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button><hr />
         </div>
+
+        <div class="tab" id="commentstab">
+            <a href="#comments" id="comments"></a>
+            <div class="w3-row">
+                <template id="gr8-comment-template">
+                    <div class='comment w3-display-container w3-left w3-padding' width="50%">
+                        <div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>
+                            <a class='link-name' href=''>
+                                <h4 class='text'></h4>
+                            </a>
+                            <span><a class='user' href='/user/'></a> replied to <a class='title' href=''></a> <span class='time'></span></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
+            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button><hr />
         </div>
         
-		<a href="#likes" id="likes"></a>
-			<div class="w3-row tab" id="likestab">
-            <h3>Likes</h3>
-			<?php
-				$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-                $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-				if ($conn->connect_error) {
-					exit($conn->connect_error);
-				}
-                
-                $profileid = $_GET['id'];
-                
-                $stmt = $conn->prepare('SELECT * FROM votes WHERE user = ?');
-                $stmt->bind_param('i', $profileid);
-                $stmt->execute();
-                $result = $stmt->get_result();
-
-                $liked = [];
-
-                if ($result->num_rows != 0) {
-                    while ($row = $result->fetch_assoc()) {
-                        $liked[] = $row['creation'];
-                    }
-                
-                	$stmt2 = $conn->prepare("SELECT * FROM model WHERE id IN (" . implode(',', $liked) . ") ORDER BY date DESC");
-                	$stmt2->execute();
-                	$result2 = $stmt2->get_result();
-                    
-                    if ($result2->num_rows != 0) {
-                    	while ($row2 = $result2->fetch_assoc()) {
-                            $model_user = $row2['user'];
-                            
-                            $stmt3 = $conn2->prepare("SELECT username FROM users WHERE id = ?");
-                    		$stmt3->bind_param("s", $model_user);
-                    		$stmt3->execute();
-                    		$result3 = $stmt3->get_result();
-                            $username = $result3->fetch_assoc()['username'] ?? "[deleted]";
-                            
-                            if (empty($row2['name'])) {
-                                $row2['name'] = $row2['username'] . "'s creation";
-                            }
-
-                            $truncatedName = htmlspecialchars(substr($row2['name'], 0, 30));
-                            if (strlen($row2['name']) >= 30) {
-                                $truncatedName .= '...';
-                            }
-
-                            echo "<div class='w3-display-container w3-left w3-padding'>";
-                            echo "<a href='/build/" . $row2['id'] . "'><img src='" . $row2['screenshot'] . "' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                            echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
-                            echo "<span>By <a href='/user/" . $row2['user'] . "'>" . $username . "</a> " . time_ago(date("Y-m-d H:i:s", strtotime($row2['date']))) . "</span>";
-                            echo "</div></div>";
-                        }
-                    }
-                }
-            	$conn->close();
-            ?>
-		</div>
+        <div class="tab" id="likestab">
+		    <a href="#likes" id="likes"></a>
+			<div class="w3-row-padding">
+                <template id="gr8-likes-template">
+                    <div class="w3-col l4 m6 s12 w3-margin-bottom">
+                        <div class="gr8-theme liked w3-card-2 w3-light-grey w3-padding creation-card">
+                            <a href="/build/" class="creation-link">
+                                <img src="" loading="lazy" class="cre-image w3-hover-opacity w3-card-2 w3-grey creation-thumbnail">
+                                <h4 class="creation-title"></h4>
+                            </a>
+                            <div class="creation-meta">
+                                <span class="meta-author">
+                                    By <b><a href=""></a></b> <span></span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+		    </div>
+        </div>
     </span>
 
     <?php include('linkbar.php') ?>
