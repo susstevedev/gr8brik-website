@@ -286,8 +286,7 @@ if(isset($_POST['delete'])) {
 
     <script>
         const userid = '<?php echo $_GET['id'] ?>';
-        const bsky = '<?php echo $data['bsky'] ?>';
-                               
+
         $(document).ready(function() {
             $.ajax({
                 url: "/ajax/profile",
@@ -305,7 +304,7 @@ if(isset($_POST['delete'])) {
                             let first = response.slice(0, 3);
                             let others = response.length - 3;
                             followedBy = first.map(user => `<a href="${user.url}">
-                            <img src="${user.pfp}" width="15px" height="15px" />
+                            <img src="${user.pfp}" width="17px" height="17px" class="w3-circle" />
                             ${user.username}</a>`).join(", ");
                             followedBy += ` and ${others} others you know`;
                         }
@@ -325,7 +324,8 @@ if(isset($_POST['delete'])) {
                 }
             });
 
-            window.params=new URL(window.location.href);
+            window.params = new URL(window.location.href);
+            window.pages = {};
 
             window.getUserBuilds = function(page) {
                 $.ajax({
@@ -334,8 +334,7 @@ if(isset($_POST['delete'])) {
                     data: { getUserBuilds:true,userid:userid,page:page },
                     dataType: "json",
                     success: function(response) {
-                        params.searchParams.set('c_page', page);
-                        window.history.replaceState({}, '', params);
+                        window.pages.c = page;
 
                         let elm = $('#creationstab div')
                         elm.children().not('#gr8-creation-template').remove();
@@ -343,14 +342,6 @@ if(isset($_POST['delete'])) {
                         if(response.success === true && response.creations) {
                             response.creations.forEach(function(r) {
                                 let $clone = $($('#gr8-creation-template').html());
-
-                                /*$clone.find(".name").text(r.name);
-                                $clone.find(".link-thumb").attr("href", "/build/" + r.id);
-                                $clone.find(".link-name").attr("href", "/build/" + r.id);
-                                $clone.find(".user").text(r.username);
-                                $clone.find(".user").attr("href", "/user/" + r.user);
-                                $clone.find(".time").text(r.date);
-                                $clone.find(".screenshot").attr("src", r.screenshot);*/
 
                                 $clone.find(".creation-title").text(r.name);
                                 $clone.find(".creation-link").attr("href", "/build/" + r.id);
@@ -416,6 +407,45 @@ if(isset($_POST['delete'])) {
                 });
             }
 
+            window.getUserForums = function(page) {
+                $.ajax({
+                    url: "/ajax/profile",
+                    method: "GET",
+                    data: { getUserForums:true,userid:userid,page:page },
+                    dataType: "json",
+                    success: function(response) {
+                        window.pages.f = page;
+
+                        var elm = $('#poststab .w3-row')
+                        elm.children().not('#gr8-posts-template').remove();
+
+                        if(response.success === true && response.posts) {
+                            response.posts.forEach(function(r) {
+                                let $clone = $($('#gr8-posts-template').html());
+
+                                $clone.find(".text").text(r.title);
+                                $clone.find(".user").text(r.username);
+                                $clone.find(".user").attr("href", "/@" + r.username);
+                                $clone.find(".time").text(r.date);
+                                $clone.find(".link-name").attr("href", "/topic/" + r.id);
+
+                                elm.append($clone);
+                            });
+                        } else if(response.posts === null) {
+                            $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div><br />`).appendTo(elm);
+                        } else if(response.error) {
+                            console.error(response.error);
+                            $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div><br />`).appendTo(elm);
+                        } else {
+                            console.log(response);
+                        }
+                    },
+                    error: function(xhr, stat, err) {
+                        console.error(stat, xhr.status, err);
+                    }
+                });
+            }
+
             window.getUserComments = function(page) {
                 $.ajax({
                     url: "/ajax/profile",
@@ -423,8 +453,7 @@ if(isset($_POST['delete'])) {
                     data: { getUserComments:true,userid:userid,page:page },
                     dataType: "json",
                     success: function(response) {
-                        params.searchParams.set('r_page', page);
-                        window.history.replaceState({}, '', params);
+                        window.pages.r = page;
 
                         var elm = $('#commentstab .w3-row')
                         elm.children().not('#gr8-comment-template').remove();
@@ -464,50 +493,24 @@ if(isset($_POST['delete'])) {
                 });
             }
 
-            $("#creationstab .foward-button").on("click", function() {
-                let c_page = parseInt(params.searchParams.get('c_page') || 0);
-                getUserBuilds(c_page + 1);
-            });
+            var tabPages = {
+                '#creationstab': { page: parseInt(window.pages.c || 0), fetch: getUserBuilds },
+                '#commentstab': { page: parseInt(window.pages.r || 0), fetch: getUserComments },
+                '#poststab': { page: parseInt(window.pages.f || 0), fetch: getUserForums }
+            };
 
-            $("#creationstab .back-button").on("click", function() {
-                let c_page = parseInt(params.searchParams.get('c_page') || 0);
-                getUserBuilds(c_page - 1);
-            });
+            $(".foward-button, .back-button").on("click", function() {
+                var $tab = $(this).closest("#creationstab, #commentstab, #poststab");
+                var tabId = `#${$tab.attr('id')}`;
+                var tabConfig = tabPages[tabId];
 
-            $("#commentstab .foward-button").on("click", function() {
-                let r_page = parseInt(params.searchParams.get('r_page') || 0);
-                getUserComments(r_page + 1);
-            });
+                if (!tabConfig) {
+                    return;
+                }
 
-            $("#commentstab .back-button").on("click", function() {
-                let r_page = parseInt(params.searchParams.get('r_page') || 0);
-                getUserComments(r_page - 1);
+                tabConfig.page += $(this).hasClass("foward-button") ? 1 : -1;
+                tabConfig.fetch(tabConfig.page);
             });
-            
-            if(bsky) {
-                $.ajax({
-                    url: `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${bsky}`,
-                    method: "GET",
-                    success: function(response) {
-                        console.log(response.handle);
-                        $("#bsky-link").append(response.handle);
-                        var link = $("#bsky-link").attr("href");
-                        link = link + response.handle;
-                        $("#bsky-link").attr("href", link);
-                    },
-
-                    error: function(xhr, text, err) {
-                        if (xhr.status === 403) {
-                            console.log('Not authed');
-                        } else if (xhr.status === 500) {
-                            var response = JSON.parse(xhr.responseText);
-                            console.log(response);
-                        } else {
-                            console.error(text, err);
-                        }
-                    }
-                });
-            }
 
             window.openTab = function(tab) {
                 var tabGroup = $('.tab'); 
@@ -523,6 +526,7 @@ if(isset($_POST['delete'])) {
 
             openTab('creationstab');
             getUserBuilds(1);
+            getUserForums(1);
             getUserComments(1);
             getUserLiked();
         });
@@ -585,10 +589,11 @@ if(isset($_POST['delete'])) {
         <?php if(!empty($data['bsky'])) { ?>
             <b>-</b>
             <span id="bsky-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">
-                <a id="bsky-link" href="https://bsky.app/profile/" target="_blank">
+                <a id="bsky-link" href="https://bsky.app/profile/<?php echo $data['bsky'] ?>" target="_blank">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-bluesky" viewBox="0 0 16 16">
   						<path d="M3.468 1.948C5.303 3.325 7.276 6.118 8 7.616c.725-1.498 2.698-4.29 4.532-5.668C13.855.955 16 .186 16 2.632c0 .489-.28 4.105-.444 4.692-.572 2.04-2.653 2.561-4.504 2.246 3.236.551 4.06 2.375 2.281 4.2-3.376 3.464-4.852-.87-5.23-1.98-.07-.204-.103-.3-.103-.218 0-.081-.033.014-.102.218-.379 1.11-1.855 5.444-5.231 1.98-1.778-1.825-.955-3.65 2.28-4.2-1.85.315-3.932-.205-4.503-2.246C.28 6.737 0 3.12 0 2.632 0 .186 2.145.955 3.468 1.948"/>
 					</svg>
+                    <?php echo $data['bsky'] ?>
                 </a>
             </span>
         <?php } ?>
@@ -771,6 +776,8 @@ if(isset($_POST['delete'])) {
                                 <option value="2042">2042</option>
                                 <option value="2043">2043</option>
                                 <option value="2044">2044</option>
+                                <option value="2045">2045</option>
+                                <option value="2046">2046</option>
                             </select></div></p>
                             <textarea name="reason" placeholder="Moderator note about this ban (required)" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea>
                             <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick='document.getElementById("ban").style.display="none"'>No</span>
@@ -791,17 +798,6 @@ if(isset($_POST['delete'])) {
             <a href="#creations" id="creations"></a>
             <div class="w3-row-padding">
                 <template id="gr8-creation-template">
-                    <!--<div class='creation w3-display-container w3-left w3-padding-large'>
-                        <a class='link-thumb' href='/build/'>
-                            <img src='' width='320px' height='240px' loading='lazy' class='screenshot w3-grey w3-card-2 w3-hover-shadow'>
-                        </a>
-                        <div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>
-                            <a class='link-name' href='/build/'>
-                                <h4 class='name'></h4>
-                            </a>
-                            <span>By <a class='user' href='/user/'></a> <span class='time'></span></span>
-                        </div>
-                    </div>-->
                     <div class="w3-col l4 m6 s12 w3-margin-bottom">
                         <div class="gr8-theme creation w3-card-2 w3-light-grey w3-padding creation-card">
                             <a href="/build/" class="creation-link">
@@ -810,7 +806,7 @@ if(isset($_POST['delete'])) {
                             </a>
                             <div class="creation-meta">
                                 <span class="meta-author">
-                                    By <a href=""><b></b></a> on <span></span>
+                                    By <b><a href=""></a></b> <span></span>
                                 </span>
                             </div>
                         </div>
@@ -820,33 +816,23 @@ if(isset($_POST['delete'])) {
             <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
             <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button><hr />
         </div>
-        
-		<a href="#posts" id="posts"></a>
-		<div class="w3-row tab" id="poststab">
-			<?php
-				$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-				if ($conn->connect_error) {
-					exit($conn->connect_error);
-				}
 
-                $profileid = $_GET['id'];
-                $sql = "SELECT * FROM messages WHERE userid = $profileid AND parent = 0 ORDER BY timestamp DESC";
-                $result = $conn->query($sql);
-
-                while ($topic = $result->fetch_assoc()) {
-                    $truncatedName = htmlspecialchars(substr($topic['title'], 0, 30));
-                    if (strlen($topic['title']) >= 30) {
-                        $truncatedName .= '...';
-                    }
-
-                    echo "<div class='w3-display-container w3-left w3-padding'>";
-                    echo "<a href='/com/view.php?id=" . $topic['id'] . "'><img src='/img/com.jpg' width='320px' height='240px' loading='lazy' class='w3-card-2 w3-hover-shadow'></a>";
-                    echo "<div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'><h4>" . $truncatedName . "</h4>";
-                    echo "<span>By <a href='/profile.php?id=" . $_GET['id'] . "'>" . $data['username'] . "</a> on " . date("D, M d, Y", strtotime($topic['timestamp'])) . "</span>";
-                    echo "</div></div>";
-                }
-                $conn->close();
-            ?>
+        <div class="tab" id="poststab">
+            <a href="#posts" id="posts"></a>
+            <div class="w3-row">
+                <template id="gr8-posts-template">
+                    <div class='posts w3-display-container w3-left w3-padding' width="50%">
+                        <div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>
+                            <a class='link-name' href=''>
+                                <h4 class='text'></h4>
+                            </a>
+                            <span><a class='user' href='/user/'></a> replied to <a class='title' href=''></a> <span class='time'></span></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+            <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
+            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button><hr />
         </div>
 
         <div class="tab" id="commentstab">
@@ -871,17 +857,6 @@ if(isset($_POST['delete'])) {
 		    <a href="#likes" id="likes"></a>
 			<div class="w3-row-padding">
                 <template id="gr8-likes-template">
-                    <!--<div class='liked w3-display-container w3-left w3-padding-large'>
-                        <a class='link-thumb' href='/build/'>
-                            <img src='' width='320px' height='240px' loading='lazy' class='screenshot w3-card-2 w3-grey w3-hover-shadow'>
-                        </a>
-                        <div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>
-                            <a class='link-name' href='/build/'>
-                                <h4 class='name'></h4>
-                            </a>
-                            <span>By <a class='user' href='/user/'></a>, <span class='time'></span></span>
-                        </div>
-                    </div>-->
                     <div class="w3-col l4 m6 s12 w3-margin-bottom">
                         <div class="gr8-theme liked w3-card-2 w3-light-grey w3-padding creation-card">
                             <a href="/build/" class="creation-link">
@@ -890,7 +865,7 @@ if(isset($_POST['delete'])) {
                             </a>
                             <div class="creation-meta">
                                 <span class="meta-author">
-                                    By <a href=""><b></b></a> on <span></span>
+                                    By <b><a href=""></a></b> <span></span>
                                 </span>
                             </div>
                         </div>
