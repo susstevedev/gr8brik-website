@@ -17,7 +17,7 @@ if(isset($_GET['my_creations']) && isset($_GET['page'])) {
     $limit = 9;
     $offset = ($page - 1) * $limit;
 
-    $stmt = $conn2->prepare('SELECT * FROM model WHERE user = ? ORDER BY date DESC LIMIT ' . $limit . ' OFFSET ' . $offset);
+    $stmt = $conn2->prepare('SELECT * FROM model WHERE user = ? AND removed = 0 ORDER BY date DESC LIMIT ' . $limit . ' OFFSET ' . $offset);
     $stmt->bind_param('i', $current_user->id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -37,13 +37,134 @@ if(isset($_GET['my_creations']) && isset($_GET['page'])) {
             'views' => Numbers::format($row['views']),
             'likes' => Numbers::format($row['likes']),
             'size' => Numbers::filesize($row['size']),
-            'thumb' => $row['screenshot'],
+            'thumb' => $row['screenshot'] ?: '/img/no_image.png',
             'comments' => Numbers::format($row['replies']),
             'date' => time_ago($row['date']),
         ];
     }
 
     echo json_encode(['success' => true, 'creations' => $creations]);
+    exit;
+}
+
+if(isset($_GET['get_creation']) && isset($_GET['id'])) {
+    $model_id = $_GET['id'];
+
+    $stmt = $conn2->prepare('SELECT * FROM model WHERE user = ? AND id = ? AND removed = 0');
+    $stmt->bind_param('ii', $current_user->id, $model_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $creation = null;
+
+    if($result->num_rows === 0) {
+        echo json_encode(['success' => false, 'error' => 'Creation not found']);
+        exit;
+    }
+
+    while ($row = $result->fetch_assoc()) {
+        $name = htmlspecialchars(substr($row['name'] ?: 'Untited Creation', 0, 30));
+        if (strlen($row['name']) >= 30) {
+            $name .= '...';
+        }
+
+        $creation = [
+            'model_id' => $row['id'],
+            'title' => $name,
+            'description' => $row['description'],
+            'thumb' => $row['screenshot'] ?: '/img/no_image.png',
+            'date' => time_ago($row['date']),
+            'modeler_url' => '/modeler?build_id=' . $row['id'],
+            'viewer_url' => '/build/' . $row['id'],
+            'visibility' => $row['visibility'],
+            'legacy' => (bool)$row['legacy'],
+        ];
+    }
+
+    echo json_encode(['success' => true, 'creation' => $creation]);
+    exit;
+}
+
+if (isset($_POST['edit']) && isset($_POST['id'])) {
+    if(!loggedin()) {
+        echo json_encode(['success' => false, 'error' => 'Sign in to edit this creation']);
+    }
+
+    $model_id = (int)$_POST['id'];
+    $name = $_POST['title'];
+    $about = $_POST['description'];
+    $visibility = $_POST['visibility'];
+
+    $stmt = $conn2->prepare("UPDATE model SET name = ?, description = ?, visibility = ? WHERE id = ? AND user = ? AND removed = 0");
+    $stmt->bind_param("sssii", $name, $about, $visibility, $model_id, $current_user->id);
+    $result = $stmt->execute();
+
+    if ($result) {
+        echo json_encode(['success' => true, 'message' => 'Creation updated']);
+        exit;
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to update creation']);
+        exit;
+    }
+}
+
+if (isset($_POST['delete']) && isset($_POST['id'])) {
+    header('Content-Type: application/json');
+    $model_id = (int)$_POST['id'];
+
+    if ($_SESSION['csrf'] === $_POST['csrf_token']) {
+        if (loggedin()) {
+            $stmt = $conn2->prepare('SELECT * FROM model WHERE user = ? AND id = ? AND removed = 0');
+            $stmt->bind_param('ii', $current_user->id, $model_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if($result->num_rows === 0) {
+                echo json_encode(['success' => false, 'error' => 'Creation not found']);
+                exit;
+            }
+
+            $data = $result->fetch_assoc();
+
+            if(trim($current_user->id) === trim($data['user']) || $current_user->admin === true) {
+                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+
+                $modelFile = basename($data['model']);
+                $screenshotFile = basename($data['screenshot']);
+
+                if (file_exists($modelFile)) {
+                    @unlink($modelFile);
+                }
+
+                if (file_exists($screenshotFile)) {
+                    @unlink($screenshotFile);
+                }
+
+                $sql2 = "DELETE FROM model WHERE id = ?";
+                $stmt2 = $conn->prepare($sql2);
+                $stmt2->bind_param("i", $model_id);
+
+                if ($stmt2->execute()) {
+                    $stmtVotes = $conn->prepare("DELETE FROM votes WHERE creation = ?");
+                    $stmtVotes->bind_param("i", $model_id);
+                    $stmtVotes->execute();
+
+                    $stmtComments = $conn->prepare("DELETE FROM comments WHERE model = ?");
+                    $stmtComments->bind_param("i", $model_id);
+                    $stmtComments->execute();
+
+                    echo json_encode(['success' => 'Creation deleted']);
+                } else {
+                    echo json_encode(['success' => false, 'error' => 'Error deleting model listing']);
+                }
+            } else {
+                echo json_encode(['success' => false, 'error' => 'An authentication error has occured']);
+            }
+        } else {
+            echo json_encode(['success' => false, 'error' => 'Not logged in']);
+        }
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Oops! Your CSRF token seems to be invalid.']);
+    }
     exit;
 }
 ?>
@@ -61,6 +182,7 @@ if(isset($_GET['my_creations']) && isset($_GET['page'])) {
 
     <script>
         $(document).ready(function() {
+            const urlparams = new URLSearchParams(window.location.search);
             window.page = 1;
 
             $("#foward-button").on("click", function() {
@@ -83,7 +205,7 @@ if(isset($_GET['my_creations']) && isset($_GET['page'])) {
                                 console.log(r);
 
                                 $clone.find(".creation").attr('data-id', r.model_id);
-                                $clone.find(".creation").attr('onclick', "window.editCreation(this)");
+                                $clone.find(".creation").attr('onclick', `window.editCreation(${r.model_id})`);
                                 $clone.find(".creation-title").text(r.title);
                                 $clone.find(".meta-author span").text(r.date);
                                 $clone.find(".creation-thumbnail").attr("src", r.thumb);
@@ -96,11 +218,11 @@ if(isset($_GET['my_creations']) && isset($_GET['page'])) {
                             });
                             window.mode();
                         } else if(response.creations === null) {
-                            $(`<br /><div class='message w3-padding w3-round w3-light-grey'>No creations to load</div>`).insertAfter(elm);
+                            $(`<br /><h4 class='message w3-light-grey w3-card-2 w3-padding w3-round'>No creations to load</h4>`).insertAfter(elm);
                             $("#foward-button").remove();
                         } else if(response.error) {
                             console.error(response.error);
-                            $(`<br /><div class='message w3-padding w3-round w3-red'>${response.error}</div>`).insertAfter(elm);
+                            $(`<br /><h4 class='message w3-red w3-card-2 w3-padding w3-round'>${response.error}</h4>`).insertAfter(elm);
                             $("#foward-button").remove();
                         }
                     },
@@ -110,35 +232,147 @@ if(isset($_GET['my_creations']) && isset($_GET['page'])) {
                 });
             }
 
-            window.editCreation = function(elm) {
-                let id = $(elm).data('id'); 
+            window.editCreation = function(id) {
                 if(!id) {
                     return;
                 }
 
                 $(".editingbox").remove();
-                console.log(id);
+                $(".message").remove();
 
-                let $clone = $($('#gr8-edit-template').html());
-                let title = $(elm).find(".creation-title").text();
+                
+                $.get("/ajax/config.php", {
+                    get_csrf_token: true
+                }, function(data) {
+                    console.log(data);
+                    window.csrf_token = data.csrf_token;
+                }, "json")
+                .fail(function(xhr, text, err) {
+                    alert(text);
+                });
 
-                $clone.find("form").attr('data-id', id);
-                $clone.find("form").addClass('editingbox');
-                $clone.find("#title").text(title);
-                $clone.find("#about").text(title);
+                $.ajax({
+                    url: "",
+                    method: "GET",
+                    data: { get_creation:true,id:id },
+                    dataType: "json",
+                    success: function(response) {
+                        let elm = $('#creationstab');
 
-                $(elm).after($clone);
+                        if(response.success === true && response.creation) {
+                            let res = response.creation;
+                            let $clone = $($('#gr8-edit-template').html());
+                            let title = res.title;
+                            let about = res.description;
+
+                            $clone.find("form").attr('data-id', id);
+                            $clone.find("#title").val(title);
+                            $clone.find("#about").val(about);
+                            $clone.find(".creation-thumbnail").attr('src', res.thumb);
+                            $clone.find("#visibility").val(res.visibility);
+                            $clone.find("#modeler-open").attr('href', res.modeler_url);
+                            $clone.find("#viewer-open").attr('href', res.viewer_url);
+
+                            if(res.legacy === true) {
+                                $clone.find("#legacy-warning").removeClass('w3-hide');
+                                $clone.find("#title").attr('disabled', true);
+                                $clone.find("#title").addClass('w3-disabled');
+                                $clone.find("#modeler-open").remove();
+                            }
+
+                            if(res.visibility === 'private') {
+                                $clone.find("#viewer-open").remove();
+                            }
+
+                            $('body').append($clone);
+                            window.mode();
+
+                            $("#edit-creation-form #edit-confirm").on("click", function(e) {
+                                e.preventDefault();
+
+                                let payload = {
+                                    edit: true,
+                                    id: id,
+                                    title: $("#edit-creation-form #title").val(),
+                                    description: $("#edit-creation-form #about").val(),
+                                    visibility: $("#edit-creation-form #visibility").val()
+                                };
+
+                                $.ajax({
+                                    url: '',
+                                    type: 'POST',
+                                    data: payload,
+                                    dataType: 'json',
+                                    success: function(response) {
+                                        if(response.success) {
+                                            alert(response.message);
+                                            $(".editingbox").remove();
+                                            $('#creationstab').children().not('template').remove();
+                                            window.getCreations(1);
+                                        } else if(response.error) {
+                                            console.error(response.error);
+                                            $(".editingbox").remove();
+                                            $(`<h4 class='message w3-red w3-card-2 w3-padding w3-round'>${response.error}</h4>`).insertBefore(elm);
+                                            $("html, body").animate({ scrollTop: 0 }, "slow");
+                                        }
+                                    },
+                                    error: function() {
+                                        alert("A server error occurred.");
+                                    }
+                                });
+                            });
+
+                            $("#edit-creation-form #edit-delete").on("click", function(e) {
+                                e.preventDefault();
+
+                                $.ajax({
+                                    type: "POST",
+                                    data: { id: id, csrf_token: window.csrf_token, delete: true },
+                                    dataType: "json",
+                                    success: function(response) {
+                                        if (response.success) {
+                                            alert(response.success);
+                                            $(".editingbox").remove();
+                                            $('#creationstab').children().not('template').remove();
+                                            window.getCreations(1);
+                                        } else if(response.error) {
+                                            console.error(response.error);
+                                            $(".editingbox").remove();
+                                            $(`<h4 class='message w3-red w3-card-2 w3-padding w3-round'>${response.error}</h4>`).insertBefore(elm);
+                                            $("html, body").animate({ scrollTop: 0 }, "slow");
+                                        }
+                                    },
+                                    error: function() {
+                                        alert("An error occurred. Please try again later.");
+                                    }
+                                });
+                            });
+                        } else if(response.error) {
+                            console.error(response.error);
+                            $(`<h4 class='message w3-red w3-card-2 w3-padding w3-round'>${response.error}</h4>`).insertBefore(elm);
+                            $("html, body").animate({ scrollTop: 0 }, "slow");
+                        }
+                    },
+                    error: function(xhr, stat, err) {
+                        console.error(stat, xhr.status, err);
+                    }
+                });
             }
 
             getCreations(1);
+
+            const edit_id = urlparams.get('edit');
+            if(edit_id) {
+                window.editCreation(edit_id);
+            }
         });
     </script>
 
-    <div id="creationstab" class="w3-row-padding">
-        <span data-testid="gr8-my-creations-text-sb">
-            <p data-testid="gr8-my-creations-text-sb--text">Creations are sorted by newest by default.</p>
-        </span>
+    <span data-testid="gr8-my-creations-text-sb">
+        <p data-testid="gr8-my-creations-text-sb--text">Creations are sorted by newest by default.</p>
+    </span>
 
+    <div id="creationstab" class="w3-row-padding">
         <template id="gr8-creation-template">
             <div class="w3-col l4 m6 s12 w3-margin-bottom">
                 <div class="gr8-theme creation w3-card-2 w3-light-grey w3-padding creation-card">
@@ -163,15 +397,79 @@ if(isset($_GET['my_creations']) && isset($_GET['page'])) {
         </template>
     </div><br />
 
-    <template id="gr8-edit-template">
-        <form method='post' action=''>
-            <div class='w3-border w3-border-grey w3-padding-large w3-round'>
+    <!--<template id="gr8-edit-template">
+        <div id="editingbox" class="editingbox w3-row w3-section">
+            <form method="post" action="" class="w3-col s12 w3-light-grey w3-card-2 w3-border w3-border-grey w3-padding-large w3-round">
+                <span onclick='document.getElementById("editingbox").style.display="none"' class="w3-btn w3-red w3-hover-white w3-padding w3-right">&times;</span>
                 <b>Edit creation</b><br />
-                <p>Name: <textarea name='title' id="title" value='' rows='1' cols='80'></textarea></p>
-                <p>Description: <textarea name='about' id="about" value='' rows='2' cols='80'></textarea></p>
-                <p><button name='edit-confirm' id="edit-confirm" class='w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo'>Update</button></p>
+                <p>
+                    <label>Name:</label>
+                    <textarea name="title" id="title" class="w3-input w3-border" rows="1"></textarea>
+                </p>
+                <p>
+                    <label>Description:</label>
+                    <textarea name="about" id="about" class="w3-input w3-border" rows="2"></textarea>
+                </p>
+                <p>
+                    <button name="edit-confirm" id="edit-confirm" class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo">Update</button>
+                </p>
+            </form>
+        </div>
+    </template>-->
+
+    <template id="gr8-edit-template">
+        <div class="w3-modal editingbox" style="display:block;">
+            <div class="w3-modal-content w3-card-4 w3-animate-zoom" style="max-width:600px">
+
+                <header class="w3-container w3-blue w3-padding">
+                    <span onclick="$('.editingbox').remove()" class="w3-button w3-display-topright w3-large w3-hover-red">&times;</span>
+                    <h3>Edit Creation</h3>
+                    <h4 id="legacy-warning" class="w3-card-2 w3-yellow w3-padding w3-round w3-hide">This creation is <b>legacy</b>, meaning it cannot be viewed in the viewer or edited in the modeler.</h4>
+                </header>
+
+                <form id="edit-creation-form" class="creation-card w3-container w3-padding-16 w3-light-grey">
+                    <p>
+                        <img src="" alt="" title="" class="creation-thumbnail">
+                    </p>
+
+                    <p>
+                        <label class="w3-text-blue"><b>Name</b></label>
+                        <textarea name="title" id="title" class="w3-input w3-border w3-round" rows="1"></textarea>
+                    </p>
+
+                    <p>
+                        <label class="w3-text-blue"><b>Description</b></label>
+                        <textarea name="about" id="about" class="w3-input w3-border w3-round" rows="3"></textarea>
+                    </p>
+
+                    <p>
+                        <label class="w3-text-blue"><b>Visibility</b></label>
+                        <select name="visibility" id="visibility" class="w3-select w3-border w3-round">
+                            <option value="public">Public</option>
+                            <option value="unlisted">Unlisted</option>
+                            <option value="private">Private</option>
+                        </select>
+                    </p>
+
+                    <p>
+                        <label class="w3-text-blue"><b>Links</b></label><br />
+                        <a id="modeler-open" href="">Edit in modeler</a><br />
+                        <a id="viewer-open" href="">View public page</a>
+                    </p>
+                    
+                    <div class="w3-padding-16">
+                        <span class="w3-left">
+                            <button type="submit" name="edit-delete" id="edit-delete" class="w3-button w3-red w3-round">Delete</button>
+                        </span>
+
+                        <span class="w3-right">
+                            <button type="button" onclick="$('.editingbox').remove()" class="w3-button w3-red w3-round">Cancel</button>
+                            <button type="submit" name="edit-confirm" id="edit-confirm" class="w3-button w3-blue w3-round">Update</button>
+                        </span>
+                    </div>
+                </form>
             </div>
-        </form><br />
+        </div>
     </template>
 
     <button id="foward-button" class="w3-btn w3-large w3-block w3-light-grey w3-border">LOAD MORE</button>
