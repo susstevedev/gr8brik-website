@@ -40,23 +40,23 @@ pre {
     text-shadow: none;
 }
 
+a {
+    transition: all 0.2s ease-in;
+}
+
 a:hover {
     color: #0000FF;
-    transition: all 0.2s ease-in;
 }
 
-.w3-button:hover, .w3-btn:hover {
+.w3-button, .w3-btn, .w3-hover-opacity, .w3-hover-shadow {
     transition: all 0.2s ease-in;
-}
-
-button, input:hover {
-    transition: all 0.2s ease-in-out;
 }
 
 input {
     padding-bottom: 5px;
     border: none;
     outline: none;
+    transition: all 0.2s ease-in-out;
 }
 
 .w3-main, .linkbar, .consoleErrorBox {
@@ -68,6 +68,69 @@ input {
     display: none !important;
 }
 
+/* creation card */
+.creation-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.creation-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.creation-thumbnail {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+}
+
+.creation-title {
+    margin-top: 10px;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.creation-meta {
+    font-size: 0.85em;
+    margin-top: auto;
+    padding-top: 10px;
+    color: #555;
+}
+
+body.mode-dark .creation-meta {
+    color: #ddd;
+}
+
+.creation-meta .meta-stats {
+    margin-top: 4px;
+    border-top: 1px solid #ddd;
+    padding-top: 4px;
+}
+
+/* creation card on the creations main page */
+
+.creation-page-title {
+    font-weight: bold;
+}
+
+.creation-page-meta {
+    margin-top: auto;
+    padding-top: 10px;
+    color: #555;
+}
+
+body.mode-dark .creation-page-meta {
+    color: #ddd;
+}
+
+.login-input {
+    width: 50%;
+}
+
 #gdpr-cookie-message {
     margin-left: 20%;
     margin-right: 20%;
@@ -77,10 +140,10 @@ input {
     top: 0;
     color: #fff;
     background-color: #333333;
-    padding: 5px 5px 5px 5px;
+    padding: 10px;
     width: auto;
     height: auto;
-    border-radius: 4px;
+    border-radius: 2px;
     box-shadow: 2px 2px 2px 2px rgba(0, 0, 0, 0.1);
 }
 
@@ -89,8 +152,8 @@ input {
     background-color: #0096FF;
     color: #fff;
     border: none;
-    border-radius: 4px;
-    padding: 6px 6px 6px 6px;
+    border-radius: 2px;
+    padding: 6px;
     cursor: pointer;
     margin-right: 5px !important;
 }
@@ -102,6 +165,7 @@ input {
 #navbar {
 	position: fixed;
 	left: 0;
+    top: 0;
 	width: 18%;
     line-height: 175%;
 }
@@ -157,24 +221,32 @@ input {
     position: relative;
 }
 
+.file-pfp {
+    width: 250px;
+    height: 250px;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: 50% 50%;
+    background-color: #000;
+    cursor: pointer; 
+}
+        
+.file-banner {
+    width: 25vw;
+    height: 25vh;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: 50% 50%;
+    background-color: #000;
+    cursor: pointer; 
+}
+
+.success,.error {
+    display:none;
+}
+
 #comment-text img {
     max-width: 100%;
-}
-
-.fullScreen {
-    width: 95vw;
-    height: 95vh;
-    position: absolute;
-    top: 0;
-    left: 0;
-    transition: all 0.2s ease-in-out;
-}
-
-.modeler {
-    width: 60vw;
-    height: 60vh;
-    border-color: black;
-    transition: all 0.2s ease-in-out;
 }
 
 img.emoji {
@@ -183,25 +255,51 @@ img.emoji {
     margin: 0;
 }
 
+.upvote-btn:hover,.downvote-btn:hover {
+    transform: translateY(-1px);
+}
+
+#model-embed {
+    width: 65%;
+    height: 50vh;
+}
+
+.model-screenshot {
+    margin: 20px;
+    height: 50%;
+}
+
 @media only screen and (max-width: 700px) {
     body {
         margin: 0px !important;
         padding: 0px 0px 0px 0px !important;
     }
+
 	#offset {
 		margin-left: 0px;
 	}
+
     #pfp {
         width: 50px; 
         height: 50px;
     }
+
     #gdpr-cookie-message {
         width: 100%;
         margin-left: 0px;
         margin-right: 0px;
         padding: 0px 0px 0px 0px;
     }
+
     .w3-main, .linkbar {
-      margin-left: 0px !important;
+        margin-left: 0px !important;
+    }
+
+    .creation-page-meta span {
+        display: inline;
+    }
+
+    #model-embed, [data-testid="description"] {
+        width: 100% !important;
     }
 }

@@ -20,37 +20,28 @@ if ("serviceWorker" in navigator) {
 }
 
 $(document).ready(function() {
-    
-    if(!window.fetch) {
-        alert("Your browser does not support the fetch API. Gr8Brik will not work.");
-    }
-    
     var cookie_options = {
-        link: "/privacy.php",
-        delay: "250",
-        fixedCookieTypeDesc: "Cookie Preferences & Session Data saved to your device and our servers.",
+        link: "/privacy",
+        delay: 150,
+        fixedCookieTypeDesc: "Essential cookies enable core functionality like security and network management. Your preferences (like light/dark mode) are stored directly on your device.",
         cookieTypes: [
             {
-                type: 'Site Preferences',
+                type: 'Preferences',
                 value: 'site-prefs',
-                description: 'These are cookies that are related to your site preferences, e.g. remembering your username, site colours, etc.'
+                description: 'Remembers your interface settings, themes, and display options.'
             },
             {
-                type: 'Session Data',
-                value: 'login-data',
-                description: 'Cookies that decide whether or not we can collect data about user sessions.'
+                type: 'Analytics & Performance',
+                value: 'analytics', 
+                description: 'Helps us understand how visitors interact with the site so we can improve it.'
             }
         ],
     }
     $('body').ihavecookies(cookie_options);
 
-    window.dropdown = function() {
-        var dropdown = $("#gr8-dropdown");
-        if (!dropdown.hasClass("w3-show")) {
-            dropdown.addClass("w3-show");
-        } else {
-            dropdown.removeClass("w3-show");
-        }
+    window.dropdown = function(id) {
+        let dropdown = $("#" + id);
+        dropdown.toggleClass("w3-show");
     }
 
     window.openTab = function(tab, btn) {
@@ -81,16 +72,16 @@ $(document).ready(function() {
         }
 
         if(theme === 'light') {
-            $("body").addClass("w3-light-blue").css({"background-color": "", "color": ""});;
-            $('#navbar').removeClass('w3-dark-grey').addClass('w3-light-grey'); 
-            $('.gr8-theme').addClass('w3-light-grey w3-text-black').removeClass('w3-dark-grey w3-text-white'); 
-            $('.gr8-theme-opposite').addClass('w3-dark-grey w3-text-white').removeClass('w3-light-grey w3-text-black'); 
+            $("body").addClass("w3-light-blue mode-light").removeClass("mode-dark").css({"background-color": "", "color": ""});
+            $('#navbar').removeClass('w3-dark-grey').addClass('w3-light-grey');
+            $('.gr8-theme').addClass('w3-light-grey w3-text-black').removeClass('w3-dark-grey w3-text-white');
+            $('.gr8-theme-opposite').addClass('w3-dark-grey w3-text-white').removeClass('w3-light-grey w3-text-black');
         }
 
         if(theme === 'dark') {
-            $("body").removeClass("w3-light-blue").css({"background-color": "#121212", "color": "#FAF9F6"});
-            $('#navbar').removeClass('w3-light-grey').addClass('w3-dark-grey'); 
-            $('.gr8-theme').removeClass('w3-light-grey w3-text-grey w3-text-black').addClass('w3-dark-grey w3-text-white'); 
+            $("body").removeClass("w3-light-blue").removeClass("mode-light").addClass("mode-dark").css({"background-color": "#121212", "color": "#FAF9F6"});
+            $('#navbar').removeClass('w3-light-grey').addClass('w3-dark-grey');
+            $('.gr8-theme').removeClass('w3-light-grey w3-text-grey w3-text-black').addClass('w3-dark-grey w3-text-white');
             $('.gr8-theme-opposite').removeClass('w3-dark-grey w3-text-white gr8-theme').addClass('w3-light-grey w3-text-black');
         }
     }
@@ -100,26 +91,25 @@ $(document).ready(function() {
         $.ajax({
             url: '/list.php',
             type: 'GET',
-            // use featured instead of feature_v2 for legacy api
-            data: { feature_v2: true },
+            data: { feature_v3: true },
+            dataType: 'json',
             success: function(res) {
-                let parsed_res = res['builds'];
-                featured = parsed_res.map(function(builds) { return `
+                let creations = [];
+                res.creations.forEach(function(creation) {
+                    let cre = `
                     <div class='gr8-theme w3-card-2 w3-padding'>
+                        <b>
+                        	<a href='/build/${creation.model_id}'>${creation.title}</a>
+                        </b><br />
                         <span>
-                        	<a href='/build/${builds.model_id}'>${builds.title}</a>
-                        </span><br />
-                        <span>
-                        	${builds.views} views - ${builds.likes} likes - 
-                            <a href='/user/${builds.user}'>
-                            	<img src="${builds.pfp}" class="w3-round" width="25px" height="25px">
-                                ${builds.username}
-                            </a>
+                        	<i class="fa fa-eye"></i>${creation.views} • <i class="fa fa-star"></i>${creation.likes} • 
+                            <a href='/@${encodeURIComponent(creation.username)}'><i class="fa fa-at"></i>${creation.username}</a>
                         </span>
-                    </div><br />
-                `});
+                    </div><br />`;
+                    creations.push(cre);
+                });
                 $(".gr8-build-count").addClass('w3-blue w3-tag w3-round').append(res['build_count']);
-                $(".featured-builds").append(featured).fadeIn();
+                $(".featured-builds").append(creations).fadeIn();
             }
         });
     }
@@ -132,28 +122,27 @@ $(document).ready(function() {
             data: { get_warn_status: true },
             success: function(res) {
                 if(res.status == "yes" && res.success == true) {
-                        console.log("status is true");
-                        	popup = `<div id="popup" class="w3-modal w3-show">
-                                        <div class="gr8-theme w3-modal-content w3-light-grey w3-card-2 w3-animate-top w3-center w3-padding-small">
-                                            <header class="w3-container">
-                                                <span onclick="document.getElementById('popup').classList.remove('w3-show'); setTimeout(getWarnStatus, 60000); seenWarnStatus();" 
-                                                class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
-                                            </header>
-                                            <div class="w3-container">
-                                                <p id="popup-text">${res.text}</p>
-                                                <p id="popup-reason">${res.reason}</p>
-                                                <p id="popup-reason-additional">${res.additional}</p>
-                                                <button onclick="document.getElementById('popup').classList.remove('w3-show'); setTimeout(getWarnStatus, 60000); seenWarnStatus();" 
-                                                class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">${res.button}</button>
-                                            </div>
-                                        </div>
-                                    </div>`
+                    popup = `<div id="popup" class="w3-modal w3-show">
+                                <div class="gr8-theme w3-modal-content w3-light-grey w3-card-2 w3-center w3-animate-bottom">
+                                    <header class="w3-container">
+                                        <h4 id="popup-text">${res.text}</h4>
+                                        <span onclick="document.getElementById('popup').classList.remove('w3-show'); setTimeout(getWarnStatus, 120000); seenWarnStatus();" 
+                                        class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
+                                    </header>
+                                    <div class="w3-container">
+                                        <p id="popup-reason">${res.reason}</p>
+                                        <p id="popup-reason-additional">${res.additional}</p>
+                                        <button onclick="document.getElementById('popup').classList.remove('w3-show'); setTimeout(getWarnStatus, 120000); seenWarnStatus();" 
+                                        class="w3-btn w3-blue w3-hover-opacity w3-round w3-border w3-border-indigo">${res.button}</button><br /><br />
+                                    </div>
+                                </div>
+                            </div>`
                     $("#popup-wrapper-global").append(popup);
                    	mode();
                 } else if(res.success == false) {
-                    throw new Error(res.error || "Error fetching JSON request from /ajax/user?get_warn_status=true");
+                    throw new Error(res.error);
                 } else {
-                	setTimeout(getWarnStatus, 60000);
+                	setTimeout(getWarnStatus, 120000);
             	}
             }
         });
@@ -186,23 +175,43 @@ $(document).ready(function() {
             }
     }
 
+    //browser-update.org script
+    //make sure to update every couple of months!!! please!!! REMEMBER!!!
+    var $buoop = {required:{e:-4,f:-3,o:-3,s:-1,c:-3},insecure:true,style:"corner",api:2026.3 }; 
+    function $buo_f() { 
+        var e = document.createElement("script"); 
+        e.src = "//browser-update.org/update.js";
+        document.body.appendChild(e);
+    };
+    try{
+        document.addEventListener("DOMContentLoaded",$buo_f,false);
+    }catch(e){
+        window.attachEvent("onload", $buo_f)
+    };
+
+    $("#hideLoginAd").click(function(event) {
+        $.cookie('hide_login_ad', true, { expires: 365, path: '/' });
+        $("#loginAd").hide();
+    });
+
     $("#toggleDark, .toggleDark").click(function(event) {
-        $.cookie('mode', 'dark', { expires: 365 });
-        window.location.reload();
+        $.cookie('mode', 'dark', { expires: 365, path: '/' });
+        mode();
     });
 
     $("#toggleLight, .toggleLight").click(function(event) {
-        $.cookie('mode', 'light', { expires: 365 });
-        window.location.reload();
+        $.cookie('mode', 'light', { expires: 365, path: '/' });
+        mode();
     });
 
     $("#toggleAuto, .toggleAuto").click(function(event) {
-        $.removeCookie('mode');
-        window.location.reload();
+        $.removeCookie('mode', { path: '/' });
+        mode();
     });
 
+    $(['/img/loading.gif', '/img/no_image.png']).preload();
     mode();
     getWarnStatus();
     twemoji.size = '72x72';
-    twemoji.parse(document.body, {base: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/'})
+    twemoji.parse(document.getElementsByClassName('gr8-main')[0], {base: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/'})
 });
