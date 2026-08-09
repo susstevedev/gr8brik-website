@@ -42,6 +42,7 @@ function login() {
     $_SESSION['userid'] = $token['user'];
 
     $user = User::getUser($id);
+    $user->id = $id;
     return $user;
 }
 
@@ -85,18 +86,18 @@ class User {
 
     public function __construct(?array $data = []) {
         $this->id = $data['id'] ?? 0;
-        $this->email = $data['email'] ?? null;
-        $this->username = $data['username'] ?? null;
+        $this->email = $data['email'] ?? '';
+        $this->username = $data['username'] ?? '';
         $this->picture = $data['picture'] ?? '/img/no_image.png';
-        $this->banner = $data['banner'] ?? null;
-        $this->description = $data['description'] ?? null;
-        $this->twitter = $data['twitter'] ?? null;
-        $this->bsky = $data['bsky'] ?? null;
-        $this->admin = $data['admin'] ?? null;
-        $this->alert = $data['alert'] ?? null;
-        $this->age = $data['age'] ?? null;
-        $this->verify_token = $data['verify_token'] ?? null;
-        $this->deactive = $data['deactive'] ?? null;
+        $this->banner = $data['banner'] ?? '';
+        $this->description = $data['description'] ?? '';
+        $this->twitter = $data['twitter'] ?? '';
+        $this->bsky = $data['bsky'] ?? '';
+        $this->admin = $data['admin'] ?? false;
+        $this->alert = $data['alert'] ?? 0;
+        $this->age = $data['age'] ?? '';
+        $this->verify_token = $data['verify_token'] ?? '';
+        $this->deactive = $data['deactive'] ?? '';
     }
 
     public static function isDeleted(?int $id): bool {
@@ -422,11 +423,6 @@ function regenerate_session() {
         return false;
     }
 
-    if (User::isDeleted($current_user->id)) {
-        logout();
-        return false;
-    }
-
     $old_token = hash('sha256', $_SESSION['tokenid']);
     $user_ip = $_SERVER['REMOTE_ADDR'];
     
@@ -435,7 +431,6 @@ function regenerate_session() {
 
     $stmt_check = $conn->prepare("SELECT remember, login_from, user_agent FROM sessions WHERE id = ?");
     if (!$stmt_check) {
-        error_log("mysql error: " . $conn->error);
         return false;
     }
 
@@ -475,7 +470,6 @@ function regenerate_session() {
     ");
     
     if (!$stmt) {
-        error_log("mysql error: " . $conn->error);
         return false;
     }
 
@@ -536,7 +530,7 @@ function delete_inactive_users($single_user_id = null, $blacklist_email = false)
     if ($single_user_id !== null) {
         $inactive_user_ids[] = (int)$single_user_id;
     } else {
-        $stmt = $conn->prepare("SELECT id FROM users WHERE deactive IS NOT NULL AND deactive < NOW() - INTERVAL 14 DAY LIMIT 20");
+        $stmt = $conn->prepare("SELECT id FROM users WHERE deactive IS NOT NULL AND STR_TO_DATE(deactive, '%Y-%m-%d %H:%i:%s') < NOW() - INTERVAL 14 DAY LIMIT 20");
         if (!$stmt || !$stmt->execute()) {
             error_log("failed query for users " . ($conn->error ?: $stmt->error));
             $conn2->close(); $conn3->close();
@@ -641,6 +635,8 @@ function delete_inactive_users($single_user_id = null, $blacklist_email = false)
         $execute_bulk($conn, "DELETE FROM bans WHERE user IN ($placeholders)", $types, $inactive_user_ids);
         $execute_bulk($conn, "DELETE FROM appeals WHERE user IN ($placeholders)", $types, $inactive_user_ids);
         $execute_bulk($conn2, "DELETE FROM reported WHERE user IN ($placeholders)", $types, $inactive_user_ids);
+        $execute_bulk($conn2, "DELETE FROM reports WHERE reporter_user_id IN ($placeholders)", $types, $inactive_user_ids);
+        $execute_bulk($conn2, "DELETE FROM reports WHERE reportable_type = 'profile' AND reportable_id IN ($placeholders)", $types, $inactive_user_ids);
 
         //dms
         $execute_bulk($conn, "DELETE FROM direct_message WHERE userid IN ($placeholders)", $types, $inactive_user_ids);

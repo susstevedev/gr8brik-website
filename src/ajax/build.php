@@ -664,7 +664,7 @@ if (loggedin()) {
 
         $model_id = (int)$_POST['model_id'];
 
-        $stmt = $conn->prepare("SELECT user, likes FROM model WHERE id = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT user, likes FROM model WHERE id = ? AND removed = 0 LIMIT 1");
         $stmt->bind_param("i", $model_id);
         $stmt->execute();
         $stmt->bind_result($model_user, $likes);
@@ -694,11 +694,24 @@ if (loggedin()) {
             exit;
         }
 
+        $reporttype = 'creation';
+        $stmt_check = $conn->prepare("SELECT * FROM reports WHERE reporter_user_id = ? AND reportable_id = ? AND reportable_type = ?");
+        $stmt_check->bind_param("iis", $id, $model_id, $reporttype);
+        $stmt_check->execute();
+        $result = $stmt_check->get_result();
+
+        if($result->num_rows !== 0) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'An unknown error has occured. Please try again later.']);
+            exit;
+        }
+
         $stmt = $conn->prepare("INSERT INTO votes (creation, user) VALUES (?, ?)");
         $stmt->bind_param("ii", $model_id, $id);
         if ($stmt->execute()) {
             echo json_encode(['success' => 'Favorited creation', 'text' => 'Unfavorite (' . $likes + 1 . ')']);
         } else {
+            http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'An unknown error has occured. Please try again later.']);
         }
 
