@@ -29,9 +29,9 @@ if(!loggedin()) {
                 urlParams.set('p', tab);
                 window.history.pushState({}, '', window.location.pathname + '?' + urlParams);
             }
-            
-            if(page === null || page === 'followingtab') {
-                updateTab(page);
+
+            if(page === null) {
+                updateTab('followingtab');
             } else {
                 updateTab(page);
             }
@@ -57,7 +57,7 @@ if(!loggedin()) {
         }
 
         $id = $current_user->id;
-        $sql = "SELECT DISTINCT u.* FROM follow f JOIN users u ON f.profileid = u.id WHERE f.userid = ? ORDER BY f.id DESC";
+        $sql = "SELECT DISTINCT u.* FROM follow f JOIN users u ON f.profileid = u.id WHERE f.userid = ? AND u.deactive IS NULL ORDER BY f.id DESC";
 
         $stmt = $conn2->prepare($sql);
         $stmt->bind_param("i", $id);
@@ -91,7 +91,7 @@ if(!loggedin()) {
         $stmt->close();
         echo "</div>";
 
-        $sql_followers = "SELECT DISTINCT u.* FROM follow f JOIN users u ON f.userid = u.id WHERE f.profileid = ? ORDER BY f.id DESC";
+        $sql_followers = "SELECT DISTINCT u.* FROM follow f JOIN users u ON f.userid = u.id WHERE f.profileid = ? AND u.deactive IS NULL ORDER BY f.id DESC";
 
         $stmt1 = $conn2->prepare($sql_followers);
         $stmt1->bind_param("i", $id);
@@ -120,7 +120,7 @@ if(!loggedin()) {
         $stmt1->close();
         echo "</div>";
 
-        $sql_blocked = "SELECT DISTINCT u.* FROM user_blocks b JOIN users u ON b.profileid = u.id WHERE b.userid = ? ORDER BY b.id DESC";
+        $sql_blocked = "SELECT DISTINCT u.* FROM user_blocks b JOIN users u ON b.profileid = u.id WHERE b.userid = ? AND u.deactive IS NULL ORDER BY b.id DESC";
 
         $stmt2 = $conn2->prepare($sql_blocked);
         $stmt2->bind_param("i", $id);
@@ -152,7 +152,7 @@ if(!loggedin()) {
         $stmt2->close();
         echo "</div>";
 
-        $sql_blockers = "SELECT DISTINCT u.* FROM user_blocks b JOIN users u ON b.userid = u.id WHERE b.profileid = ? ORDER BY b.id DESC";
+        $sql_blockers = "SELECT DISTINCT u.* FROM user_blocks b JOIN users u ON b.userid = u.id WHERE b.profileid = ? AND u.deactive IS NULL ORDER BY b.id DESC";
 
         $stmt3 = $conn2->prepare($sql_blockers);
         $stmt3->bind_param("i", $id);

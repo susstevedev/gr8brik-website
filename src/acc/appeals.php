@@ -36,18 +36,23 @@ if(isset($_POST['accept']) && $current_user->admin) {
     }
 
     $user = $conn->real_escape_string($_GET['user']);
+    $value = $conn->real_escape_string($_GET['value']);
 
-	$sql = "DELETE FROM bans WHERE user = '$user' LIMIT 1"; 
-    $result = $conn->query($sql);
+	$sql = "DELETE FROM blacklist WHERE (value = '$value' AND type = 'username') OR (value = '$value' AND type = 'email') LIMIT 1"; 
+    $result_unblacklist = $conn->query($sql);
 
-    if($result) {
+    $sql = "UPDATE users SET deactive = NULL WHERE id = $user"; 
+    $result_undel = $conn->query($sql);
+
+    if($result_unblacklist && $result_undel) {
 	    $sql2 = "DELETE FROM appeals WHERE user = '$user' LIMIT 1"; 
         $result2 = $conn->query($sql2);
+        $finished = true;
     } else {
-        $result2 = false;
+        $finished = false;
     }
 
-    if ($result && $result2) {
+    if ($finished) {
         exit("Unbanned user");
     } else {
         exit($conn->error ?? 'Error');
@@ -67,13 +72,12 @@ if(isset($_POST['accept']) && $current_user->admin) {
         include('../navbar.php');
         include('panel.php');
 
-        echo "<center>";
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-            $query = $conn->prepare("SELECT user, reason, end_date FROM appeals");
+            $query = $conn->prepare("SELECT user, reason FROM appeals");
             $query->execute();
             $query->store_result();
-            $query->bind_result($user, $reason, $date);
+            $query->bind_result($user, $reason);
 
             if(!$current_user->admin) {
                 "<h2>Invalid permissions</h2>";
@@ -81,24 +85,40 @@ if(isset($_POST['accept']) && $current_user->admin) {
 
             if($query->num_rows != 0 && $current_user->admin) {
                 while ($query->fetch()) {
-                    $query2 = $conn->prepare("SELECT username, picture FROM users WHERE id = ?");
+                    $query2 = $conn->prepare("SELECT username, email, picture FROM users WHERE id = ?");
                     $query2->bind_param("i", $user);
                     $query2->execute();
                     $result = $query2->get_result();
+
                     $row = $result->fetch_assoc();
+                    $email = hash('sha256', strtolower(trim($row['email'])));
+                    $username = $row['username'];
 
-                    $username = htmlspecialchars($row['username'] ?? '[]');
+                    $query_blacklist = $conn->prepare("SELECT value, reason FROM blacklist WHERE (value = ? AND type = 'username') OR (value = ? AND type = 'email')");
+                    $query_blacklist->bind_param("ss", $username, $email);
+                    $query_blacklist->execute();
+                    $query_blacklist->store_result();
+                    $query_blacklist->bind_result($value, $ban_reason);
+                    $query_blacklist->fetch();
+
+                    $username = htmlspecialchars($username ?? '[]');
                     $query2->free_result();
+                    ?>
 
-                    echo "<article class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>";
-                    echo "<header><img src='" . $row['picture'] . "' id='pfp' style='border-radius: 50%;'><br />";
-                    echo "<h3><a href='/user/" . $user . "'>" . htmlspecialchars($username) . "</a></h3></header>";
-                    echo "<h4>" . $reason . "</h4>";
-                    echo "<b>Appeal valid until " . date('F j, Y, g:i a', (int)$date) . " (" . time_ago(date('Y-m-d H:i:s', (int)$date)) . ").</b>";
-                    echo "<form method='post' action='appeals.php?user=" . $user . "&name=" . $username . "'>";
-                    echo "<input type='submit' value='Keep user banned' name='deny' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>&nbsp;";
-                    echo "<input type='submit' value='Unban user' name='accept' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo'>";
-                    echo "</form></article><br />";
+                    <article class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>
+                        <header>
+                            <img src='<?php echo $row['picture'] ?>' id='pfp' style='border-radius: 50%;'><br />
+                            <h3><a href='/user/<?php echo $user ?>'><?php echo $username ?></a></h3>
+                        </header>
+                        <h4>Reason user wants to be unbanned:<br /><?php echo $reason ?></h4>
+                        <h4>Reason for ban:<br /><?php echo $ban_reason ?></h4>
+                        <form method='post' action='appeals.php?value=<?php echo $value ?>&user=<?php echo $user ?>'>
+                            <input type='submit' value='Keep user banned' name='deny' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>
+                            <input type='submit' value='Unban user' name='accept' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo'>
+                        </form>
+                    </article><br />
+
+                    <?php
                     $query2->close();
                 }
                 $query->free_result();
@@ -107,7 +127,6 @@ if(isset($_POST['accept']) && $current_user->admin) {
                 echo "<b>No ban appeals. You're all caught up!</b><br />";
             }
             $conn->close();
-            echo "</center>";
 
             include '../linkbar.php' 
         ?>
