@@ -64,6 +64,76 @@ if (isset($_POST['report'])) {
     exit;
 }
 
+if (isset($_POST['reportv2'])) {
+    header('Content-Type: application/json');
+
+    if ($_SESSION['csrf'] === $_POST['csrf_token']) {
+        if (loggedin()) {
+            $id = $current_user->id;
+            $reportable_id = (int)$_POST['reportable_id'];
+
+            $type = isset($_POST['report_type']) ? trim($_POST['report_type']) : null;
+            $desc = isset($_POST['other']) ? trim($_POST['other']) : null;
+            $reason = isset($_POST['reason']) ? trim($_POST['reason']) : null;
+
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+            if ($conn->connect_error) {
+                echo json_encode(['error' => 'Database connection failed.']);
+                exit;
+            }
+
+            if (!isset($type) || empty($type)) {
+                echo json_encode(['error' => 'report_type shall be string with values of either: comment, creation, profile']);
+                exit;
+            }
+
+            if (!isset($reason) || empty($reason)) {
+                echo json_encode(['error' => 'No reason provided']);
+                exit;
+            }
+
+            $stmt_check = $conn->prepare("SELECT * FROM reports WHERE reporter_user_id = ? AND reportable_id = ? AND reportable_type = ?");
+            $stmt_check->bind_param("iis", $id, $reportable_id, $type);
+            $stmt_check->execute();
+            $result = $stmt_check->get_result();
+
+            if($result->num_rows !== 0) {
+                echo json_encode(['error' => 'You have already reported this content.']);
+                exit;
+            }
+
+            if ($reason === 'other' && empty($desc)) {
+                echo json_encode(['error' => 'Please fill in the description box to explain your report.']);
+                exit;
+            }
+
+            if ($desc !== null) {
+                if(strlen($desc) > 500) {
+                    echo json_encode(['error' => 'Description shall be under 500 characters.']);
+                    exit;
+                }
+            }
+
+            $stmt = $conn->prepare("INSERT INTO reports (reportable_id, reportable_type, reason, description, reporter_user_id) VALUES (?, ?, ?, ?, ?)");
+            $stmt->bind_param("isssi", $reportable_id, $type, $reason, $desc, $id);
+
+            if ($stmt->execute()) {
+                echo json_encode(['success' => 'Content reported! Thanks for making our platform a safe space for everyone!']);
+            } else {
+                echo json_encode(['error' => 'Oops! We couldn\'t report the submitted content at this moment. Please try again later.']);
+            }
+
+            $stmt->close();
+            $conn->close();
+        } else {
+            echo json_encode(['error' => 'Oops! Please login to report content.']);
+        }
+    } else {
+        echo json_encode(['error' => 'Oops! Your cross-site-request-forgery token seems to be invalid.']);
+    }
+    exit;
+}
+
 if (isset($_POST['delete_model'])) {
     header('Content-Type: application/json');
     $model_id = (int)$_POST['model_id'];
@@ -116,29 +186,25 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 </head>
 
 <body class="w3-light-blue w3-container">
-
-    <div id="report" class="w3-modal" style="z-index: 999999">
+    <div id="report-comment" class="w3-modal" style="z-index: 999999">
         <div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
             <div class="w3-container">
-                <span onclick="$('#report').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
-                <form id="reportForm">
-                    <h2>Why do you want to report this creation?</h2>
-                    <b>You can only report a creation when it violates our <a href="/rules?src=creation" target="_blank"><i class="fa fa-external-link" aria-hidden="true"></i>rules</a>.</b><br />
-                    <input type="checkbox" name="reason" value="violent" class="w3-check"> <label>Violent or extreme content</label><br />
-                    <input type="checkbox" name="reason" value="misinformation" class="w3-check"> <label>Misinformation/disinformation</label><br />
-                    <input type="checkbox" name="reason" value="inappropriate-content" class="w3-check"> <label>Inappropriate content</label><br />
-                    <input type="checkbox" name="reason" value="harrasing-me" class="w3-check"> <label>Harassing me or others</label><br />
-                    <input type="checkbox" name="reason" value="spam" class="w3-check"> <label>Spam</label><br />
-                    <input type="checkbox" name="reason" value="something-else" class="w3-check" id="otherReasonToggle"> <label>Something else</label><br /><br />
+                <span onclick="$('#reportCommentForm')[0].reset();$('#report-comment').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
+                <form id="reportCommentForm">
+                    <h2>Why do you want to report this content?</h2>
+                    <b>You can only report content when it violates our <a href="/rules?src=creation" target="_blank"><i class="fa fa-external-link" aria-hidden="true"></i>rules</a>.</b><br />
+                    <input type="radio" name="reason" value="violent" class="w3-check"> <label>Violent or extreme content</label><br />
+                    <input type="radio" name="reason" value="misinformation" class="w3-check"> <label>Misinformation/disinformation</label><br />
+                    <input type="radio" name="reason" value="inappropriate" class="w3-check"> <label>Inappropriate content</label><br />
+                    <input type="radio" name="reason" value="harrasing-me" class="w3-check"> <label>Harassing me or others</label><br />
+                    <input type="radio" name="reason" value="spam" class="w3-check"> <label>Spam</label><br />
+                    <input type="radio" name="reason" value="underage" class="w3-check"> <label>User is under 13</label><br />
+                    <input type="radio" name="reason" value="copyright" class="w3-check"> <label>Copyrighted content</label><br />
+                    <input type="radio" name="reason" value="other" class="w3-check" id="otherReasonToggle"> <label>Something else</label><br /><br />
 
-                    <textarea class="w3-input w3-card-2 w3-hover-shadow w3-mobile w3-round w3-hide" name="other" id="otherReason" placeholder="Explain more..." rows="4"></textarea><br />
+                    <textarea class="w3-input w3-card-2 w3-hover-shadow w3-mobile w3-round" name="other" id="otherReason" placeholder="Explain more..." rows="4"></textarea><br />
 
-                    <input type="hidden" name="user" value="<?php echo $current_user->id; ?>">
-                    <input type="hidden" name="model_id" value="<?php echo $model_id; ?>">
-                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf']; ?>">
-                    <input type="hidden" name="report" value="1">
-
-                    <span class="w3-btn w3-large w3-white w3-hover-blue w3-round-small" onclick="$('#report').hide();">Close</span>
+                    <span class="w3-btn w3-large w3-white w3-hover-blue w3-round-small" onclick="$('#reportCommentForm')[0].reset();$('#report-comment').hide();">Close</span>
                     <button type="submit" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">Report</button>
                 </form>
             </div>
@@ -166,9 +232,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             $(document).ready(function() {
-                $("#otherReasonToggle").change(function() {
-                    $("#otherReason").toggleClass("w3-hide", !this.checked);
-                });
+                let embed_model = <?php echo (int)$_GET['id'] ?>
 
                 function fetchCSRFToken(callback) {
                     $.get("/ajax/config.php", {
@@ -184,26 +248,94 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         });
                 }
 
-                $("#reportForm").submit(function(e) {
-                    e.preventDefault();
-                    fetchCSRFToken(function() {
-                        $.ajax({
-                            url: "",
-                            type: "POST",
-                            data: $("#reportForm").serialize(),
-                            dataType: "json",
-                            success: function(response) {
-                                if (response.success) {
-                                    alert(response.success);
-                                    $("#report").hide();
-                                    $("#reportForm")[0].reset();
-                                } else {
-                                    alert(response.error);
-                                }
-                            },
-                            error: function() {
-                                alert("An error occurred. Please try again later.");
+                $(document).on("click", "#report-comment-button", function() {
+                    event.preventDefault();
+                    let comment_id = $(this).data("id");
+
+                    $('#report-comment').show();
+                    $("#reportCommentForm [name='comment_id']").val(comment_id);
+
+                    $("#reportCommentForm").submit(function(e) {
+                        e.preventDefault();
+
+                        fetchCSRFToken(function() {
+
+                            let payload = {
+                                report_type: 'comment',
+                                csrf_token: window.csrf_token,
+                                reportv2: true,
+                                reportable_id: comment_id,
+                                other: $("#reportCommentForm #otherReason").val(),
+                                reason: $("#reportCommentForm [name='reason']:checked").val(),
                             }
+                            console.log(payload);
+
+                            $.ajax({
+                                url: "",
+                                type: "POST",
+                                data: payload,
+                                dataType: "json",
+                                success: function(response) {
+                                    $("#report-comment").hide();
+
+                                    if (response.success) {
+                                        $("#ajax-success").text(response.success).show(500).delay(5000).hide(500);
+                                        $("#reportCommentForm")[0].reset();
+                                    } else {
+                                        $("#ajax-error").text(response.error).show(500).delay(5000).hide(500);
+                                    }
+                                },
+                                error: function() {
+                                    $("#report-comment").hide();
+                                    $("#ajax-error").text("An error occurred. Please try again later.").show(500).delay(5000).hide(500);
+                                }
+                            });
+                        });
+                    });
+                });
+
+                $(document).on("click", "#report-creation-button", function() {
+                    event.preventDefault();
+                    let creation_id = $(this).data("id");
+
+                    $('#report-comment').show();
+                    $("#reportCommentForm [name='comment_id']").val(creation_id);
+
+                    $("#reportCommentForm").submit(function(e) {
+                        e.preventDefault();
+
+                        fetchCSRFToken(function() {
+
+                            let payload = {
+                                report_type: 'creation',
+                                csrf_token: window.csrf_token,
+                                reportv2: true,
+                                reportable_id: creation_id,
+                                other: $("#reportCommentForm #otherReason").val(),
+                                reason: $("#reportCommentForm [name='reason']:checked").val(),
+                            }
+                            console.log(payload);
+
+                            $.ajax({
+                                url: "",
+                                type: "POST",
+                                data: payload,
+                                dataType: "json",
+                                success: function(response) {
+                                    $("#report-comment").hide();
+
+                                    if (response.success) {
+                                        $("#ajax-success").text(response.success).show(500).delay(5000).hide(500);
+                                        $("#reportCommentForm")[0].reset();
+                                    } else {
+                                        $("#ajax-error").text(response.error).show(500).delay(5000).hide(500);
+                                    }
+                                },
+                                error: function() {
+                                    $("#report-comment").hide();
+                                    $("#ajax-error").text("An error occurred. Please try again later.").show(500).delay(5000).hide(500);
+                                }
+                            });
                         });
                     });
                 });
@@ -268,14 +400,15 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                         .addClass('like-creation w3-yellow');
                                 }
                             } else if (res.error) {
-                                console.error(res.error);
+                                $("#ajax-error").text(res.error).show(500).delay(5000).hide(500);
                             }
                         },
                         error: (xhr, text, err) => {
                             console.error(text, err, xhr);
                             try {
                                 let res = JSON.parse(xhr.responseText);
-                                alert(res.error || "An error occurred, try again later");
+                                let texterror = res.error || "An error occurred, try again later";
+                                $("#ajax-error").text(texterror).show(500).delay(5000).hide(500);
                             } catch (e) {
                                 alert("An error occurred, try again later");
                             }
@@ -404,7 +537,8 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     <?php } ?>
 
     <main id="wrapper">
-        <div id="ajax-error" style="display: none;" class="w3-bottom w3-padding w3-round w3-red"></div>
+        <h4 id="ajax-error" style="display: none;" class="w3-col m8 w3-bottom w3-card-2 w3-padding w3-round w3-red"></h4>
+        <h4 id="ajax-success" style="display: none;" class="w3-col m8 w3-bottom w3-card-2 w3-padding w3-round w3-light-grey"></h4>
 
         <figure class="model-screenshot">
             <iframe id="model-embed" src="/viewer.html?model=<?php echo urlencode($_GET['id']) ?>" class="w3-border w3-card-2"></iframe>
@@ -498,7 +632,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 
                         <div class="tooltip" id="data-report-model">
                             <span class="w3-tag w3-blue tooltiptext">Report this creation to moderators</span>
-                            <button onclick='document.getElementById("report").style.display="block"' name="flag" class="w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink" />
+                            <button data-id="<?php echo $_GET['id'] ?>" id="report-creation-button"  name="flag" class="w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink" />
                             <i class="fa fa-flag" aria-hidden="true"></i> Report
                             </button>&nbsp;
                         </div>
@@ -587,15 +721,22 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 <?php } ?>
                             </span><br />
 
-                            <?php if ($comment['voted'] === false) { ?>
-                                <div class="tooltip">
-                                    <span class="w3-blue tooltiptext">Favorite Comment</span>
-                                    <button data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
-                                </div>
-                            <?php } elseif ($comment['voted'] === true) { ?>
-                                <div class="tooltip">
-                                    <span class="w3-blue tooltiptext">Unfavorite Comment</span>
-                                    <button data-id="<?php echo $comment['id'] ?>" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>
+                            <?php if(loggedin()) { ?>
+                                <?php if ($comment['voted'] === false) { ?>
+                                    <div class="tooltip">
+                                        <span class="w3-blue tooltiptext">Favorite Comment</span>
+                                        <button data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
+                                    </div>
+                                <?php } elseif ($comment['voted'] === true) { ?>
+                                    <div class="tooltip">
+                                        <span class="w3-blue tooltiptext">Unfavorite Comment</span>
+                                        <button data-id="<?php echo $comment['id'] ?>" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>
+                                    </div>
+                                <?php } ?>
+
+                                <div class="tooltip w3-right" id="data-report-comment">
+                                    <span class="w3-blue tooltiptext">Report this comment to moderators</span>
+                                    <button data-id="<?php echo $comment['id'] ?>" id="report-comment-button" name="flag-comment" class="fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round" /></button>
                                 </div>
                             <?php } ?>
                         </article>

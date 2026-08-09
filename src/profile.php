@@ -201,7 +201,7 @@ if(isset($_POST['ban'])) {
         exit('Ban date must be in the future!');
     }
 		
-    if($$current_user->admin != false) {
+    if($current_user->admin != false) {
         $sql = "INSERT INTO bans (user, email, reason, start_date, end_date) VALUES ($profile_id, '$email', '$reason', $start_date, $end_date)";
         $result = $conn->query($sql);
         if ($result) {
@@ -228,7 +228,7 @@ if(isset($_POST['warn'])) {
         exit('Invalid user ID!');
     }
 		
-    if($$current_user->admin != false) {
+    if($current_user->admin != false) {
         $sql = "INSERT INTO warnings (user, reason, timestamp) VALUES ($profile_id, '$reason', $start_date)";
         $result = $conn->query($sql);
         if ($result) {
@@ -248,13 +248,16 @@ if(isset($_POST['delete'])) {
     }
 
     $profile_id = (int)$_GET['id'];
-    $date = new DateTime('9999-12-31');
-    $dateStr = $date->format('Y-m-d');
+    $email = $email = hash('sha256', strtolower(trim($data['email'])));
+    $reason = isset($_POST['reason']) ? trim($_POST['reason']) : 'banned by admin request';
 
-    if($$current_user->admin != false) {
-        $sql = "UPDATE users SET deactive = '$dateStr' WHERE id = $profile_id";
+    if($current_user->admin != false) {
+        $sql = "UPDATE users SET deactive = 1, verify_token = 1 WHERE id = $profile_id";
         $result = $conn->query($sql);
         if ($result) {
+            $sql = "INSERT IGNORE INTO blacklist (value, type, reason) VALUES ('$email', 'email', '$reason')";
+            $result = $conn->query($sql);
+
             header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
             exit;
         } else {
@@ -493,6 +496,49 @@ if(isset($_POST['delete'])) {
                 });
             }
 
+
+            $("#reportForm").submit(function(e) {
+                e.preventDefault();
+
+                $.get("/ajax/config.php", {
+                    get_csrf_token: true
+                }, function(d) {
+                    let csrf_token = d.csrf_token;
+
+                    let payload = {
+                        report_type: 'profile',
+                        csrf_token: csrf_token,
+                        reportv2: true,
+                        reportable_id: userid,
+                        other: $("#reportForm #otherReason").val(),
+                        reason: $("#reportForm [name='reason']:checked").val(),
+                    }
+
+                    $.ajax({
+                        url: "/creation.php?id=null",//placeholder, will move to seperate api page probably
+                        type: "POST",
+                        data: payload,
+                        dataType: "json",
+                        success: function(response) {
+                            $("#modal-report").hide();
+
+                            if (response.success) {
+                                alert(response.success);
+                                $("#reportForm")[0].reset();
+                            } else {
+                                alert(response.error);
+                            }
+                        },
+                        error: function() {
+                            $("#modal-report").hide();
+                            alert("An error occurred. Please try again later.");
+                        }
+                    });
+                }, "json").fail(function(xhr, text, err) {
+                    alert(text);
+                });
+            });
+
             var tabPages = {
                 '#creationstab': { page: parseInt(window.pages.c || 0), fetch: getUserBuilds },
                 '#commentstab': { page: parseInt(window.pages.r || 0), fetch: getUserComments },
@@ -536,7 +582,7 @@ if(isset($_POST['delete'])) {
         <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('creationstab')">Creations</a>
         <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('poststab')">Posts</a>
         <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('commentstab')">Comments</a>
-        <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('likestab')">Likes</a>
+        <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('likestab')">Favorites</a>
     </div><br /><br />
 
     <article id="user-card" class="gr8-theme w3-light-grey w3-card-2 w3-padding w3-round">
@@ -620,18 +666,19 @@ if(isset($_POST['delete'])) {
                                 Block
                             </button>
                         <?php } elseif($data['is_blocking'] === true) { ?>
-                            <input id="button-unblock" form="unblockUser" class="w3-bar-item w3-button" type="submit" value="Unblock User" name="unblock">
+                            <input id="button-unblock" form="unblockUser" class="w3-bar-item w3-button" type="submit" value="Unblock" name="unblock">
                         <?php } ?>
 
+                        <button id="button-report-user" onclick='document.getElementById("modal-report").style.display="block"' name="report" class="w3-bar-item w3-button" />
+                            Report
+                        </button>
+
                         <?php if($current_user->admin != false) { ?>
-                            <button id="button-ban-user" onclick='document.getElementById("modal-ban").style.display="block"' name="ban" class="w3-bar-item w3-button" />
-                                Ban until...
-                            </button>
         					<button id="button-warn-user" onclick='document.getElementById("modal-warn").style.display="block"' name="warn" class="w3-bar-item w3-button" />
                                 Warn
                             </button>
                             <button id="button-delete-user" onclick='document.getElementById("modal-delete").style.display="block"' name="delete" class="w3-bar-item w3-button" />
-                                Hard ban
+                                Ban
                             </button>
                         <?php } ?>
                     </div>
@@ -660,6 +707,31 @@ if(isset($_POST['delete'])) {
 		</div>
 	</div>
 
+    <div id="modal-report" class="w3-modal" style="z-index: 999999">
+        <div class="w3-modal-content gr8-theme w3-card-2 w3-light-grey w3-center">
+            <div class="w3-container">
+                <span onclick="$('#reportForm')[0].reset();$('#modal-report').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
+                <form id="reportForm">
+                    <h2>Why do you want to report this user?</h2>
+                    <b>You can only report content when it violates our <a href="/rules?src=creation" target="_blank"><i class="fa fa-external-link" aria-hidden="true"></i>rules</a>.</b><br />
+                    <input type="radio" name="reason" value="violent" class="w3-check"> <label>Violent or extreme content</label><br />
+                    <input type="radio" name="reason" value="misinformation" class="w3-check"> <label>Misinformation/disinformation</label><br />
+                    <input type="radio" name="reason" value="inappropriate" class="w3-check"> <label>Inappropriate content</label><br />
+                    <input type="radio" name="reason" value="harrasing-me" class="w3-check"> <label>Harassing me or others</label><br />
+                    <input type="radio" name="reason" value="spam" class="w3-check"> <label>Spam</label><br />
+                    <input type="radio" name="reason" value="underage" class="w3-check"> <label>User is under 13</label><br />
+                    <input type="radio" name="reason" value="copyright" class="w3-check"> <label>Copyrighted content</label><br />
+                    <input type="radio" name="reason" value="other" class="w3-check" id="otherReasonToggle"> <label>Something else</label><br /><br />
+
+                    <textarea class="w3-input w3-card-2 w3-hover-shadow w3-mobile w3-round" name="other" id="otherReason" placeholder="Explain more..." rows="4"></textarea><br />
+
+                    <span class="w3-btn w3-large w3-white w3-hover-blue w3-round-small" onclick="$('#reportForm')[0].reset();$('#modal-report').hide();">Close</span>
+                    <button type="submit" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">Report</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-block" class="w3-modal">
 		<div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
 			<div class="w3-container">
@@ -680,6 +752,7 @@ if(isset($_POST['delete'])) {
                     <span onclick="document.getElementById('modal-delete').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
                         <form method='post' action=''>
                         <h2>Are you sure you want to hard ban this user?</h2>
+                        <textarea name="reason" placeholder="Moderator note about this ban" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea>
                         <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span>
                         <input type="submit" value="Yes" name="delete" class="w3-btn w3-large w3-white w3-hover-red">
                     </form>
