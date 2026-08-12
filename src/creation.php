@@ -175,6 +175,48 @@ if (isset($_POST['delete_model'])) {
     exit;
 }
 
+if (isset($_POST['delete_comment'])) {
+    header('Content-Type: application/json');
+    $comment_id = (int)$_POST['id'];
+
+    if ($_SESSION['csrf'] === $_POST['csrf_token']) {
+        if (loggedin() && $current_user->admin === true) {
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+            $id = $current_user->id;
+
+            $sql = "SELECT id, hidden, user FROM comments WHERE id = ? AND user = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ii", $comment_id, $id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($row = $result->fetch_assoc()) {
+                $sql2 = "UPDATE comments SET hidden = 1 WHERE id = ?";
+
+                if($row['hidden']) {
+                    $sql2 = "UPDATE comments SET hidden = 0 WHERE id = ?";
+                }
+
+                $stmt2 = $conn->prepare($sql2);
+                $stmt2->bind_param("i", $comment_id);
+
+                if ($stmt2->execute()) {
+                    echo json_encode(['success' => 'Comment updated']);
+                } else {
+                    echo json_encode(['error' => 'Error deleting comment']);
+                }
+            } else {
+                echo json_encode(['error' => 'Comment not found']);
+            }
+        } else {
+            echo json_encode(['error' => 'An authentication error has occured']);
+        }
+    } else {
+        echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
+    }
+    exit;
+}
+
 $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?model=" . htmlspecialchars($_GET['id']) . "' id='model_embed' title='model_embed' width='300' height='200'></iframe>");
 ?>
 <!DOCTYPE html>
@@ -229,6 +271,21 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
         </div>
     </div>
 
+    <div id="delete-comment" class="w3-modal" style="z-index: 999999">
+        <div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
+            <div class="w3-container">
+                <span onclick="$('#delete-comment').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
+                <form id="deleteCommentForm">
+                    <h2>Are you sure you want to delete this comment?</h2>
+
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf']; ?>">
+                    <span class="w3-btn w3-large w3-white w3-hover-blue w3-round-small" onclick="$('#delete-comment').hide();">No</span>
+                    <button type="submit" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">Yes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             $(document).ready(function() {
@@ -246,6 +303,14 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         .fail(function(xhr, text, err) {
                             alert(text);
                         });
+                }
+
+                function showError(text) {
+                    $('#ajax-error').text(text).slideDown("fast").delay(5000).slideUp("fast");
+                }
+
+                function showSuccess(text) {
+                    $('#ajax-success').text(text).slideDown('fast').delay(5000).slideUp('fast');
                 }
 
                 $(document).on("click", "#report-comment-button", function() {
@@ -279,15 +344,15 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                     $("#report-comment").hide();
 
                                     if (response.success) {
-                                        $("#ajax-success").text(response.success).show(500).delay(5000).hide(500);
+                                        showSuccess(response.success);
                                         $("#reportCommentForm")[0].reset();
                                     } else {
-                                        $("#ajax-error").text(response.error).show(500).delay(5000).hide(500);
+                                        showError(response.error);
                                     }
                                 },
                                 error: function() {
                                     $("#report-comment").hide();
-                                    $("#ajax-error").text("An error occurred. Please try again later.").show(500).delay(5000).hide(500);
+                                    showError("An error occurred. Please try again later.");
                                 }
                             });
                         });
@@ -325,15 +390,58 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                     $("#report-comment").hide();
 
                                     if (response.success) {
-                                        $("#ajax-success").text(response.success).show(500).delay(5000).hide(500);
+                                        showSuccess(response.success);
                                         $("#reportCommentForm")[0].reset();
                                     } else {
-                                        $("#ajax-error").text(response.error).show(500).delay(5000).hide(500);
+                                        showError(response.error);
                                     }
                                 },
                                 error: function() {
                                     $("#report-comment").hide();
-                                    $("#ajax-error").text("An error occurred. Please try again later.").show(500).delay(5000).hide(500);
+                                    showError("An error occurred. Please try again later.");
+                                }
+                            });
+                        });
+                    });
+                });
+
+                $(document).on("click", "#delete-comment-button", function() {
+                    event.preventDefault();
+                    let comment_id = $(this).data("id");
+                    $('#delete-comment').show();
+
+                    $("#deleteCommentForm").submit(function(e) {
+                        e.preventDefault();
+
+                        fetchCSRFToken(function() {
+                            let payload = {
+                                csrf_token: window.csrf_token,
+                                delete_comment: true,
+                                id: comment_id,
+                            }
+                            console.log(payload);
+
+                            $.ajax({
+                                url: "",
+                                type: "POST",
+                                data: payload,
+                                dataType: "json",
+                                success: function(response) {
+                                    $("#delete-comment").hide();
+
+                                    if (response.success) {
+                                        showSuccess(response.success);
+                                        $("#deleteCommentForm")[0].reset();
+
+                                        let comment_selector = '#comment' + comment_id;
+                                        $(comment_selector).remove();
+                                    } else {
+                                        showError(response.error);
+                                    }
+                                },
+                                error: function() {
+                                    $("#delete-comment").hide();
+                                    showError("An error occurred. Please try again later.");
                                 }
                             });
                         });
@@ -350,14 +458,14 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             dataType: "json",
                             success: function(response) {
                                 if (response.success) {
-                                    alert(response.success);
+                                    showSuccess(response.success);
                                     window.location.reload();
                                 } else {
-                                    alert(response.error);
+                                    showError(response.error);
                                 }
                             },
                             error: function() {
-                                alert("An error occurred. Please try again later.");
+                                showError("An error occurred. Please try again later.");
                             }
                         });
                     });
@@ -400,7 +508,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                         .addClass('like-creation w3-yellow');
                                 }
                             } else if (res.error) {
-                                $("#ajax-error").text(res.error).show(500).delay(5000).hide(500);
+                                showError(res.error);
                             }
                         },
                         error: (xhr, text, err) => {
@@ -408,9 +516,9 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             try {
                                 let res = JSON.parse(xhr.responseText);
                                 let texterror = res.error || "An error occurred, try again later";
-                                $("#ajax-error").text(texterror).show(500).delay(5000).hide(500);
+                                showError(texterror);
                             } catch (e) {
-                                alert("An error occurred, try again later");
+                                showError("An error occurred. Please try again later.");
                             }
                         }
                     });
@@ -433,13 +541,13 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             if (response.success) {
                                 btn.replaceWith(`<button data-id="${comment_id}" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>`);
                             } else if (response.error) {
-                                $("#ajax-error").text(response.error).show(500).delay(5000).hide(500);
+                                showError(response.error);
                             }
                         },
                         error: (jqXHR, textStatus, errorThrown) => {
                             console.error("error:", textStatus, errorThrown, jqXHR);
                             const response = JSON.parse(jqXHR.responseText);
-                            alert(response.error);
+                            showError(response.error);
                         }
                     });
                 });
@@ -461,13 +569,13 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             if (response.success) {
                                 btn.replaceWith(`<button data-id="${comment_id}" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>`);
                             } else if (response.error) {
-                                $("#ajax-error").text(response.error).show(500).delay(5000).hide(500);
+                                showError(response.error);
                             }
                         },
                         error: (jqXHR, textStatus, errorThrown) => {
                             console.error("error:", textStatus, errorThrown, jqXHR);
                             const response = JSON.parse(jqXHR.responseText);
-                            alert(response.error);
+                            showError(response.error);
                         }
                     });
                 });
@@ -501,9 +609,36 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 if (response.success) {
                                     commentBtnText.html(prevCommentBtnText);
                                     btn.prop("disabled", false);
-                                    window.location.reload();
-                                } else {
-                                    errorElm.text(response.error).show(500).delay(5000).hide(500);
+                                    var elm = $('#data-comment-wrapper');
+
+                                    if(response.success && response.comment) {
+                                        let $clone = $($('#comment-template').html());
+
+                                        $clone.find("#comment-internal-text").text(response.comment.text);
+                                        $clone.find("#comment-user").text(response.comment.username);
+                                        $clone.find("#comment-user").attr('href', '/user/' + response.comment.userid);
+
+                                        if(response.comment.admin) {
+                                            $clone.find("#comment-user").addClass('w3-text-red w3-hover-text-yellow');
+                                        }
+
+                                        $clone.find("#date").text(response.comment.date);
+                                        $clone.find(".upvote-btn").attr('data-id', response.comment.id);
+
+                                        $clone.attr('data-testid', response.comment.id);
+                                        $clone.attr('id', 'comment' + response.comment.id);
+
+                                        $("#comment-count").text(response.comment.replies);
+
+                                        elm.append($clone);
+                                        $("html, body").animate({ scrollTop: $(document).height() }, "slow");
+                                    } else {
+                                        window.location.reload();
+                                    }
+                                } else if(response.error) {
+                                    commentBtnText.html(prevCommentBtnText);
+                                    btn.prop("disabled", false);
+                                    showError(response.error);
                                 }
                             },
                             error: (jqXHR, textStatus, errorThrown) => {
@@ -511,8 +646,8 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 btn.prop("disabled", false);
                                 console.error("error:", textStatus, errorThrown, jqXHR);
                                 const response = JSON.parse(jqXHR.responseText);
-                                errorElm.text(response.error).show(500).delay(5000).hide(500);
-                            }
+                                showError(response.error);
+                            },
                         });
                     });
                 });
@@ -523,12 +658,12 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     <?php include 'navbar.php' ?>
 
     <?php if (isset($error)) { ?>
-        <h4 class="message w3-card-2 w3-padding w3-round w3-red"><?php echo $error ?></h4><br />
+        <div class="message w3-card-2 w3-padding w3-round-small w3-red"><?php echo $error ?></div><br />
         <?php exit; ?>
     <?php } ?>
 
     <?php if (isset($message)) { ?>
-        <h4 class="message w3-card-2 w3-padding w3-round w3-light-grey"><?php echo $message ?></h4><br />
+        <div class="message w3-card-2 w3-padding w3-round-small w3-light-grey"><?php echo $message ?></div><br />
     <?php } ?>
 
     <?php if ($loggedin === true) { ?>
@@ -537,8 +672,8 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     <?php } ?>
 
     <main id="wrapper">
-        <h4 id="ajax-error" style="display: none;" class="w3-col m8 w3-bottom w3-card-2 w3-padding w3-round w3-red"></h4>
-        <h4 id="ajax-success" style="display: none;" class="w3-col m8 w3-bottom w3-card-2 w3-padding w3-round w3-light-grey"></h4>
+        <div id="ajax-error" class="w3-col m9 w3-bottom w3-card-2 w3-padding w3-round-small w3-red"></div>
+        <div id="ajax-success" class="w3-col m9 w3-bottom w3-card-2 w3-padding w3-round-small w3-light-grey"></div>
 
         <figure class="model-screenshot">
             <iframe id="model-embed" src="/viewer.html?model=<?php echo urlencode($_GET['id']) ?>" class="w3-border w3-card-2"></iframe>
@@ -676,6 +811,9 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
             echo '<h4><span class="fa fa-comments-o" aria-hidden="true"></span>&nbsp;<span id="comment-count">' . $data['comments'] . '</span> comments</h4><hr />';
 
             foreach ($comment_data as $comment) {
+                if(!is_array($comment)) {
+                    continue;
+                }
         ?>
 
                 <?php if (!empty($comment['message'])) { ?>
@@ -734,9 +872,18 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                     </div>
                                 <?php } ?>
 
-                                <div class="tooltip w3-right" id="data-report-comment">
-                                    <span class="w3-blue tooltiptext">Report this comment to moderators</span>
-                                    <button data-id="<?php echo $comment['id'] ?>" id="report-comment-button" name="flag-comment" class="fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round" /></button>
+                                <div class="w3-right">
+                                    <div class="tooltip" id="data-report-comment">
+                                        <span class="w3-blue tooltiptext">Report this comment to moderators</span>
+                                        <button data-id="<?php echo $comment['id'] ?>" id="report-comment-button" name="flag-comment" class="fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round" /></button>
+                                    </div>
+
+                                    <?php if (trim($current_user->id) === trim($comment['userid']) || $current_user->admin) { ?>
+                                        <div class="tooltip" id="data-report-comment">
+                                            <span class="w3-blue tooltiptext">Delete this comment</span>
+                                            <button data-id="<?php echo $comment['id'] ?>" id="delete-comment-button" name="delete-comment" class="fa fa-trash w3-btn w3-red w3-hover-opacity w3-padding-small w3-round" /></button>
+                                        </div>
+                                    <?php } ?>
                                 </div>
                             <?php } ?>
                         </article>
@@ -748,9 +895,41 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
             echo "<h4>No comments yet.</h4>";
         }
         ?>
+        
+        <template id="comment-template">
+            <div id="comment" data-testid="" class="w3-row w3-section">
+                <div class="w3-col" id="comment-profile-picture" style="width: 50px;">
+                    <img class="w3-bar-item w3-circle w3-card-2" width="50px" height="50px" src="/img/no_image.png">
+                </div>
+
+                <div data-testid="gr8-comment-divider" class="w3-hide-small w3-col" style="width: max-content; height: max-content;">
+                    <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
+                </div>
+
+                <div id="comment-text" class="w3-col w3-card-2" style="width: 60%;">
+                    <article class="gr8-theme w3-light-grey w3-padding-small w3-round w3-border w3-border-grey w3-text-black" style="min-height: 75px;">
+                        <header class="w3-padding-bottom">
+                            <b><a id="comment-user" href="/@"></a></b>
+
+                            <span class="w3-mobile w3-right">
+                                <span id="date"></span> -
+                                <span id="votes">0 favorites</span>
+                            </span>
+                        </header>
+
+                        <span id="comment-internal-text" class="w3-padding-bottom" style="word-wrap: break-word; white-space: normal;"></span><br>
+
+                        <div class="tooltip">
+                            <span class="w3-blue tooltiptext">Favorite Comment</span>
+                            <button data-id="" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </template>
     </div>
     <?php
-    echo '<br /><br />';
+    echo '<br />';
     include('linkbar.php');
     ?>
 </body>
