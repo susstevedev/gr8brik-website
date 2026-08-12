@@ -409,10 +409,7 @@ function fetch_comments($model_id, $csrf) {
     $bbcode = new BBCode();
 
     if (empty($csrf) || $csrf != $_SESSION['csrf']) {
-        return json_encode([
-            "message" => 'Invalid CSRF token provided',
-            "error" => 'INVALID_CSRF'
-        ]);
+        return json_encode(["error" => 'Invalid CSRF token provided']);
     }
 
     if(loggedin()) {
@@ -427,6 +424,11 @@ function fetch_comments($model_id, $csrf) {
     $comments = [];
 	while ($row = $comResult->fetch_assoc()) {
         $comment_id = $row['id'];
+ 
+        $result = $conn->query("SELECT * FROM model WHERE id = '$model_id' AND removed = 0");
+        if($result->num_rows === 0 && $current_user->admin != true) {
+            continue;
+        }
 
         $voted_query = $conn->query("SELECT * FROM comment_votes WHERE comment_id = '$comment_id'");
         $comment_votes = 0;
@@ -442,6 +444,7 @@ function fetch_comments($model_id, $csrf) {
         
         $c_user = $row['user'];
         $userRow = User::getUser($c_user);
+        $comment = $bbcode->toHTML($row['comment'], true, true);
 
         $youBlocked = false;
         $theyBlocked = false;
@@ -457,10 +460,12 @@ function fetch_comments($model_id, $csrf) {
                 }
                 if ($youBlocked && $theyBlocked) {
                     $message = "You blocked @" . $userRow->username . ", and they blocked you. Their comments and profile will not be visible.";
+                    $comment = null;
                 } elseif ($youBlocked) {
                     $message = "You blocked @" . $userRow->username . ". Your comments and profile will not be visible to them.";
                 } elseif ($theyBlocked) {
                     $message = "You're blocked from @" . $userRow->username . ". Their comments and profile will not be visible.";
+                    $comment = null;
                 }
             }
         }
@@ -468,8 +473,6 @@ function fetch_comments($model_id, $csrf) {
         if (!is_numeric($row['date'])) {
             $row['date'] = 0;
         }
-
-        $comment = $bbcode->toHTML($row['comment'], true, true);
 
         $comments[] = [
             'id' => $comment_id,
@@ -486,6 +489,7 @@ function fetch_comments($model_id, $csrf) {
         ];
         $message = null;
     }
+
     $comResult->free();
     return json_encode($comments); 
 }
@@ -537,12 +541,19 @@ if(isset($_POST['comment'])) {
         exit;
     }
 
-    $stmt4 = $conn->prepare("SELECT user FROM model WHERE id = ?");
+    $stmt4 = $conn->prepare("SELECT user FROM model WHERE id = ? AND removed = 0");
     $stmt4->bind_param("i", $model_id);
     $stmt4->execute();
     $result = $stmt4->get_result();
-    $userid = (int)$result->fetch_assoc()['user'];
-		
+
+    if($result->num_rows === 0) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Creation not found.']);
+        exit;
+    }
+
+    $userid = $result->fetch_assoc()['user'] ?? null;
+
 	$date = time();
     $is_op = $_SESSION['userid'] === $userid ? 1 : 0;
     $id = $current_user->id;
@@ -557,12 +568,19 @@ if(isset($_POST['comment'])) {
     $stmt->execute();
     
     if ($stmt2->execute()) {
+        $last_id = $conn->insert_id;
         $stmt2->close();
 
         $stmtCountUpd = $conn->prepare("UPDATE model SET replies = replies + 1 WHERE id = ?");
         $stmtCountUpd->bind_param("i", $model_id);
         $stmtCountUpd->execute();
         $stmtCountUpd->close();
+
+        $stmt4 = $conn->prepare("SELECT replies FROM model WHERE id = ? AND removed = 0");
+        $stmt4->bind_param("i", $model_id);
+        $stmt4->execute();
+        $result = $stmt4->get_result();
+        $reply_count = $result->fetch_assoc()['replies'];
 
         $sub_stmt = $conn2->prepare("SELECT userid FROM subscriptions WHERE content = ? AND category = ? AND userid != ?");
         $sub_stmt->bind_param("iii", $model_id, $category, $id);
@@ -593,7 +611,19 @@ if(isset($_POST['comment'])) {
 
         $conn->close();
         http_response_code(200);
-        echo json_encode(['success' => 'Comment sent.']);
+        echo json_encode([
+            'success' => 'Comment sent.',
+            'comment' => [
+                'id' => $last_id,
+                'text' => $comment,
+                'username' => $current_user->username,
+                'userid' => $current_user->id,
+                'admin' => $current_user->admin,
+                'picture' => $current_user->picture,
+                'date' => time_ago(date('Y-m-d H:i:s', $date)),
+                'replies' => $reply_count
+            ],
+        ]);
         exit;
     } else {
         $stmt2->close();
