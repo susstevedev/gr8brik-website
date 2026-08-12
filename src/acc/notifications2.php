@@ -36,7 +36,7 @@ if (!loggedin()) {
         $offset = ($page - 1) * $limit;
         $pDown = $page - 1;
         $pUp = $page + 1;
-        $sql = "SELECT * FROM notifications WHERE user = ? ORDER BY timestamp DESC";
+        $sql = "SELECT * FROM notifications WHERE user = ? AND category2 IS NOT NULL ORDER BY timestamp DESC";
 
         try {
             $thisuser = $current_user->id;
@@ -61,7 +61,7 @@ if (!loggedin()) {
             while ($row = $result->fetch_assoc()) {
                 $profile = $row['profile'];
                 $content = $row['content'];
-                $category = (int)$row['category'];
+                $category = $row['category2'];
                 $timestamp = is_numeric($row['timestamp']) ? (int)$row['timestamp'] : time();
 
                 $user_data_o = User::getUser($profile);
@@ -69,10 +69,8 @@ if (!loggedin()) {
                 $userid = $user_data_o->id ?: 0;
 
                 //groups matching content together
-                if ($category === 4) {
-                    $group_key = $category . "_" . $row['content'] . "_" . date("Y-m-d", $timestamp);
-                } else if ($category === 1) {
-                    $group_key = "cat_" . $category . "_" . date("Y-m-d", $timestamp);
+                if ($category === 'profile') {
+                    $group_key = $category . "_" . date("Y-m-d", $timestamp);
                 } else {
                     $group_key = $category . "_" . $row['content'] . "_" . date("Y-m-d", $timestamp);
                 }
@@ -97,6 +95,7 @@ if (!loggedin()) {
 
             $total_groups = count($grouped_notifications);
             $sliced_notifications = array_slice($grouped_notifications, $offset, $limit);
+            print_r($sliced_notifications);
 
             if ($page > 1) {
                 echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round w3-border w3-border-indigo" href="?page=' . $pDown . '">Back</a>&nbsp;&nbsp;';
@@ -107,7 +106,7 @@ if (!loggedin()) {
             echo '<hr />';
             $stmt->close();
 
-            foreach ($sliced_notifications as $group) {
+            foreach ($sliced_notifications as $group_name => $group) {
                 $url = null;
                 $post = null;
                 $img = null;
@@ -127,7 +126,7 @@ if (!loggedin()) {
                 }
 
                 // --- CATEGORY 1: Follows ---
-                if ($category === 1) {
+                if ($category === 'follow') {
                     $valid = true;
 
                     if ($user_count > 1) {
@@ -139,7 +138,7 @@ if (!loggedin()) {
                     $post = ($user_count > 1 ? "followed you " : "followed you ");
                     $img = $group['fallback_pic'];
                     // --- CATEGORY 2: Model Comments ---
-                } elseif ($category === 2) {
+                } elseif ($category === 'comment') {
                     $stmt2 = $conn->prepare("SELECT screenshot, name FROM `" . DB_NAME2 . "`.`model` WHERE id = ?");
                     $stmt2->bind_param("i", $content);
                     $stmt2->execute();
@@ -152,7 +151,7 @@ if (!loggedin()) {
                     $post = ($user_count > 1 ? 'commented on ' : 'commented on ') . ($row2['name'] ?: '[unknown]');
                     $stmt2->close();
                     // --- CATEGORY 3: Topic Replies ---
-                } elseif ($category === 3) {
+                } elseif ($category === 'forum_reply') {
                     $stmt2 = $conn->prepare("SELECT title FROM `" . DB_NAME3 . "`.`messages` WHERE id = ?");
                     $stmt2->bind_param("i", $content);
                     $stmt2->execute();
@@ -166,23 +165,23 @@ if (!loggedin()) {
                     $post = ($user_count > 1 ? "replied to " : "replied to ") . $title;
 
                     $stmt2->close();
-                    // --- CATEGORY 4: Admin Warnings ---
-                } elseif ($category === 4) {
-                    $stmt2 = $conn->prepare("SELECT reason FROM `warnings` WHERE id = ?");
+                    // --- CATEGORY 4: Admin creation removals ---
+                } elseif ($category === 'creation_remove') {
+                    $stmt2 = $conn->prepare("SELECT screenshot, name FROM `" . DB_NAME2 . "`.`model` WHERE id = ?");
                     $stmt2->bind_param("i", $content);
                     $stmt2->execute();
                     $res2 = $stmt2->get_result();
                     $row2 = $res2->fetch_assoc();
 
                     $valid = true;
-                    $img = '../img/com.jpg';
-                    $url = "#";
-                    $reason = !empty($row2['reason']) ? $row2['reason'] : "[unknown]";
-                    $post = "got warned: " . $reason;
+                    $img = $row2['screenshot'];
+                    $url = "/build/" . urlencode($content);
+                    $title = !empty($row2['name']) ? $row2['name'] : "[unknown]";
+                    $post = $title . " was removed";
 
                     $stmt2->close();
                     // --- CATEGORY 5: Model Favorites ---
-                } elseif ($category === 5) {
+                } elseif ($category === 'creation_fav') {
                     $stmt2 = $conn->prepare("SELECT screenshot, name FROM `" . DB_NAME2 . "`.`model` WHERE id = ?");
                     $stmt2->bind_param("i", $content);
                     $stmt2->execute();
@@ -201,7 +200,7 @@ if (!loggedin()) {
 
                 if ($valid === true) {
         ?>
-            <article class='w3-card-4 w3-hover-opacity gr8-theme w3-padding w3-round w3-large'>
+            <article id="<?php echo $group_name ?>" class='w3-card-4 w3-hover-opacity gr8-theme w3-padding w3-round w3-large'>
                 <a href="<?php echo htmlspecialchars($url); ?>"><img src="<?php echo htmlspecialchars($img); ?>" class="w3-round" style='background: #ddd; width: 150px; height: 150px;' alt='Image' title='Image'></a>
                 <a href="<?php echo htmlspecialchars($url); ?>"><span style='display: inline-block; vertical-align: top; padding: 10px;'>
                         <strong><?php echo htmlspecialchars($user_string); ?></strong> <?php echo htmlspecialchars($post); ?>
