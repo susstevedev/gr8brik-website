@@ -61,6 +61,10 @@ if (!in_array($post_id, $_SESSION['viewed_post_ids'])) {
     $_SESSION['viewed_post_ids'][] = $post_id;
 }
 
+if ($category === "deleted") {
+    $error = "<b>This conversation has been removed because it violated our <a href='/rules'>rules</a>.</b><br />";
+}
+
 if (isset($_POST['comment_delete'])) {
     if ($conn->connect_error) {
         exit("Database connection failed.");
@@ -244,11 +248,6 @@ if (isset($_POST['comment'])) {
         exit;
     }
 
-    if ($category === "deleted") {
-        echo "<b id='deletedwarning'>This conversation has been removed because it violated our <a href='/rules'>rules</a>.</b><br />";
-        exit;
-    }
-
     if ($category === "nolist") {
         echo "<b id='unlistedwarning'>This forum is unlisted, only people with the link can view it.</b><br />";
     }
@@ -282,17 +281,9 @@ if (isset($_POST['comment'])) {
             }
 
             $c_user_o = User::getUser($c_user);
-            $c_user = $c_user_o->id;
-
-            if (!User::isDeleted($c_user)) {
-                $c_username = htmlspecialchars($c_user_o->username);
-                $isAdmin = $c_user_o->admin === 1 ? "w3-text-red" : "";
-                $pfp = $c_user_o->picture ?: '/img/user.png';
-            } else {
-                $c_username = $row['username'] ?? null;
-                $isAdmin = false;
-                $pfp = '/img/user.png';
-            }
+            $c_username = htmlspecialchars($c_user_o->username);
+            $isAdmin = $c_user_o->admin === 1 ? "w3-text-red" : "";
+            $pfp = $c_user_o->picture;
 
             $user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user'");
             $user_post_count_row = $user_post_count_result->fetch_assoc();
@@ -303,11 +294,16 @@ if (isset($_POST['comment'])) {
             <div class="w3-row" style="display:flex;width:100%;">
                 <div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-margin-right" style="flex-shrink: 1; width: 20%;">
                     <img id="pfp" src="<?php echo $pfp ?>"><br />
-                    <a href="../user/<?php echo $c_user ?>">
+                    <?php if (!User::isDeleted($c_user)) { ?>
+                        <a href="../user/<?php echo $c_user ?>">
+                    <?php } ?>
                         <span class="<?php echo $isAdmin ?>" style="text-overflow: ellipsis;">
                             <?php echo $c_username ?>
                         </span>
-                    </a><br />
+                    <?php if (!User::isDeleted($c_user)) { ?>
+                        </a>
+                    <?php } ?>
+                    <br />
                     <time title="<?php echo $c_date ?>" datetime="<?php echo $c_date ?>">Posted <?php echo time_ago($c_date) ?></time><br />
                     <time title="<?php echo $c_edited ?>" datetime="<?php echo $c_edited ?>">Edited <?php echo time_ago($c_edited) ?></time><br />
                     <span><?php echo $user_post_count ?> total posts</span>
