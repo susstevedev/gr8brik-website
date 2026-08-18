@@ -62,10 +62,7 @@ if(isset($_GET['get_creation']) && isset($_GET['id'])) {
     }
 
     while ($row = $result->fetch_assoc()) {
-        $name = htmlspecialchars(substr($row['name'] ?: 'Untited Creation', 0, 30));
-        if (strlen($row['name']) >= 30) {
-            $name .= '...';
-        }
+        $name = htmlspecialchars($row['name'] ?: 'Untited Creation');
 
         $creation = [
             'model_id' => $row['id'],
@@ -77,6 +74,7 @@ if(isset($_GET['get_creation']) && isset($_GET['id'])) {
             'viewer_url' => '/build/' . $row['id'],
             'visibility' => $row['visibility'],
             'legacy' => (bool)$row['legacy'],
+            'can_edit' => (bool)$row['can_edit'],
         ];
     }
 
@@ -90,12 +88,29 @@ if (isset($_POST['edit']) && isset($_POST['id'])) {
     }
 
     $model_id = (int)$_POST['id'];
+
+    $stmt_find = $conn2->prepare('SELECT id, name, legacy FROM model WHERE user = ? AND id = ? AND removed = 0');
+    $stmt_find->bind_param('ii', $current_user->id, $model_id);
+    $stmt_find->execute();
+    $result = $stmt_find->get_result();
+
+    if($result->num_rows === 0) {
+        echo json_encode(['success' => false, 'error' => 'Creation not found']);
+        exit;
+    }
+
+    $data = $result->fetch_assoc();
     $name = $_POST['title'];
     $about = $_POST['description'];
     $visibility = $_POST['visibility'];
+    $editior = (bool)$_POST['can_edit'];
 
-    $stmt = $conn2->prepare("UPDATE model SET name = ?, description = ?, visibility = ? WHERE id = ? AND user = ? AND removed = 0");
-    $stmt->bind_param("sssii", $name, $about, $visibility, $model_id, $current_user->id);
+    if((bool)$data['legacy'] === true) {
+        $name = $data['name'];
+    }
+
+    $stmt = $conn2->prepare("UPDATE model SET name = ?, description = ?, visibility = ?, can_edit = ? WHERE id = ? AND user = ? AND removed = 0");
+    $stmt->bind_param("sssiii", $name, $about, $visibility, $editior, $model_id, $current_user->id);
     $result = $stmt->execute();
 
     if ($result) {
@@ -272,6 +287,7 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                             $clone.find("#visibility").val(res.visibility);
                             $clone.find("#modeler-open").attr('href', res.modeler_url);
                             $clone.find("#viewer-open").attr('href', res.viewer_url);
+                            $clone.find('#can_edit').prop('checked', res.can_edit);
 
                             if(res.legacy === true) {
                                 $clone.find("#legacy-warning").removeClass('w3-hide');
@@ -295,7 +311,8 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                                     id: id,
                                     title: $("#edit-creation-form #title").val(),
                                     description: $("#edit-creation-form #about").val(),
-                                    visibility: $("#edit-creation-form #visibility").val()
+                                    visibility: $("#edit-creation-form #visibility").val(),
+                                    can_edit: $('#edit-creation-form #can_edit').is(':checked'),
                                 };
 
                                 $.ajax({
@@ -305,10 +322,11 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                                     dataType: 'json',
                                     success: function(response) {
                                         if(response.success) {
-                                            alert(response.message);
                                             $(".editingbox").remove();
                                             $('#creationstab').children().not('template').remove();
                                             window.getCreations(1);
+                                            $(`<h4 class='message w3-light-grey w3-card-2 w3-padding w3-round'>${response.message}</h4>`).insertBefore(elm);
+                                            $("html, body").animate({ scrollTop: 0 }, "slow");
                                         } else if(response.error) {
                                             console.error(response.error);
                                             $(".editingbox").remove();
@@ -449,6 +467,11 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                             <option value="unlisted">Unlisted</option>
                             <option value="private">Private</option>
                         </select>
+                    </p>
+
+                    <p>
+                        <input type="checkbox" id="can_edit" name="can_edit">
+                        <label for="can_edit"> Let other people open this creation in the modeler</label><br>
                     </p>
 
                     <p>

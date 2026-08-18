@@ -103,7 +103,7 @@ if (isset($_POST['banner'])) {
                 <form method='post' action='/ajax/account_settings.php'>
                     <h2>Are you sure you want to delete your account?</h2>
                     <p><input type="password" name="password" placeholder="Password" class="w3-input w3-border w3-mobile" required /></p>
-                    <p>You can restore your account up until 7 days after you start the process. After those 7 days, all of your account data will be anonymized or deleted.</p>
+                    <p>You can restore your account up until 14 days after you start the process. After those 14 days, all of your account data will be anonymized or deleted.</p>
                     <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('deactive').style.display='none'">No</span>&nbsp;
                     <input type="submit" value="Yes" name="deactive_account" class="w3-btn w3-large w3-white w3-hover-red">
                 </form>
