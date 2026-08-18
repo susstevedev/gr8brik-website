@@ -20,50 +20,6 @@ if ($data['message']) {
     }
 }
 
-if (isset($_POST['report'])) {
-    header('Content-Type: application/json');
-
-    if ($_SESSION['csrf'] === $_POST['csrf_token']) {
-        if (loggedin()) {
-            $id = $current_user->id;
-            $report_id = bin2hex(random_bytes(16));
-            $date = date("Y-m-d H:i:s");
-            $model_id = (int)htmlspecialchars($_POST['model_id']);
-
-            if (!empty($_POST['other']) || isset($_POST['reason']) && $_POST['reason'] === "something-else") {
-                $reason = htmlspecialchars($_POST['other']);
-            } elseif (isset($_POST['reason'])) {
-                $reason = htmlspecialchars($_POST['reason']);
-            } else {
-                echo json_encode(['error' => 'Oops! No reason selected.']);
-            }
-
-            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-            if ($conn->connect_error) {
-                echo json_encode(['error' => 'Database connection failed.']);
-                exit;
-            }
-
-            $stmt = $conn->prepare("INSERT INTO reported (id, build, date, reason, user) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("sissi", $report_id, $model_id, $date, $reason, $id);
-
-            if ($stmt->execute()) {
-                echo json_encode(['success' => 'Creation reported! Thanks for making our platform a safe space for everyone!']);
-            } else {
-                echo json_encode(['error' => 'Oops! We couldn\'t report the submitted creation at this moment. Please try again later.']);
-            }
-
-            $stmt->close();
-            $conn->close();
-        } else {
-            echo json_encode(['error' => 'Oops! Please login to report a creation.']);
-        }
-    } else {
-        echo json_encode(['error' => 'Oops! Your cross-site-request-forgery token seems to be invalid.']);
-    }
-    exit;
-}
-
 if (isset($_POST['reportv2'])) {
     header('Content-Type: application/json');
 
@@ -83,7 +39,7 @@ if (isset($_POST['reportv2'])) {
             }
 
             if (!isset($type) || empty($type)) {
-                echo json_encode(['error' => 'report_type shall be string with values of either: comment, creation, profile']);
+                echo json_encode(['error' => 'No report type provided']);
                 exit;
             }
 
@@ -129,7 +85,7 @@ if (isset($_POST['reportv2'])) {
             echo json_encode(['error' => 'Oops! Please login to report content.']);
         }
     } else {
-        echo json_encode(['error' => 'Oops! Your cross-site-request-forgery token seems to be invalid.']);
+        echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
     }
     exit;
 }
@@ -180,36 +136,40 @@ if (isset($_POST['delete_comment'])) {
     $comment_id = (int)$_POST['id'];
 
     if ($_SESSION['csrf'] === $_POST['csrf_token']) {
-        if (loggedin() && $current_user->admin === true) {
+        if (loggedin()) {
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
             $id = $current_user->id;
 
-            $sql = "SELECT id, hidden, user FROM comments WHERE id = ? AND user = ?";
+            $sql = "SELECT id, hidden, user FROM comments WHERE id = ?";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("ii", $comment_id, $id);
+            $stmt->bind_param("i", $comment_id);
             $stmt->execute();
             $result = $stmt->get_result();
 
             if ($row = $result->fetch_assoc()) {
-                $sql2 = "UPDATE comments SET hidden = 1 WHERE id = ?";
+                if(trim($row['user']) === trim($current_user->id) || $current_user->admin) {
+                    $sql2 = "UPDATE comments SET hidden = 1 WHERE id = ?";
 
-                if($row['hidden']) {
-                    $sql2 = "UPDATE comments SET hidden = 0 WHERE id = ?";
-                }
+                    if($row['hidden']) {
+                        $sql2 = "UPDATE comments SET hidden = 0 WHERE id = ?";
+                    }
 
-                $stmt2 = $conn->prepare($sql2);
-                $stmt2->bind_param("i", $comment_id);
+                    $stmt2 = $conn->prepare($sql2);
+                    $stmt2->bind_param("i", $comment_id);
 
-                if ($stmt2->execute()) {
-                    echo json_encode(['success' => 'Comment updated']);
+                    if ($stmt2->execute()) {
+                        echo json_encode(['success' => 'Comment updated']);
+                    } else {
+                        echo json_encode(['error' => 'Error deleting comment']);
+                    }
                 } else {
-                    echo json_encode(['error' => 'Error deleting comment']);
+                    echo json_encode(['error' => 'An authentication error has occured']);
                 }
             } else {
                 echo json_encode(['error' => 'Comment not found']);
             }
         } else {
-            echo json_encode(['error' => 'An authentication error has occured']);
+            echo json_encode(['error' => 'Not logged in']);
         }
     } else {
         echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
@@ -225,6 +185,13 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 <head>
     <title><?php echo $data['name'] ?? "This user's creation"?> by <?php echo $data['username'] ?? null ?></title>
     <?php include 'header.php' ?>
+
+    <script type="text/javascript">
+        $(document).ready(function() {
+            window.embed_model = <?php echo (int)$_GET['id'] ?>;
+        });
+    </script>
+    <script type="text/javascript" src="/lib/creation.js"></script>
 </head>
 
 <body class="w3-light-blue w3-container">
@@ -276,7 +243,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
             <div class="w3-container">
                 <span onclick="$('#delete-comment').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
                 <form id="deleteCommentForm">
-                    <h2>Are you sure you want to delete this comment?</h2>
+                    <h2>Are you sure you want to delete/restore this comment?</h2>
 
                     <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf']; ?>">
                     <span class="w3-btn w3-large w3-white w3-hover-blue w3-round-small" onclick="$('#delete-comment').hide();">No</span>
@@ -285,375 +252,6 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
             </div>
         </div>
     </div>
-
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            $(document).ready(function() {
-                let embed_model = <?php echo (int)$_GET['id'] ?>
-
-                function fetchCSRFToken(callback) {
-                    $.get("/ajax/config.php", {
-                            get_csrf_token: true
-                        }, function(data) {
-                            console.log(data);
-                            $("#csrf_token").val(data.csrf_token);
-                            window.csrf_token = data.csrf_token;
-                            callback();
-                        }, "json")
-                        .fail(function(xhr, text, err) {
-                            alert(text);
-                        });
-                }
-
-                function showError(text) {
-                    $('#ajax-error').text(text).slideDown("fast").delay(5000).slideUp("fast");
-                }
-
-                function showSuccess(text) {
-                    $('#ajax-success').text(text).slideDown('fast').delay(5000).slideUp('fast');
-                }
-
-                $(document).on("click", "#report-comment-button", function() {
-                    event.preventDefault();
-                    let comment_id = $(this).data("id");
-
-                    $('#report-comment').show();
-                    $("#reportCommentForm [name='comment_id']").val(comment_id);
-
-                    $("#reportCommentForm").submit(function(e) {
-                        e.preventDefault();
-
-                        fetchCSRFToken(function() {
-
-                            let payload = {
-                                report_type: 'comment',
-                                csrf_token: window.csrf_token,
-                                reportv2: true,
-                                reportable_id: comment_id,
-                                other: $("#reportCommentForm #otherReason").val(),
-                                reason: $("#reportCommentForm [name='reason']:checked").val(),
-                            }
-                            console.log(payload);
-
-                            $.ajax({
-                                url: "",
-                                type: "POST",
-                                data: payload,
-                                dataType: "json",
-                                success: function(response) {
-                                    $("#report-comment").hide();
-
-                                    if (response.success) {
-                                        showSuccess(response.success);
-                                        $("#reportCommentForm")[0].reset();
-                                    } else {
-                                        showError(response.error);
-                                    }
-                                },
-                                error: function() {
-                                    $("#report-comment").hide();
-                                    showError("An error occurred. Please try again later.");
-                                }
-                            });
-                        });
-                    });
-                });
-
-                $(document).on("click", "#report-creation-button", function() {
-                    event.preventDefault();
-                    let creation_id = $(this).data("id");
-
-                    $('#report-comment').show();
-                    $("#reportCommentForm [name='comment_id']").val(creation_id);
-
-                    $("#reportCommentForm").submit(function(e) {
-                        e.preventDefault();
-
-                        fetchCSRFToken(function() {
-
-                            let payload = {
-                                report_type: 'creation',
-                                csrf_token: window.csrf_token,
-                                reportv2: true,
-                                reportable_id: creation_id,
-                                other: $("#reportCommentForm #otherReason").val(),
-                                reason: $("#reportCommentForm [name='reason']:checked").val(),
-                            }
-                            console.log(payload);
-
-                            $.ajax({
-                                url: "",
-                                type: "POST",
-                                data: payload,
-                                dataType: "json",
-                                success: function(response) {
-                                    $("#report-comment").hide();
-
-                                    if (response.success) {
-                                        showSuccess(response.success);
-                                        $("#reportCommentForm")[0].reset();
-                                    } else {
-                                        showError(response.error);
-                                    }
-                                },
-                                error: function() {
-                                    $("#report-comment").hide();
-                                    showError("An error occurred. Please try again later.");
-                                }
-                            });
-                        });
-                    });
-                });
-
-                $(document).on("click", "#delete-comment-button", function() {
-                    event.preventDefault();
-                    let comment_id = $(this).data("id");
-                    $('#delete-comment').show();
-
-                    $("#deleteCommentForm").submit(function(e) {
-                        e.preventDefault();
-
-                        fetchCSRFToken(function() {
-                            let payload = {
-                                csrf_token: window.csrf_token,
-                                delete_comment: true,
-                                id: comment_id,
-                            }
-                            console.log(payload);
-
-                            $.ajax({
-                                url: "",
-                                type: "POST",
-                                data: payload,
-                                dataType: "json",
-                                success: function(response) {
-                                    $("#delete-comment").hide();
-
-                                    if (response.success) {
-                                        showSuccess(response.success);
-                                        $("#deleteCommentForm")[0].reset();
-
-                                        let comment_selector = '#comment' + comment_id;
-                                        $(comment_selector).remove();
-                                    } else {
-                                        showError(response.error);
-                                    }
-                                },
-                                error: function() {
-                                    $("#delete-comment").hide();
-                                    showError("An error occurred. Please try again later.");
-                                }
-                            });
-                        });
-                    });
-                });
-
-                $("#deleteModelForm").submit(function(e) {
-                    e.preventDefault();
-                    fetchCSRFToken(function() {
-                        $.ajax({
-                            url: "",
-                            type: "POST",
-                            data: $("#deleteModelForm").serialize(),
-                            dataType: "json",
-                            success: function(response) {
-                                if (response.success) {
-                                    showSuccess(response.success);
-                                    window.location.reload();
-                                } else {
-                                    showError(response.error);
-                                }
-                            },
-                            error: function() {
-                                showError("An error occurred. Please try again later.");
-                            }
-                        });
-                    });
-                });
-
-                $(document).on("click", ".like-creation, .unlike-creation", function(event) {
-                    event.preventDefault();
-
-                    let btn = $(this);
-                    let btnspan = btn.find('span.text');
-                    let btnicon = btn.find('span.fa');
-
-                    let is_like = btn.hasClass('like-creation');
-                    let data = {
-                        model_id: embed_model
-                    };
-
-                    if (is_like) {
-                        data.upvote = true;
-                    } else {
-                        data.downvote = true;
-                    }
-
-                    $.ajax({
-                        url: "/ajax/build",
-                        method: "POST",
-                        dataType: 'json',
-                        data: data,
-                        success: function(res) {
-                            if ((is_like && res.success) || !is_like) {
-                                if (is_like) {
-                                    btnspan.text(res.text);
-                                    btnicon.removeClass('fa-star-o').addClass('fa-star');
-                                    btn.removeClass('like-creation w3-yellow')
-                                        .addClass('unlike-creation w3-red');
-                                } else {
-                                    btnspan.text(res.text);
-                                    btnicon.removeClass('fa-star').addClass('fa-star-o');
-                                    btn.removeClass('unlike-creation w3-red')
-                                        .addClass('like-creation w3-yellow');
-                                }
-                            } else if (res.error) {
-                                showError(res.error);
-                            }
-                        },
-                        error: (xhr, text, err) => {
-                            console.error(text, err, xhr);
-                            try {
-                                let res = JSON.parse(xhr.responseText);
-                                let texterror = res.error || "An error occurred, try again later";
-                                showError(texterror);
-                            } catch (e) {
-                                showError("An error occurred. Please try again later.");
-                            }
-                        }
-                    });
-                });
-
-                $(document).on("click", ".upvote-btn", function() {
-                    event.preventDefault();
-                    let comment_id = $(this).data("id");
-                    let btn = $(this);
-
-                    $.ajax({
-                        url: "/ajax/build",
-                        method: "POST",
-                        dataType: 'json',
-                        data: {
-                            upvote_comment: true,
-                            comment_id: comment_id
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                btn.replaceWith(`<button data-id="${comment_id}" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>`);
-                            } else if (response.error) {
-                                showError(response.error);
-                            }
-                        },
-                        error: (jqXHR, textStatus, errorThrown) => {
-                            console.error("error:", textStatus, errorThrown, jqXHR);
-                            const response = JSON.parse(jqXHR.responseText);
-                            showError(response.error);
-                        }
-                    });
-                });
-
-                $(document).on("click", ".downvote-btn", function() {
-                    event.preventDefault();
-                    let comment_id = $(this).data("id");
-                    let btn = $(this);
-
-                    $.ajax({
-                        url: "/ajax/build",
-                        method: "POST",
-                        dataType: 'json',
-                        data: {
-                            downvote_comment: true,
-                            comment_id: comment_id
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                btn.replaceWith(`<button data-id="${comment_id}" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>`);
-                            } else if (response.error) {
-                                showError(response.error);
-                            }
-                        },
-                        error: (jqXHR, textStatus, errorThrown) => {
-                            console.error("error:", textStatus, errorThrown, jqXHR);
-                            const response = JSON.parse(jqXHR.responseText);
-                            showError(response.error);
-                        }
-                    });
-                });
-
-                $(document).on("click", "#post-comment", function() {
-                    event.preventDefault();
-
-                    fetchCSRFToken(function() {
-                        const btn = $(this);
-                        const commentBox = $("[data-testid='gr8-comment-box--comment-value']").val();
-                        console.log(commentBox);
-                        const prevCommentBtnText = $("#comment-btn-text").html();
-                        const commentBtnText = $("#comment-btn-text");
-                        const errorElm = $("#ajax-error");
-                        const csrf = window.csrf_token;
-
-                        commentBtnText.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
-                        btn.prop("disabled", true);
-
-                        $.ajax({
-                            url: "/ajax/build",
-                            method: "POST",
-                            dataType: 'json',
-                            data: {
-                                comment: true,
-                                buildId: <?php echo $_GET['id'] ?>,
-                                commentbox: commentBox,
-                                csrf_token: csrf
-                            },
-                            success: function(response) {
-                                if (response.success) {
-                                    commentBtnText.html(prevCommentBtnText);
-                                    btn.prop("disabled", false);
-                                    var elm = $('#data-comment-wrapper');
-
-                                    if(response.success && response.comment) {
-                                        let $clone = $($('#comment-template').html());
-
-                                        $clone.find("#comment-internal-text").text(response.comment.text);
-                                        $clone.find("#comment-user").text(response.comment.username);
-                                        $clone.find("#comment-user").attr('href', '/user/' + response.comment.userid);
-
-                                        if(response.comment.admin) {
-                                            $clone.find("#comment-user").addClass('w3-text-red w3-hover-text-yellow');
-                                        }
-
-                                        $clone.find("#date").text(response.comment.date);
-                                        $clone.find(".upvote-btn").attr('data-id', response.comment.id);
-
-                                        $clone.attr('data-testid', response.comment.id);
-                                        $clone.attr('id', 'comment' + response.comment.id);
-
-                                        $("#comment-count").text(response.comment.replies);
-
-                                        elm.append($clone);
-                                        $("html, body").animate({ scrollTop: $(document).height() }, "slow");
-                                    } else {
-                                        window.location.reload();
-                                    }
-                                } else if(response.error) {
-                                    commentBtnText.html(prevCommentBtnText);
-                                    btn.prop("disabled", false);
-                                    showError(response.error);
-                                }
-                            },
-                            error: (jqXHR, textStatus, errorThrown) => {
-                                commentBtnText.html(prevCommentBtnText);
-                                btn.prop("disabled", false);
-                                console.error("error:", textStatus, errorThrown, jqXHR);
-                                const response = JSON.parse(jqXHR.responseText);
-                                showError(response.error);
-                            },
-                        });
-                    });
-                });
-            });
-        });
-    </script>
 
     <?php include 'navbar.php' ?>
 
@@ -754,7 +352,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </div>
                         <?php } ?>
 
-                        <?php if (trim($current_user->id) === trim($data['userid'])) { ?>
+                        <?php if ($data['can_edit']) { ?>
                             <div class="tooltip" id="data-edit-model">
                                 <span class="w3-tag w3-blue tooltiptext">Edit this creation</span>
                                 <a href="/acc/creations?edit=<?php echo $_GET['id'] ?>">
@@ -781,48 +379,58 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 
         <div class="w3-container w3-margin">
             <?php if ($data['message']) { ?>
-                <p>
-                <div class="gr8-theme w3-light-grey w3-round w3-padding"><?php echo $data['message'] ?></div>
-                </p>
+                <p><div class="gr8-theme w3-light-grey w3-round w3-padding"><?php echo $data['message'] ?></div></p>
             <?php } elseif (loggedin()) { ?>
-                <div id='comment-form w3-half'>
-                    <div id='post'>
-                        <textarea data-testid="gr8-comment-box--comment-value" name='comment-box' id='comment-box' class='w3-input w3-half' placeholder='Add a comment... (@username mentions someone, BBcode supported)' rows='auto' cols='40'></textarea>
+                <div id="comment-form" class="w3-half w3-row w3-display-container">
+                    <div class="w3-left xw3-margin-right" id="comment-profile-picture">
+                        <img class="w3-round" width="50px" height="50px" src="<?php echo $current_user->picture ?>">
                     </div>
-                    <div class="w3-margin-top">
-                        <button id='post-comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo'>
+
+                    <div class="w3-hide-small w3-left xw3-margin-right">
+                        <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
+                    </div>
+
+                    <div id="post" class="w3-rest">
+                        <textarea name="comment-box" id="comment-box" class="w3-input w3-col s12" placeholder="Add a comment... (@username mentions someone, BBcode supported)" rows='auto' cols='40'></textarea>
+                    </div>
+
+                    <div class="w3-col s12 w3-margin-top">
+                        <button id="post-comment" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
                             <span id="comment-btn-text"><i class="fa fa-paper-plane-o" aria-hidden="true"></i> Post comment</span>
                         </button>
                     </div>
                 </div>
             <?php } else { ?>
                 <div>
-                    <a href="/acc/login" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Login to comment</a>
+                    <a href="/acc/login" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo"><i class="fa fa-paper-plane-o" aria-hidden="true"></i> Login to post comments</a>
                 </div>
             <?php } ?>
         </div>
     </main>
 
     <div id="data-comment-wrapper">
-        <?php
-        $comment_data = json_decode(fetch_comments($model_id, $_SESSION['csrf']), true);
+        <h4><span class="fa fa-comments-o" aria-hidden="true"></span> <span id="comment-count"><?php echo $data['comments'] ?></span> comments</h4><hr />
 
-        if ($comment_data && is_array($comment_data)) {
-            echo '<h4><span class="fa fa-comments-o" aria-hidden="true"></span>&nbsp;<span id="comment-count">' . $data['comments'] . '</span> comments</h4><hr />';
+            <?php
+            $comment_data = json_decode(fetch_comments($model_id, $_SESSION['csrf']), true);
+            if ($comment_data && is_array($comment_data)) {
+                foreach ($comment_data as $comment) {
+                    if(!is_array($comment)) {
+                        continue;
+                    }
+            ?>
 
-            foreach ($comment_data as $comment) {
-                if(!is_array($comment)) {
-                    continue;
-                }
-        ?>
-
-                <?php if (!empty($comment['message'])) { ?>
-                    <div class="gr8-theme w3-light-grey w3-padding-small"><?php echo $comment['message'] ?></div>
+                <?php if (!empty($comment['error'])) { ?>
+                    <ul>
+                        <?php foreach ($comment['error'] as $err) { ?>
+                            <li class="w3-text-red"><?php echo $err ?></li>
+                        <?php } ?>
+                    </ul>
                 <?php } ?>
 
-                <div id="comment<?php echo $comment['id'] ?>" data-testid="<?php echo $comment['id'] ?>" class="w3-row w3-section">
+                <div id="comment<?php echo $comment['id'] ?>" data-testid="<?php echo $comment['id'] ?>" class="comment w3-row w3-section">
                     <div class="w3-col" id="comment-profile-picture" style="width: 50px;">
-                        <img class="w3-bar-item w3-circle w3-card-2" width="50px" height="50px" src="<?php echo $comment['picture'] ? $comment['picture'] : '/img/no_image.png' ?>">
+                        <img class="w3-bar-item w3-round w3-card-2 w3-grey" width="50px" height="50px" src="<?php echo $comment['picture'] ? $comment['picture'] : '/img/no_image.png' ?>">
                     </div>
 
                     <div data-testid="gr8-comment-divider" class="w3-hide-small w3-col" style="width: max-content; height: max-content;">
@@ -833,13 +441,11 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         <article class="gr8-theme w3-light-grey w3-padding-small w3-round w3-border w3-border-grey" style="min-height: 75px;">
                             <header class="w3-padding-bottom">
                                 <b>
-                                    <?php $is_deleted = User::isDeleted($comment['userid']);
-                                    if (!$is_deleted) { ?>
-                                        <a href="/@<?php echo urlencode($comment['username']) ?>"
-                                            class="<?php echo $comment['user_admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>">
-                                        <?php }
-                                    echo $comment['username'];
-                                    if (!$is_deleted) { ?>
+                                    <?php if (!User::isDeleted($comment['userid'])) { ?>
+                                        <a href="/@<?php echo urlencode($comment['username']) ?>" class="<?php echo $comment['user_admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>">
+                                    <?php } ?>
+                                    <?php echo $comment['username'] ?>
+                                    <?php if (!User::isDeleted($comment['userid'])) { ?>
                                         </a>
                                     <?php } ?>
                                 </b>
@@ -847,7 +453,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 <span class="w3-mobile w3-right">
                                     <?php echo $comment['is_op'] ? '<b id="is-op" title="Original Poster">OP</b> - ' : '' ?>
                                     <time title="<?php echo $comment['date'] ?>" datetime="<?php echo $comment['date'] ?>"><?php echo $comment['date'] ?></time> -
-                                    <span id="votes"><?php echo $comment['votes'] ?> favorites</span>
+                                    <span class="votes"><span class="count"><?php echo $comment['votes'] ?></span> favorites</span>
                                 </span>
                             </header>
 
@@ -855,7 +461,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 <?php if (!empty($comment['comment'])) { ?>
                                     <?php echo $comment['comment'] ?>
                                 <?php } else { ?>
-                                    <i>Empty message</i>
+                                    <i>Comment was removed</i>
                                 <?php } ?>
                             </span><br />
 
@@ -873,15 +479,17 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 <?php } ?>
 
                                 <div class="w3-right">
-                                    <div class="tooltip" id="data-report-comment">
-                                        <span class="w3-blue tooltiptext">Report this comment to moderators</span>
-                                        <button data-id="<?php echo $comment['id'] ?>" id="report-comment-button" name="flag-comment" class="fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round" /></button>
-                                    </div>
+                                    <?php if (trim($current_user->id) !== trim($comment['userid'])) { ?>
+                                        <div class="tooltip" id="data-report-comment">
+                                            <span class="w3-blue tooltiptext">Report this comment to moderators</span>
+                                            <button data-id="<?php echo $comment['id'] ?>" id="report-comment-button" name="flag-comment" class="fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round" /></button>
+                                        </div>
+                                    <?php } ?>
 
                                     <?php if (trim($current_user->id) === trim($comment['userid']) || $current_user->admin) { ?>
                                         <div class="tooltip" id="data-report-comment">
-                                            <span class="w3-blue tooltiptext">Delete this comment</span>
-                                            <button data-id="<?php echo $comment['id'] ?>" id="delete-comment-button" name="delete-comment" class="fa fa-trash w3-btn w3-red w3-hover-opacity w3-padding-small w3-round" /></button>
+                                            <span class="w3-blue tooltiptext"><?php echo $comment['hidden'] ? 'Restore' : 'Delete'; ?> this comment</span>
+                                            <button data-id="<?php echo $comment['id'] ?>" id="delete-comment-button" name="delete-comment" class="fa fa-trash w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
                                         </div>
                                     <?php } ?>
                                 </div>
@@ -891,37 +499,42 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 </div>
         <?php
             }
-        } else {
-            echo "<h4>No comments yet.</h4>";
         }
         ?>
         
         <template id="comment-template">
-            <div id="comment" data-testid="" class="w3-row w3-section">
-                <div class="w3-col" id="comment-profile-picture" style="width: 50px;">
-                    <img class="w3-bar-item w3-circle w3-card-2" width="50px" height="50px" src="/img/no_image.png">
+            <div id="comment" data-testid="" class="comment w3-row w3-section">
+                <div class="comment-profile-picture w3-col" style="width: 50px;">
+                    <img class="w3-bar-item w3-round w3-card-2 w3-grey" width="50px" height="50px" src="/img/no_image.png">
                 </div>
 
                 <div data-testid="gr8-comment-divider" class="w3-hide-small w3-col" style="width: max-content; height: max-content;">
                     <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
                 </div>
 
-                <div id="comment-text" class="w3-col w3-card-2" style="width: 60%;">
+                <div class="comment-body w3-col w3-card-2" style="width: 60%;">
                     <article class="gr8-theme w3-light-grey w3-padding-small w3-round w3-border w3-border-grey w3-text-black" style="min-height: 75px;">
                         <header class="w3-padding-bottom">
-                            <b><a id="comment-user" href="/@"></a></b>
+                            <b><a class="comment-user" href="/@"></a></b>
 
                             <span class="w3-mobile w3-right">
-                                <span id="date"></span> -
-                                <span id="votes">0 favorites</span>
+                                <span class="date"></span> -
+                                <span class="votes"><span class="count">0</span> favorites</span>
                             </span>
                         </header>
 
-                        <span id="comment-internal-text" class="w3-padding-bottom" style="word-wrap: break-word; white-space: normal;"></span><br>
+                        <span class="comment-text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;"></span><br>
 
                         <div class="tooltip">
                             <span class="w3-blue tooltiptext">Favorite Comment</span>
-                            <button data-id="" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
+                            <button class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
+                        </div>
+
+                        <div class="w3-right">
+                            <div class="tooltip" id="data-report-comment">
+                                <span class="w3-blue tooltiptext">Delete this comment</span>
+                                <button id="delete-comment-button" name="delete-comment" class="fa fa-trash w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
+                            </div>
                         </div>
                     </article>
                 </div>

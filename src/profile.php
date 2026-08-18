@@ -89,9 +89,11 @@ if (isset($_POST['follow'])) {
         if ($result) {
             header("HTTP/1.0 200 OK");
             $message = "Followed this user with success";
+            header('refresh:3');
         } else {
             header("HTTP/1.0 500 Internal Server Error");
             $error = "An error occured while following this user";
+            header('refresh:3');
         }
     }
 }
@@ -110,9 +112,11 @@ if(isset($_POST['unfollow'])) {
         if ($result) {
             header("HTTP/1.0 200 OK");
             $message = "Unfollowed this user with success";
+            header('refresh:3');
         } else {
             header("HTTP/1.0 500 Internal Server Error");
             $error = "An error occured while unfollowing this user";
+            header('refresh:3');
         }
     }
 }
@@ -156,9 +160,11 @@ if (isset($_POST['block'])) {
     if ($result) {
         header("HTTP/1.0 200 OK");
         $message = "Blocked this user with success";
+        header('refresh:3');
     } else {
         header("HTTP/1.0 500 Internal Server Error");
         $error = "An error has happened while blocking this user";
+        header('refresh:3');
     }
 }
 
@@ -175,9 +181,11 @@ if(isset($_POST['unblock'])) {
     if ($result) {
         header("HTTP/1.0 200 OK");
         $message = "Unblocked this user with success";
+        header('refresh:3');
     } else {
         header("HTTP/1.0 500 Internal Server Error");
         $error = "An error has happened while unblocking this user";
+        header('refresh:3');
     }
 }
 
@@ -208,7 +216,7 @@ if(isset($_POST['ban'])) {
             $sql2 = "DELETE FROM sessions WHERE user = $profile_id";
             $result2 = $conn->query($sql2);
             if($result2) {
-                header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
+                header('refresh:0');
                 exit;
             }
         } else {
@@ -232,7 +240,7 @@ if(isset($_POST['warn'])) {
         $sql = "INSERT INTO warnings (user, reason, timestamp) VALUES ($profile_id, '$reason', $start_date)";
         $result = $conn->query($sql);
         if ($result) {
-           	header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
+           	header('refresh:0');
         	exit;
         } else {
             exit('An SQL error occured!');
@@ -257,8 +265,7 @@ if(isset($_POST['delete'])) {
         if ($result) {
             $sql = "INSERT IGNORE INTO blacklist (value, type, reason) VALUES ('$email', 'email', '$reason')";
             $result = $conn->query($sql);
-
-            header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
+            header('refresh:0');
             exit;
         } else {
             exit('An SQL error occured!');
@@ -284,7 +291,7 @@ if(isset($_POST['delete'])) {
     <?php } ?>
 
     <?php if(isset($message)) { ?>
-        <div class="message w3-padding w3-round w3-light-grey"><?php echo $message ?></div><br /><br />
+        <div class="message w3-padding w3-round w3-card-2 w3-light-grey w3-bottom"><?php echo $message ?></div><br /><br />
     <?php } ?>
 
     <script>
@@ -861,10 +868,8 @@ if(isset($_POST['delete'])) {
 			</div><br />
         <?php } ?>
 
-    <div ignore>
         <br />
         <br />
-    </div>
 
     <span id="data-user-actions" class="w3-animate-bottom">
         <div class="tab" id="creationstab">
