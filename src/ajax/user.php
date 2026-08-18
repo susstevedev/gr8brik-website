@@ -86,18 +86,18 @@ class User {
 
     public function __construct(?array $data = []) {
         $this->id = $data['id'] ?? 0;
-        $this->email = $data['email'] ?? '';
-        $this->username = $data['username'] ?? '';
+        $this->email = $data['email'] ?? null;
+        $this->username = $data['username'] ?? '[deleted]';
         $this->picture = $data['picture'] ?? '/img/no_image.png';
-        $this->banner = $data['banner'] ?? '';
-        $this->description = $data['description'] ?? '';
-        $this->twitter = $data['twitter'] ?? '';
-        $this->bsky = $data['bsky'] ?? '';
+        $this->banner = $data['banner'] ?? '/img/no_image.png';
+        $this->description = $data['description'] ?? null;
+        $this->twitter = $data['twitter'] ?? null;
+        $this->bsky = $data['bsky'] ?? null;
         $this->admin = $data['admin'] ?? false;
         $this->alert = $data['alert'] ?? 0;
-        $this->age = $data['age'] ?? '';
-        $this->verify_token = $data['verify_token'] ?? '';
-        $this->deactive = $data['deactive'] ?? '';
+        $this->age = $data['age'] ?? null;
+        $this->verify_token = $data['verify_token'] ?? null;
+        $this->deactive = $data['deactive'] ?? null;
     }
 
     public static function isDeleted(?int $id): bool {
@@ -141,19 +141,15 @@ class User {
         return false;
     }
 
-    public static function getUser(?int $id) {
-        if(!$id) {
-            $id = 0;
-        }
-
+    public static function getUser(?int $id = 0) {
         $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
         $user_stmt = $conn->prepare("SELECT * FROM users WHERE id = ? AND deactive IS NULL");
         $user_stmt->bind_param("i", $id);
         $user_stmt->execute();
         $user_res = $user_stmt->get_result();
+        $user_row = $user_res->fetch_assoc();
 
-        $user_row = $user_res->fetch_assoc() ?? null;
         return new User($user_row);
     }
 
@@ -621,8 +617,10 @@ function delete_inactive_users($single_user_id = null, $blacklist_email = false)
         $execute_bulk($conn2, "UPDATE parts SET userid = 0 WHERE userid IN ($placeholders)", $types, $inactive_user_ids);
 
         //comments
-        $execute_bulk($conn2, "UPDATE comments SET user = 0 WHERE user IN ($placeholders)", $types, $inactive_user_ids);
         $execute_bulk($conn2, "DELETE FROM comment_votes WHERE user_id IN ($placeholders)", $types, $inactive_user_ids);
+        $execute_bulk($conn2, "DELETE FROM comment_votes WHERE comment_id IN (SELECT id FROM comments WHERE hidden = 1 AND user IN ($placeholders))", $types, $inactive_user_ids);
+        $execute_bulk($conn2, "UPDATE comments SET user = 0 WHERE hidden = 0 AND user IN ($placeholders)", $types, $inactive_user_ids);
+        $execute_bulk($conn2, "DELETE FROM comments WHERE hidden = 1 AND user IN ($placeholders)", $types, $inactive_user_ids);
 
         //user interactions
         $execute_bulk($conn2, "DELETE FROM votes WHERE user IN ($placeholders)", $types, $inactive_user_ids);
@@ -660,6 +658,7 @@ function delete_inactive_users($single_user_id = null, $blacklist_email = false)
                 if (file_exists($pfp)) {
                     @unlink($pfp);
                 }
+
                 if (file_exists($banner)) {
                     @unlink($banner);
                 }

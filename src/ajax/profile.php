@@ -109,14 +109,31 @@ if(isset($_GET['who_follows_you'])) {
     exit;
 }
 
-function user_blocks($profileid, $userid, $username, $db) {
+function user_blocks(int $profileid, mixed $db) {
+    global $current_user;
+
+    if(!loggedin()) {
+        return;
+    }
+
     $you = false;
     $them = false;
+    $type = null;
     $message = false;
+    $message_arr = [];
+    $userid = $current_user->id ?? 0; //clarification: this is your user id profileid is their userid
 
     $block_result = $db->query("SELECT * FROM user_blocks WHERE (userid = '$userid' AND profileid = '$profileid') OR (userid = '$profileid' AND profileid = '$userid')");
 
     if ($block_result && $block_result->num_rows > 0) {
+        $block_usero = User::getUser($profileid);
+
+        if(!$block_usero) {
+            return;
+        }
+
+        $username = $block_usero->username ?? '[user]';
+
         while ($row = $block_result->fetch_assoc()) {
             if ($row['userid'] == $userid && $row['profileid'] == $profileid) {
                 $you = true;
@@ -127,13 +144,21 @@ function user_blocks($profileid, $userid, $username, $db) {
 
         if ($you && $them) {
             $message = "You blocked " . $username . ", and they blocked you.";
+            $type = 'both';
         } elseif ($you) {
             $message = "You blocked " . $username;
+            $type = 'you';
         } elseif ($them) {
             $message = "You're blocked from " . $username;
+            $type = 'them';
         }
 
-        return $message;
+        $message_arr = array(
+            'message' => $message,
+            'type' => $type,
+        );
+
+        return $message_arr;
     }
 }
 
@@ -166,7 +191,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
 
     if($use_name === true) {
         $profile_name = $profile_id;
-        $sql = "SELECT id FROM users WHERE username = ? AND deactive IS NULL";
+        $sql = "SELECT * FROM users WHERE username = ? AND deactive IS NULL";
 
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("s", $profile_name);
@@ -175,18 +200,18 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
 
         if($result->num_rows > 0) {
             $row = $result->fetch_assoc();
-            $profile_name = null;
-            $profile_id = (int)$row['id'] ?? null;
+            $profile_id = $row['id'] ?? 0;
+            $usero = new User($row);
         } else {
             return delete_mini_message();
         }
 
         $stmt->close();
     } else {
-        $profile_id = (int)$profile_id;
+        $profile_id = $profile_id;
+        $usero = User::getUser($profile_id);
     }
 
-    $usero = User::getUser($profile_id);
     $email = $usero->email ?? null;
     $username = $usero->username ?? null;
 
@@ -232,13 +257,18 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     $is_blocking = false;
     $is_following = false;
     if(loggedin()) {
-        $blocks = user_blocks($profile_id, $userid, $usero->username , $conn);
-        if($blocks) {
-            header("HTTP/1.0 403 Forbidden");
-            return [
-                "message" => htmlspecialchars($blocks),
-                "error" => 'ACC_BLOCKED_USR'
-            ];
+        $blocks = user_blocks($profile_id, $conn);
+
+        if($blocks && is_array($blocks)) {
+            if($blocks['type'] !== 'you') {
+                header("HTTP/1.0 403 Forbidden");
+                return [
+                    "message" => htmlspecialchars($blocks['message']),
+                    "error" => 'ACC_BLOCKED_USR'
+                ];
+            } else {
+                $is_blocking = true;
+            }
         }
 
         $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ? AND profileid = ?");
@@ -305,7 +335,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         'is_following' => (bool)$is_following,
         'is_blocking' => $is_blocking,
         'message' => $message,
-        'email' => $adm_email ?? ''
+        'email' => $adm_email ?? null
     ];
 
     return $data;
@@ -327,7 +357,7 @@ class UserContent {
         $creation_conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 
         if ($creation_conn->connect_error) {
-            exit("Connection failed: " . $creation_conn->connect_error);
+            return ['success' => false, 'error' => "Database connection failed"];
         }
 
         $limit = 9;
@@ -439,7 +469,7 @@ class UserContent {
 
         // comments and replies
         $profileid = $userid; // whatever
-        $profile_stmt = $conn_creations->prepare("SELECT * FROM comments WHERE user = ? ORDER BY id DESC LIMIT $limit OFFSET $offset;");
+        $profile_stmt = $conn_creations->prepare("SELECT * FROM comments WHERE hidden = 0 AND user = ? ORDER BY id DESC LIMIT $limit OFFSET $offset;");
         $profile_stmt->bind_param("s", $profileid);
         $profile_stmt->execute();
         $result = $profile_stmt->get_result();
@@ -473,9 +503,9 @@ class UserContent {
             $creation_replies[] = $comment2;
         }
 
-        $sql = "SELECT * FROM messages WHERE userid = $profileid AND parent != 0 ORDER BY timestamp DESC LIMIT $limit OFFSET $offset;";
+        $sql = "SELECT * FROM messages WHERE userid = $profileid AND deleted_at IS NULL AND parent != 0 ORDER BY timestamp DESC LIMIT $limit OFFSET $offset;";
         $result = $conn_forum->query($sql);
-                
+
         while ($reply = $result->fetch_assoc()) {
             $parent = $reply['parent'];
             $reply2 = [];

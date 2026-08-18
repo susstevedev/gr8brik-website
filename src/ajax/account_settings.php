@@ -358,16 +358,26 @@ if(isset($_POST['change'])){
 
 $default_pfp = '/img/no_image.png';
 if (isset($_POST['picture'])) {
+    global $current_user;
     $okay = true;
 
-    if ($current_user->verify_token !== NULL) {
-        $error = "Please verify your account to upload or edit your profile picture.";
+    if(!loggedin()) {
+        $error = 'Not logged in';
         $okay = false;
     }
 
-    if (empty($_FILES['fileToUpload']['tmp_name'])) {
-        $error = 'No file selected.';
-        $okay = false;
+    if($okay) {
+        if ($current_user->verify_token != NULL) {
+            $error = "Please verify your account to upload or edit your profile picture. Token: " . $current_user->verify_token;
+            $okay = false;
+        }
+    }
+
+    if ($okay) {
+        if (empty($_FILES['fileToUpload']['tmp_name'])) {
+            $error = 'No file selected.';
+            $okay = false;
+        }
     }
 
     if ($okay) {
@@ -394,7 +404,7 @@ if (isset($_POST['picture'])) {
 
     if ($okay) {
         $db_pfp = '/acc/users/pfps/' . $current_user->id . '.webp';
-        $upload = "users/pfps/" . $current_user->id . ".webp";
+        $upload = "../acc/users/pfps/" . $current_user->id . ".webp";
 
         if (imagewebp($image, $upload, 50)) {
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -407,7 +417,7 @@ if (isset($_POST['picture'])) {
             $stmt->bind_param("ss", $db_pfp, $id);
             if ($stmt->execute()) {
                 http_response_code(200);
-                exit(json_encode(['success' => true, 'message' => 'Profile picture updated.', 'image' => $upload]));
+                exit(json_encode(['success' => true, 'message' => 'Profile picture updated.', 'image' => $db_pfp]));
             } else {
                 http_response_code(500);
                 exit(json_encode(['success' => false, 'error' => 'Could not update profile picture row in the database.']));

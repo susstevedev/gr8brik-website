@@ -145,7 +145,7 @@ if (isset($_POST['save_build'])) {
 
             imagealphablending($image, false);
             imagesavealpha($image, true);
-            $saved = imagewebp($image, $screenshot_path, 80);
+            $saved = imagewebp($image, $screenshot_path, 75);
 
             if (!$saved) {
                 http_response_code(500);
@@ -186,13 +186,504 @@ if (isset($_POST['save_build'])) {
         $stmt->close();
         $conn->close();
 
-        echo json_encode(['success' => "Your creation was saved successfully!", 'screenshot' => $screenshot_path]);
+        echo json_encode(['success' => "Your creation was saved successfully!", 'screenshot' => $screenshot_path, 'creation' => $file_name]);
         exit;
     } else {
         http_response_code(500);
         echo json_encode(['error' => "Could not save: {0}"]);
         exit;
     }
+}
+
+/*if (isset($_POST['save_build_v2'])) {
+    header('Content-Type: application/json');
+
+    if (!loggedin()) {
+        http_response_code(401);
+        echo json_encode(['error' => "Please login to save models."]);
+        exit;
+    }
+
+    $user = $current_user->id ?? 0;
+
+    if (User::isDeleted($user)) {
+        http_response_code(401);
+        echo json_encode(['error' => "Invalid login"]);
+        exit;
+    }
+
+    if (!isset($_POST['creation']) || empty($_POST['creation'])) {
+        http_response_code(400);
+        echo json_encode(['error' => "Request is empty."]);
+        exit;
+    }
+
+    $modelJson = $_POST['creation'];
+    $visible = $_POST['visibility'] ?? null;
+
+    $decoded_json = json_decode($modelJson, true);
+
+    if ($decoded_json === null && json_last_error() !== JSON_ERROR_NONE) {
+        http_response_code(400);
+        echo json_encode(['error' => "Invalid creation format."]);
+        exit;
+    }
+
+    if (!$visible || !in_array($visible, ['public', 'unlisted', 'private'], true)) {
+        http_response_code(400);
+        echo json_encode(['error' => "Visibility must be one of: public, unlisted, private"]);
+        exit;
+    }
+
+    if (isset($_POST['build_id']) && $_POST['build_id'] !== null && $_POST['build_id'] !== "null") {
+        $build_id = filter_var($_POST['build_id'], FILTER_VALIDATE_INT);
+
+        if ($build_id === false) {
+            http_response_code(400);
+            echo json_encode(['error' => "Invalid build ID."]);
+            exit;
+        }
+
+        $stmt = $conn->prepare("SELECT id, user, model, screenshot, size FROM model WHERE id = ? AND user = ? LIMIT 1");
+        $stmt->bind_param("ii", $build_id, $user);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        $existing = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$existing) {
+            http_response_code(404);
+            echo json_encode(['error' => "Creation not found."]);
+            exit;
+        }
+
+        $file_name = ".." . $existing['model'];
+        $db_file_name = $existing['model'];
+        $old_file_size = (int)$existing['size'];
+        $new_file_size = strlen($modelJson);
+
+        $stmt = $conn->prepare("SELECT COALESCE(SUM(size), 0) AS total_used FROM model WHERE user = ?");
+        $stmt->bind_param("i", $user);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        $total = (int)$result->fetch_assoc()['total_used'];
+        $stmt->close();
+        $new_total = $total - $old_file_size + $new_file_size;
+
+        if ($new_total > MODEL_STORAGE_LIMIT) {
+            http_response_code(413);
+            echo json_encode([
+                'error' => "Storage limit of " . Numbers::filesize(MODEL_STORAGE_LIMIT) . " was reached."]);
+            exit;
+        }
+
+        if (file_put_contents($file_name, $modelJson) === false) {
+            http_response_code(500);
+            echo json_encode(['error' => "Failed to save creation JSON."]);
+            exit;
+        }
+
+        $db_file_size = filesize($file_name);
+        $db_screenshot = $existing['screenshot'];
+
+        if (!empty($_POST['screenshot'])) {
+            $screenshot_data = $_POST['screenshot'];
+            if (strpos($screenshot_data, 'data:image/png;base64,') === 0) {
+                $base64_str = substr(
+                    $screenshot_data,
+                    strlen('data:image/png;base64,')
+                );
+            } elseif (strpos($screenshot_data, 'data:image/webp;base64,') === 0) {
+                $base64_str = substr(
+                    $screenshot_data,
+                    strlen('data:image/webp;base64,')
+                );
+            } else {
+                http_response_code(400);
+                echo json_encode(['error' => "Screenshot must be encoded in WebP or PNG."]);
+                exit;
+            }
+
+            $decoded_image = base64_decode($base64_str, true);
+
+            if ($decoded_image === false) {
+                http_response_code(400);
+                echo json_encode(['error' => "Invalid screenshot encoding."]);
+                exit;
+            }
+
+            $image = imagecreatefromstring($decoded_image);
+
+            if (!$image) {
+                http_response_code(400);
+                echo json_encode(['error' => "Thumbnail is not a valid image."]);
+                exit;
+            }
+
+            $screenshot_path = ".." . $existing['screenshot'];
+            imagealphablending($image, false);
+            imagesavealpha($image, true);
+            $saved = imagewebp($image, $screenshot_path, 75);
+            imagedestroy($image);
+
+            if (!$saved) {
+                http_response_code(500);
+                echo json_encode(['error' => "Failed to save screenshot."]);
+                exit;
+            }
+
+            $db_screenshot = $existing['screenshot'];
+        }
+
+        $desc = htmlspecialchars($_POST['desc'] ?? '', ENT_QUOTES, 'UTF-8');
+        $name = htmlspecialchars($_POST['name'] ?? '', ENT_QUOTES, 'UTF-8');
+        $date = date("Y-m-d H:i:s");
+
+        $stmt = $conn->prepare("UPDATE model SET model = ?, description = ?, name = ?, date = ?, size = ?, screenshot = ?, visibility = ? WHERE id = ? AND user = ?");
+
+        if (!$stmt) {
+            http_response_code(500);
+            echo json_encode(['error' => "Failed to prepare creation update."]);
+            exit;
+        }
+
+        $stmt->bind_param(
+            "ssssissii",
+            $db_file_name,
+            $desc,
+            $name,
+            $date,
+            $db_file_size,
+            $db_screenshot,
+            $visible,
+            $build_id,
+            $user
+        );
+
+        if (!$stmt->execute()) {
+            http_response_code(500);
+            echo json_encode(['error' => "Failed to update your creation."]);
+            exit;
+        }
+
+        $stmt->close();
+        $_SESSION['last_request'] = time();
+        echo json_encode(['success' => "Your creation was updated successfully!", 'url' => '/creation?id=' . $build_id]);
+        exit;
+    }
+
+    $stmt = $conn->prepare("INSERT INTO model (user, model, description, name, date, size, screenshot, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    if (!$stmt) {
+        http_response_code(500);
+        echo json_encode(['error' => "Failed to save your creation to the database."]);
+        exit;
+    }
+    $stmt->bind_param("issssiss", $user, $db_file_name, $desc, $name, $date, $db_file_size, $db_screenshot, $visible);
+
+    if (!$stmt->execute()) {
+        http_response_code(500);
+        echo json_encode(['error' => "Failed to save your creation to the database."]);
+        exit;
+    }
+
+    $url = '/creation?id=' . $conn->insert_id;
+    $_SESSION['last_request'] = time();
+    $stmt->close();
+
+    echo json_encode(['success' => "Your creation was saved successfully!", 'url' => '/creation?id=' . $conn->insert_id]);
+    exit;
+}*/
+
+if (isset($_POST['save_build_v2'])) {
+    header('Content-Type: application/json');
+
+    if (!loggedin()) {
+        http_response_code(401);
+        echo json_encode(['error' => "Please login to save models."]);
+        exit;
+    }
+
+    $user = $current_user->id ?? 0;
+
+    if (User::isDeleted($user)) {
+        http_response_code(401);
+        echo json_encode(['error' => "Invalid login"]);
+        exit;
+    }
+
+    if (!isset($_POST['creation']) || empty($_POST['creation'])) {
+        http_response_code(400);
+        echo json_encode(['error' => "Request is empty."]);
+        exit;
+    }
+
+    $modelJson = $_POST['creation'];
+    $visible = $_POST['visibility'] ?? null;
+    $can_edit = $_POST['can_edit'] ?? 0;
+
+    $decoded_json = json_decode($modelJson, true);
+
+    if ($decoded_json === null && json_last_error() !== JSON_ERROR_NONE) {
+        http_response_code(400);
+        echo json_encode(['error' => "Invalid creation format."]);
+        exit;
+    }
+
+    if (!$visible || !in_array($visible, ['public', 'unlisted', 'private'], true)) {
+        http_response_code(400);
+        echo json_encode([
+            'error' => "Visibility must be one of: public, unlisted, private"
+        ]);
+        exit;
+    }
+
+    $updating = false;
+    $build_id = null;
+    $existing = null;
+
+    if (isset($_POST['build_id']) && $_POST['build_id'] !== null && $_POST['build_id'] !== "null") {
+        $build_id = filter_var($_POST['build_id'], FILTER_VALIDATE_INT);
+
+        if ($build_id === false) {
+            http_response_code(400);
+            echo json_encode(['error' => "Invalid build ID."]);
+            exit;
+        }
+
+        $stmt = $conn->prepare("SELECT id, user, model, screenshot, size FROM model WHERE id = ? AND user = ? LIMIT 1");
+
+        if (!$stmt) {
+            http_response_code(500);
+            echo json_encode(['error' => "Failed to find creation."]);
+            exit;
+        }
+
+        $stmt->bind_param("ii", $build_id, $user);
+        $stmt->execute();
+
+        $result = $stmt->get_result();
+        $existing = $result->fetch_assoc();
+
+        $stmt->close();
+
+        if (!$existing) {
+            $updating = false; //so users can save other peoples creations
+        }
+
+        $updating = true;
+    }
+
+    if ($updating) {
+        $file_name = ".." . $existing['model'];
+        $db_file_name = $existing['model'];
+
+        $old_file_size = (int)$existing['size'];
+
+        if (!empty($existing['screenshot'])) {
+            $screenshot_path = ".." . $existing['screenshot'];
+            $db_screenshot = $existing['screenshot'];
+        } else {
+            $screenshot_path = null;
+            $db_screenshot = null;
+        }
+    } else {
+        $file_id = bin2hex(random_bytes(16));
+
+        $file_name = "../cre/" . $file_id . ".json";
+        $db_file_name = "/cre/" . $file_id . ".json";
+
+        $screenshot_path = "../cre/" . $file_id . ".webp";
+        $db_screenshot = "/cre/" . $file_id . ".webp";
+
+        $old_file_size = 0;
+    }
+
+    $new_file_size = strlen($modelJson);
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(size), 0) AS total_used FROM model WHERE user = ?");
+
+    if (!$stmt) {
+        http_response_code(500);
+        echo json_encode(['error' => "Failed to check storage usage."]);
+        exit;
+    }
+
+    $stmt->bind_param("i", $user);
+    $stmt->execute();
+
+    $result = $stmt->get_result();
+    $total = (int)$result->fetch_assoc()['total_used'];
+
+    $stmt->close();
+
+    $new_total = $total - $old_file_size + $new_file_size;
+
+    if ($new_total > MODEL_STORAGE_LIMIT) {
+        http_response_code(413);
+        echo json_encode([
+            'error' => "Storage limit of " . Numbers::filesize(MODEL_STORAGE_LIMIT) . " was reached."
+        ]);
+        exit;
+    }
+
+    if (file_put_contents($file_name, $modelJson) === false) {
+        http_response_code(500);
+        echo json_encode([
+            'error' => "Failed to save creation JSON."
+        ]);
+        exit;
+    }
+
+    $db_file_size = filesize($file_name);
+
+    if (!empty($_POST['screenshot'])) {
+        $screenshot_data = $_POST['screenshot'];
+        if (strpos($screenshot_data, 'data:image/png;base64,') === 0) {
+            $base64_str = substr(
+                $screenshot_data,
+                strlen('data:image/png;base64,')
+            );
+        } elseif (strpos($screenshot_data, 'data:image/webp;base64,') === 0) {
+            $base64_str = substr(
+                $screenshot_data,
+                strlen('data:image/webp;base64,')
+            );
+        } else {
+            http_response_code(400);
+            echo json_encode([
+                'error' => "Screenshot must be encoded in WebP or PNG."
+            ]);
+            exit;
+        }
+
+        $decoded_image = base64_decode($base64_str, true);
+
+        if ($decoded_image === false) {
+            http_response_code(400);
+            echo json_encode([
+                'error' => "Invalid screenshot encoding."
+            ]);
+            exit;
+        }
+
+        $image = imagecreatefromstring($decoded_image);
+
+        if (!$image) {
+            http_response_code(400);
+            echo json_encode([
+                'error' => "Thumbnail is not a valid image."
+            ]);
+            exit;
+        }
+
+        if (!$screenshot_path) {
+            $file_id = bin2hex(random_bytes(16));
+
+            $screenshot_path = "../cre/" . $file_id . ".webp";
+            $db_screenshot = "/cre/" . $file_id . ".webp";
+        }
+
+        imagealphablending($image, false);
+        imagesavealpha($image, true);
+        $saved = imagewebp($image, $screenshot_path, 80);
+        imagedestroy($image);
+
+        if (!$saved) {
+            http_response_code(500);
+            echo json_encode(['error' => "Failed to save screenshot."]);
+            exit;
+        }
+    }
+
+    $desc = $_POST['desc'] ?? '';
+    $name = $_POST['name'] ?? '';
+    $date = date("Y-m-d H:i:s");
+
+    if ($updating) {
+        $stmt = $conn->prepare("UPDATE model SET model = ?, description = ?, name = ?, date = ?, size = ?, screenshot = ?, visibility = ?, can_edit = ? WHERE id = ? AND user = ?");
+
+        if (!$stmt) {
+            http_response_code(500);
+            echo json_encode(['error' => "Failed to prepare creation update."]);
+            exit;
+        }
+
+        $stmt->bind_param(
+            "ssssissiii",
+            $db_file_name,
+            $desc,
+            $name,
+            $date,
+            $db_file_size,
+            $db_screenshot,
+            $visible,
+            $can_edit,
+            $build_id,
+            $user
+        );
+
+        if (!$stmt->execute()) {
+            http_response_code(500);
+            echo json_encode([
+                'error' => "Failed to update your creation."
+            ]);
+            exit;
+        }
+    } else {
+        $stmt = $conn->prepare("INSERT INTO model (user, model, description, name, date, size, screenshot, visibility, can_edit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+        if (!$stmt) {
+            http_response_code(500);
+            echo json_encode(['error' => "Failed to save your creation to the database."]);
+            exit;
+        }
+
+        $stmt->bind_param(
+            "issssissi",
+            $user,
+            $db_file_name,
+            $desc,
+            $name,
+            $date,
+            $db_file_size,
+            $db_screenshot,
+            $visible,
+            $can_edit
+        );
+
+        if (!$stmt->execute()) {
+            http_response_code(500);
+            echo json_encode(['error' => "Failed to save your creation to the database."]);
+            exit;
+        }
+
+        $build_id = $conn->insert_id;
+    }
+
+    $url_view = $visible !== 'private' ? '/creation?id=' . $build_id : null;
+    $url_modeler = $can_edit ? '/modeler?build_id=' . $build_id : null;
+    $_SESSION['last_request'] = time();
+
+    $stmt->close();
+
+    echo json_encode([
+        'success' => $updating ? "Your creation was updated successfully!" : "Your creation was saved successfully!",
+        'creation' => [
+            'id' => $build_id,
+            'url' => $url_view,
+            'name' => $name,
+            'url_edit' => '/acc/creations?edit=' . $build_id,
+            'url_modeler' => $url_modeler,
+            'visibility' => $visible,
+            'can_edit' => $can_edit,
+        ],
+        'user' => [
+            'id' => $current_user->id,
+            'name' => $current_user->username,
+        ],
+    ]);
+    exit;
 }
 
 function truncateStr($mystr) {
@@ -255,22 +746,59 @@ function fetch_build($model_id, $csrf) {
         ]);
     }
 
-    $sql = "SELECT * FROM model WHERE id = '$model_id' AND visibility != 'private' AND removed = 0";
+    /*$sql = "SELECT * FROM model WHERE id = '$model_id' AND visibility != 'private' AND removed = 0";
     if(loggedin()) {
         if($current_user->admin === true) {
             $sql = "SELECT * FROM model WHERE id = '$model_id'";
+        } else if(trim($current_user->id) === trim($data['userid'])) {
+            $sql = "SELECT * FROM model WHERE id = '$model_id' AND removed = 0";
         }
     }
 
     $result = $conn->query($sql);
     $row2 = $result->fetch_assoc();
 
-    if($result->num_rows === 0 || empty($row2['id'])) {
+    if($result->num_rows === 0) {
         http_response_code(404);
         return json_encode([
             "message" => 'Creation not found',
             "error" => '404'
         ]);
+    }*/
+
+    $stmt = $conn->prepare("SELECT * FROM model WHERE id = ?");
+    $stmt->bind_param("i", $model_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row2 = $result->fetch_assoc();
+
+    if (!$row2) {
+        http_response_code(404);
+        return json_encode([
+            "message" => 'Creation not found',
+            "error" => '404'
+        ]);
+    }
+
+    $is_admin = (isset($current_user->admin) && $current_user->admin === true);
+    $is_owner = (loggedin() && trim($current_user->id) === trim($row2['user']));
+
+    if (!$is_admin) {
+        if ($row2['removed'] === 1) {
+            http_response_code(404);
+            return json_encode(["message" => 'Creation not found', "error" => '404']);
+        }
+
+        if ($row2['visibility'] === 'private' && !$is_owner) {
+            http_response_code(404);
+            return json_encode(["message" => 'Creation not found', "error" => '404']);
+        }
+    }
+
+    if($is_admin || $is_owner) {
+        $can_edit = true;
+    } else {
+        $can_edit = $row2['can_edit'];
     }
 
     $userid = $row2['user'];
@@ -382,6 +910,7 @@ function fetch_build($model_id, $csrf) {
         'is_removed' => $row2['removed'],
         'did_track' => $did_track,
         'legacy' => $row2['legacy'],
+        'can_edit' => $can_edit,
         'voted' => $voted,
         'likes' => $votes,
         'comments' => $row2['replies'],
@@ -395,6 +924,11 @@ function fetch_build($model_id, $csrf) {
 
 if(isset($_GET['fetch'])) {
     header('Content-Type: application/json');
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+        header("Refresh:0");
+    }
+
     $model_id = htmlspecialchars((int)$_GET['buildId']);
     $data = fetch_build($model_id, $_SESSION['csrf']);
     exit($data);
@@ -416,11 +950,15 @@ function fetch_comments($model_id, $csrf) {
         $id = $current_user->id;
     }
 
-    $message = null;
+    $message = [];
 
-	$sql = "SELECT * FROM comments WHERE model = $model_id AND hidden = 0 ORDER BY id ASC";
-	$comResult = $conn->query($sql);
+    if($current_user->admin !== true) {
+	    $sql = "SELECT * FROM comments WHERE model = $model_id AND hidden = 0 ORDER BY id ASC";
+    } else {
+        $sql = "SELECT * FROM comments WHERE model = $model_id ORDER BY id ASC";
+    }
 
+    $comResult = $conn->query($sql);
     $comments = [];
 	while ($row = $comResult->fetch_assoc()) {
         $comment_id = $row['id'];
@@ -430,18 +968,16 @@ function fetch_comments($model_id, $csrf) {
             continue;
         }
 
-        $voted_query = $conn->query("SELECT * FROM comment_votes WHERE comment_id = '$comment_id'");
-        $comment_votes = 0;
+        $voted_query = $conn->query("SELECT * FROM comment_votes WHERE comment_id = '$comment_id' AND user_id = '$id'");
+        $comment_votes = $row['votes'];
         $is_voted = false;
         $is_op = $row['is_op'];
         while ($voted_row = $voted_query->fetch_assoc()) {
-            $comment_votes++;
-
             if (loggedin() && (int)$voted_row['user_id'] === (int)$id) {
                 $is_voted = true;
             }
         }
-        
+
         $c_user = $row['user'];
         $userRow = User::getUser($c_user);
         $comment = $bbcode->toHTML($row['comment'], true, true);
@@ -459,12 +995,12 @@ function fetch_comments($model_id, $csrf) {
                     }
                 }
                 if ($youBlocked && $theyBlocked) {
-                    $message = "You blocked @" . $userRow->username . ", and they blocked you. Their comments and profile will not be visible.";
+                    $message[] = "You blocked @" . $userRow->username . ", and they blocked you. Their comments and profile will not be visible.";
                     $comment = null;
                 } elseif ($youBlocked) {
-                    $message = "You blocked @" . $userRow->username . ". Your comments and profile will not be visible to them.";
+                    $message[] = "You blocked @" . $userRow->username . ". Your comments and profile will not be visible to them.";
                 } elseif ($theyBlocked) {
-                    $message = "You're blocked from @" . $userRow->username . ". Their comments and profile will not be visible.";
+                    $message[] = "You're blocked from @" . $userRow->username . ". Their comments and profile will not be visible.";
                     $comment = null;
                 }
             }
@@ -474,20 +1010,25 @@ function fetch_comments($model_id, $csrf) {
             $row['date'] = 0;
         }
 
+        if($row['hidden']) {
+            $message[] = 'This comment is <b>hidden</b> for normal users.';
+        }
+
         $comments[] = [
             'id' => $comment_id,
             'userid' => $c_user,
             'user_admin' => $userRow->admin || 0,
             'username' => $userRow->username,
             'is_op' => $is_op,
+            'hidden' => $row['hidden'],
             'picture' => $userRow->picture,
             'comment' => $comment,
             'date' => time_ago(date('Y-m-d H:i:s', $row['date'])),
             'votes' => $comment_votes,
             'voted' => $is_voted,
-            'message' => $message
+            'error' => $message
         ];
-        $message = null;
+        $message = [];
     }
 
     $comResult->free();
@@ -504,7 +1045,6 @@ if(isset($_GET['build_comments'])) {
 if(isset($_POST['comment'])) {
     header('Content-Type: application/json');
 
-    $id = $current_user->id;
 	$comment = $_POST['commentbox'];
     $csrf = $_POST['csrf_token'];
     $model_id = $_POST['buildId'];
@@ -522,6 +1062,7 @@ if(isset($_POST['comment'])) {
         echo json_encode(['error' => 'Please login to comment.']);
         exit;
     }
+    $id = $current_user->id;
 
     if($current_user->verify_token != NULL) {
         http_response_code(401);
@@ -791,7 +1332,7 @@ if (loggedin()) {
         
         $username = htmlspecialchars($current_user->username);
         $comment_id = (int)$_POST['comment_id'];
-        
+
         $stmt = $conn->prepare("SELECT id, user FROM comments WHERE id = ? LIMIT 1");
         $stmt->bind_param("i", $comment_id);
         $stmt->execute();
@@ -799,7 +1340,7 @@ if (loggedin()) {
         $stmt->fetch();
         $stmt->close();
 
-        if ($comment_id === 0) {
+        if (!$comment_id) {
             echo json_encode(['error' => 'Comment does not exist in the database']);
             exit;
         }
@@ -839,18 +1380,26 @@ if (loggedin()) {
             echo json_encode(['error' => 'You cannot favorite this comment']);
             exit;
         }
-        
-        $comm_data_arr = array(
-            'success' => true,
-            'message' => 'Comment favorited',
-            'comment_user' => $comment_user,
-            'comment_id' => $comment_id
-        );
 
         $stmt = $conn->prepare("INSERT INTO comment_votes (comment_id, user_id, user_name) VALUES (?, ?, ?)");
         $stmt->bind_param("iis", $comment_id, $id, $username);
-        if ($stmt->execute()) {
-            echo json_encode($comm_data_arr);
+
+        $stmt_upd = $conn->prepare("UPDATE comments SET votes = votes + 1 WHERE id = ?");
+        $stmt_upd->bind_param("i", $comment_id);
+    
+        if ($stmt->execute() && $stmt_upd->execute()) {
+            $stmt_count = $conn->prepare("SELECT votes FROM comments WHERE id = ?");
+            $stmt_count->bind_param("i", $comment_id);
+            $stmt_count->execute();
+            $stmt_count->bind_result($count);
+            $stmt_count->fetch();
+            $stmt_count->close();
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Comment favorited',
+                'count' => $count,
+            ]);
         } else {
             echo json_encode(['success' => false, 'error' => 'Failed to favorite comment']);
         }
@@ -882,8 +1431,19 @@ if (loggedin()) {
 
         $stmt = $conn->prepare("DELETE FROM comment_votes WHERE comment_id = ? AND user_id = ?");
         $stmt->bind_param("ii", $comment_id, $id);
-        if ($stmt->execute()) {
-            echo json_encode(['success' => true, 'message' => 'Comment unfavorited']);
+
+        $stmt_upd = $conn->prepare("UPDATE comments SET votes = votes - 1 WHERE id = ?");
+        $stmt_upd->bind_param("i", $comment_id);
+
+        if ($stmt->execute() && $stmt_upd->execute()) {
+            $stmt_count = $conn->prepare("SELECT votes FROM comments WHERE id = ?");
+            $stmt_count->bind_param("i", $comment_id);
+            $stmt_count->execute();
+            $stmt_count->bind_result($count);
+            $stmt_count->fetch();
+            $stmt_count->close();
+
+            echo json_encode(['success' => true, 'message' => 'Comment unfavorited', 'count' => $count]);
         } else {
             echo json_encode(['success' => false, 'error' => 'Failed to unfavorite']);
         }
