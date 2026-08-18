@@ -41,7 +41,7 @@ $(document).ready(function() {
 
     window.dropdown = function(id) {
         let dropdown = $("#" + id);
-        dropdown.toggleClass("w3-show");
+        dropdown.slideToggle(250);
     }
 
     window.openTab = function(tab, btn) {

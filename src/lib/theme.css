@@ -241,7 +241,7 @@ body.mode-dark .creation-page-meta {
     cursor: pointer; 
 }
 
-.success,.error {
+#ajax-success,#ajax-error {
     display:none;
 }
 
