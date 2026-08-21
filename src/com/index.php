@@ -132,8 +132,17 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
                         echo "<tr><td><a href='/topic/" . $id . "?p=" . $last_page . "'><i class='fa fa-map-pin w3-padding-small w3-text-grey' aria-hidden='true' title='Pinned Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                         echo "<td>" . $date . "</td>";
-                        echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
-                        echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";
+                        if(User::isDeleted($post_user)) {
+                            echo "<td><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</td>";
+                        } else {
+                            echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
+                        }
+
+                        if(User::isDeleted($last_posted)) {
+                            echo "<td><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</tr>";
+                        } else {
+                            echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";
+                        }
                     $username = null;
                     $last_post_username = null;
                 }
@@ -186,7 +195,12 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                     } else {
                         echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
                     }
-                    echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";
+
+                    if(User::isDeleted($last_posted)) {
+                        echo "<td><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</tr>";
+                    } else {
+                        echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";
+                    }
                     $username = null;
                     $last_post_username = null;
                 }

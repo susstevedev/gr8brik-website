@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 
 if (loggedin()) {
     $id = $current_user->id;
@@ -21,7 +22,8 @@ $result = $stmt->get_result();
 
 if ($result->num_rows <= 0) {
     header('HTTP/1.0 404 Not Found');
-    exit;
+    $error = "<b>This conversation does not exist.</b>";
+    //exit;
 }
 
 $row = $result->fetch_assoc();
@@ -62,7 +64,7 @@ if (!in_array($post_id, $_SESSION['viewed_post_ids'])) {
 }
 
 if ($category === "deleted") {
-    $error = "<b>This conversation has been removed because it violated our <a href='/rules'>rules</a>.</b><br />";
+    $error = "<b>This conversation has been removed because it violated our <a href='/rules'>rules</a>.</b>";
 }
 
 if (isset($_POST['comment_delete'])) {
@@ -95,7 +97,6 @@ if (isset($_POST['comment_delete'])) {
         exit('You are not allowed to delete this message.');
     }
 
-    //old: $delete_sql = "DELETE FROM messages WHERE id = ? LIMIT 1";
     $delete_sql = "UPDATE messages SET deleted_at = NOW() WHERE id = ? LIMIT 1";
     $delete_stmt = $conn->prepare($delete_sql);
     $delete_stmt->bind_param("i", $commentid);
@@ -104,11 +105,12 @@ if (isset($_POST['comment_delete'])) {
     $conn->close();
 
     if ($delete_result) {
-        $goto = htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES, 'UTF-8');
+        /*$goto = htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES, 'UTF-8');
         if (!empty($_SERVER['QUERY_STRING'])) {
             $goto .= '?' . htmlspecialchars($_SERVER['QUERY_STRING'], ENT_QUOTES, 'UTF-8');
         }
-        header('Location: ' . $goto);
+        header('Location: ' . $goto);*/
+        header('Refresh:0');
         exit;
     }
 }
@@ -124,16 +126,17 @@ if (isset($_POST['comment'])) {
         exit;
     }
 
-    $username = htmlspecialchars($_POST['username']);
+    $username = isset($_POST['username']) ? trim($_POST['username']) : null;
 
     if ($username) {
-        $_SESSION['forum_anonymous_username'] = $username;
+        $_SESSION['forum_anonymous_username'] = htmlspecialchars($username);
     }
 
     if (isset($category) && $category == "nolist" && loggedin() === false) {
         if (!$username) {
             exit('No username provided.');
         }
+
         $date = date("Y-m-d H:i:s");
         $sql = "INSERT INTO messages (username, parent, content, timestamp) VALUES (?, ?, ?, ?)";
         $stmt2 = $conn->prepare($sql);
@@ -142,6 +145,7 @@ if (isset($_POST['comment'])) {
         if (!$loggedin) {
             exit('Please login to post messages.');
         }
+
         $date = date("Y-m-d H:i:s");
         $sql = "INSERT INTO messages (userid, parent, content, timestamp) VALUES (?, ?, ?, ?)";
         $stmt2 = $conn->prepare($sql);
@@ -152,6 +156,7 @@ if (isset($_POST['comment'])) {
         echo "An error has occured. Please try again later.";
         exit;
     }
+
     $stmt2->close();
 
     $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
@@ -164,53 +169,15 @@ if (isset($_POST['comment'])) {
     $sql = "UPDATE messages SET last_active_time = ?, last_page = ?, last_posted = ? WHERE id = ?";
     $stmt3 = $conn->prepare($sql);
     $stmt3->bind_param("iiii", $time, $total_pages, $id, $post_id);
-
     $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $category = 3; //3 = forum reply
 
-    $stmt = $conn3->prepare("INSERT IGNORE INTO subscriptions (userid, category, content) VALUES (?, ?, ?)");
-    $stmt->bind_param("iii", $id, $category, $post_id);
-    $stmt->execute();
+    $notifications = new Notifications($conn3);
+    $notifications->subscribe($id, 'forum_reply', $post_id);
+    $notifications->notify_subscribers('forum_reply', $post_id, $id);
 
-    if ($stmt3->execute()) {
-        $time = time();
-        $content = $post_id;
-        $category = 3; //3 = forum reply
-
-        $sub_stmt = $conn3->prepare("SELECT userid FROM subscriptions WHERE content = ? AND category = ? AND userid != ?");
-        $sub_stmt->bind_param("iii", $content, $category, $id);
-        $sub_stmt->execute();
-        $result = $sub_stmt->get_result();
-
-        $subscribers = [];
-        while ($row = $result->fetch_assoc()) {
-            $subscribers[] = $row['userid'];
-        }
-        $sub_stmt->close();
-
-        if (!empty($subscribers)) {
-            $notif_stmt = $conn3->prepare("INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)");
-            $alert_stmt = $conn3->prepare("UPDATE users SET alert = alert + 1 WHERE id = ?");
-
-            foreach ($subscribers as $subscriber_id) {
-                $notif_stmt->bind_param("iisii", $subscriber_id, $id, $time, $content, $category);
-                $notif_stmt->execute();
-
-                $alert_stmt->bind_param("i", $subscriber_id);
-                $alert_stmt->execute();
-            }
-
-            $notif_stmt->close();
-            $alert_stmt->close();
-        }
-
-        $goto = $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING'];
-        header('Location: ' . $goto);
-    } else {
-        echo "An error has occured. Please try again later.";
-        exit;
-    }
     $stmt3->close();
+    header('Refresh:0');
+    exit;
 }
 ?>
 <!DOCTYPE html>
@@ -260,7 +227,7 @@ if (isset($_POST['comment'])) {
     </div><br />
 
     <?php
-    $sql = "SELECT * FROM messages WHERE (parent = $post_id OR id = $post_id) AND deleted_at IS NULL ORDER BY timestamp ASC LIMIT $limit OFFSET $offset";
+    $sql = "SELECT * FROM messages WHERE (parent = $post_id OR id = $post_id) AND deleted_at IS NULL LIMIT $limit OFFSET $offset";
     $comResult = $conn->query($sql);
 
     if ($comResult->num_rows > 0) {
