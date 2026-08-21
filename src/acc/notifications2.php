@@ -65,7 +65,7 @@ if (!loggedin()) {
                 $timestamp = is_numeric($row['timestamp']) ? (int)$row['timestamp'] : time();
 
                 $user_data_o = User::getUser($profile);
-                $username = $user_data_o->username ?: '[unknown]';
+                $username = htmlspecialchars($user_data_o->username) ?: '[unknown]';
                 $userid = $user_data_o->id ?: 0;
 
                 //groups matching content together
@@ -95,14 +95,15 @@ if (!loggedin()) {
 
             $total_groups = count($grouped_notifications);
             $sliced_notifications = array_slice($grouped_notifications, $offset, $limit);
-            print_r($sliced_notifications);
 
             if ($page > 1) {
                 echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round w3-border w3-border-indigo" href="?page=' . $pDown . '">Back</a>&nbsp;&nbsp;';
             }
+
             if (($offset + $limit) < $total_groups) {
                 echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round w3-border w3-border-indigo" href="?page=' . $pUp . '">Next</a>';
             }
+
             echo '<hr />';
             $stmt->close();
 
@@ -118,11 +119,11 @@ if (!loggedin()) {
                 $user_count = count($users);
 
                 if ($user_count === 1) {
-                    $user_string = $users[0]['name'];
+                    $user_string = "<a href='/user/" . $users[0]['id'] . "'>" . $users[0]['name'] . "</a>";
                 } elseif ($user_count === 2) {
-                    $user_string = $users[0]['name'] . " and " . $users[1]['name'];
+                    $user_string = "<a href='/user/" . $users[0]['id'] . "'>" . $users[0]['name'] . "</a> and <a href='/user/" . $users[1]['id'] . "'>" . $users[1]['name'] . "</a>";
                 } else {
-                    $user_string = $users[0]['name'] . " and " . ($user_count - 1) . " others";
+                    $user_string = "<a href='/user/" . $users[0]['id'] . "'>" . $users[0]['name'] . "</a> and " . ($user_count - 1) . " others";
                 }
 
                 // --- CATEGORY 1: Follows ---
@@ -135,7 +136,8 @@ if (!loggedin()) {
                         $url = "/user/" . $group['users'][0]['id'];
                     }
 
-                    $post = ($user_count > 1 ? "followed you " : "followed you ");
+                    $title = $user_string;
+                    $post = 'followed you';
                     $img = $group['fallback_pic'];
                     // --- CATEGORY 2: Model Comments ---
                 } elseif ($category === 'comment') {
@@ -148,7 +150,8 @@ if (!loggedin()) {
                     $valid = true;
                     $img = $row2['screenshot'];
                     $url = "/build/" . urlencode($content);
-                    $post = ($user_count > 1 ? 'commented on ' : 'commented on ') . ($row2['name'] ?: '[unknown]');
+                    $title = !empty($row2['name']) ? $row2['name'] : "[unknown]";
+                    $post = 'commented on by';
                     $stmt2->close();
                     // --- CATEGORY 3: Topic Replies ---
                 } elseif ($category === 'forum_reply') {
@@ -162,7 +165,7 @@ if (!loggedin()) {
                     $img = '../img/com.jpg';
                     $url = "/topic/" . urlencode($content);
                     $title = !empty($row2['title']) ? $row2['title'] : "[unknown]";
-                    $post = ($user_count > 1 ? "replied to " : "replied to ") . $title;
+                    $post = "replied to by";
 
                     $stmt2->close();
                     // --- CATEGORY 4: Admin creation removals ---
@@ -177,7 +180,7 @@ if (!loggedin()) {
                     $img = $row2['screenshot'];
                     $url = "/build/" . urlencode($content);
                     $title = !empty($row2['name']) ? $row2['name'] : "[unknown]";
-                    $post = $title . " was removed";
+                    $post = $title . " was removed by";
 
                     $stmt2->close();
                     // --- CATEGORY 5: Model Favorites ---
@@ -191,7 +194,8 @@ if (!loggedin()) {
                         $valid = true;
                         $img = $row2['screenshot'];
                         $url = "/build/" . urlencode($content);
-                        $post = ($user_count > 1 ? "favorited " : "favorited ") . ($row2['name'] ?: '[unknown]');
+                        $title = !empty($row2['name']) ? $row2['name'] : "[unknown]";
+                        $post = "Favorited by";
                     }
                     $stmt2->close();
                 }
@@ -200,12 +204,21 @@ if (!loggedin()) {
 
                 if ($valid === true) {
         ?>
-            <article id="<?php echo $group_name ?>" class='w3-card-4 w3-hover-opacity gr8-theme w3-padding w3-round w3-large'>
-                <a href="<?php echo htmlspecialchars($url); ?>"><img src="<?php echo htmlspecialchars($img); ?>" class="w3-round" style='background: #ddd; width: 150px; height: 150px;' alt='Image' title='Image'></a>
-                <a href="<?php echo htmlspecialchars($url); ?>"><span style='display: inline-block; vertical-align: top; padding: 10px;'>
-                        <strong><?php echo htmlspecialchars($user_string); ?></strong> <?php echo htmlspecialchars($post); ?>
-                    </span></a>
-                <time class='w3-right'><?php echo htmlspecialchars($time); ?></time>
+            <article id="<?php echo $group_name ?>" class='w3-card-4 w3-hover-shadow gr8-theme w3-padding w3-round w3-large'>
+                <div class="w3-row">
+                    <div class="w3-col s2 m3">
+                        <img src="<?php echo htmlspecialchars($img); ?>" class="w3-round" style='background: #ddd; height: 150px;' alt='Image' title='Image'>
+                    </div>
+
+                    <div class="w3-col s6 m7">
+                        <a href="<?php echo htmlspecialchars($url); ?>">
+                            <strong><?php echo htmlspecialchars($title); ?></strong>
+                        </a><br />
+                        <?php echo htmlspecialchars($post); ?> <?php echo $user_string ?> 
+                    </div>
+
+                    <time class='w3-right-align w3-col m2'><?php echo htmlspecialchars($time); ?></time>
+                </div>
             </article>
             <br />
         <?php
