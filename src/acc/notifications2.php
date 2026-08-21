@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 
 if (!loggedin()) {
     header('Location:login.php');
@@ -19,93 +20,25 @@ if (!loggedin()) {
         include '../navbar.php';
         include 'panel.php';
 
-        try {
-            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        } catch (Exception $e) {
-            error_log($e->getMessage());
-            echo "<p>Unable to load notifications at this time.</p>";
-            return;
-        }
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         if ($page < 1) {
             $page = 1;
         }
 
-        $limit = 8;
-        $offset = ($page - 1) * $limit;
         $pDown = $page - 1;
         $pUp = $page + 1;
-        $sql = "SELECT * FROM notifications WHERE user = ? AND category2 IS NOT NULL ORDER BY timestamp DESC";
+        $id = $current_user->id ?? 0;
 
         try {
-            $thisuser = $current_user->id;
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("i", $thisuser);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $grouped_notifications = [];
+            $notifications = new Notifications($conn);
+            $sliced_notifications = $notifications->get_notifications($id, $page);
 
-            if ($result->num_rows !== 0 && $current_user->alert > 0) {
-                $alertsql = "UPDATE users SET alert = 0 WHERE id = ?";
-                $alertstmt = $conn->prepare($alertsql);
-                $alertstmt->bind_param("i", $thisuser);
-                if ($alertstmt->execute()) {
-                    $alertstmt->close();
-                } else {
-                    echo $alertstmt->error;
-                    exit;
-                }
-            }
-
-            while ($row = $result->fetch_assoc()) {
-                $profile = $row['profile'];
-                $content = $row['content'];
-                $category = $row['category2'];
-                $timestamp = is_numeric($row['timestamp']) ? (int)$row['timestamp'] : time();
-
-                $user_data_o = User::getUser($profile);
-                $username = htmlspecialchars($user_data_o->username) ?: '[unknown]';
-                $userid = $user_data_o->id ?: 0;
-
-                //groups matching content together
-                if ($category === 'profile') {
-                    $group_key = $category . "_" . date("Y-m-d", $timestamp);
-                } else {
-                    $group_key = $category . "_" . $row['content'] . "_" . date("Y-m-d", $timestamp);
-                }
-
-                if (!isset($grouped_notifications[$group_key])) {
-                    $grouped_notifications[$group_key] = [
-                        'category' => $category,
-                        'content' => $content,
-                        'timestamp' => $timestamp,
-                        'users' => [],
-                        'fallback_pic' => $user_data_o->picture ?: '/img/no_image.png'
-                    ];
-                }
-
-                if (!in_array($userid, array_column($grouped_notifications[$group_key]['users'], 'id'))) {
-                    $grouped_notifications[$group_key]['users'][] = [
-                        'name' => $username,
-                        'id'   => $userid
-                    ];
-                }
-            }
-
-            $total_groups = count($grouped_notifications);
-            $sliced_notifications = array_slice($grouped_notifications, $offset, $limit);
-
-            if ($page > 1) {
-                echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round w3-border w3-border-indigo" href="?page=' . $pDown . '">Back</a>&nbsp;&nbsp;';
-            }
-
-            if (($offset + $limit) < $total_groups) {
-                echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round w3-border w3-border-indigo" href="?page=' . $pUp . '">Next</a>';
-            }
+            echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round w3-border w3-border-indigo" href="?page=' . $pDown . '">Back</a>&nbsp;&nbsp;';
+            echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round w3-border w3-border-indigo" href="?page=' . $pUp . '">Next</a>';
 
             echo '<hr />';
-            $stmt->close();
 
             foreach ($sliced_notifications as $group_name => $group) {
                 $url = null;
@@ -224,7 +157,7 @@ if (!loggedin()) {
         <?php
             }
         }
-            $conn->close();
+        $conn->close();
         } catch (Exception $e) {
             error_log($e->getMessage());
             echo "<p>Error loading some notifications.</p>";
