@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
 $bbcode = new BBCode;
@@ -693,33 +694,6 @@ function truncateStr($mystr) {
     }
 }
 
-// Model screenshot to PNG
-function convert_webp_to_png($source_webp_file) {
-    clearstatcache();
-    $webp_file = str_replace('/cre/', '', $source_webp_file);
-    if (file_exists($_SERVER['DOCUMENT_ROOT'] . '/cre/' . $webp_file) && exif_imagetype($_SERVER['DOCUMENT_ROOT'] . '/cre/' . $webp_file) === IMAGETYPE_WEBP) {
-        $image = imagecreatefromwebp($_SERVER['DOCUMENT_ROOT'] . '/cre/' . $webp_file);
-        
-        if ($image !== false) {
-            imagepalettetotruecolor($image);
-            imagealphablending($image, true);
-            imagesavealpha($image, true);
-            
-            ob_start();
-			imagepng($image);
-			$image_data = ob_get_contents();
-			ob_end_clean();
-             
-            $base64_data = base64_encode($image_data);
-            return $base64_data;
-        } else {
-            return false;
-        }
-    } else {
-        return "Not found";
-    }
-}
-
 function fetch_build($model_id, $csrf) {
     global $current_user;
     global $conn;
@@ -745,26 +719,6 @@ function fetch_build($model_id, $csrf) {
             "error" => 'INVALID_ID'
         ]);
     }
-
-    /*$sql = "SELECT * FROM model WHERE id = '$model_id' AND visibility != 'private' AND removed = 0";
-    if(loggedin()) {
-        if($current_user->admin === true) {
-            $sql = "SELECT * FROM model WHERE id = '$model_id'";
-        } else if(trim($current_user->id) === trim($data['userid'])) {
-            $sql = "SELECT * FROM model WHERE id = '$model_id' AND removed = 0";
-        }
-    }
-
-    $result = $conn->query($sql);
-    $row2 = $result->fetch_assoc();
-
-    if($result->num_rows === 0) {
-        http_response_code(404);
-        return json_encode([
-            "message" => 'Creation not found',
-            "error" => '404'
-        ]);
-    }*/
 
     $stmt = $conn->prepare("SELECT * FROM model WHERE id = ?");
     $stmt->bind_param("i", $model_id);
@@ -863,6 +817,9 @@ function fetch_build($model_id, $csrf) {
         } else {
             $voted = false;
         }
+
+        $notifications = new Notifications($conn2);
+        $is_subbed = $notifications->is_subscriber('comment', $model_id, $id);
     } else {
         $voted = false;
     }
@@ -912,6 +869,7 @@ function fetch_build($model_id, $csrf) {
         'legacy' => $row2['legacy'],
         'can_edit' => $can_edit,
         'voted' => $voted,
+        'is_subbed' => $is_subbed ?? false,
         'likes' => $votes,
         'comments' => $row2['replies'],
         'username' => $username,
@@ -1103,7 +1061,7 @@ if(isset($_POST['comment'])) {
     $stmt2 = $conn->prepare($sql);
     $stmt2->bind_param("iissi", $id, $model_id, $comment, $date, $is_op);
 
-    $category = 2; //2 = comment on model
+    /*$category = 2; //2 = comment on model
     $stmt = $conn2->prepare("INSERT IGNORE INTO subscriptions (userid, category, content) VALUES (?, ?, ?)");
     $stmt->bind_param("iii", $id, $category, $model_id);
     $stmt->execute();
@@ -1151,6 +1109,48 @@ if(isset($_POST['comment'])) {
         }
 
         $conn->close();
+        http_response_code(200);
+        echo json_encode([
+            'success' => 'Comment sent.',
+            'comment' => [
+                'id' => $last_id,
+                'text' => $comment,
+                'username' => $current_user->username,
+                'userid' => $current_user->id,
+                'admin' => $current_user->admin,
+                'picture' => $current_user->picture,
+                'date' => time_ago(date('Y-m-d H:i:s', $date)),
+                'replies' => $reply_count
+            ],
+        ]);
+        exit;
+    } else {
+        $stmt2->close();
+        $conn->close();
+        http_response_code(500);
+        echo json_encode(['error' => 'Could not send comment. Please try again later.']);
+        exit;
+    }*/
+
+    if ($stmt2->execute()) {
+        $last_id = $conn->insert_id;
+        $stmt2->close();
+
+        $stmtCountUpd = $conn->prepare("UPDATE model SET replies = replies + 1 WHERE id = ?");
+        $stmtCountUpd->bind_param("i", $model_id);
+        $stmtCountUpd->execute();
+        $stmtCountUpd->close();
+
+        $stmtCountGet = $conn->prepare("SELECT replies FROM model WHERE id = ? AND removed = 0");
+        $stmtCountGet->bind_param("i", $model_id);
+        $stmtCountGet->execute();
+        $result = $stmtCountGet->get_result();
+        $reply_count = $result->fetch_assoc()['replies'];
+
+        $notifications = new Notifications($conn2);
+        $notifications->subscribe($id, 'comment', $model_id);
+        $notifications->notify_subscribers('comment', $model_id, $id);
+
         http_response_code(200);
         echo json_encode([
             'success' => 'Comment sent.',
@@ -1290,35 +1290,85 @@ if (loggedin()) {
         $stmt->bind_param("i", $model_id);
 
         if ($stmt->execute()) {
-            $time = time();
-            $content = $model_id;
             $id = $current_user->id;
-            $category = 5;
-            $sql = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
 
-            $stmt2 = $conn2->prepare($sql);
-            $stmt2->bind_param("iisii", $model_user, $id, $time, $content, $category);
-            $stmt2->execute();
-            $stmt2->close();
-
-            $sql = "SELECT alert FROM users WHERE id = ? LIMIT 1";
-            $stmt3 = $conn2->prepare($sql);
-            $stmt3->bind_param("i", $model_user);
-            $stmt3->bind_result($alert);
-            $stmt3->execute();
-            $stmt3->fetch();
-            $stmt3->close();
-
-            $alertnum = $alert + 1;
-            $stmt2 = $conn2->prepare("UPDATE users SET alert = ? WHERE id = ?");
-            $stmt2->bind_param("ii", $alertnum, $model_user);
-            $stmt2->execute();
-
-            $stmt2->close();
-            $conn->close();
+            $notifications = new Notifications($conn2);
+            $notifications->notify_subscribers('creation_fav', $model_id, $id);
         }
 
         $stmt->close();
+        exit;
+    }
+
+    if (isset($_POST['subscribe'])) {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['model_id']) || !is_numeric($_POST['model_id'])) {
+            echo json_encode(['success' => false, 'error' => 'Invalid creation id provided']);
+            exit;
+        }
+
+        $model_id = (int)$_POST['model_id'];
+
+        $stmt = $conn->prepare("SELECT user, likes FROM model WHERE id = ? AND removed = 0 LIMIT 1");
+        $stmt->bind_param("i", $model_id);
+        $stmt->execute();
+        $stmt->bind_result($model_user, $likes);
+        $stmt->fetch();
+        $stmt->close();
+
+        if ($model_id === 0) {
+            echo json_encode(['error' => 'Creation does not exist in the database']);
+            exit;
+        }
+
+        if($current_user->verify_token != NULL) {
+            http_response_code(401);
+            echo json_encode(['error' => "Please verify your account to continue this action."]);
+            exit;
+        }
+
+        $id = $current_user->id;
+        $notifications = new Notifications($conn2);
+        $notifications->subscribe($id, 'comment', $model_id);
+
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    if (isset($_POST['unsubscribe'])) {
+        header('Content-Type: application/json');
+
+        if (!isset($_POST['model_id']) || !is_numeric($_POST['model_id'])) {
+            echo json_encode(['success' => false, 'error' => 'Invalid creation id provided']);
+            exit;
+        }
+
+        $model_id = (int)$_POST['model_id'];
+
+        $stmt = $conn->prepare("SELECT user, likes FROM model WHERE id = ? AND removed = 0 LIMIT 1");
+        $stmt->bind_param("i", $model_id);
+        $stmt->execute();
+        $stmt->bind_result($model_user, $likes);
+        $stmt->fetch();
+        $stmt->close();
+
+        if ($model_id === 0) {
+            echo json_encode(['error' => 'Creation does not exist in the database']);
+            exit;
+        }
+
+        if($current_user->verify_token != NULL) {
+            http_response_code(401);
+            echo json_encode(['error' => "Please verify your account to continue this action."]);
+            exit;
+        }
+
+        $id = $current_user->id;
+        $notifications = new Notifications($conn2);
+        $notifications->remove_subscriber('comment', $model_id, $id);
+
+        echo json_encode(['success' => true]);
         exit;
     }
 

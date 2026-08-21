@@ -17,76 +17,91 @@ ini_set('display_errors', '1');
 
 // constants
 require_once 'constants.php';
+require_once 'what_browser.php';
 
-function sess_open($save_path, $session_name) {
-    global $sess_db;
-    $sess_db = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if ($sess_db->connect_error) {
-        echo "Session DB connection failed: " . $sess_db->connect_error;
+class SessHandler implements SessionHandlerInterface {
+    private ?mysqli $db = null;
+    private string $dbServer;
+    private string $dbUser;
+    private string $dbPassword;
+    private string $dbName;
+    private ?int $userId = null;
+
+    public function __construct(string $server, string $user, string $password, string $name) {
+        $this->dbServer = $server;
+        $this->dbUser = $user;
+        $this->dbPassword = $password;
+        $this->dbName = $name;
+    }
+
+    public function user(?int $user): void {
+        $this->userId = $user;
+    }
+
+    public function open($save_path, $session_name):bool {
+        $this->db = new mysqli($this->dbServer, $this->dbUser, $this->dbPassword, $this->dbName);
+        if ($this->db->connect_error) {
+            return false;
+        }
+        return true;
+    }
+
+    public function close():bool {
+        if ($this->db) {
+            $this->db->close();
+            return true;
+        }
         return false;
     }
-    return true;
+
+    public function read($id):string {
+        $stmt = $this->db->query("SELECT data FROM php_sessions WHERE id = '$id'");
+        $row = $stmt->fetch_assoc();
+
+        if($row) {
+            if($row['data']) {
+                return $row['data'];
+            }
+        }
+
+        return '';
+    }
+
+    public function write($id, $data):bool {
+        $time = time();
+        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+        $useragent = UA ?? null; //UA is defined in what_browser.php
+        $userid = $this->userId;
+        $stmt = $this->db->query("REPLACE INTO php_sessions (id, data, timestamp, ip, ua, userid) VALUES ('$id', '$data', '$time', '$ip', '$useragent', '$userid')");
+        return $stmt;
+    }
+
+    public function destroy($id):bool {
+        $stmt = $this->db->query("DELETE FROM php_sessions WHERE id = '$id'");
+        return $stmt;
+    }
+
+    public function gc($maxlifetime):int {
+        $old = time() - $maxlifetime;
+        $stmt = $this->db->query("DELETE FROM php_sessions WHERE timestamp < '$old'");
+        $rows = $stmt ? $this->db->affected_rows : false;
+        return $rows;
+    }
 }
 
-function sess_close() {
-    global $sess_db;
-    return $sess_db->close();
-}
+$handler = new SessHandler(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+session_set_save_handler($handler, true);
 
-function sess_read($id) {
-    global $sess_db;
-    $stmt = $sess_db->prepare("SELECT data FROM php_sessions WHERE id = ?");
-    $stmt->bind_param("s", $id);
-    $stmt->execute();
-    $stmt->bind_result($data);
-    $stmt->fetch();
-    return $data ?? '';
-}
-
-function sess_write($id, $data) {
-    global $sess_db;
-    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
-
-    $time = time();
-    $ip = $_SERVER['REMOTE_ADDR'] ?? null;
-    $useragent = UA ?? null; //UA is defined in what_browser.php
-    $userid = $_SESSION['userid'] ?? null;
-
-    $stmt = $sess_db->prepare("REPLACE INTO php_sessions (id, data, timestamp, ip, ua, userid) VALUES (?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("ssissi", $id, $data, $time, $ip, $useragent, $userid);
-    return $stmt->execute();
-}
-
-function sess_destroy($id) {
-    global $sess_db;
-    $stmt = $sess_db->prepare("DELETE FROM php_sessions WHERE id = ?");
-    $stmt->bind_param("s", $id);
-    return $stmt->execute();
-}
-
-function sess_gc($maxlifetime) {
-    global $sess_db;
-    $old = time() - $maxlifetime;
-    $stmt = $sess_db->prepare("DELETE FROM php_sessions WHERE timestamp < ?");
-    $stmt->bind_param("i", $old);
-    return $stmt->execute();
-}
-
-session_set_save_handler(
-    'sess_open',
-    'sess_close',
-    'sess_read',
-    'sess_write',
-    'sess_destroy',
-    'sess_gc'
-);
-
-register_shutdown_function('session_write_close');
-ini_set('session.gc_maxlifetime', 1000);
-ini_set('session.gc_probability', 5);
+ini_set('session.gc_maxlifetime', 172800);
+ini_set('session.cookie_lifetime', 172800);
+ini_set('session.gc_probability', 1);
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+}
+
+if (isset($_SESSION['userid'])) {
+    $handler->user($_SESSION['userid']);
 }
 
 if (!isset($_SESSION['requests'])) {
