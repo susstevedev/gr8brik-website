@@ -140,7 +140,7 @@ if (isset($_POST['delete_comment'])) {
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
             $id = $current_user->id;
 
-            $sql = "SELECT id, hidden, user FROM comments WHERE id = ?";
+            $sql = "SELECT id, hidden, user, model FROM comments WHERE id = ?";
             $stmt = $conn->prepare($sql);
             $stmt->bind_param("i", $comment_id);
             $stmt->execute();
@@ -149,15 +149,22 @@ if (isset($_POST['delete_comment'])) {
             if ($row = $result->fetch_assoc()) {
                 if(trim($row['user']) === trim($current_user->id) || $current_user->admin) {
                     $sql2 = "UPDATE comments SET hidden = 1 WHERE id = ?";
+                    $sql3 = "UPDATE model SET replies = replies - 1 WHERE id = ?";
+                    $model_id = $row['model'];
 
                     if($row['hidden']) {
                         $sql2 = "UPDATE comments SET hidden = 0 WHERE id = ?";
+                        $sql3 = "UPDATE model SET replies = replies + 1 WHERE id = ?";
                     }
 
                     $stmt2 = $conn->prepare($sql2);
                     $stmt2->bind_param("i", $comment_id);
 
                     if ($stmt2->execute()) {
+                        $stmt_count = $conn->prepare($sql3);
+                        $stmt_count->bind_param("i", $model_id);
+                        $stmt_count->execute();
+
                         echo json_encode(['success' => 'Comment updated']);
                     } else {
                         echo json_encode(['error' => 'Error deleting comment']);
@@ -330,7 +337,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         <?php if ($data['voted'] === true) { ?>
                             <div class="tooltip" id="data-unlike-creation">
                                 <span class="w3-tag w3-blue tooltiptext">Unfavorite this creation</span>
-                                &nbsp;<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-orange"><span class="fa fa-star"></span>
+                                &nbsp;<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink"><span class="fa fa-star"></span>
                                     <span class="text">Unfavorite (<?php echo $data['likes'] ?>)</span>
                                 </button>&nbsp;
                             </div>
@@ -339,6 +346,22 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 <span class="w3-tag w3-blue tooltiptext">Favorite this creation to support it and the creator</span>
                                 &nbsp;<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-padding-small w3-border w3-border-orange"><span class="fa fa-star-o"></span>
                                     <span class="text">Favorite (<?php echo $data['likes'] ?>)</span>
+                                </button>&nbsp;
+                            </div>
+                        <?php } ?>
+
+                        <?php if ($data['is_subbed'] === true) { ?>
+                            <div class="tooltip" id="data-unsubscribe-creation">
+                                <span class="w3-tag w3-blue tooltiptext">Unsubscribe to cancel notifications out for this creation</span>
+                                &nbsp;<button class="unsubscribe-creation w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink"><span class="fa fa-plus-square"></span>
+                                    <span class="text">Unsubscribe</span>
+                                </button>&nbsp;
+                            </div>
+                        <?php } else { ?>
+                            <div class="tooltip" id="data-subscribe-creation">
+                                <span class="w3-tag w3-blue tooltiptext">Subscribe to get notifications for this creation</span>
+                                &nbsp;<button class="subscribe-creation w3-btn w3-yellow w3-hover-opacity w3-padding-small w3-border w3-border-orange"><span class="fa fa-plus-square-o"></span>
+                                    <span class="text">Subscribe</span>
                                 </button>&nbsp;
                             </div>
                         <?php } ?>

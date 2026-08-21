@@ -57,9 +57,9 @@ if (isset($_POST['follow'])) {
 
         if ($userid != $profile_id) {
             $content = $profile_id;
-            $category = 1;
+            $category = 'follow';
 
-            $sql_notification = "INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)";
+            $sql_notification = "INSERT INTO notifications (user, profile, timestamp, content, category2) VALUES (?, ?, ?, ?, ?)";
             $stmt_notification = $conn->prepare($sql_notification);
             $stmt_notification->bind_param("iisii", $profile_id, $userid, $time, $content, $category);
             $stmt_notification->execute();

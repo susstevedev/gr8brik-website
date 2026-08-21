@@ -304,12 +304,12 @@ if (isset($_GET['feature_v3'])) {
                 $sql = 'SELECT * FROM model WHERE user IN (' . implode(',', $followed_users) . ') ORDER BY date DESC LIMIT 12 OFFSET ' . (int)$offset;
 
                 if ((isset($_GET['sort']) && $_GET['sort'] === "follow") || (empty($_GET['sort']) && empty($_GET['q']))) {
-                    echo '<div class="w3-col s12 w3-margin-bottom"><p class="w3-panel w3-pale-blue w3-padding w3-round">You can get a better feed by following more people. <a href="/users">Find people to follow</a>.</p></div>';
+                    echo '<div class="w3-col s12 w3-margin-bottom"><p class="w3-panel w3-light-grey w3-padding w3-round">You can get a better feed by following more people. <a href="/users">Find people to follow</a>.</p></div>';
                 }
             } else {
                 $sql = 'SELECT * FROM model WHERE removed = 0 ORDER BY id DESC LIMIT 12 OFFSET ' . (int)$offset;
 
-                echo '<div class="w3-col s12 w3-margin-bottom w3-panel w3-pale-blue w3-round">';
+                echo '<div class="w3-col s12 w3-margin-bottom w3-panel w3-light-grey w3-round">';
                 echo '<h4>You\'re not following anyone</h4>';
                 echo '<p>Start following people to engage with more people and get a custom feed. <a href="/users">Find people to follow</a>.</p>';
                 echo '<a href="/rules">Rules</a> • <a href="/terms">Terms and Conditions</a> • <a href="/privacy">Privacy Policy</a>';
@@ -332,7 +332,7 @@ if (isset($_GET['feature_v3'])) {
             echo '<div class="w3-col s12"><p>Search results for <b>' . htmlspecialchars($query) . '</b></p></div>';
         }
 
-        if (isset($_GET['t']) && $_GET['t']) {
+        /*if (isset($_GET['t']) && $_GET['t']) {
             $is_search = true;
             $query = trim($_GET['t']);
             $search = "%$query%";
@@ -345,6 +345,34 @@ if (isset($_GET['feature_v3'])) {
             $result2 = $stmt->get_result();
 
             echo '<div class="w3-col s12"><p>Models tagged <b>' . htmlspecialchars($query) . '</b></p></div>';
+        }*/
+
+        if (isset($_GET['t']) && $_GET['t']) {
+            $is_search = true;
+            $query = trim($_GET['t']);
+            $tags = array_filter(array_map('trim', explode(',', $query)));
+
+            if (!empty($tags)) {
+                $conditions = array_fill(0, count($tags), "t.tag_name LIKE ?");
+                $where_clause = implode(' OR ', $conditions);
+
+                //Distinct to prevent duplicates
+                $sql = "SELECT DISTINCT m.* FROM model m JOIN tags t ON m.id = t.model_id WHERE ($where_clause) LIMIT 12 OFFSET " . (int)$offset;
+                $stmt = $conn2->prepare($sql);
+
+                $types = str_repeat('s', count($tags));
+                $search_params = [];
+                foreach ($tags as $tag) {
+                    $search_params[] = "%" . $tag . "%";
+                }
+
+                $stmt->bind_param($types, ...$search_params);
+                $stmt->execute();
+                $result2 = $stmt->get_result();
+
+                $escaped_tags = array_map('htmlspecialchars', $tags);
+                echo '<div class="w3-col s12"><p>Creations tagged <b>' . implode(', ', $escaped_tags) . '</b></p></div>';
+            }
         }
 
         if (isset($_GET['sort']) && $_GET['sort']) {
