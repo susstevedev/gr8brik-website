@@ -20,9 +20,6 @@ class ScreenNameUtils {
     public function check_username_available(string $new) {
         global $current_user;
         global $conn;
-
-        $available = '1';
-        $reason = null;
         
         $reserved_names = array(
             'administrator', 
@@ -64,7 +61,7 @@ class ScreenNameUtils {
             }
 
             if(trim((strtolower($new))) == trim((strtolower($current_user->username)))) {
-                return ['available' => '0', 'reason' => null];
+                return ['available' => false];
             }
         }
 
@@ -82,16 +79,16 @@ class ScreenNameUtils {
 
         $isBanned = AccountManager::isBanned($conn, null, $new);
         if($isBanned !== false) {
-            return ['available' => 0];
+            return ['available' => false, 'reason' => 'This username is unavailable. Please choose another.'];
         }
 
         $result = $conn->query("SELECT * FROM users WHERE username = '$new' AND deactive IS NULL");
         if($result->num_rows != 0 || in_array($new, $reserved_names)) {
             return ['available' => false, 'reason' => 'This username has been taken. Please choose another.'];
         }
-        
+
         foreach($banned_words as $banned_word) {
-            if (!$reason && strpos(base64_encode($new), $banned_word) !== false) {
+            if (strpos(base64_encode($new), $banned_word) !== false) {
                 return ['available' => false, 'reason' => 'This username is unavailable. Please choose another.'];
             }
         }
@@ -183,6 +180,48 @@ class AccountSettings {
             return ['error' => "Please verify your account to continue this action."];
         }
 
+        if(empty($new)) {
+            return ['error' => 'The provided handle seems to be empty.'];
+        }
+
+        $new = strtolower(trim($new));
+
+        $stmt = $conn->prepare("SELECT 1 FROM users WHERE bsky = ? AND deactive IS NULL");
+        $stmt->bind_param("s", $new);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if($result->num_rows != 0) {
+            return ['error' => 'This handle has been choosen by another account. Please note that alt accounts are not allowed.'];
+        }
+
+        if(strlen($new) > 253) {
+            $error_message = "The handle of the linked Bluesky account cannot be over 253 characters.";
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => $error_message];
+        }
+
+        if(strlen($new) < 3) {
+            $error_message = "The handle of the linked Bluesky account cannot be under 3 characters.";
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => $error_message];
+        }
+
+        $segments = explode('.', $new);
+        if (count($segments) < 2) {
+            return ['error' => 'The handle include a domain (e.g., bsky.social).'];
+        }
+
+        foreach ($segments as $str) {
+            if (strlen($str) < 1 || strlen($str) > 63) {
+                return ['error' => 'Each part of the handle must be between 1 and 63 characters.'];
+            }
+
+            if (!preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $str)) {
+                return ['error' => 'Bluesky handle can only contain a-z, 0-9, and hyphens (cannot start or end with a hyphen).'];
+            }
+        }
+
         $stmt_2 = $conn->prepare("UPDATE users SET bsky = ? WHERE id = ?");
         $stmt_2->bind_param("ss", $new, $id);
         if ($stmt_2->execute()) {
@@ -209,7 +248,7 @@ class AccountSettings {
         // 1k as of 1/1/2026
         if(strlen($new) > 1000) {
             header("HTTP/1.0 500 Internal Server Error");
-            return ['error' => 'About section can only be 1,000 characters.'];
+            return ['error' => 'About section must be under 1,000 characters.'];
         }
 
         $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -222,8 +261,6 @@ class AccountSettings {
             header("HTTP/1.0 500 Internal Server Error");
             return ['error' => 'Error changing about section.'];
         }
-
-        $stmt->close();
     }
 
     public function password_change($oldPassword, $newPassword, $confirmPassword) {
@@ -243,27 +280,25 @@ class AccountSettings {
             return ['error' => "New passwords do not match"];
         }
 
-        $stmt = $conn->prepare("SELECT password, salt FROM users WHERE id = ?");
+        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
         $stmt->bind_param("i", $userid);
         $stmt->execute();
-        $stmt->bind_result($storedHash, $salt);
+        $stmt->bind_result($hash);
         $stmt->fetch();
         $stmt->close();
 
-        if ($storedHash) {
-            if ($storedHash === md5($oldPassword . $salt)) {
-                $newSalt = uniqid();
-                $newHashedPassword = md5($newPassword . $newSalt);
-
-                $stmt = $conn->prepare("UPDATE users SET password = ?, salt = ? WHERE id = ?");
-                $stmt->bind_param("ssi", $newHashedPassword, $newSalt, $userid);
+        if ($hash) {
+            if (password_verify($oldPassword, $hash)) {
+                $newPwd = password_hash($newPassword, PASSWORD_DEFAULT);
+                $stmt = $conn->prepare("UPDATE users SET password = ?, salt = NULL WHERE id = ?");
+                $stmt->bind_param("si", $newPwd, $userid);
 
                 if ($stmt->execute()) {
                     header("HTTP/1.0 200 OK");
                     return ['success' => 'Congrats! Your password was updated with success!'];
                 } else {
                     header("HTTP/1.0 500 Internal Server Error");
-                    return ['error' => "Unknown error changing password."];
+                    return ['error' => "An unknown error occured while changing password."];
                 }
             } else {
                 header("HTTP/1.0 500 Internal Server Error");
@@ -297,7 +332,7 @@ class AccountSettings {
 
                 if ($conn->query($sql2) === TRUE) {
                     header("HTTP/1.0 200 OK");
-                    echo json_encode(['success' => 'Email address updated. Please navigate backwards to continue.']);
+                    echo json_encode(['success' => 'Email address updated.']);
                     exit;
                 } else {
                     $error_message = "Error changing email address.";
@@ -308,7 +343,7 @@ class AccountSettings {
             } else {
                 $error_message = htmlspecialchars($row['email']) . " is not equal to " . htmlspecialchars($old) . ".";
                 header("HTTP/1.0 500 Internal Server Error");
-                echo json_encode(['error' => $error_message]);
+                echo json_encode(['success' => false, 'error' => $error_message]);
                 exit;
             }
         }
@@ -346,12 +381,21 @@ if(isset($_GET['about_change'])){
     exit;
 }
 
-if(isset($_POST['change'])){
+if(isset($_POST['change'])) {
     $new = urldecode($_POST['n_password']);
     $old = urldecode($_POST['o_password']);
     $confirm = urldecode($_POST['c_password']);
 
     $result = $account_settings->password_change($old, $new, $confirm);
+    echo json_encode($result);
+    exit;
+}
+
+if(isset($_POST['mail_change'])) {
+    $new = urldecode($_POST['n_email']);
+    $old = urldecode($_POST['o_email']);
+
+    $result = $account_settings->mail_change($new, $old);
     echo json_encode($result);
     exit;
 }

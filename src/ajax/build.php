@@ -793,6 +793,8 @@ function fetch_build($model_id, $csrf) {
         }
     }
 
+    $notifications = new Notifications($conn2);
+
     if(loggedin()) {
         $id = $current_user->id;
 
@@ -818,7 +820,6 @@ function fetch_build($model_id, $csrf) {
             $voted = false;
         }
 
-        $notifications = new Notifications($conn2);
         $is_subbed = $notifications->is_subscriber('comment', $model_id, $id);
     } else {
         $voted = false;
@@ -874,6 +875,7 @@ function fetch_build($model_id, $csrf) {
         'comments' => $row2['replies'],
         'username' => $username,
         'followers' => $followers,
+        'conversation_subbed' => $notifications->get_subscribers('comment', $model_id),
         'model_admin' => $row->admin,
         'message' => $message ?? null
     ];

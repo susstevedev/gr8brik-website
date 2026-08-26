@@ -163,10 +163,8 @@ function user_blocks(int $profileid, mixed $db) {
 }
 
 function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
-    global $token, $current_user;
+    global $current_user;
     $userid = $current_user->id ?? null;
-
-    require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
     $bbcode = new BBCode();
 
     if (empty($csrf) || $csrf != $_SESSION['csrf']) {
@@ -181,81 +179,26 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         exit($conn->connect_error);
     }
 
-    function delete_mini_message() {
-        header("HTTP/1.0 403 Forbidden");
+    if($use_name === true) {
+        $usero = User::getUserByName($profile_id);
+        $profile_id = $usero->id;
+    } else {
+        $profile_id = $profile_id;
+        $usero = User::getUser($profile_id);
+    }
+
+    if (!isset($usero) || User::isDeleted($profile_id) || AccountManager::isBanned($conn, $usero->email, $usero->username)) {
+        http_response_code(404);
         return [
             "message" => 'User not found.',
             "error" => 'USR_NOT_FND'
         ];
     }
 
-    if($use_name === true) {
-        $profile_name = $profile_id;
-        $sql = "SELECT * FROM users WHERE username = ? AND deactive IS NULL";
-
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("s", $profile_name);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if($result->num_rows > 0) {
-            $row = $result->fetch_assoc();
-            $profile_id = $row['id'] ?? 0;
-            $usero = new User($row);
-        } else {
-            return delete_mini_message();
-        }
-
-        $stmt->close();
-    } else {
-        $profile_id = $profile_id;
-        $usero = User::getUser($profile_id);
-    }
-
-    $email = $usero->email ?? null;
-    $username = $usero->username ?? null;
-
-    if (!isset($usero) || User::isDeleted($profile_id) || AccountManager::isBanned($conn, $email, $username)) {
-        return delete_mini_message();
-    }
-
-    $bsky = null;
-    if (!isset($_SESSION['viewed_bskys'])) {
-        $_SESSION['viewed_bskys'] = [];
-    }
-
-    if ($usero->bsky) {
-        $actor_did = $usero->bsky;
-        if (array_key_exists($actor_did, $_SESSION['viewed_bskys'])) {
-            $bsky = $_SESSION['viewed_bskys'][$actor_did];
-        } else {
-            $ch = curl_init();
-            $url = "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=" . urlencode($usero->bsky);
-            
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
-            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36');
-
-            $response = curl_exec($ch);
-
-            if (!curl_errno($ch)) {
-                $data = json_decode($response, true);
-
-                if (json_last_error() === JSON_ERROR_NONE && isset($data['handle'])) {
-                    $bsky = $data['handle'] ?? null;
-
-                    if ($bsky !== null) {
-                        $_SESSION['viewed_bskys'][$actor_did] = $bsky;
-                    }
-                }
-            }
-            curl_close($ch);
-        }
-    }
-
+    $bsky = $usero->bsky ?? null;
     $is_blocking = false;
     $is_following = false;
+
     if(loggedin()) {
         $blocks = user_blocks($profile_id, $conn);
 
@@ -278,7 +221,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     	$stmt->close();
 
         if($current_user->admin == '1') {
-            $adm_email = htmlspecialchars($email);
+            $adm_email = isset($usero->email) ? htmlspecialchars($usero->email) : '';
         }
     }
 
@@ -287,51 +230,59 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         exit($conn2->connect_error);
     }
 
-    $stmt = $conn2->prepare("SELECT COUNT(*) as all_models FROM model WHERE user = ?");
-    $stmt->bind_param("s", $profile_id);
-    $stmt->execute();
-    $model_count = $stmt->get_result()->fetch_assoc()['all_models'] ?? 0;
-    $stmt->close();
+    if(User::isDeleted($profile_id) || AccountManager::isBanned($conn, $usero->email, $usero->username)) {
+        $model_count = '';
+        $views = '';
+        $likes = '';
+        $followers = '';
+        $following = '';
+    } else {
+        $stmt = $conn2->prepare("SELECT COUNT(*) as all_models FROM model WHERE user = ?");
+        $stmt->bind_param("s", $profile_id);
+        $stmt->execute();
+        $model_count = $stmt->get_result()->fetch_assoc()['all_models'] ?? 0;
+        $stmt->close();
 
-    $stmt = $conn2->prepare("SELECT SUM(views) as total_views FROM model WHERE user = ?");
-    $stmt->bind_param("s", $profile_id);
-    $stmt->execute();
-    $views = $stmt->get_result()->fetch_assoc()['total_views'] ?? 0;
-    $stmt->close();
+        $stmt = $conn2->prepare("SELECT SUM(views) as total_views FROM model WHERE user = ?");
+        $stmt->bind_param("s", $profile_id);
+        $stmt->execute();
+        $views = $stmt->get_result()->fetch_assoc()['total_views'] ?? 0;
+        $stmt->close();
 
-    $stmt = $conn2->prepare("SELECT SUM(likes) as total_likes FROM model WHERE user = ?");
-    $stmt->bind_param("s", $profile_id);
-    $stmt->execute();
-    $likes = $stmt->get_result()->fetch_assoc()['total_likes'] ?? 0;
-    $stmt->close();
+        $stmt = $conn2->prepare("SELECT SUM(likes) as total_likes FROM model WHERE user = ?");
+        $stmt->bind_param("s", $profile_id);
+        $stmt->execute();
+        $likes = $stmt->get_result()->fetch_assoc()['total_likes'] ?? 0;
+        $stmt->close();
 
-    $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
-    $stmt->bind_param("s", $profile_id);
-    $stmt->execute();
-    $followers = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
-    $stmt->close();
+        $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
+        $stmt->bind_param("s", $profile_id);
+        $stmt->execute();
+        $followers = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
+        $stmt->close();
 
-    $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ?");
-    $stmt->bind_param("s", $profile_id);
-    $stmt->execute();
-    $following = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
-    $stmt->close();
+        $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ?");
+        $stmt->bind_param("s", $profile_id);
+        $stmt->execute();
+        $following = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
+        $stmt->close();
+    }
 
     $message = null;
     $data = [
         'userid' => $profile_id,
-        'username' => htmlspecialchars($username),
+        'username' => htmlspecialchars($usero->username),
         'admin' => (string)$usero->admin,
         'description' => isset($usero->description) ? $bbcode->toHTML($usero->description) : '', 
-        'twitter' => htmlspecialchars($usero->twitter),
+        'twitter' => isset($usero->twitter) ? htmlspecialchars($usero->twitter) : '',
         'bsky' => $bsky,
-        'age' => htmlspecialchars($usero->age),
+        'age' => isset($usero->age) ? htmlspecialchars($usero->age) : '',
         'picture' => htmlspecialchars($usero->picture),
-        'model_count' => (int)$model_count,
-        'followers' => (int)$followers,
-        'following' => (int)$following,
-        'views' => (int)$views,
-        'likes' => (int)$likes,
+        'model_count' => $model_count,
+        'followers' => $followers,
+        'following' => $following,
+        'views' => $views,
+        'likes' => $likes,
         'is_following' => (bool)$is_following,
         'is_blocking' => $is_blocking,
         'message' => $message,
@@ -362,6 +313,11 @@ class UserContent {
 
         $limit = 9;
         $offset = ($page - 1) * $limit;
+        $user = User::getUser($userid);
+
+        if(!$user || User::isDeleted($userid)) {
+            return ['success' => false, 'error' => "What user is this?"];
+        }
 
         $stmt = $creation_conn->prepare("SELECT * FROM model WHERE user = ? AND visibility = 'public' AND removed = 0 ORDER BY date DESC LIMIT $limit OFFSET $offset;");
         $stmt->bind_param("i", $userid);
@@ -370,7 +326,6 @@ class UserContent {
 
         $creations = [];
         while ($creation = $result->fetch_assoc()) {
-            $user = User::getUser($creation['user']);
             $creation['username'] = $user->username ?? null;
             $creation['user'] = $user->id ?? null;
                     
@@ -390,7 +345,7 @@ class UserContent {
         }
         $stmt->close();
         $creation_conn->close();
-        return $creations;
+        return ['success' => true, 'creations' => $creations];
     }
 
     public function returnLikedModels($userid) {
@@ -402,7 +357,13 @@ class UserContent {
 
         if (!loggedin()) {
             http_response_code(401);
-            return ['success' => false, 'error' => "Sign in to view liked models of a user"];
+            return ['success' => false, 'error' => "Sign in to view liked creations of a user"];
+        }
+
+        $user = User::getUser($userid);
+
+        if(!$user || User::isDeleted($userid)) {
+            return ['success' => false, 'error' => "What user is this?"];
         }
 
         $stmt = $creation_conn->prepare('SELECT * FROM votes WHERE user = ?');
@@ -417,19 +378,16 @@ class UserContent {
             while ($row = $result->fetch_assoc()) {
                 $liked[] = $row['creation'];
             }
-                
+
             $stmt2 = $creation_conn->prepare("SELECT * FROM model WHERE id IN (" . implode(',', $liked) . ") AND visibility = 'public' AND removed = 0 ORDER BY date DESC");
             $stmt2->execute();
             $result2 = $stmt2->get_result();
-                    
+
             if ($result2->num_rows != 0) {
                 while ($row2 = $result2->fetch_assoc()) {
-                    $model_user = $row2['user'];
+                    $model_user_id = $row2['user'] ?? null;
+                    $row2['username'] = User::getUser($model_user_id)->username ?? null;
 
-                    $user = User::getUser($model_user);
-                    $row2['username'] = $user->username ?? null;
-                    $row2['userid'] = $user->id ?? null;
-                    
                     if (empty($row2['name'])) {
                         $row2['name'] = $row2['username'] . "'s creation";
                     }
@@ -467,6 +425,12 @@ class UserContent {
             exit;
         }
 
+        $user = User::getUser($userid);
+
+        if(!$user || User::isDeleted($userid)) {
+            return ['success' => false, 'error' => "What user is this?"];
+        }
+
         // comments and replies
         $profileid = $userid; // whatever
         $profile_stmt = $conn_creations->prepare("SELECT * FROM comments WHERE hidden = 0 AND user = ? ORDER BY id DESC LIMIT $limit OFFSET $offset;");
@@ -489,8 +453,6 @@ class UserContent {
             } else {
                 $comment2['parent_name'] = "a model";
             }
-
-            $user = User::getUser($userid);
 
             $comment2['type'] = 'model';
             $comment2['id'] = $comment['id'];
@@ -521,8 +483,6 @@ class UserContent {
             } else {
                 $parent_name = "a forum topic";
             }
-
-            $user = User::getUser($userid);
             
             $reply2['type'] = 'forum';
             $reply2['id'] = $reply['id'];
@@ -537,6 +497,7 @@ class UserContent {
         }
 
         $arr = array([
+            'success' => true,
             'creation_replies' => $creation_replies,
             'forum_replies' => $forum_replies,
         ]);
@@ -560,6 +521,12 @@ class UserContent {
             exit;
         }
 
+        $user = User::getUser($userid);
+
+        if(!$user || User::isDeleted($userid)) {
+            return ['success' => false, 'error' => "What user is this?"];
+        }
+
         $profile_stmt = $conn_forum->prepare("SELECT * FROM messages WHERE userid = ? AND (parent = 0 OR parent IS NULL) ORDER BY id DESC LIMIT $limit OFFSET $offset;");
         $profile_stmt->bind_param("s", $userid);
         $profile_stmt->execute();
@@ -567,7 +534,6 @@ class UserContent {
 
         while ($p = $result->fetch_assoc()) {
             $p2 = [];
-            $user = User::getUser($userid);
 
             $p2['id'] = $p['id'];
             $p2['username'] = $user->username ?? null;
@@ -579,8 +545,7 @@ class UserContent {
         }
 
         $conn_forum->close();
-
-        return $posts;
+        return ['success' => true, 'posts' => $posts];
     }
 }
 
@@ -600,7 +565,7 @@ if(isset($_GET['getUserBuilds'])) {
     $UserContent = new UserContent();
     $creations = $UserContent->returnModels($_GET['userid'], $page);
 
-    echo json_encode(['success' => true, 'creations' => $creations]);
+    echo json_encode($creations);
     exit;
 }
 
@@ -620,7 +585,7 @@ if(isset($_GET['getUserForums'])) {
     $UserContent = new UserContent();
     $posts = $UserContent->returnForums($_GET['userid'], $page);
 
-    echo json_encode(['success' => true, 'posts' => $posts]);
+    echo json_encode($posts);
     exit;
 }
 
@@ -652,20 +617,24 @@ if(isset($_GET['getUserComments'])) {
     
     $UserContent = new UserContent();
     $comments = $UserContent->returnComments($_GET['userid'], $page);
-
-    $user = User::getUser($_GET['userid']);
-
     $comments_arr = [];
+    $json = null;
 
-    foreach($comments[0]['creation_replies'] as $comment) {
-        $comments_arr[] = $comment;
+    if(isset($comments['success']) && $comments['success'] !== true) {
+        $json = json_encode($comments);
+    } else {
+        foreach($comments[0]['creation_replies'] as $comment) {
+            $comments_arr[] = $comment;
+        }
+
+        foreach($comments[0]['forum_replies'] as $comment) {
+            $comments_arr[] = $comment;
+        }
+
+        $json = json_encode(['success' => true, 'comments' => $comments_arr]);
     }
 
-    foreach($comments[0]['forum_replies'] as $comment) {
-        $comments_arr[] = $comment;
-    }
-
-    echo json_encode(['success' => true, 'comments' => $comments_arr]);
+    echo $json;
     exit;
 }
 ?>

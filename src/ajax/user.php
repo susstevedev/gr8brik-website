@@ -153,6 +153,30 @@ class User {
         return new User($user_row);
     }
 
+    public static function getUserByName(?string $username) {
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+        $user_stmt = $conn->prepare("SELECT * FROM users WHERE username = ? AND deactive IS NULL");
+        $user_stmt->bind_param("s", $username);
+        $user_stmt->execute();
+        $user_res = $user_stmt->get_result();
+        $user_row = $user_res->fetch_assoc();
+
+        return new User($user_row);
+    }
+
+    public static function getUserByEmail(?string $email) {
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+        $user_stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND deactive IS NULL");
+        $user_stmt->bind_param("s", $email);
+        $user_stmt->execute();
+        $user_res = $user_stmt->get_result();
+        $user_row = $user_res->fetch_assoc();
+
+        return new User($user_row);
+    }
+
     public static function isVerified() {
         global $current_user;
 
@@ -163,7 +187,7 @@ class User {
                 return false;
             }
 
-            if(User::isDeleted($id)) {
+            if(self::isDeleted($id)) {
                 return false;
             }
 

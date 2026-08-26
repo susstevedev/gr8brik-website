@@ -62,29 +62,71 @@ if (isset($_GET['revoke']) && isset($_GET['tokenId'])) {
 
 class AccountManager
 {
-    function verifyAccount()
+	public static function verifyUser(mixed $db, string $token)
     {
         global $current_user;
         if (!loggedin() || !isset($current_user)) {
-            return "User is not authenticated";
+            return ['error' => "Please login to verify an account"];
         }
 
-        if (!isset($_GET['bot'])) {
-            return false;
+		$check = $db->prepare("SELECT id, verify_token FROM users WHERE verify_token = ? AND verify_token IS NOT NULL");
+        $check->bind_param("s", $token);
+        $check->execute();
+        $result = $check->get_result();
+
+        if ($result->num_rows === 0) {
+            http_response_code(404);
+            return ['error' => "Invalid verification token. It's possible that the verification code sent via email was invalid. It's also possible that this verification token is being used by another user."];
         }
 
-        $userid = $current_user->id;
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-        $stmt = $conn->prepare("UPDATE users SET verify_token = NULL WHERE id = ?");
+		$row = $result->fetch_assoc();
+        $userid = $row['id'];
+        $stmt = $db->prepare("UPDATE users SET verify_token = NULL WHERE id = ?");
         $stmt->bind_param("i", $userid);
+
         if ($stmt->execute()) {
-            header("Refresh:2;url=/list.php");
-            return "Verified account";
+			return ['success' => "Your account has been verified. You may now continue to use the platform."];
         } else {
-            return "An unknown error occured. Please try again later.";
+            return ['error' => "An unknown error occured. Please try again later."];
         }
     }
+
+	public static function send_verify_email(string $token, string $email, ?string $username) {
+		require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/phpmailer/Exception.php';
+		require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/phpmailer/PHPMailer.php';
+		require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/phpmailer/SMTP.php';
+
+		$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
+
+		$message = "Hi! Thank you for creating an account.\n\nPlease click the link below to verify your email address:\n\n";
+		$message .= $protocol . $_SERVER['HTTP_HOST'] . "/acc/verify.php?code=" . $token . "\n\n";
+		$message .= 'Note: if you didn\'t request this email, ignore this email. If you didn\'t create this account, email us back and we\'ll delete it.';
+
+		$mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+
+		try {
+			$mail->isSMTP();
+
+			$mail->Host = 'smtp.gmail.com';
+			$mail->SMTPAuth = true;
+			$mail->Username = GMAIL_USER;
+			$mail->Password = GMAIL_APP_PWD;
+			$mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+			$mail->Port = 587;
+
+			$mail->setFrom(DB_MAIL);
+			$mail->addAddress($email);
+
+			$mail->Subject = "Email verification";
+			$mail->Body = $message;
+
+			$mail->send();
+			return true;
+		} catch (\PHPMailer\PHPMailer\Exception $e) {
+			error_log($mail->ErrorInfo);
+			return false;
+		}
+	}
 
     //new ban helper
     public static function isBanned(mixed $db, ?string $email = null, ?string $user = null)
@@ -98,9 +140,14 @@ class AccountManager
         $paramTypes = "";
 
         if ($email !== null) {
-            $hashedEmail = hash('sha256', strtolower(trim($email)));
             $conditions[] = "(value = ? AND type = 'email')";
-            $params[] = $hashedEmail;
+            $params[] = strtolower(trim($email));
+            $paramTypes .= "s";
+        }
+
+		if ($email !== null) {
+            $conditions[] = "(value = ? AND type = 'email')";
+            $params[] = hash('sha256', strtolower(trim($email)));
             $paramTypes .= "s";
         }
 
@@ -110,8 +157,8 @@ class AccountManager
             $paramTypes .= "s";
         }
 
-        $sql = "SELECT reason FROM blacklist WHERE " . implode(" OR ", $conditions) . " LIMIT 1";
-        
+        $sql = "SELECT reason FROM blacklist WHERE (" . implode(" OR ", $conditions) . ") AND (created_at IS NULL OR created_at <= CURRENT_TIMESTAMP()) AND (ignore_at IS NULL OR ignore_at >= CURRENT_TIMESTAMP()) LIMIT 1";
+
         $stmt = $db->prepare($sql);
         if (!$stmt) {
             return false;
@@ -122,7 +169,7 @@ class AccountManager
         $res = $stmt->get_result();
 
         if ($row = $res->fetch_assoc()) {
-            return !empty($row['reason']) ? $row['reason'] : "An unknown error occurred. Please try again later.";
+            return !empty($row['reason']) ? $row['reason'] : "Email or username is not unavailable.";
         }
 
         return false;
@@ -153,8 +200,7 @@ class AccountManager
             return ['error' => "Already logged in"];
         }
 
-        //$stmt = $conn->prepare("SELECT * FROM users WHERE email = ? OR username = ? LIMIT 1");
-        $stmt = $conn->prepare("SELECT * FROM users WHERE (email = ? OR username = ?) AND (deactive IS NULL OR deactive < NOW() + INTERVAL 14 DAY) LIMIT 1");
+        $stmt = $conn->prepare("SELECT id, username, email, password, deactive FROM users WHERE (email = ? OR username = ?) AND (deactive IS NULL OR deactive < NOW() + INTERVAL 14 DAY) LIMIT 1");
         $stmt->bind_param("ss", $user, $user);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -162,7 +208,7 @@ class AccountManager
 
         if (!$row) {
             http_response_code(400);
-            return ['error' => "Invalid combination of email or username and password."];
+            return ['error' => "Invalid combination of email or username and password. (no account)"];
         }
 
         $db_hashed_pwd = null;
@@ -198,23 +244,23 @@ class AccountManager
             }
         }
 
+		$isBanned = self::isBanned($conn, $row['email'], $row['username']);
+        if ($isBanned !== false) {
+            http_response_code(400);
+            return ['error' => $isBanned];
+        }
+
         if (!empty($row['deactive'])) {
-            $sql = "INSERT INTO sessions (id, user, timestamp) VALUES ('$token_raw', '$userid', '$time') LIMIT 1";
+            $sql = "INSERT INTO sessions (id, user, timestamp) VALUES ('$token_hashed', '$userid', '$time') LIMIT 1";
             if (mysqli_query($conn, $sql)) {
                 http_response_code(500);
                 return [
                     'popup' => "Do you want to reactivate your account?",
                     'error' => "Do you want to reactivate your account?",
-                    'goto' => "/acc/index?reactive=1&token=" . $token_raw,
+                    'goto' => "/acc/index?reactive=1&token=" . $token_hashed,
                     'btn' => "Yes"
                 ];
             }
-        }
-
-        $isBanned = self::isBanned($conn, $row['email'], $row['username']);
-        if ($isBanned !== false) {
-            http_response_code(400);
-            return ['error' => $isBanned];
         }
 
         $banStmt = $conn->prepare("SELECT * FROM bans WHERE user = ? AND end_date >= UNIX_TIMESTAMP() ORDER BY end_date DESC LIMIT 1");
@@ -272,9 +318,8 @@ class AccountManager
 
         $username = mysqli_real_escape_string($conn, htmlspecialchars((urldecode($username))));
         $email = mysqli_real_escape_string($conn, trim($email ?? ''));
-        $created = date("Y-m-d H:i:s");
-        $bloguser = md5(uniqid());
-        $tokenid = bin2hex(random_bytes(32));
+        $token_raw = bin2hex(random_bytes(32));
+		$token_hashed = hash('sha256', $token_raw);
         $login_from = $_SERVER['REMOTE_ADDR'];
 
         if (empty($password) || empty($email) || empty($username)) {
@@ -290,11 +335,16 @@ class AccountManager
             }
         }
 
+		if (loggedin()) {
+            http_response_code(400);
+            return ['error' => "Already logged in"];
+        }
+
         $usernameutils = new ScreenNameUtils();
         $username_available = $usernameutils->check_username_available($username);
-        if ($username_available['available'] === '0') {
+        if (!$username_available['available']) {
             http_response_code(400);
-            return ['error' => "Username is not avaliable"];
+            return ['error' => $username_available['reason']];
         }
 
         $picture = "/img/no_image.png";
@@ -311,33 +361,27 @@ class AccountManager
 
         $password = password_hash($password, PASSWORD_DEFAULT);
 
-        //Prevents re-registration for banned or deactivated accounts
         $current_domain = strtolower(explode('@', $email)[1]);
         $current_local = strtolower(explode('@', $email)[0]);
 
-        if (str_contains($current_local, '+')) {
+        if (str_contains($current_local, '+') || str_contains($current_local, '.')) {
             http_response_code(400);
             return ['error' => "Invalid email address format"];
-        }   
+        }
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             http_response_code(400);
             return ['error' => "Invalid email address format"];
         }
 
-        if (!checkdnsrr($current_domain, 'MX')) {
-            http_response_code(400);
-            return ['error' => "Email address is not avaliable"];
-        }
-
         //Account email blacklist system
-        $isBanned = AccountManager::isBanned($conn, $email, null);
+        $isBanned = AccountManager::isBanned($conn, $email);
         if ($isBanned !== false) {
             http_response_code(400);
-            return ['error' => "Email address is not avaliable"];
+            return ['error' => "Email address is not valid"];
         }
 
-        $sql_check = "SELECT id FROM users WHERE email = '$email'";
+        $sql_check = "SELECT 1 FROM users WHERE email = '$email'";
         $stmt = mysqli_query($conn, $sql_check);
 
         if (mysqli_num_rows($stmt) > 0) {
@@ -345,20 +389,18 @@ class AccountManager
             return ['error' => "Email address is not avaliable"];
         }
 
-        $sql = "INSERT INTO users (blog_user_id, username, password, email, age, picture, verify_token) VALUES ('$bloguser', '$username', '$password', '$email', '$created', '$picture', '$tokenid') LIMIT 1";
+        $sql = "INSERT INTO users (blog_user_id, username, password, email, age, picture, verify_token) VALUES ('$token_raw', '$username', '$password', '$email', CURRENT_TIMESTAMP(), '$picture', '$token_raw') LIMIT 1";
         if (mysqli_query($conn, $sql)) {
-            $sql = "SELECT id FROM users WHERE username = '$username'";
-            $result = mysqli_query($conn, $sql);
-            $row2 = mysqli_fetch_assoc($result);
-
-            $userid = $row2['id'];
+            $userid = mysqli_insert_id($conn);
             $time = time();
 
             // Create session token
-            $sql = "INSERT INTO sessions (id, login_from, user, timestamp, remember) VALUES ('$tokenid', '$login_from', '$userid', '$time', '1') LIMIT 1";
+            $sql = "INSERT INTO sessions (id, login_from, user, timestamp, remember) VALUES ('$token_hashed', '$login_from', '$userid', '$time', '1') LIMIT 1";
             if (mysqli_query($conn, $sql)) {
                 $_SESSION['userid'] = $userid;
-                $_SESSION['tokenid'] = $tokenid;
+                $_SESSION['tokenid'] = $token_hashed;
+
+				self::send_verify_email($token_raw, $email, $username);
                 return ['success' => true];
             }
         } else {
@@ -371,126 +413,10 @@ class AccountManager
     }
 }
 
-if (isset($_GET['verify_account'])) {
-    $accManager = new AccountManager();
-    echo $accManager->verifyAccount();
-    exit;
-}
-
 if (isset($_POST['login'])) {
     $accManager = new AccountManager();
     echo json_encode($accManager->login_user($_POST['mail'], $_POST['pwd'], $_POST['remember']));
     exit;
-}
-
-function register_user($username, $password, $email)
-{
-    $conn = mysqli_connect(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if (mysqli_connect_errno()) {
-        header('HTTP/1.0 500 Internal Server Error');
-        return ['error' => "Database connection failed"];
-    }
-
-    $username = mysqli_real_escape_string($conn, htmlspecialchars((urldecode($username))));
-    $email = mysqli_real_escape_string($conn, trim($email ?? ''));
-    $created = date("Y-m-d H:i:s");
-    $bloguser = md5(uniqid());
-    $tokenid = uniqid();
-    $login_from = $_SERVER['REMOTE_ADDR'];
-
-    if (empty($password) || empty($email) || empty($username)) {
-        header("HTTP/1.0 400 Bad Request");
-        if (empty($password)) {
-            return ['error' => "Password field is blank"];
-        }
-        if (empty($email)) {
-            return ['error' => "Email field is blank"];
-        }
-        if (empty($username)) {
-            return ['error' => "Username field is blank"];
-        }
-    }
-
-    $usernameutils = new ScreenNameUtils();
-    $username_available = $usernameutils->check_username_available($username);
-    if ($username_available['available'] === '0') {
-        header("HTTP/1.1 400 Bad Request");
-        return ['error' => "Username is not avaliable"];
-    }
-
-    $picture = "/img/no_image.png";
-
-    if (strlen($password) < 8) {
-        header("HTTP/1.1 400 Bad Request");
-        return ['error' => "Password cannot be less than 8 characters"];
-    }
-
-    if (strlen($password) > 250) {
-        header("HTTP/1.1 400 Bad Request");
-        return ['error' => "Password cannot be more than 250 characters"];
-    }
-
-    $password = password_hash($password, PASSWORD_DEFAULT);
-
-    // Prevents re-registration for banned or deactivated accounts
-    $current_domain = strtolower(explode('@', $email)[1]);
-
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        header('HTTP/1.1 400 Bad Request');
-        return ['error' => "Email address is not avaliable"];
-    }
-
-    if (!checkdnsrr($current_domain, 'MX')) {
-        header('HTTP/1.1 400 Bad Request');
-        return ['error' => "Email address is not avaliable"];
-    }
-
-    // Account email blacklist system
-    $isBanned = AccountManager::isBanned($conn, $email, null);
-    if ($isBanned !== false) {
-        header('HTTP/1.0 500 Internal Server Error');
-        return ['error' => "Email address is not avaliable"];
-    }
-
-    $sql_check = "SELECT id FROM users WHERE email = '$email'";
-    $stmt = mysqli_query($conn, $sql_check);
-
-    if (mysqli_num_rows($stmt) > 0) {
-        header("HTTP/1.1 400 Bad Request");
-        return ['error' => "Email address is not avaliable"];
-    }
-
-    $sql = "INSERT INTO users (blog_user_id, username, password, email, age, picture, verify_token) VALUES ('$bloguser', '$username', '$password', '$email', '$created', '$picture', '$tokenid') LIMIT 1";
-    if (mysqli_query($conn, $sql)) {
-        $sql = "SELECT id FROM users WHERE username = '$username'";
-        $result = mysqli_query($conn, $sql);
-        $row2 = mysqli_fetch_assoc($result);
-
-        $userid = $row2['id'];
-        $time = time();
-
-        // Create session token
-        $sql = "INSERT INTO sessions (id, login_from, user, timestamp, remember) VALUES ('$tokenid', '$login_from', '$userid', '$time', '1') LIMIT 1";
-        if (mysqli_query($conn, $sql)) {
-            setcookie('token', $tokenid, [
-                'expires' => $time + (60 * 60 * 24 * 400),
-                'path' => '/',
-                //'domain' => '.gr8brik.rf.gd',
-                'secure' => false,
-                'httponly' => true,
-                'samesite' => 'Lax'
-            ]);
-            $_SESSION['userid'] = $userid;
-            $_SESSION['tokenid'] = $tokenid;
-            return ['success' => true];
-        }
-    } else {
-        header("HTTP/1.1 500 Internal Server Error");
-        return ['error' => "Failed to register account."];
-    }
-
-    header("HTTP/1.1 503 Service Unavailable");
-    return ['error' => 'An unknown error occured. Please try again later.'];
 }
 
 if (isset($_POST['register'])) {
