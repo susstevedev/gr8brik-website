@@ -249,6 +249,22 @@ body.mode-dark .creation-page-meta {
     max-width: 100%;
 }
 
+#user-conversation-wrapper .avatar {
+    transition: all 0.15s ease-in;
+    margin-left: -25px;
+    border-bottom: none;
+}
+
+#user-conversation-wrapper .avatar:first-child {
+    margin-left: 0;
+}
+
+#user-conversation-wrapper:hover {
+    .avatar {
+        margin-left: 0;
+    }
+}
+
 img.emoji {
     height: 1.2em;
     width: 1.2em;

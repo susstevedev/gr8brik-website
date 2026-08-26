@@ -235,6 +235,57 @@
             });
         });
 
+        $(document).on("click", ".subscribe-creation, .unsubscribe-creation", function (event) {
+            event.preventDefault();
+
+            let btn = $(this);
+            let btnspan = btn.find('span.text');
+            let btnicon = btn.find('span.fa');
+
+            let is_sub = btn.hasClass('subscribe-creation');
+            let data = {
+                model_id: embed_model
+            };
+
+            if (is_sub) {
+                data.subscribe = true;
+            } else {
+                data.unsubscribe = true;
+            }
+
+            $.ajax({
+                url: "/ajax/build",
+                method: "POST",
+                dataType: 'json',
+                data: data,
+                success: function (res) {
+                    if (res.success) {
+                        if (is_sub) {
+                            btnspan.text('Unsubscribe');
+                            btnicon.removeClass('fa-plus-square-o').addClass('fa-plus-square');
+                            btn.removeClass('subscribe-creation w3-yellow').addClass('unsubscribe-creation w3-red');
+                        } else {
+                            btnspan.text('Subscribe');
+                            btnicon.removeClass('fa-plus-square').addClass('fa-plus-square-o');
+                            btn.removeClass('unsubscribe-creation w3-red').addClass('subscribe-creation w3-yellow');
+                        }
+                    } else if (res.error) {
+                        showError(res.error);
+                    }
+                },
+                error: (xhr, text, err) => {
+                    console.error(text, err, xhr);
+                    try {
+                        let res = JSON.parse(xhr.responseText);
+                        let texterror = res.error || "An error occurred, try again later";
+                        showError(texterror);
+                    } catch (e) {
+                        showError("An error occurred. Please try again later.");
+                    }
+                }
+            });
+        });
+
         $(document).on("click", ".upvote-btn", function () {
             event.preventDefault();
             let btn = $(this);
