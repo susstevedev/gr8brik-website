@@ -20,7 +20,7 @@ The Gr8brik website's source code (updated every couple of weeks)
 | User list                  | `/users`            | [`/users.php`](/src/users.php)                         |
 | **Account**                |                     |                                                        |
 | Account settings           | `/acc`              | [`/acc/index.php`](/src/acc/index.php)                 |
-| Account notifications      | `/acc/notifications`| [`/acc/new.php`](/src/acc/notifications.php)           |
+| Account notifications      | `/acc/notifications`| [`/acc/notifications.php`](/src/acc/notifications.php) |
 | Account creations          | `/acc/creations`    | [`/acc/creations.php`](/src/acc/creations.php)         |
 | Account follower info      | `/acc/following`    | [`/acc/following.php`](/src/acc/following.php)         |
 | Account ban appeals        | `/acc/appeals`      | [`/acc/appeals.php`](/src/acc/appeals.php)             |
