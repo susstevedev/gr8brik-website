@@ -434,6 +434,19 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     <div id="data-comment-wrapper">
         <h4><span class="fa fa-comments-o" aria-hidden="true"></span> <span id="comment-count"><?php echo $data['comments'] ?></span> comments</h4><hr />
 
+            <div id="user-conversation-wrapper">
+                <?php
+                    foreach($data['conversation_subbed'] as $subbed) {
+                        ?>
+                        <span class="tooltip avatar">
+                            <span class="w3-blue tooltiptext"><?php echo $subbed['username'] ?></span>
+                            <a href="/user/<?php echo $subbed['id'] ?>"><img src="<?php echo $subbed['picture'] ?>" class="w3-circle w3-grey" width="50px" height="50px" alt="User Avatar" /></a>
+                        </span>
+                        <?php
+                    }
+                ?>
+            </div>
+
             <?php
             $comment_data = json_decode(fetch_comments($model_id, $_SESSION['csrf']), true);
             if ($comment_data && is_array($comment_data)) {
@@ -453,7 +466,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 
                 <div id="comment<?php echo $comment['id'] ?>" data-testid="<?php echo $comment['id'] ?>" class="comment w3-row w3-section">
                     <div class="w3-col" id="comment-profile-picture" style="width: 50px;">
-                        <img class="w3-bar-item w3-round w3-card-2 w3-grey" width="50px" height="50px" src="<?php echo $comment['picture'] ? $comment['picture'] : '/img/no_image.png' ?>">
+                        <img class="w3-bar-item w3-circle w3-card-2 w3-grey" width="50px" height="50px" src="<?php echo $comment['picture'] ? $comment['picture'] : '/img/no_image.png' ?>">
                     </div>
 
                     <div data-testid="gr8-comment-divider" class="w3-hide-small w3-col" style="width: max-content; height: max-content;">

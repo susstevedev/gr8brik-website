@@ -95,17 +95,12 @@
 </div>
 
 <div class="w3-main gr8-main"><br />
-	<?php if(loggedin() && $current_user->verify_token != null) { ?>
+	<?php if(loggedin() && !User::isVerified()) { ?>
         <div class="w3-card-2 w3-light-grey w3-padding w3-round-small w3-margin-top gr8-theme">
             <i class="fa fa-lock" aria-hidden="true"></i>
-            <b>Verify your account to unlock all features of Gr8Brik</b>
-            <p>What does this do anymore after I stopped using a capchta alternative? Idk.</p>
-            <form action="/ajax/auth.php" method="GET">
-                <input type="checkbox" name="bot">
-                <label for="bot"> I'm not a robot</label><br />
-                <input type="submit" value="Verify" id="verify_account" name="verify_account" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
-            </form>
+            <b>Verify your account to unlock all features</b>
+			<p>An email was sent to <?php echo $current_user->email ?>. If you did not receive an email, <a href="mailto:<?php echo DB_MAIL ?>">contact us</a>.</p>
         </div><br />
 	<?php } ?>
-            
+
 	<span id="popup-wrapper-global"></span>

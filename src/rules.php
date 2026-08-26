@@ -1,5 +1,6 @@
 <?php
-    header("Location:/com/view.php?id=17")
+    header("Location:/com/view.php?id=17");
+    exit;
 ?>
 
 <!-- OLD DOCUMENT -->

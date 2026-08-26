@@ -1,14 +1,12 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
 
-$use_username = false;
-if(!isset($_GET['id'])) {
-    if(!isset($_GET['name'])) {
-    	header("HTTP/1.0 404 Not Found");
-    	exit;
-    } else {
-        $use_username = true;
-    }
+if(isset($_GET['name'])) {
+    $use_username = true;
+} else if(isset($_GET['id'])) {
+    $use_username = false;
+} else {
+    exit;
 }
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
@@ -35,6 +33,10 @@ if (isset($_POST['follow'])) {
         $error = "Please login to follow this user";
     }
 
+    if(User::isDeleted($_GET['id'])) {
+       $error = "No user found";
+    }
+
     $profile_id = (int)$_GET['id'];
     $time = time();
 
@@ -55,36 +57,8 @@ if (isset($_POST['follow'])) {
         $result = $stmt_follow->execute();
         $stmt_follow->close();
 
-        if ($userid != $profile_id) {
-            $content = $profile_id;
-            $category = 'follow';
-
-            $sql_notification = "INSERT INTO notifications (user, profile, timestamp, content, category2) VALUES (?, ?, ?, ?, ?)";
-            $stmt_notification = $conn->prepare($sql_notification);
-            $stmt_notification->bind_param("iisii", $profile_id, $userid, $time, $content, $category);
-            $stmt_notification->execute();
-            $stmt_notification->close();
-
-            $sql_alert_select = "SELECT alert FROM users WHERE id = ?";
-            $stmt_alert_select = $conn->prepare($sql_alert_select);
-            $stmt_alert_select->bind_param("i", $profile_id);
-            $stmt_alert_select->execute();
-            $stmt_alert_select->bind_result($alert);
-            $stmt_alert_select->fetch();
-            $stmt_alert_select->close();
-
-            if($alert === null) {
-                $alertnum = 1;
-            } else {
-                $alertnum = $alert + 1;
-            }
-
-            $sql_alert_update = "UPDATE users SET alert = ? WHERE id = ?";
-            $stmt_alert_update = $conn->prepare($sql_alert_update);
-            $stmt_alert_update->bind_param("ii", $alertnum, $profile_id);
-            $stmt_alert_update->execute();
-            $stmt_alert_update->close();
-        }
+        $notification = new Notifications($conn);
+        $notification->notify_subscribers('profile', $profile_id, $userid);
 
         if ($result) {
             header("HTTP/1.0 200 OK");
@@ -102,6 +76,10 @@ if(isset($_POST['unfollow'])) {
     if(!isset($userid)) {
         header("HTTP/1.0 500 Internal Server Error");
         $error = "Please login to unfollow this user";
+    }
+
+    if(User::isDeleted($_GET['id'])) {
+       $error = "No user found";
     }
 
     $profile_id = (int)$_GET['id'];
@@ -125,6 +103,10 @@ if (isset($_POST['block'])) {
     if(!isset($userid)) {
         header("HTTP/1.0 500 Internal Server Error");
         $error = "Please login to block this user";
+    }
+
+    if(User::isDeleted($_GET['id'])) {
+        exit('No user found');
     }
 
     $profile_id = (int)$_GET['id'];
@@ -174,6 +156,10 @@ if(isset($_POST['unblock'])) {
         $error = "Please login to unblock this user";
     }
 
+    if(User::isDeleted($_GET['id'])) {
+       $error = "No user found";
+    }
+
     $profile_id = (int)$_GET['id'];
 
     $sql = "DELETE FROM user_blocks WHERE userid = '$userid' AND profileid = '$profile_id'";
@@ -203,6 +189,10 @@ if(isset($_POST['ban'])) {
 
     if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
         exit('Invalid user ID!');
+    }
+
+    if(User::isDeleted($_GET['id'])) {
+        exit('No user found');
     }
 
     if ($duration <= 0) {
@@ -235,6 +225,10 @@ if(isset($_POST['warn'])) {
     if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
         exit('Invalid user ID!');
     }
+
+    if(User::isDeleted($_GET['id'])) {
+        exit('No user found');
+    }
 		
     if($current_user->admin != false) {
         $sql = "INSERT INTO warnings (user, reason, timestamp) VALUES ($profile_id, '$reason', $start_date)";
@@ -253,6 +247,10 @@ if(isset($_POST['warn'])) {
 if(isset($_POST['delete'])) {
     if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
         exit('Invalid user ID!');
+    }
+
+    if(User::isDeleted($_GET['id'])) {
+        exit('No user found');
     }
 
     $profile_id = (int)$_GET['id'];
@@ -278,8 +276,15 @@ if(isset($_POST['delete'])) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title><?php echo $data['username'] ?? 'This user' ?>'s page</title>
+    <title><?php echo isset($data['username']) ? $data['username'] . '\'s profile' : 'Unknown profile' ?></title>
     <?php include 'header.php' ?>
+
+    <script type="text/javascript">
+        $(document).ready(function() {
+            window.userid = '<?php echo $_GET['id'] ?>';
+        });
+    </script>
+    <script type="text/javascript" src="/lib/profile.js"></script>
 </head>
 <body class="w3-container">
 
@@ -293,297 +298,6 @@ if(isset($_POST['delete'])) {
     <?php if(isset($message)) { ?>
         <div class="message w3-padding w3-round w3-card-2 w3-light-grey w3-bottom"><?php echo $message ?></div><br /><br />
     <?php } ?>
-
-    <script>
-        const userid = '<?php echo $_GET['id'] ?>';
-
-        $(document).ready(function() {
-            $.ajax({
-                url: "/ajax/profile",
-                method: "GET",
-                data: { followed_by: userid },
-                success: function(response) {
-                    let followedBy = "";
-                    if (response.length > 0) {
-                        if (response.length <= 3) {
-                            followedBy = response.map(user => `
-                            <a href="${user.url}">
-                            <img src="${user.pfp}" width="15px" height="15px" />
-                            ${user.username}</a>`).join(", ");
-                        } else {
-                            let first = response.slice(0, 3);
-                            let others = response.length - 3;
-                            followedBy = first.map(user => `<a href="${user.url}">
-                            <img src="${user.pfp}" width="17px" height="17px" class="w3-circle" />
-                            ${user.username}</a>`).join(", ");
-                            followedBy += ` and ${others} others you know`;
-                        }
-                    } else {
-                        followedBy = "nobody you know";
-                    }
-                    $("#followedby-wrapper").html(`Followed by ${followedBy}`);
-                    $("#followedby-wrapper").css({
-                        "display": "inline",
-                        "font-size": "15px",
-                        "text-shadow": "0px 0px 0px #fff"
-                    })
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    var response = JSON.parse(jqXHR.responseText);
-                    console.error('Server status code: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
-                }
-            });
-
-            window.params = new URL(window.location.href);
-            window.pages = {};
-
-            window.getUserBuilds = function(page) {
-                $.ajax({
-                    url: "/ajax/profile",
-                    method: "GET",
-                    data: { getUserBuilds:true,userid:userid,page:page },
-                    dataType: "json",
-                    success: function(response) {
-                        window.pages.c = page;
-
-                        let elm = $('#creationstab div')
-                        elm.children().not('#gr8-creation-template').remove();
-
-                        if(response.success === true && response.creations) {
-                            response.creations.forEach(function(r) {
-                                let $clone = $($('#gr8-creation-template').html());
-
-                                $clone.find(".creation-title").text(r.name);
-                                $clone.find(".creation-link").attr("href", "/build/" + r.id);
-                                $clone.find(".meta-author a").text(r.username);
-                                $clone.find(".meta-author a").attr("href", "/@" + r.username);
-                                $clone.find(".meta-author span").text(r.date);
-                                $clone.find(".creation-thumbnail").attr("src", r.screenshot);
-
-                                elm.append($clone);
-                                window.mode();
-                            });
-                        } else if(response.creations === null) {
-                            $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div>`).appendTo(elm);
-                        } else if(response.error) {
-                            console.error(response.error);
-                            $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div>`).appendTo(elm);
-                        } else {
-                            console.log(response);
-                        }
-                    },
-                    error: function(xhr, stat, err) {
-                        console.error(stat, xhr.status, err);
-                    }
-                });
-            }
-
-            window.getUserLiked = function() {
-                $.ajax({
-                    url: "/ajax/profile",
-                    method: "GET",
-                    data: { getUserLiked:true,userid:userid },
-                    dataType: "json",
-                    success: function(response) {
-                        let elm = $('#likestab div')
-                        elm.children().not('#gr8-likes-template').remove();
-
-                        if(response.success === true && response.creations) {
-                            response.creations.forEach(function(r) {
-                                let $clone = $($('#gr8-likes-template').html());
-
-                                $clone.find(".creation-title").text(r.name);
-                                $clone.find(".creation-link").attr("href", "/build/" + r.id);
-                                $clone.find(".meta-author a").text(r.username);
-                                $clone.find(".meta-author a").attr("href", "/@" + r.username);
-                                $clone.find(".meta-author span").text(r.date);
-                                $clone.find(".creation-thumbnail").attr("src", r.screenshot);
-
-                                elm.append($clone);
-                                window.mode();
-                            });
-                        } else if(response.creations === null) {
-                            $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div>`).appendTo(elm);
-                        } else if(response.error) {
-                            console.error(response.error);
-                            $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div>`).appendTo(elm);
-                        } else {
-                            console.log(response);
-                        }
-                    },
-                    error: function(xhr, stat, err) {
-                        console.error(stat, xhr.status, err);
-                    }
-                });
-            }
-
-            window.getUserForums = function(page) {
-                $.ajax({
-                    url: "/ajax/profile",
-                    method: "GET",
-                    data: { getUserForums:true,userid:userid,page:page },
-                    dataType: "json",
-                    success: function(response) {
-                        window.pages.f = page;
-
-                        var elm = $('#poststab .w3-row')
-                        elm.children().not('#gr8-posts-template').remove();
-
-                        if(response.success === true && response.posts) {
-                            response.posts.forEach(function(r) {
-                                let $clone = $($('#gr8-posts-template').html());
-
-                                $clone.find(".text").text(r.title);
-                                $clone.find(".user").text(r.username);
-                                $clone.find(".user").attr("href", "/@" + r.username);
-                                $clone.find(".time").text(r.date);
-                                $clone.find(".link-name").attr("href", "/topic/" + r.id);
-
-                                elm.append($clone);
-                            });
-                        } else if(response.posts === null) {
-                            $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div><br />`).appendTo(elm);
-                        } else if(response.error) {
-                            console.error(response.error);
-                            $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div><br />`).appendTo(elm);
-                        } else {
-                            console.log(response);
-                        }
-                    },
-                    error: function(xhr, stat, err) {
-                        console.error(stat, xhr.status, err);
-                    }
-                });
-            }
-
-            window.getUserComments = function(page) {
-                $.ajax({
-                    url: "/ajax/profile",
-                    method: "GET",
-                    data: { getUserComments:true,userid:userid,page:page },
-                    dataType: "json",
-                    success: function(response) {
-                        window.pages.r = page;
-
-                        var elm = $('#commentstab .w3-row')
-                        elm.children().not('#gr8-comment-template').remove();
-
-                        if(response.success === true && response.comments) {
-                            response.comments.forEach(function(r) {
-                                let $clone = $($('#gr8-comment-template').html());
-
-                                $clone.find(".text").text(r.content);
-                                $clone.find(".title").text(r.parent_name);
-                                $clone.find(".user").text(r.username);
-                                $clone.find(".user").attr("href", "/user/" + r.userid);
-                                $clone.find(".time").text(r.date);
-
-                                if(r.type === 'forum') {
-                                    $clone.find(".link-name").attr("href", "/topic/" + r.parent);
-                                    $clone.find(".title").attr("href", "/topic/" + r.parent);
-                                } else if(r.type === 'model') {
-                                    $clone.find(".link-name").attr("href", "/build/" + r.parent);
-                                    $clone.find(".title").attr("href", "/build/" + r.parent);
-                                }
-
-                                elm.append($clone);
-                            });
-                        } else if(response.comments === null) {
-                            $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div><br />`).appendTo(elm);
-                        } else if(response.error) {
-                            console.error(response.error);
-                            $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div><br />`).appendTo(elm);
-                        } else {
-                            console.log(response);
-                        }
-                    },
-                    error: function(xhr, stat, err) {
-                        console.error(stat, xhr.status, err);
-                    }
-                });
-            }
-
-
-            $("#reportForm").submit(function(e) {
-                e.preventDefault();
-
-                $.get("/ajax/config.php", {
-                    get_csrf_token: true
-                }, function(d) {
-                    let csrf_token = d.csrf_token;
-
-                    let payload = {
-                        report_type: 'profile',
-                        csrf_token: csrf_token,
-                        reportv2: true,
-                        reportable_id: userid,
-                        other: $("#reportForm #otherReason").val(),
-                        reason: $("#reportForm [name='reason']:checked").val(),
-                    }
-
-                    $.ajax({
-                        url: "/creation.php?id=null",//placeholder, will move to seperate api page probably
-                        type: "POST",
-                        data: payload,
-                        dataType: "json",
-                        success: function(response) {
-                            $("#modal-report").hide();
-
-                            if (response.success) {
-                                alert(response.success);
-                                $("#reportForm")[0].reset();
-                            } else {
-                                alert(response.error);
-                            }
-                        },
-                        error: function() {
-                            $("#modal-report").hide();
-                            alert("An error occurred. Please try again later.");
-                        }
-                    });
-                }, "json").fail(function(xhr, text, err) {
-                    alert(text);
-                });
-            });
-
-            var tabPages = {
-                '#creationstab': { page: parseInt(window.pages.c || 0), fetch: getUserBuilds },
-                '#commentstab': { page: parseInt(window.pages.r || 0), fetch: getUserComments },
-                '#poststab': { page: parseInt(window.pages.f || 0), fetch: getUserForums }
-            };
-
-            $(".foward-button, .back-button").on("click", function() {
-                var $tab = $(this).closest("#creationstab, #commentstab, #poststab");
-                var tabId = `#${$tab.attr('id')}`;
-                var tabConfig = tabPages[tabId];
-
-                if (!tabConfig) {
-                    return;
-                }
-
-                tabConfig.page += $(this).hasClass("foward-button") ? 1 : -1;
-                tabConfig.fetch(tabConfig.page);
-            });
-
-            window.openTab = function(tab) {
-                var tabGroup = $('.tab'); 
-                    
-                tabGroup.each(function() {
-                    $(this).hide();
-                });
-
-                var tabElement = $(`#${tab}`);
-                tabElement.show();
-                $('html, body').animate({ scrollTop: 0 }, 'slow');
-            }
-
-            openTab('creationstab');
-            getUserBuilds(1);
-            getUserForums(1);
-            getUserComments(1);
-            getUserLiked();
-        });
-    </script>
 
     <div class="w3-navbar w3-top w3-row w3-margin-top w3-center" style="flex-direction:row;">
         <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('creationstab')">Creations</a>
@@ -868,10 +582,7 @@ if(isset($_POST['delete'])) {
 			</div><br />
         <?php } ?>
 
-        <br />
-        <br />
-
-    <span id="data-user-actions" class="w3-animate-bottom">
+    <span id="data-user-actions">
         <div class="tab" id="creationstab">
             <a href="#creations" id="creations"></a>
             <div class="w3-row-padding">
@@ -891,8 +602,8 @@ if(isset($_POST['delete'])) {
                     </div>
                 </template>
             </div>
-            <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
-            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button><hr />
+            <br /><button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
+            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button>
         </div>
 
         <div class="tab" id="poststab">
@@ -910,7 +621,7 @@ if(isset($_POST['delete'])) {
                 </template>
             </div>
             <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
-            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button><hr />
+            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button>
         </div>
 
         <div class="tab" id="commentstab">
@@ -928,7 +639,7 @@ if(isset($_POST['delete'])) {
                 </template>
             </div>
             <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
-            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button><hr />
+            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button>
         </div>
         
         <div class="tab" id="likestab">
