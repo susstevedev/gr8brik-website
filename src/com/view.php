@@ -21,9 +21,8 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 if ($result->num_rows <= 0) {
-    header('HTTP/1.0 404 Not Found');
+    http_response_code(404);
     $error = "<b>This conversation does not exist.</b>";
-    //exit;
 }
 
 $row = $result->fetch_assoc();
@@ -67,14 +66,71 @@ if ($category === "deleted") {
     $error = "<b>This conversation has been removed because it violated our <a href='/rules'>rules</a>.</b>";
 }
 
+if (isset($_POST['comment_edit'])) {
+	header('Content-Type: Application/JSON');
+
+    if ($conn->connect_error) {
+        exit("Database connection failed.");
+    }
+
+    $commentid = (int)$_POST['commentid'];
+    if (!isset($commentid)) {
+		echo json_encode(['success' => false, 'message' => 'Invalid message ID.']);
+		exit;
+    }
+
+	$content = $_POST['content'];
+    if (!isset($content)) {
+		echo json_encode(['success' => false, 'message' => 'Message shall contain text.']);
+		exit;
+    }
+
+    $sql = "SELECT userid FROM messages WHERE id = ? AND deleted_at IS NULL AND (parent IS NOT NULL AND parent != 0) LIMIT 1";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $commentid);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $mrow = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$mrow) {
+		echo json_encode(['success' => false, 'message' => 'Message with that ID does not exist.']);
+		exit;
+    }
+
+    if (!loggedin()) {
+		echo json_encode(['success' => false, 'message' => 'You are not logged in.']);
+		exit;
+    }
+
+    if (!$current_user->admin || (int)$mrow['userid'] !== (int)$id) {
+		echo json_encode(['success' => false, 'message' => 'You are not allowed to edit this message.']);
+		exit;
+    }
+
+	$date = date('Y-m-d H:i:s', time());
+    $edit_sql = "UPDATE messages SET content = ?, edited = ? WHERE id = ? LIMIT 1";
+    $edit_stmt = $conn->prepare($edit_sql);
+    $edit_stmt->bind_param("ssi", $content, $date, $commentid);
+	$edit_result = $edit_stmt->execute();
+    $edit_stmt->close();
+    $conn->close();
+
+    if ($edit_result) {
+		echo json_encode(['success' => true]);
+		exit;
+    }
+}
+
 if (isset($_POST['comment_delete'])) {
     if ($conn->connect_error) {
         exit("Database connection failed.");
     }
 
     $commentid = (int)$_POST['commentid'];
-    if ($commentid <= 0) {
-        exit('Invalid message ID.');
+    if (!isset($commentid)) {
+		echo json_encode(['success' => false, 'message' => 'Invalid message ID.']);
+		exit;
     }
 
     $sql = "SELECT userid FROM messages WHERE id = ? AND (parent IS NOT NULL AND parent != 0) LIMIT 1";
@@ -86,15 +142,18 @@ if (isset($_POST['comment_delete'])) {
     $stmt->close();
 
     if (!$mrow) {
-        exit('Message with that ID does not exist.');
+		echo json_encode(['success' => false, 'message' => 'Message with that ID does not exist.']);
+		exit;
     }
 
     if (!loggedin()) {
-        exit('You are not logged in.');
+		echo json_encode(['success' => false, 'message' => 'You are not logged in.']);
+		exit;
     }
 
     if (!$current_user->admin || (int)$mrow['userid'] !== (int)$id) {
-        exit('You are not allowed to delete this message.');
+		echo json_encode(['success' => false, 'message' => 'You are not allowed to delete this message.']);
+		exit;
     }
 
     $delete_sql = "UPDATE messages SET deleted_at = NOW() WHERE id = ? LIMIT 1";
@@ -105,13 +164,8 @@ if (isset($_POST['comment_delete'])) {
     $conn->close();
 
     if ($delete_result) {
-        /*$goto = htmlspecialchars($_SERVER['PHP_SELF'], ENT_QUOTES, 'UTF-8');
-        if (!empty($_SERVER['QUERY_STRING'])) {
-            $goto .= '?' . htmlspecialchars($_SERVER['QUERY_STRING'], ENT_QUOTES, 'UTF-8');
-        }
-        header('Location: ' . $goto);*/
-        header('Refresh:0');
-        exit;
+        echo json_encode(['success' => true]);
+		exit;
     }
 }
 
@@ -186,6 +240,7 @@ if (isset($_POST['comment'])) {
 <head>
     <title><?php echo $title ?></title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/header.php' ?>
+	<script type="text/javascript" src="/lib/forum.js"></script>
 </head>
 
 <body class="w3-light-blue w3-container">
@@ -236,11 +291,7 @@ if (isset($_POST['comment'])) {
             $c_comment = $row['content'];
             $c_date = $row['timestamp'];
             $decoded_comment = htmlentities($c_comment, ENT_QUOTES, 'UTF-8');
-
             $c_edited = $row['edited'];
-            if (empty($row['edited'])) {
-                $c_edited = $row['timestamp'];
-            }
 
             $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
             if ($conn2->connect_error) {
@@ -252,14 +303,15 @@ if (isset($_POST['comment'])) {
             $isAdmin = $c_user_o->admin === 1 ? "w3-text-red" : "";
             $pfp = $c_user_o->picture;
 
-            $user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user'");
-            $user_post_count_row = $user_post_count_result->fetch_assoc();
-            $user_post_count = $user_post_count_row['reply_count'];
+			if (!User::isDeleted($c_user)) {
+				$user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user' AND deleted_at IS NULL");
+				$user_post_count = $user_post_count_result->fetch_assoc()['reply_count'] ?? 0;
+			}
 
     ?>
 
-            <div class="w3-row" style="display:flex;width:100%;">
-                <div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-margin-right" style="flex-shrink: 1; width: 20%;">
+            <div id="comment-<?php echo $row['id'] ?>" class="reply w3-row" style="display:flex;width:100%;">
+                <div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-margin-right w3-col m3 l3">
                     <img id="pfp" src="<?php echo $pfp ?>"><br />
                     <?php if (!User::isDeleted($c_user)) { ?>
                         <a href="../user/<?php echo $c_user ?>">
@@ -272,22 +324,43 @@ if (isset($_POST['comment'])) {
                     <?php } ?>
                     <br />
                     <time title="<?php echo $c_date ?>" datetime="<?php echo $c_date ?>">Posted <?php echo time_ago($c_date) ?></time><br />
-                    <time title="<?php echo $c_edited ?>" datetime="<?php echo $c_edited ?>">Edited <?php echo time_ago($c_edited) ?></time><br />
-                    <span><?php echo $user_post_count ?> total posts</span>
+					<?php if(!empty($c_edited)) { ?>
+						<time title="<?php echo $c_edited ?>" datetime="<?php echo $c_edited ?>">Edited <?php echo time_ago($c_edited) ?></time><br />
+					<?php }
+					if (!User::isDeleted($c_user)) { ?>
+						<span><?php echo $user_post_count ?> total posts</span>
+					<?php } ?>
                 </div>
-                <span class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round-small" style="flex-shrink: 1; width:80%;">
-                    <pre><?php echo $bbcode->toHTML($bbcode->Smilify($decoded_comment), false, true) ?></pre>
-                </span>
-                <?php
-                if (loggedin()) {
-                    if ($current_user->admin || trim($current_user->id) === trim($c_user)) {
-                        echo "<form id='delete_comment' method='post'><input type='hidden' name='commentid' value=" . $row['id'] . " /></form>";
-                        echo "<button form='delete_comment' type='submit' name='comment_delete' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>
-                        <i class='fa fa-trash' aria-hidden='true'></i>
-                    </button>";
-                    }
-                }
-                ?>
+                <div class="gr8-theme w3-display-container w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-col m9 l9">
+                    <pre class="comment-text"><?php echo $bbcode->toHTML($bbcode->Smilify($decoded_comment), false, true) ?></pre>
+					<form class="edit w3-hide">
+						<textarea class="edit-textarea"><?php echo $decoded_comment ?></textarea><br />
+						<button class="save-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Save</button>
+						<button class="cancel-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
+					</form>
+					<span class="w3-display-bottomleft">
+						<?php
+						if (loggedin()) {
+							if ($current_user->admin || trim($current_user->id) === trim($c_user)) {
+								?>
+								<div class="delete gr8-theme w3-hide w3-light-grey w3-round-small w3-padding-small w3-margin-bottom">
+									<!-- <form id='delete_comment' method='post'><input type='hidden' name='commentid' value="<?php echo $row['id'] ?>"/></form> -->
+									<p>Are you sure you want to delete this comment?</p>
+									<!--<button form='delete_comment' type='submit' name='comment_delete' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-margin-right w3-border w3-border-pink'>Yes</button>-->
+									<button class="confirm-delete-btn w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" data-id="<?php echo $row['id'] ?>">Yes</button>
+									<button class="cancel-delete-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
+								</div>
+								<button class="delete-btn w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" data-id="<?php echo $row['id'] ?>"><i class="fa fa-trash" aria-hidden="true"></i></button>
+								<?php
+							}
+
+							if (trim($current_user->id) === trim($c_user)) {
+								echo '<button class="edit-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" data-id="' .  $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button>';
+							}
+						}
+						?>
+					</span>
+				</div>
             </div><br />
         <?php
         }
