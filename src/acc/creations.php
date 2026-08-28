@@ -16,12 +16,22 @@ if(isset($_GET['my_creations']) && isset($_GET['page'])) {
     $page = $_GET['page'] ?: 1;
     $limit = 9;
     $offset = ($page - 1) * $limit;
+	
+	if(!loggedin()) {
+		echo json_encode(['success' => false, 'code' => 'NO_LOGIN']);
+		exit;
+	}
 
     $stmt = $conn2->prepare('SELECT * FROM model WHERE user = ? AND removed = 0 ORDER BY date DESC LIMIT ' . $limit . ' OFFSET ' . $offset);
     $stmt->bind_param('i', $current_user->id);
     $stmt->execute();
     $result = $stmt->get_result();
     $creations = null;
+
+	if($page <= 1 && $result->num_rows === 0) {
+		echo json_encode(['success' => false, 'code' => 'ACC_NO_CREATIONS']);
+		exit;
+	}
 
     while ($row = $result->fetch_assoc()) {
         $model_id = $row['id'];
@@ -50,6 +60,11 @@ if(isset($_GET['my_creations']) && isset($_GET['page'])) {
 if(isset($_GET['get_creation']) && isset($_GET['id'])) {
     $model_id = $_GET['id'];
 
+	if(!loggedin()) {
+		echo json_encode(['success' => false, 'code' => 'NO_LOGIN']);
+		exit;
+	}
+
     $stmt = $conn2->prepare('SELECT * FROM model WHERE user = ? AND id = ? AND removed = 0');
     $stmt->bind_param('ii', $current_user->id, $model_id);
     $stmt->execute();
@@ -57,7 +72,7 @@ if(isset($_GET['get_creation']) && isset($_GET['id'])) {
     $creation = null;
 
     if($result->num_rows === 0) {
-        echo json_encode(['success' => false, 'error' => 'Creation not found']);
+        echo json_encode(['success' => false, 'code' => 'CREATION_404']);
         exit;
     }
 
@@ -84,7 +99,7 @@ if(isset($_GET['get_creation']) && isset($_GET['id'])) {
 
 if (isset($_POST['edit']) && isset($_POST['id'])) {
     if(!loggedin()) {
-        echo json_encode(['success' => false, 'error' => 'Sign in to edit this creation']);
+        echo json_encode(['success' => false, 'code' => 'NO_LOGIN']);
     }
 
     $model_id = (int)$_POST['id'];
@@ -95,7 +110,7 @@ if (isset($_POST['edit']) && isset($_POST['id'])) {
     $result = $stmt_find->get_result();
 
     if($result->num_rows === 0) {
-        echo json_encode(['success' => false, 'error' => 'Creation not found']);
+        echo json_encode(['success' => false, 'code' => 'CREATION_404']);
         exit;
     }
 
@@ -117,7 +132,7 @@ if (isset($_POST['edit']) && isset($_POST['id'])) {
         echo json_encode(['success' => true, 'message' => 'Creation updated']);
         exit;
     } else {
-        echo json_encode(['success' => false, 'error' => 'Failed to update creation']);
+        echo json_encode(['success' => false, 'code' => 'EDIT_GENERIC']);
         exit;
     }
 }
@@ -205,6 +220,14 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                 getCreations(window.page);
             });
 
+			const SERVER_CODES = {
+				'NO_LOGIN': 'Please sign in to continue',
+				'QUERY_NO_CREATIONS': 'No creations found',
+				'ACC_NO_CREATIONS': 'You don\'t have any creations yet',
+				'CREATION_404': 'Creation not found',
+				'EDIT_GENERIC': 'Failed to update creation',
+			}
+
             window.getCreations = function(page) {
                 $.ajax({
                     url: "",
@@ -233,11 +256,10 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                             });
                             window.mode();
                         } else if(response.creations === null) {
-                            $(`<br /><h4 class='message w3-light-grey w3-card-2 w3-padding w3-round'>No creations to load</h4>`).insertAfter(elm);
                             $("#foward-button").remove();
-                        } else if(response.error) {
-                            console.error(response.error);
-                            $(`<br /><h4 class='message w3-red w3-card-2 w3-padding w3-round'>${response.error}</h4>`).insertAfter(elm);
+                        } else if(response.code) {
+                            console.error(response.code);
+                            $(`<br /><h4 class='message w3-red w3-card-2 w3-padding w3-round'>${SERVER_CODES[response.code] || 'An error has occured'}</h4>`).insertAfter(elm);
                             $("#foward-button").remove();
                         }
                     },
@@ -327,10 +349,10 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                                             window.getCreations(1);
                                             $(`<h4 class='message w3-light-grey w3-card-2 w3-padding w3-round'>${response.message}</h4>`).insertBefore(elm);
                                             $("html, body").animate({ scrollTop: 0 }, "slow");
-                                        } else if(response.error) {
-                                            console.error(response.error);
+                                        } else if(response.code) {
+                                            console.error(response.code);
                                             $(".editingbox").remove();
-                                            $(`<h4 class='message w3-red w3-card-2 w3-padding w3-round'>${response.error}</h4>`).insertBefore(elm);
+                                            $(`<h4 class='message w3-red w3-card-2 w3-padding w3-round'>${SERVER_CODES[response.code] || 'An error has occured'}</h4>`).insertBefore(elm);
                                             $("html, body").animate({ scrollTop: 0 }, "slow");
                                         }
                                     },
@@ -365,9 +387,9 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                                     }
                                 });
                             });
-                        } else if(response.error) {
-                            console.error(response.error);
-                            $(`<h4 class='message w3-red w3-card-2 w3-padding w3-round'>${response.error}</h4>`).insertBefore(elm);
+                        } else if(response.code) {
+                            console.error(response.code);
+                            $(`<h4 class='message w3-red w3-card-2 w3-padding w3-round'>${SERVER_CODES[response.code] || 'An error has occured'}</h4>`).insertBefore(elm);
                             $("html, body").animate({ scrollTop: 0 }, "slow");
                         }
                     },

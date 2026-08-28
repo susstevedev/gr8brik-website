@@ -172,6 +172,54 @@ if (isset($_POST['banner'])) {
                 });
             });
 
+            $("#password").submit(function(event) {
+                event.preventDefault();
+                var formData = $("#password").serialize() + "&change=true";
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    method: "POST",
+                    dataType: 'json',
+                    data: formData,
+                    success: function(response) {
+                        if(response.success) {
+                            DOMsuccess(response.success);
+                        } else if(response.error) {
+                            DOMerror(response.error || "An error occurred. Please try again later.");
+                        }
+                    },
+
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        DOMerror(response.error || "An error occurred. Please try again later.");
+                    }
+                });
+            });
+
+            $("#email").submit(function(event) {
+                event.preventDefault();
+                var formData = $("#email").serialize() + "&mail_change=true";
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    method: "POST",
+                    dataType: 'json',
+                    data: formData,
+                    success: function(response) {
+                        if(response.success) {
+                            DOMsuccess(response.success);
+                        } else if(response.error) {
+                            DOMerror(response.error || "An error occurred. Please try again later.");
+                        }
+                    },
+
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        var response = JSON.parse(jqXHR.responseText);
+                        DOMerror(response.error || "An error occurred. Please try again later.");
+                    }
+                });
+            });
+
             $("#blog_user_change").click(function(event) {
                 event.preventDefault();
 
@@ -256,7 +304,7 @@ if (isset($_POST['banner'])) {
             $("#bsky_change").click(function(event) {
                 event.preventDefault();
 
-                var handle = $("#bsky input[name='did']").val();
+                var handle = $("#bsky input[name='handle']").val();
                 var token = $.cookie('token');
 
                 $.ajax({
@@ -269,7 +317,11 @@ if (isset($_POST['banner'])) {
                         token: token
                     },
                     success: function(response) {
-                        DOMsuccess(response.success || "Unknown response");
+                        if(response.success) {
+                            DOMsuccess(response.success);
+                        } else if(response.error) {
+                            DOMerror(response.error || "An error occurred. Please try again later.");
+                        }
                     },
 
                     error: function(jqXHR, textStatus, errorThrown) {
@@ -432,14 +484,14 @@ if (isset($_POST['banner'])) {
 
             <form id="bsky" name="bsky">
                 <b><legend>Bluesky</legend></b>
-                <p>To link your Bluesky account, you will need to use your DID instead of your handle. Your Bluesky DID can be found <a href="https://bsky-did.neocities.org" target="_blank" rel="noopener noreferrer">here</a>.</p>
-                <input class="w3-input w3-border w3-mobile w3-third" placeholder="did:plc:mydid" value="<?php echo $current_user->bsky ?>" type="text" name="did">
+                <p>To link your Bluesky account, you will need to provide your handle (without the at part!). Note that some handles may not be seen as valid internally. If so, contact us so we can update it for you.</p>
+                <input class="w3-input w3-border w3-mobile w3-third" placeholder="user.bsky.social" value="<?php echo $current_user->bsky ?>" type="text" name="handle">
                 <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="bsky_change" name="bsky_change">Update Bluesky</button>
             </form><br />
 
             <form id="about" name="about">
                 <b><legend>About</legend></b>
-                <p>Your description can be 1-200 characters of anything. Keep it clean and make sure it doesn't violate our <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.</p>
+                <p>Your description can be 1-1000 characters. Keep it clean and make sure it doesn't violate our <a href="/rules" target="_blank" rel="noopener noreferrer">Rules</a>.</p>
                 <textarea id="description" name="description" value="<?php echo $current_user->description ?>" placeholder="New about section" class="w3-input w3-border w3-mobile" rows="4" cols="50"><?php echo $current_user->description ?></textarea>
                 <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="a_change" name="about">Change Description</button>
             </form><br />
@@ -447,7 +499,7 @@ if (isset($_POST['banner'])) {
     </div><br /><hr />
 
     <h2>Account</h2>
-    <form id="password" method="post" action="/ajax/account_settings">
+    <form id="password">
         <b><legend>Password</legend></b>
         <p>Your password to login to your account. Don't share this with anyone. Keep this saved somewhere, like a secure password manager.</p>
         <p>
@@ -458,7 +510,7 @@ if (isset($_POST['banner'])) {
         <input type="submit" name="change" value="Update Password" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" /><br />
     </form><br />
 
-    <form id="email" method="post" action="/ajax/account_settings">
+    <form id="email">
         <b><legend>Email address</legend></b>
         <p>Your email to login to your account. Don't share this either. Make sure you own this email incase you ever lose access to your account.</p>
         <p>
