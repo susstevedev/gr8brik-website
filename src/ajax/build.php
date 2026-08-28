@@ -196,260 +196,77 @@ if (isset($_POST['save_build'])) {
     }
 }
 
-/*if (isset($_POST['save_build_v2'])) {
-    header('Content-Type: application/json');
+$CREATION_SAVE_STRINGS = [
+	'NO_LOGIN' => "Please login to save creations.",
+	'REQUEST_EMPTY' => "Request is empty.",
+	'CREATION_FORMAT_INVALID' => "Invalid creation format.",
+	'CREATION_INVALID' => 'Failed to look for creation.',
+	'INVALID_VISIBILITY' => "Visibility must be one of: public, unlisted, private.",
+	'STORAGE_INVALID' => "Failed to check storage usage.",
+	'STORAGE_MAX' => "Storage limit of " . Numbers::filesize(MODEL_STORAGE_LIMIT) . " was reached.",
+	'CREATION_SAVE_FAIL' => "Failed to save creation.",
+	'CREATION_UPDATE_FAIL' => "Failed to update creation.",
+	'THUMBNAIL_INVALID' => "Thumbnail is not a valid image.",
+	'THUMBNAIL_BAD_ENCODING' => "Thumbnail must be encoded in Webp or PNG.",
+	'THUMBNAIL_SAVE_FAIL' => "Failed to save thumbnail.",
+];
 
-    if (!loggedin()) {
-        http_response_code(401);
-        echo json_encode(['error' => "Please login to save models."]);
-        exit;
-    }
-
-    $user = $current_user->id ?? 0;
-
-    if (User::isDeleted($user)) {
-        http_response_code(401);
-        echo json_encode(['error' => "Invalid login"]);
-        exit;
-    }
-
-    if (!isset($_POST['creation']) || empty($_POST['creation'])) {
-        http_response_code(400);
-        echo json_encode(['error' => "Request is empty."]);
-        exit;
-    }
-
-    $modelJson = $_POST['creation'];
-    $visible = $_POST['visibility'] ?? null;
-
-    $decoded_json = json_decode($modelJson, true);
-
-    if ($decoded_json === null && json_last_error() !== JSON_ERROR_NONE) {
-        http_response_code(400);
-        echo json_encode(['error' => "Invalid creation format."]);
-        exit;
-    }
-
-    if (!$visible || !in_array($visible, ['public', 'unlisted', 'private'], true)) {
-        http_response_code(400);
-        echo json_encode(['error' => "Visibility must be one of: public, unlisted, private"]);
-        exit;
-    }
-
-    if (isset($_POST['build_id']) && $_POST['build_id'] !== null && $_POST['build_id'] !== "null") {
-        $build_id = filter_var($_POST['build_id'], FILTER_VALIDATE_INT);
-
-        if ($build_id === false) {
-            http_response_code(400);
-            echo json_encode(['error' => "Invalid build ID."]);
-            exit;
-        }
-
-        $stmt = $conn->prepare("SELECT id, user, model, screenshot, size FROM model WHERE id = ? AND user = ? LIMIT 1");
-        $stmt->bind_param("ii", $build_id, $user);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-        $existing = $result->fetch_assoc();
-        $stmt->close();
-
-        if (!$existing) {
-            http_response_code(404);
-            echo json_encode(['error' => "Creation not found."]);
-            exit;
-        }
-
-        $file_name = ".." . $existing['model'];
-        $db_file_name = $existing['model'];
-        $old_file_size = (int)$existing['size'];
-        $new_file_size = strlen($modelJson);
-
-        $stmt = $conn->prepare("SELECT COALESCE(SUM(size), 0) AS total_used FROM model WHERE user = ?");
-        $stmt->bind_param("i", $user);
-        $stmt->execute();
-
-        $result = $stmt->get_result();
-        $total = (int)$result->fetch_assoc()['total_used'];
-        $stmt->close();
-        $new_total = $total - $old_file_size + $new_file_size;
-
-        if ($new_total > MODEL_STORAGE_LIMIT) {
-            http_response_code(413);
-            echo json_encode([
-                'error' => "Storage limit of " . Numbers::filesize(MODEL_STORAGE_LIMIT) . " was reached."]);
-            exit;
-        }
-
-        if (file_put_contents($file_name, $modelJson) === false) {
-            http_response_code(500);
-            echo json_encode(['error' => "Failed to save creation JSON."]);
-            exit;
-        }
-
-        $db_file_size = filesize($file_name);
-        $db_screenshot = $existing['screenshot'];
-
-        if (!empty($_POST['screenshot'])) {
-            $screenshot_data = $_POST['screenshot'];
-            if (strpos($screenshot_data, 'data:image/png;base64,') === 0) {
-                $base64_str = substr(
-                    $screenshot_data,
-                    strlen('data:image/png;base64,')
-                );
-            } elseif (strpos($screenshot_data, 'data:image/webp;base64,') === 0) {
-                $base64_str = substr(
-                    $screenshot_data,
-                    strlen('data:image/webp;base64,')
-                );
-            } else {
-                http_response_code(400);
-                echo json_encode(['error' => "Screenshot must be encoded in WebP or PNG."]);
-                exit;
-            }
-
-            $decoded_image = base64_decode($base64_str, true);
-
-            if ($decoded_image === false) {
-                http_response_code(400);
-                echo json_encode(['error' => "Invalid screenshot encoding."]);
-                exit;
-            }
-
-            $image = imagecreatefromstring($decoded_image);
-
-            if (!$image) {
-                http_response_code(400);
-                echo json_encode(['error' => "Thumbnail is not a valid image."]);
-                exit;
-            }
-
-            $screenshot_path = ".." . $existing['screenshot'];
-            imagealphablending($image, false);
-            imagesavealpha($image, true);
-            $saved = imagewebp($image, $screenshot_path, 75);
-            imagedestroy($image);
-
-            if (!$saved) {
-                http_response_code(500);
-                echo json_encode(['error' => "Failed to save screenshot."]);
-                exit;
-            }
-
-            $db_screenshot = $existing['screenshot'];
-        }
-
-        $desc = htmlspecialchars($_POST['desc'] ?? '', ENT_QUOTES, 'UTF-8');
-        $name = htmlspecialchars($_POST['name'] ?? '', ENT_QUOTES, 'UTF-8');
-        $date = date("Y-m-d H:i:s");
-
-        $stmt = $conn->prepare("UPDATE model SET model = ?, description = ?, name = ?, date = ?, size = ?, screenshot = ?, visibility = ? WHERE id = ? AND user = ?");
-
-        if (!$stmt) {
-            http_response_code(500);
-            echo json_encode(['error' => "Failed to prepare creation update."]);
-            exit;
-        }
-
-        $stmt->bind_param(
-            "ssssissii",
-            $db_file_name,
-            $desc,
-            $name,
-            $date,
-            $db_file_size,
-            $db_screenshot,
-            $visible,
-            $build_id,
-            $user
-        );
-
-        if (!$stmt->execute()) {
-            http_response_code(500);
-            echo json_encode(['error' => "Failed to update your creation."]);
-            exit;
-        }
-
-        $stmt->close();
-        $_SESSION['last_request'] = time();
-        echo json_encode(['success' => "Your creation was updated successfully!", 'url' => '/creation?id=' . $build_id]);
-        exit;
-    }
-
-    $stmt = $conn->prepare("INSERT INTO model (user, model, description, name, date, size, screenshot, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    if (!$stmt) {
-        http_response_code(500);
-        echo json_encode(['error' => "Failed to save your creation to the database."]);
-        exit;
-    }
-    $stmt->bind_param("issssiss", $user, $db_file_name, $desc, $name, $date, $db_file_size, $db_screenshot, $visible);
-
-    if (!$stmt->execute()) {
-        http_response_code(500);
-        echo json_encode(['error' => "Failed to save your creation to the database."]);
-        exit;
-    }
-
-    $url = '/creation?id=' . $conn->insert_id;
-    $_SESSION['last_request'] = time();
-    $stmt->close();
-
-    echo json_encode(['success' => "Your creation was saved successfully!", 'url' => '/creation?id=' . $conn->insert_id]);
-    exit;
-}*/
+//access like
+//$CREATION_SAVE_STRINGS['NO_LOGIN']
 
 if (isset($_POST['save_build_v2'])) {
     header('Content-Type: application/json');
 
     if (!loggedin()) {
         http_response_code(401);
-        echo json_encode(['error' => "Please login to save models."]);
+        echo json_encode(['error' => $CREATION_SAVE_STRINGS['NO_LOGIN']]);
         exit;
     }
 
     $user = $current_user->id ?? 0;
 
-    if (User::isDeleted($user)) {
-        http_response_code(401);
-        echo json_encode(['error' => "Invalid login"]);
-        exit;
-    }
-
     if (!isset($_POST['creation']) || empty($_POST['creation'])) {
         http_response_code(400);
-        echo json_encode(['error' => "Request is empty."]);
+        echo json_encode(['error' => $CREATION_SAVE_STRINGS['REQUEST_EMPTY']]);
         exit;
     }
 
-    $modelJson = $_POST['creation'];
-    $visible = $_POST['visibility'] ?? null;
-    $can_edit = $_POST['can_edit'] ?? 0;
+    $desc = $_POST['desc'] ?: null;
+    $name = $_POST['name'] ?: "Untitled Creation";
+    $modelJson = $_POST['creation'] ?: null;
+    $visible = $_POST['visibility'] ?: null;
+    $can_edit = $_POST['can_edit'] ?: 0;
 
     $decoded_json = json_decode($modelJson, true);
 
     if ($decoded_json === null && json_last_error() !== JSON_ERROR_NONE) {
         http_response_code(400);
-        echo json_encode(['error' => "Invalid creation format."]);
+        echo json_encode(['error' => $CREATION_SAVE_STRINGS['CREATION_FORMAT_INVALID']]);
         exit;
     }
 
     if (!$visible || !in_array($visible, ['public', 'unlisted', 'private'], true)) {
         http_response_code(400);
-        echo json_encode([
-            'error' => "Visibility must be one of: public, unlisted, private"
-        ]);
+        echo json_encode(['error' => $CREATION_SAVE_STRINGS['INVALID_VISIBILITY']]);
         exit;
     }
 
     $updating = false;
     $build_id = null;
     $existing = null;
+	
+	if($visible === 'public' && $current_user->verify_token !== null) {
+		http_response_code(400);
+        echo json_encode(['error' => "Please verify your account to create public creations."]);
+        exit;
+	}
 
     if (isset($_POST['build_id']) && $_POST['build_id'] !== null && $_POST['build_id'] !== "null") {
         $build_id = filter_var($_POST['build_id'], FILTER_VALIDATE_INT);
 
         if ($build_id === false) {
             http_response_code(400);
-            echo json_encode(['error' => "Invalid build ID."]);
+            echo json_encode(['error' => $CREATION_SAVE_STRINGS['CREATION_INVALID']]);
             exit;
         }
 
@@ -457,7 +274,7 @@ if (isset($_POST['save_build_v2'])) {
 
         if (!$stmt) {
             http_response_code(500);
-            echo json_encode(['error' => "Failed to find creation."]);
+            echo json_encode(['error' => $CREATION_SAVE_STRINGS['CREATION_INVALID']]);
             exit;
         }
 
@@ -506,7 +323,7 @@ if (isset($_POST['save_build_v2'])) {
 
     if (!$stmt) {
         http_response_code(500);
-        echo json_encode(['error' => "Failed to check storage usage."]);
+        echo json_encode(['error' => $CREATION_SAVE_STRINGS['STORAGE_INVALID']]);
         exit;
     }
 
@@ -522,17 +339,13 @@ if (isset($_POST['save_build_v2'])) {
 
     if ($new_total > MODEL_STORAGE_LIMIT) {
         http_response_code(413);
-        echo json_encode([
-            'error' => "Storage limit of " . Numbers::filesize(MODEL_STORAGE_LIMIT) . " was reached."
-        ]);
+        echo json_encode(['error' => $CREATION_SAVE_STRINGS['STORAGE_MAX']]);
         exit;
     }
 
     if (file_put_contents($file_name, $modelJson) === false) {
         http_response_code(500);
-        echo json_encode([
-            'error' => "Failed to save creation JSON."
-        ]);
+        echo json_encode(['error' => $CREATION_SAVE_STRINGS['CREATION_SAVE_FAIL']]);
         exit;
     }
 
@@ -541,20 +354,12 @@ if (isset($_POST['save_build_v2'])) {
     if (!empty($_POST['screenshot'])) {
         $screenshot_data = $_POST['screenshot'];
         if (strpos($screenshot_data, 'data:image/png;base64,') === 0) {
-            $base64_str = substr(
-                $screenshot_data,
-                strlen('data:image/png;base64,')
-            );
+            $base64_str = substr($screenshot_data, strlen('data:image/png;base64,'));
         } elseif (strpos($screenshot_data, 'data:image/webp;base64,') === 0) {
-            $base64_str = substr(
-                $screenshot_data,
-                strlen('data:image/webp;base64,')
-            );
+            $base64_str = substr($screenshot_data, strlen('data:image/webp;base64,'));
         } else {
             http_response_code(400);
-            echo json_encode([
-                'error' => "Screenshot must be encoded in WebP or PNG."
-            ]);
+            echo json_encode(['error' => $CREATION_SAVE_STRINGS['THUMBNAIL_BAD_ENCODING']]);
             exit;
         }
 
@@ -562,9 +367,7 @@ if (isset($_POST['save_build_v2'])) {
 
         if ($decoded_image === false) {
             http_response_code(400);
-            echo json_encode([
-                'error' => "Invalid screenshot encoding."
-            ]);
+            echo json_encode(['error' => $CREATION_SAVE_STRINGS['THUMBNAIL_INVALID']]);
             exit;
         }
 
@@ -572,9 +375,7 @@ if (isset($_POST['save_build_v2'])) {
 
         if (!$image) {
             http_response_code(400);
-            echo json_encode([
-                'error' => "Thumbnail is not a valid image."
-            ]);
+            echo json_encode(['error' => $CREATION_SAVE_STRINGS['THUMBNAIL_INVALID']]);
             exit;
         }
 
@@ -592,13 +393,11 @@ if (isset($_POST['save_build_v2'])) {
 
         if (!$saved) {
             http_response_code(500);
-            echo json_encode(['error' => "Failed to save screenshot."]);
+            echo json_encode(['error' => $CREATION_SAVE_STRINGS['THUMBNAIL_SAVE_FAIL']]);
             exit;
         }
     }
 
-    $desc = $_POST['desc'] ?? '';
-    $name = $_POST['name'] ?? '';
     $date = date("Y-m-d H:i:s");
 
     if ($updating) {
@@ -606,7 +405,7 @@ if (isset($_POST['save_build_v2'])) {
 
         if (!$stmt) {
             http_response_code(500);
-            echo json_encode(['error' => "Failed to prepare creation update."]);
+            echo json_encode(['error' => $CREATION_SAVE_STRINGS['CREATION_UPDATE_FAIL']]);
             exit;
         }
 
@@ -626,9 +425,7 @@ if (isset($_POST['save_build_v2'])) {
 
         if (!$stmt->execute()) {
             http_response_code(500);
-            echo json_encode([
-                'error' => "Failed to update your creation."
-            ]);
+            echo json_encode(['error' => $CREATION_SAVE_STRINGS['CREATION_UPDATE_FAIL']]);
             exit;
         }
     } else {
@@ -636,7 +433,7 @@ if (isset($_POST['save_build_v2'])) {
 
         if (!$stmt) {
             http_response_code(500);
-            echo json_encode(['error' => "Failed to save your creation to the database."]);
+            echo json_encode(['error' => $CREATION_SAVE_STRINGS['CREATION_SAVE_FAIL']]);
             exit;
         }
 
@@ -655,7 +452,7 @@ if (isset($_POST['save_build_v2'])) {
 
         if (!$stmt->execute()) {
             http_response_code(500);
-            echo json_encode(['error' => "Failed to save your creation to the database."]);
+            echo json_encode(['error' => $CREATION_SAVE_STRINGS['CREATION_SAVE_FAIL']]);
             exit;
         }
 
@@ -665,8 +462,11 @@ if (isset($_POST['save_build_v2'])) {
     $url_view = $visible !== 'private' ? '/creation?id=' . $build_id : null;
     $url_modeler = $can_edit ? '/modeler?build_id=' . $build_id : null;
     $_SESSION['last_request'] = time();
-
     $stmt->close();
+
+	$notifications = new Notifications($conn2);
+    $notifications->subscribe($current_user->id, 'creation_fav', $build_id);
+	$notifications->subscribe($current_user->id, 'comment', $build_id);
 
     echo json_encode([
         'success' => $updating ? "Your creation was updated successfully!" : "Your creation was saved successfully!",
@@ -820,7 +620,9 @@ function fetch_build($model_id, $csrf) {
             $voted = false;
         }
 
-        $is_subbed = $notifications->is_subscriber('comment', $model_id, $id);
+        $is_subbed = $notifications->is_subscriber('comment', $model_id, $id) || $notifications->is_subscriber('fav', $model_id, $id);
+		$is_subbed_comment = $notifications->is_subscriber('comment', $model_id, $id);
+		$is_subbed_fav = $notifications->is_subscriber('creation_fav', $model_id, $id);
     } else {
         $voted = false;
     }
@@ -871,6 +673,8 @@ function fetch_build($model_id, $csrf) {
         'can_edit' => $can_edit,
         'voted' => $voted,
         'is_subbed' => $is_subbed ?? false,
+		'is_subbed_comment' => $is_subbed_comment ?? false,
+		'is_subbed_fav' => $is_subbed_fav ?? false,
         'likes' => $votes,
         'comments' => $row2['replies'],
         'username' => $username,
@@ -1301,6 +1105,11 @@ if (loggedin()) {
         $stmt->close();
         exit;
     }
+	
+	$SUB_TYPES = [
+		'creation_fav' => 'favorites',
+		'comment' => 'comments'
+	];
 
     if (isset($_POST['subscribe'])) {
         header('Content-Type: application/json');
@@ -1311,6 +1120,12 @@ if (loggedin()) {
         }
 
         $model_id = (int)$_POST['model_id'];
+		$type = $_POST['type'];
+
+		if($type !== 'comment' && $type !== 'creation_fav') {
+			echo json_encode(['error' => 'Invalid type of method']);
+            exit;
+		}
 
         $stmt = $conn->prepare("SELECT user, likes FROM model WHERE id = ? AND removed = 0 LIMIT 1");
         $stmt->bind_param("i", $model_id);
@@ -1332,9 +1147,9 @@ if (loggedin()) {
 
         $id = $current_user->id;
         $notifications = new Notifications($conn2);
-        $notifications->subscribe($id, 'comment', $model_id);
+        $notifications->subscribe($id, $type, $model_id);
 
-        echo json_encode(['success' => true]);
+        echo json_encode(['success' => true, 'type' => $type, 'text' => "Unsubscribe from " . $SUB_TYPES[$type], "textParent" => 'Unsubscribe']);
         exit;
     }
 
@@ -1347,6 +1162,12 @@ if (loggedin()) {
         }
 
         $model_id = (int)$_POST['model_id'];
+		$type = $_POST['type'];
+
+		if($type !== 'comment' && $type !== 'creation_fav') {
+			echo json_encode(['error' => 'Invalid type of method']);
+            exit;
+		}
 
         $stmt = $conn->prepare("SELECT user, likes FROM model WHERE id = ? AND removed = 0 LIMIT 1");
         $stmt->bind_param("i", $model_id);
@@ -1368,9 +1189,9 @@ if (loggedin()) {
 
         $id = $current_user->id;
         $notifications = new Notifications($conn2);
-        $notifications->remove_subscriber('comment', $model_id, $id);
+        $notifications->remove_subscriber($type, $model_id, $id);
 
-        echo json_encode(['success' => true]);
+		echo json_encode(['success' => true, 'type' => $type, 'text' => "Subscribe to " . $SUB_TYPES[$type], "textParent" => 'Subscribe']);
         exit;
     }
 
