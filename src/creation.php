@@ -150,11 +150,13 @@ if (isset($_POST['delete_comment'])) {
                 if(trim($row['user']) === trim($current_user->id) || $current_user->admin) {
                     $sql2 = "UPDATE comments SET hidden = 1 WHERE id = ?";
                     $sql3 = "UPDATE model SET replies = replies - 1 WHERE id = ?";
+					$type = 'delete';
                     $model_id = $row['model'];
 
                     if($row['hidden']) {
                         $sql2 = "UPDATE comments SET hidden = 0 WHERE id = ?";
                         $sql3 = "UPDATE model SET replies = replies + 1 WHERE id = ?";
+						$type = 'restore';
                     }
 
                     $stmt2 = $conn->prepare($sql2);
@@ -165,7 +167,7 @@ if (isset($_POST['delete_comment'])) {
                         $stmt_count->bind_param("i", $model_id);
                         $stmt_count->execute();
 
-                        echo json_encode(['success' => 'Comment updated']);
+                        echo json_encode(['success' => 'Comment updated', 'type' => $type]);
                     } else {
                         echo json_encode(['error' => 'Error deleting comment']);
                     }
@@ -322,16 +324,18 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <?php } ?>
 
                 <div class="w3-right">
-                    <div class="w3-dropdown-click" style="z-index: 999;">
-                        <div class="tooltip">
-                            <span class="w3-tag w3-blue tooltiptext">Download this model's screenshot and json file</span>
-                            <button onclick="dropdown('dropdown-download')" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo"><i class="fa fa-download" aria-hidden="true"></i> Download</button>
-                        </div>
-                        <div id="dropdown-download" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
-                            <a id="data-gr8-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['model'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['username']) ?>.<?php echo substr(strrchr($data['model'], '.'), 1) ?>">Creation file</a>
-                            <a id="data-webp-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['username']) ?>.<?php echo substr(strrchr($data['screenshot'], '.'), 1) ?>">Thumbnail file</a>
-                        </div>
-                    </div>
+					<?php if ($data['can_edit']) { ?>
+						<div class="w3-dropdown-click" style="z-index: 999;">
+							<div class="tooltip">
+								<span class="w3-tag w3-blue tooltiptext">Download this model's screenshot and json file</span>
+								<button onclick="dropdown('dropdown-download')" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo"><i class="fa fa-download" aria-hidden="true"></i> Download</button>
+							</div>
+							<div id="dropdown-download" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
+								<a id="data-gr8-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['model'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['username']) ?>.<?php echo substr(strrchr($data['model'], '.'), 1) ?>">Creation file</a>
+								<a id="data-webp-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['username']) ?>.<?php echo substr(strrchr($data['screenshot'], '.'), 1) ?>">Thumbnail file</a>
+							</div>
+						</div>
+					<?php } ?>
 
                     <?php if (loggedin()) { ?>
                         <?php if ($data['voted'] === true) { ?>
@@ -350,21 +354,18 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </div>
                         <?php } ?>
 
-                        <?php if ($data['is_subbed'] === true) { ?>
-                            <div class="tooltip" id="data-unsubscribe-creation">
-                                <span class="w3-tag w3-blue tooltiptext">Unsubscribe to cancel notifications out for this creation</span>
-                                &nbsp;<button class="unsubscribe-creation w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink"><span class="fa fa-plus-square"></span>
-                                    <span class="text">Unsubscribe</span>
-                                </button>&nbsp;
-                            </div>
-                        <?php } else { ?>
-                            <div class="tooltip" id="data-subscribe-creation">
-                                <span class="w3-tag w3-blue tooltiptext">Subscribe to get notifications for this creation</span>
-                                &nbsp;<button class="subscribe-creation w3-btn w3-yellow w3-hover-opacity w3-padding-small w3-border w3-border-orange"><span class="fa fa-plus-square-o"></span>
-                                    <span class="text">Subscribe</span>
-                                </button>&nbsp;
-                            </div>
-                        <?php } ?>
+						<div class="w3-dropdown-click" style="z-index: 999;">
+							<div class="tooltip">
+								<span class="w3-tag w3-blue tooltiptext"><?php if ($data['is_subbed']) { ?> Unsubscribe to cancel notifications out for this creation <?php } else { ?> Subscribe to get notifications for this creation <?php }?></span>
+								<button onclick="dropdown('dropdown-subscribe')" class="w3-btn creation-subscribe <?php if ($data['is_subbed']) { ?> w3-red w3-border w3-border-pink <?php } else { ?> w3-yellow w3-border w3-border-orange <?php } ?> w3-hover-opacity w3-padding-small"><span class="fa <?php if ($data['is_subbed']) { ?> fa-plus-square <?php } else { ?> fa-plus-square-o <?php } ?>"></span>
+                                    <span class="text"><?php if ($data['is_subbed']) { ?> Unsubscribe <?php } else { ?> Subscribe <?php } ?></span>
+                                </button>
+							</div>
+							<div id="dropdown-subscribe" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
+								<a class="<?php if ($data['is_subbed_comment']) { ?> creation-comment-unsubscribe w3-red <?php } else { ?> creation-comment-subscribe w3-yellow <?php } ?> w3-bar-item w3-btn w3-hover-blue w3-border"><?php if ($data['is_subbed_comment']) { ?> Unsubscribe from <?php } else { ?> Subscribe to <?php } ?> comments</a>
+								<a class="<?php if ($data['is_subbed_fav']) { ?> creation-fav-unsubscribe w3-red <?php } else { ?> creation-fav-subscribe w3-yellow <?php } ?> w3-bar-item w3-btn w3-hover-blue w3-border"><?php if ($data['is_subbed_fav']) { ?> Unsubscribe from <?php } else { ?> Subscribe to <?php } ?> favorites</a>
+							</div>
+						</div>
 
                         <?php if ($current_user->admin === true) { ?>
                             <div class="tooltip" id="data-delete-model">
@@ -459,7 +460,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <?php if (!empty($comment['error'])) { ?>
                     <ul>
                         <?php foreach ($comment['error'] as $err) { ?>
-                            <li class="w3-text-red"><?php echo $err ?></li>
+                            <li class="w3-text-red comment-error-<?php echo $comment['id'] ?>"><?php echo $err ?></li>
                         <?php } ?>
                     </ul>
                 <?php } ?>
