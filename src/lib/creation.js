@@ -142,10 +142,16 @@
 
                             if (response.success) {
                                 showSuccess(response.success);
+								let comment_selector = '#comment' + comment_id;
+								let comment_error_selector = '.comment-error-' + comment_id;
+
                                 $("#deleteCommentForm")[0].reset();
 
-                                let comment_selector = '#comment' + comment_id;
-                                $(comment_selector).remove();
+								if(response.type === 'delete') {
+									$(comment_selector).remove();
+								} else if(response.type === 'restore') {
+									$(comment_error_selector).remove();
+								}
                             } else {
                                 showError(response.error);
                             }
@@ -235,16 +241,32 @@
             });
         });
 
-        $(document).on("click", ".subscribe-creation, .unsubscribe-creation", function (event) {
+        $(document).on("click", ".creation-comment-subscribe, .creation-comment-unsubscribe, .creation-fav-subscribe, .creation-fav-unsubscribe", function (event) {
             event.preventDefault();
 
             let btn = $(this);
-            let btnspan = btn.find('span.text');
-            let btnicon = btn.find('span.fa');
+			let btntext = $('.creation-subscribe .text');
+            let btnicon = $('.creation-subscribe .fa');
 
-            let is_sub = btn.hasClass('subscribe-creation');
+            let is_sub = btn.hasClass('creation-comment-subscribe') || btn.hasClass('creation-fav-subscribe');
+			let is_comment = btn.hasClass('creation-comment-subscribe') || btn.hasClass('creation-comment-unsubscribe');
+			let is_fav = btn.hasClass('creation-fav-subscribe') || btn.hasClass('creation-fav-unsubscribe');
+
+			let type = null;
+			if(is_fav) {
+				type = 'creation_fav';
+			} else if(is_comment) {
+				type = 'comment';
+			}
+
+			if(!type) {
+				showError('Not a valid type of action');
+				return;
+			}
+
             let data = {
-                model_id: embed_model
+                model_id: embed_model,
+				type: type,
             };
 
             if (is_sub) {
@@ -261,14 +283,22 @@
                 success: function (res) {
                     if (res.success) {
                         if (is_sub) {
-                            btnspan.text('Unsubscribe');
-                            btnicon.removeClass('fa-plus-square-o').addClass('fa-plus-square');
-                            btn.removeClass('subscribe-creation w3-yellow').addClass('unsubscribe-creation w3-red');
+							btnicon.removeClass('fa-plus-square-o').addClass('fa-plus-square');
+							if(res.type === 'creation_fav') {
+								btn.removeClass('creation-fav-subscribe w3-yellow').addClass('creation-fav-unsubscribe w3-red');
+							} else if(res.type === 'comment') {
+								btn.removeClass('creation-comment-subscribe w3-yellow').addClass('creation-comment-unsubscribe w3-red');
+							}
                         } else {
-                            btnspan.text('Subscribe');
                             btnicon.removeClass('fa-plus-square').addClass('fa-plus-square-o');
-                            btn.removeClass('unsubscribe-creation w3-red').addClass('subscribe-creation w3-yellow');
+							if(res.type === 'creation_fav') {
+								btn.removeClass('creation-fav-unsubscribe w3-red').addClass('creation-fav-subscribe w3-yellow');
+							} else if(res.type === 'comment') {
+								btn.removeClass('creation-comment-unsubscribe w3-red').addClass('creation-comment-subscribe w3-yellow');
+							}
                         }
+						btntext.text(res.textParent);
+						btn.text(res.text);
                     } else if (res.error) {
                         showError(res.error);
                     }
@@ -397,13 +427,13 @@
 
                                 $clone.find(".date").text(response.comment.date);
                                 $clone.find(".upvote-btn").attr('data-id', response.comment.id);
-
                                 $clone.attr('data-testid', response.comment.id);
                                 $clone.attr('id', 'comment' + response.comment.id);
 
                                 $("#comment-count").text(response.comment.replies);
-
                                 elm.append($clone);
+
+								window.mode();
                                 $("html, body").animate({ scrollTop: $(document).height() }, "slow");
                             } else {
                                 window.location.reload();
