@@ -72,6 +72,7 @@ if (loggedin()) {
 class User {
     public ?int $id;
     public ?string $email;
+    public ?string $github_id;
     public ?string $username;
     public ?string $picture;
     public ?string $banner;
@@ -86,10 +87,11 @@ class User {
 
     public function __construct(?array $data = []) {
         $this->id = $data['id'] ?? 0;
+        $this->github_id = $data['github_id'] ?? null;
         $this->email = $data['email'] ?? null;
         $this->username = $data['username'] ?? '[deleted]';
-        $this->picture = $data['picture'] ?? '/img/no_image.png';
-        $this->banner = $data['banner'] ?? '/img/no_image.png';
+        $this->picture = $data['picture'] ?? ($this->email ? $this->userGravatar($this->email, 256) : '/img/no_image.png');
+        $this->banner = $data['banner'] ?? null;
         $this->description = $data['description'] ?? null;
         $this->twitter = $data['twitter'] ?? null;
         $this->bsky = $data['bsky'] ?? null;
@@ -153,6 +155,38 @@ class User {
         return new User($user_row);
     }
 
+    public static function getUsers(?array $ids): array {
+        if (empty($ids)) {
+            return [];
+        }
+
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $ids = array_unique(array_map('intval', $ids));
+        $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+
+        $stmt = $conn->prepare("
+            SELECT *
+            FROM users
+            WHERE id IN ($placeholders)
+            AND deactive IS NULL
+        ");
+
+        $types = str_repeat('i', count($ids));
+        $stmt->bind_param($types, ...$ids);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $users = [];
+        while($row = $result->fetch_assoc()) {
+            $user = new User($row);
+            $users[$user->id] = $user;
+        }
+
+        $stmt->close();
+        $conn->close();
+        return $users;
+    }
+
     public static function getUserByName(?string $username) {
         $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
@@ -175,6 +209,23 @@ class User {
         $user_row = $user_res->fetch_assoc();
 
         return new User($user_row);
+    }
+
+    private function userGravatar(?string $email, ?int $size = 50) {
+        if(empty($email)) {
+            return;
+        }
+
+        $cleaned_email = strtolower(trim($email));
+        $hash = hash('sha256', $cleaned_email);
+
+        $params = [
+            's' => $size,
+            'd' => 'identicon',
+            'r' => 'pg'
+        ];
+
+        return "https://www.gravatar.com/avatar/" . $hash . "?" . http_build_query($params);
     }
 
     public static function isVerified() {

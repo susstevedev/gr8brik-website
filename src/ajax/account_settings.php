@@ -21,7 +21,7 @@ class ScreenNameUtils {
         global $current_user;
         global $conn;
         
-        $reserved_names = array(
+        /*$reserved_names = array(
             'administrator', 
             'admin',
             'susstevedev',
@@ -29,20 +29,9 @@ class ScreenNameUtils {
             'the_an0nym',
             'missbricker',
             'gr8brik'
-        );
-        
-        /* I will not add some words as the project is open source and github/contibutors might get mad */
-        /* If someone has somehow registered an account with one of these names, report their account or one of their creations */
-        $banned_words = array(
-            'ZnVjaw',
-            'c2hpdA',
-            'ZGFtbg',
-            'ZnVja2luZw',
-            'ZGFtbWl0',
-            'bW90aGVyZnVja2Vy',
-            'ZmFnZw',
-            'bmlnZw'
-        );
+        );*/
+
+        $reserved_names = array('gr8brik');
 
         if(empty($new) || $new === null) {
             return ['available' => false, 'reason' => 'Please provide a username.'];
@@ -85,12 +74,6 @@ class ScreenNameUtils {
         $result = $conn->query("SELECT * FROM users WHERE username = '$new' AND deactive IS NULL");
         if($result->num_rows != 0 || in_array($new, $reserved_names)) {
             return ['available' => false, 'reason' => 'This username has been taken. Please choose another.'];
-        }
-
-        foreach($banned_words as $banned_word) {
-            if (strpos(base64_encode($new), $banned_word) !== false) {
-                return ['available' => false, 'reason' => 'This username is unavailable. Please choose another.'];
-            }
         }
 
         return ['available' => true, 'reason' => 'Username is available'];
@@ -321,33 +304,109 @@ class AccountSettings {
 
         $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
         $id = $current_user->id;
+        $rand = bin2hex(random_bytes(32));
 
-        $sql = "SELECT email FROM users WHERE id = '$id'";
+        if (!filter_var($new, FILTER_VALIDATE_EMAIL)) {
+            return ['error' => 'Invalid email address format'];
+        }
+
+        $isBanned = AccountManager::isBanned($conn, $new);
+        if ($isBanned !== false) {
+            return ['error' => "Email address is not valid"];
+        }
+
+        $sql_check = "SELECT 1 FROM users WHERE email = '$new'";
+        $stmt = mysqli_query($conn, $sql_check);
+
+        if (mysqli_num_rows($stmt) > 0) {
+            return ['error' => "Email address is not avaliable"];
+        }
+
+        $sql = "SELECT email FROM users WHERE id = '$id' AND deactive IS NULL";
         $result = $conn->query($sql);
         $row = $result->fetch_assoc();
 
         if($result->num_rows != 0) {
             if($row['email'] === $old) {
-                $sql2 = "UPDATE users SET email = '$new' WHERE id = '$id'";
+                $sql2 = "UPDATE users SET email = '$new', verify_token = '$rand' WHERE id = '$id'";
+                $email = AccountManager::send_verify_email($rand, $new);
 
-                if ($conn->query($sql2) === TRUE) {
+                if ($conn->query($sql2) === TRUE && $email) {
                     header("HTTP/1.0 200 OK");
-                    echo json_encode(['success' => 'Email address updated.']);
-                    exit;
+                    return ['success' => 'Email address updated.'];
                 } else {
-                    $error_message = "Error changing email address.";
+                    $error_message = "An error occured while changing the email address.";
                     header("HTTP/1.0 500 Internal Server Error");
-                    echo json_encode(['error' => $error_message]);
-                    exit;
+                    return ['error' => $error_message];
                 }
             } else {
                 $error_message = htmlspecialchars($row['email']) . " is not equal to " . htmlspecialchars($old) . ".";
                 header("HTTP/1.0 500 Internal Server Error");
-                echo json_encode(['success' => false, 'error' => $error_message]);
-                exit;
+                return ['success' => false, 'error' => $error_message];
             }
+        } else {
+            $error_message = "Your account wasn't found";
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['success' => false, 'error' => $error_message];
         }
-        exit;
+    }
+
+    public function link_github_account($userid, $github_id) {
+        $conn = mysqli_connect(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        if (mysqli_connect_errno()) {
+            return ['error' => "Database connection failed"];
+        }
+
+        if(!loggedin()) {
+            header("HTTP/1.0 403 Forbidden");
+            return ['error' => 'Not authenticated'];
+        }
+
+        $stmt = $conn->prepare("SELECT id FROM users WHERE github_id = ? AND id != ? LIMIT 1");
+        $stmt->bind_param("si", $github_id, $userid);
+        $stmt->execute();
+        if ($stmt->get_result()->fetch_assoc()) {
+            return ['error' => "This github account is already linked to another user."];
+        }
+
+        $stmt = $conn->prepare("UPDATE users SET github_id = ? WHERE id = ?");
+        $stmt->bind_param("si", $github_id, $userid);
+        
+        if ($stmt->execute()) {
+            return ['success' => true];
+        } else {
+            return ['error' => "Failed to link github account"];
+        }
+    }
+
+    public function unlink_github_account($userid) {
+        $conn = mysqli_connect(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        if (mysqli_connect_errno()) {
+            return ['error' => "Database connection failed"];
+        }
+
+        if(!loggedin()) {
+            header("HTTP/1.0 403 Forbidden");
+            return ['error' => 'Not authenticated'];
+        }
+
+        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ? LIMIT 1");
+        $stmt->bind_param("i", $userid);
+        $stmt->execute();
+        $user = $stmt->get_result()->fetch_assoc();
+
+        if (empty($user['password'])) {
+            return ['error' => "You must set an account password before disconnecting github so you can still log in."];
+        }
+
+        $stmt = $conn->prepare("UPDATE users SET github_id = NULL WHERE id = ?");
+        $stmt->bind_param("i", $userid);
+        
+        if ($stmt->execute()) {
+            return ['success' => true];
+        } else {
+            return ['error' => "Failed to unlink github account"];
+        }
     }
 }
 
@@ -382,6 +441,8 @@ if(isset($_GET['about_change'])){
 }
 
 if(isset($_POST['change'])) {
+    header('Content-Type: application/json');
+
     $new = urldecode($_POST['n_password']);
     $old = urldecode($_POST['o_password']);
     $confirm = urldecode($_POST['c_password']);
@@ -392,6 +453,8 @@ if(isset($_POST['change'])) {
 }
 
 if(isset($_POST['mail_change'])) {
+    header('Content-Type: application/json');
+
     $new = urldecode($_POST['n_email']);
     $old = urldecode($_POST['o_email']);
 
@@ -400,7 +463,6 @@ if(isset($_POST['mail_change'])) {
     exit;
 }
 
-$default_pfp = '/img/no_image.png';
 if (isset($_POST['picture'])) {
     global $current_user;
     $okay = true;
@@ -412,7 +474,7 @@ if (isset($_POST['picture'])) {
 
     if($okay) {
         if ($current_user->verify_token != NULL) {
-            $error = "Please verify your account to upload or edit your profile picture. Token: " . $current_user->verify_token;
+            $error = "Please verify your account to upload or edit your profile picture.";
             $okay = false;
         }
     }
@@ -484,7 +546,6 @@ if (isset($_POST['remove_picture'])) {
     }
 
     $old_pfp = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture;
-    $new_pfp = '/img/no_image.png';
 
     if (strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($old_pfp)) {
         unlink($old_pfp);
@@ -493,12 +554,12 @@ if (isset($_POST['remove_picture'])) {
         exit(json_encode(['success' => false, 'error' => 'You do not have an uploaded profile image.']));
     }
 
-    $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
-    $stmt->bind_param("ss", $new_pfp, $id);
+    $stmt = $conn->prepare("UPDATE users SET picture = NULL WHERE id = ?");
+    $stmt->bind_param("s", $id);
 
     if ($stmt->execute()) {
         http_response_code(200);
-        exit(json_encode(['success' => true, 'message' => 'Profile picture removed.', 'image' => $default_pfp]));
+        exit(json_encode(['success' => true, 'message' => 'Profile picture removed.', 'image' => login()->picture]));
     } else {
         http_response_code(500);
         exit(json_encode(['success' => false, 'error' => 'Error removing profile picture. Please try again later.']));

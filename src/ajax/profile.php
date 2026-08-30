@@ -15,7 +15,7 @@ if (isset($_GET['followed_by'])) {
     }
 
     $profile_id = $_GET['followed_by'];
-    $current_user_id = $current_user->id;
+    $current_user_id = $current_user->id ?? 0;
 
     //selects user follow row(s), selects users actual account, fliters invalid accounts
     $query = "

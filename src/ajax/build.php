@@ -487,13 +487,6 @@ if (isset($_POST['save_build_v2'])) {
     exit;
 }
 
-function truncateStr($mystr) {
-    $truncatedName = substr($mystr, 0, 30);
-    if (strlen($mystr) >= 30) {
-        $truncatedName .= '...';
-    }
-}
-
 function fetch_build($model_id, $csrf) {
     global $current_user;
     global $conn;
@@ -702,19 +695,14 @@ function fetch_comments($model_id, $csrf) {
     global $conn;
     global $conn2;
     global $current_user;
-
-    require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
-    $bbcode = new BBCode();
+    global $bbcode;
 
     if (empty($csrf) || $csrf != $_SESSION['csrf']) {
         return json_encode(["error" => 'Invalid CSRF token provided']);
     }
 
-    if(loggedin()) {
-        $id = $current_user->id;
-    }
-
-    $message = [];
+    $model_id = (int)$model_id;
+    $id = loggedin() ? (int)$current_user->id : 0;
 
     if($current_user->admin !== true) {
 	    $sql = "SELECT * FROM comments WHERE model = $model_id AND hidden = 0 ORDER BY id ASC";
@@ -722,60 +710,89 @@ function fetch_comments($model_id, $csrf) {
         $sql = "SELECT * FROM comments WHERE model = $model_id ORDER BY id ASC";
     }
 
+    $result = $conn->query("SELECT * FROM model WHERE id = '$model_id' AND removed = 0");
+    if($result->num_rows === 0 && $current_user->admin != true) {
+        return;
+    }
+
     $comResult = $conn->query($sql);
+    $rows = [];
     $comments = [];
-	while ($row = $comResult->fetch_assoc()) {
+    $fav_ids = [];
+    $blocked = [];
+
+    while ($row = $comResult->fetch_assoc()) {
+        $rows[] = $row;
+    }
+
+    $userIds = array_column($rows, 'user');
+    $users = User::getUsers($userIds);
+
+    if (loggedin() && !empty($rows)) {
+        $commentIds = array_map('intval', array_column($rows, 'id'));
+        $ids = implode(',', $commentIds);
+
+        $res = $conn->query(
+            "SELECT comment_id
+            FROM comment_votes
+            WHERE user_id = $id
+            AND comment_id IN ($ids)"
+        );
+
+        while ($fav = $res->fetch_assoc()) {
+            $fav_ids[(int)$fav['comment_id']] = true;
+        }
+
+        $userId = (int)$current_user->id;
+
+        $result = $conn2->query("
+            SELECT userid, profileid
+            FROM user_blocks
+            WHERE userid = $userId
+            OR profileid = $userId
+        ");
+
+        while ($row = $result->fetch_assoc()) {
+            $userid = (int)$row['userid'];
+            $profileid = (int)$row['profileid'];
+
+            if ($userid === $userId) {
+                $blocked[$profileid]['you_blocked'] = true;
+            }
+
+            if ($profileid === $userId) {
+                $blocked[$userid]['they_blocked'] = true;
+            }
+        }
+    }
+
+	foreach($rows as $row) {
         $comment_id = $row['id'];
- 
-        $result = $conn->query("SELECT * FROM model WHERE id = '$model_id' AND removed = 0");
-        if($result->num_rows === 0 && $current_user->admin != true) {
-            continue;
-        }
-
-        $voted_query = $conn->query("SELECT * FROM comment_votes WHERE comment_id = '$comment_id' AND user_id = '$id'");
-        $comment_votes = $row['votes'];
-        $is_voted = false;
+        $comment_votes = Numbers::format($row['votes']);
         $is_op = $row['is_op'];
-        while ($voted_row = $voted_query->fetch_assoc()) {
-            if (loggedin() && (int)$voted_row['user_id'] === (int)$id) {
-                $is_voted = true;
-            }
-        }
-
         $c_user = $row['user'];
-        $userRow = User::getUser($c_user);
         $comment = $bbcode->toHTML($row['comment'], true, true);
+        $comment_og = $row['comment'];
+        $userRow = $users[$c_user] ?? User::getUser($c_user);
+        $date = time_ago(date('Y-m-d H:i:s', is_numeric($row['date']) ? $row['date'] : 0));
+        $edited_at = null;
 
-        $youBlocked = false;
-        $theyBlocked = false;
+        if((int)$row['edited_at'] !== 0) {
+            $edited_at = time_ago(date('Y-m-d H:i:s', is_numeric($row['edited_at']) ? $row['edited_at'] : 0));
+        }
+
+        $youBlocked = $blocked[$c_user]['you_blocked'] ?? false;
+        $theyBlocked = $blocked[$c_user]['they_blocked'] ?? false;
         if(loggedin()) {
-            $blockResult = $conn2->query("SELECT * FROM user_blocks WHERE (userid = '$c_user' AND profileid = '$id') OR (userid = '$id' AND profileid = '$c_user')");
-            if ($blockResult && $blockResult->num_rows > 0) {
-                while ($row_block = $blockResult->fetch_assoc()) {
-                    if ($row_block['userid'] == $id && $row_block['profileid'] == $c_user) {
-                        $youBlocked = true;
-                    } elseif ($row_block['userid'] == $c_user && $row_block['profileid'] == $id) {
-                        $theyBlocked = true;
-                    }
-                }
-                if ($youBlocked && $theyBlocked) {
-                    $message[] = "You blocked @" . $userRow->username . ", and they blocked you. Their comments and profile will not be visible.";
-                    $comment = null;
-                } elseif ($youBlocked) {
-                    $message[] = "You blocked @" . $userRow->username . ". Your comments and profile will not be visible to them.";
-                } elseif ($theyBlocked) {
-                    $message[] = "You're blocked from @" . $userRow->username . ". Their comments and profile will not be visible.";
-                    $comment = null;
-                }
+            if ($youBlocked && $theyBlocked) {
+                $message[] = "You blocked @" . $userRow->username . ", and they blocked you. Their comments and profile will not be visible.";
+                $comment = null;
+            } elseif ($youBlocked) {
+                $message[] = "You blocked @" . $userRow->username . ". Your comments and profile will not be visible to them.";
+            } elseif ($theyBlocked) {
+                $message[] = "You're blocked from @" . $userRow->username . ". Their comments and profile will not be visible.";
+                $comment = null;
             }
-        }
-
-        if (!is_numeric($row['date'])) {
-            $row['date'] = 0;
-        }
-
-        if($row['hidden']) {
-            $message[] = 'This comment is <b>hidden</b> for normal users.';
         }
 
         $comments[] = [
@@ -784,13 +801,15 @@ function fetch_comments($model_id, $csrf) {
             'user_admin' => $userRow->admin || 0,
             'username' => $userRow->username,
             'is_op' => $is_op,
-            'hidden' => $row['hidden'],
+            'is_hidden' => $row['hidden'],
+            'parent' => $row['parent'],
             'picture' => $userRow->picture,
             'comment' => $comment,
-            'date' => time_ago(date('Y-m-d H:i:s', $row['date'])),
+            'comment_og' => $comment_og,
+            'date' => $date,
+            'edited_at' => $edited_at,
             'votes' => $comment_votes,
-            'voted' => $is_voted,
-            'error' => $message
+            'voted' => isset($fav_ids[$comment_id])
         ];
         $message = [];
     }
@@ -810,6 +829,7 @@ if(isset($_POST['comment'])) {
     header('Content-Type: application/json');
 
 	$comment = $_POST['commentbox'];
+    $parent = isset($_POST['parent']) ? (int)$_POST['parent'] : 0;
     $csrf = $_POST['csrf_token'];
     $model_id = $_POST['buildId'];
 	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
@@ -859,84 +879,25 @@ if(isset($_POST['comment'])) {
 
     $userid = $result->fetch_assoc()['user'] ?? null;
 
+    if(!empty($parent)) {
+        $stmt_reply = $conn->prepare("SELECT user FROM comments WHERE id = ? AND hidden = 0");
+        $stmt_reply->bind_param("i", $parent);
+        $stmt_reply->execute();
+        $result = $stmt_reply->get_result();
+
+        if($result->num_rows === 0) {
+            http_response_code(404);
+            echo json_encode(['error' => 'The comment that you are trying to reply to does not exist.']);
+            exit;
+        }
+    }
+
 	$date = time();
-    $is_op = $_SESSION['userid'] === $userid ? 1 : 0;
-    $id = $current_user->id;
-    
-    $sql = "INSERT INTO comments (user, model, comment, date, is_op) VALUES (?, ?, ?, ?, ?) LIMIT 1";
+    $is_op = $id === $userid ? 1 : 0;
+
+    $sql = "INSERT INTO comments (user, model, comment, parent, date, is_op) VALUES (?, ?, ?, ?, ?, ?) LIMIT 1";
     $stmt2 = $conn->prepare($sql);
-    $stmt2->bind_param("iissi", $id, $model_id, $comment, $date, $is_op);
-
-    /*$category = 2; //2 = comment on model
-    $stmt = $conn2->prepare("INSERT IGNORE INTO subscriptions (userid, category, content) VALUES (?, ?, ?)");
-    $stmt->bind_param("iii", $id, $category, $model_id);
-    $stmt->execute();
-    
-    if ($stmt2->execute()) {
-        $last_id = $conn->insert_id;
-        $stmt2->close();
-
-        $stmtCountUpd = $conn->prepare("UPDATE model SET replies = replies + 1 WHERE id = ?");
-        $stmtCountUpd->bind_param("i", $model_id);
-        $stmtCountUpd->execute();
-        $stmtCountUpd->close();
-
-        $stmt4 = $conn->prepare("SELECT replies FROM model WHERE id = ? AND removed = 0");
-        $stmt4->bind_param("i", $model_id);
-        $stmt4->execute();
-        $result = $stmt4->get_result();
-        $reply_count = $result->fetch_assoc()['replies'];
-
-        $sub_stmt = $conn2->prepare("SELECT userid FROM subscriptions WHERE content = ? AND category = ? AND userid != ?");
-        $sub_stmt->bind_param("iii", $model_id, $category, $id);
-        $sub_stmt->execute();
-        $result = $sub_stmt->get_result();
-
-        $subscribers = [];
-        while ($row = $result->fetch_assoc()) {
-            $subscribers[] = $row['userid'];
-        }
-        $sub_stmt->close();
-
-        if (!empty($subscribers)) {
-            $notif_stmt = $conn2->prepare("INSERT INTO notifications (user, profile, timestamp, content, category) VALUES (?, ?, ?, ?, ?)");
-            $alert_stmt = $conn2->prepare("UPDATE users SET alert = alert + 1 WHERE id = ?");
-
-            foreach ($subscribers as $subscriber_id) {
-                $notif_stmt->bind_param("iisii", $subscriber_id, $id, $date, $model_id, $category);
-                $notif_stmt->execute();
-
-                $alert_stmt->bind_param("i", $subscriber_id);
-                $alert_stmt->execute();
-            }
-
-            $notif_stmt->close();
-            $alert_stmt->close();
-        }
-
-        $conn->close();
-        http_response_code(200);
-        echo json_encode([
-            'success' => 'Comment sent.',
-            'comment' => [
-                'id' => $last_id,
-                'text' => $comment,
-                'username' => $current_user->username,
-                'userid' => $current_user->id,
-                'admin' => $current_user->admin,
-                'picture' => $current_user->picture,
-                'date' => time_ago(date('Y-m-d H:i:s', $date)),
-                'replies' => $reply_count
-            ],
-        ]);
-        exit;
-    } else {
-        $stmt2->close();
-        $conn->close();
-        http_response_code(500);
-        echo json_encode(['error' => 'Could not send comment. Please try again later.']);
-        exit;
-    }*/
+    $stmt2->bind_param("iisisi", $id, $model_id, $comment, $parent, $date, $is_op);
 
     if ($stmt2->execute()) {
         $last_id = $conn->insert_id;
@@ -955,7 +916,13 @@ if(isset($_POST['comment'])) {
 
         $notifications = new Notifications($conn2);
         $notifications->subscribe($id, 'comment', $model_id);
+        $notifications->subscribe($id, 'comment_reply', $last_id);
         $notifications->notify_subscribers('comment', $model_id, $id);
+
+        if($parent) {
+            $notifications->subscribe($id, 'comment_reply', $parent);
+            $notifications->notify_subscribers('comment_reply', $parent, $id);
+        }
 
         http_response_code(200);
         echo json_encode([
@@ -966,6 +933,8 @@ if(isset($_POST['comment'])) {
                 'username' => $current_user->username,
                 'userid' => $current_user->id,
                 'admin' => $current_user->admin,
+                'op' => $is_op,
+                'parent' => $parent,
                 'picture' => $current_user->picture,
                 'date' => time_ago(date('Y-m-d H:i:s', $date)),
                 'replies' => $reply_count
@@ -979,6 +948,53 @@ if(isset($_POST['comment'])) {
         echo json_encode(['error' => 'Could not send comment. Please try again later.']);
         exit;
     }
+}
+
+if (isset($_POST['edit_comment'])) {
+    header('Content-Type: application/json');
+
+    if ($_SESSION['csrf'] === $_POST['csrf_token']) {
+        if (loggedin()) {
+            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+            $id = $current_user->id;
+            $comment_text = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
+            $comment_id = isset($_POST['id']) ? (int)$_POST['id'] : null;
+            $date = time();
+
+            if(!empty($comment_id) || !empty($comment_text)) {
+                $sql = "SELECT id, hidden, user, model FROM comments WHERE id = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("i", $comment_id);
+                $stmt->execute();
+                $result = $stmt->get_result();
+
+                if ($row = $result->fetch_assoc()) {
+                    if(trim($row['user']) === trim($current_user->id)) {
+                        $sql2 = "UPDATE comments SET comment = ?, edited_at = ? WHERE id = ?";
+                        $stmt2 = $conn->prepare($sql2);
+                        $stmt2->bind_param("ssi", $comment_text, $date, $comment_id);
+
+                        if ($stmt2->execute()) {
+                            echo json_encode(['success' => 'Comment edited', 'comment' => ['text' => $bbcode->toHTML($comment_text, true, true), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
+                        } else {
+                            echo json_encode(['error' => 'Error editing comment']);
+                        }
+                    } else {
+                        echo json_encode(['error' => 'An authentication error has occured']);
+                    }
+                } else {
+                    echo json_encode(['error' => 'Comment not found']);
+                }
+            } else {
+                echo json_encode(['error' => 'No comment Id or comment text provided']);
+            }
+        } else {
+            echo json_encode(['error' => 'Not logged in']);
+        }
+    } else {
+        echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
+    }
+    exit;
 }
 
 if (loggedin()) {
@@ -1254,8 +1270,8 @@ if (loggedin()) {
             exit;
         }
 
-        $stmt = $conn->prepare("INSERT INTO comment_votes (comment_id, user_id, user_name) VALUES (?, ?, ?)");
-        $stmt->bind_param("iis", $comment_id, $id, $username);
+        $stmt = $conn->prepare("INSERT INTO comment_votes (comment_id, user_id) VALUES (?, ?)");
+        $stmt->bind_param("ii", $comment_id, $id);
 
         $stmt_upd = $conn->prepare("UPDATE comments SET votes = votes + 1 WHERE id = ?");
         $stmt_upd->bind_param("i", $comment_id);
@@ -1271,7 +1287,7 @@ if (loggedin()) {
             echo json_encode([
                 'success' => true,
                 'message' => 'Comment favorited',
-                'count' => $count,
+                'count' => Numbers::format($count),
             ]);
         } else {
             echo json_encode(['success' => false, 'error' => 'Failed to favorite comment']);
@@ -1316,7 +1332,7 @@ if (loggedin()) {
             $stmt_count->fetch();
             $stmt_count->close();
 
-            echo json_encode(['success' => true, 'message' => 'Comment unfavorited', 'count' => $count]);
+            echo json_encode(['success' => true, 'message' => 'Comment unfavorited', 'count' => Numbers::format($count)]);
         } else {
             echo json_encode(['success' => false, 'error' => 'Failed to unfavorite']);
         }

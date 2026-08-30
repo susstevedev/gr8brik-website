@@ -1,5 +1,7 @@
 <?php
 function time_ago($timestamp) {
+    require_once 'numbers.php';
+
     $time_ago = strtotime($timestamp);
     $current_time = time();
     $time_difference = $time_ago - $current_time;
@@ -14,35 +16,35 @@ function time_ago($timestamp) {
 
     if ($time_difference < 0) {
         if ($seconds < 60) {
-            return "$seconds seconds ago";
+            return Numbers::format($seconds) . " seconds ago";
         } else if ($minutes < 60) {
-            return "$minutes minutes ago";
+            return Numbers::format($minutes) . " minutes ago";
         } else if ($hours < 24) {
-            return "$hours hours ago";
+            return Numbers::format($hours) . " hours ago";
         } else if ($days < 7) {
-            return "$days days ago";
+            return Numbers::format($days) . " days ago";
         } else if ($weeks < 4) {
-            return "$weeks weeks ago";
+            return Numbers::format($weeks) . " weeks ago";
         } else if ($months < 12) {
-            return "$months months ago";
+            return Numbers::format($months) . " months ago";
         } else {
-            return "$years years ago";
+            return Numbers::format($years) . " years ago";
         }
     } else {
         if ($seconds < 60) {
-            return "in $seconds seconds";
+            return "in " . Numbers::format($seconds) . " seconds";
         } else if ($minutes < 60) {
-            return "in $minutes minutes";
+            return "in " . Numbers::format($minutes) . " minutes";
         } else if ($hours < 24) {
-            return "in $hours hours";
+            return "in " . Numbers::format($hours) . " hours";
         } else if ($days < 7) {
-            return "in $days days";
+            return "in " . Numbers::format($days) . " days";
         } else if ($weeks < 4) {
-            return "in $weeks weeks";
+            return "in " . Numbers::format($weeks) . " weeks";
         } else if ($months < 12) {
-            return "in $months months";
+            return "in " . Numbers::format($months) . " months";
         } else {
-            return "in $years years";
+            return "in " . Numbers::format($years) . " years";
         }
     }
 }

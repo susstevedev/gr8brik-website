@@ -197,9 +197,10 @@ class Notifications
                 continue;
             }
 
-            $url = null;
-            $post = null;
-            $img = null;
+            $url = '';
+            $post = '';
+            $title = '';
+            $img = '/img/no_image.png';
 
             $category = $group['category'];
             $content = $group['content'];
@@ -238,6 +239,32 @@ class Notifications
                         $url = "/build/" . urlencode($content);
                         $title = !empty($row2['name']) ? $row2['name'] : "[unknown]";
                         $post = 'commented on by';
+                    }
+
+                    $stmt2->close();
+                    break;
+                case 'comment_reply':
+                    $stmt2 = $this->db->prepare("SELECT user, comment, model FROM `" . DB_NAME2 . "`.`comments` WHERE id = ?");
+                    $stmt2->bind_param("i", $content);
+                    $stmt2->execute();
+                    $res2 = $stmt2->get_result();
+
+                    if ($row2 = $res2->fetch_assoc()) {
+                        $modelid = $row2['model'];
+
+                        $stmt3 = $this->db->prepare("SELECT screenshot, name FROM `" . DB_NAME2 . "`.`model` WHERE id = ?");
+                        $stmt3->bind_param("i", $modelid);
+                        $stmt3->execute();
+                        $res3 = $stmt3->get_result();
+
+                        if ($row3 = $res3->fetch_assoc()) {
+                            $img = $row3['screenshot'];
+                            $name = !empty($row3['name']) ? $row3['name'] : "[unknown]";
+                            $title = "Comment on " . $name;
+                        }
+
+                        $url = "/build/" . urlencode($row2['model']) . '#comment' . $content;
+                        $post = 'replied to by';
                     }
 
                     $stmt2->close();
