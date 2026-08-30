@@ -379,6 +379,7 @@ if (isset($_POST['banner'])) {
                     success: function(res) {
                         if (res && res.success && res.image) {
                             $('#pictureForm #fileToUpload').css('background-image', 'url(' + res.image + ')');
+                            $('#pictureForm #remove_picture').remove();
                         } else if (res && res.error) {
                             alert(res.error);
                         } else {
@@ -441,7 +442,7 @@ if (isset($_POST['banner'])) {
             <p>We recommend your banner be 1200x400</p>
             <p><input type="file" name="fileToupload" id="fileToupload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-banner"></p>
             <?php
-            if ($current_user->banner != null) {
+            if (strpos($current_user->banner, '/acc/users/banners/') !== false && file_exists($_SERVER['DOCUMENT_ROOT'] . $current_user->banner)) {
                 echo '<input type="checkbox" class="w3-check" id="deleteBanner" name="deleteBanner" value="1">';
                 echo '<label for="deleteBanner">Remove banner</label>';
             }
@@ -458,7 +459,7 @@ if (isset($_POST['banner'])) {
                 <p><input type="file" name="fileToUpload" id="fileToUpload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
                 <input type="submit" value="Upload picture" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-col m4">
                 <?php
-                if ($current_user->picture != null) {
+                if (strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($_SERVER['DOCUMENT_ROOT'] . $current_user->picture)) {
                     echo '<span class="w3-col m1">&nbsp;</span>';
                     echo '<input type="submit" value="Remove picture" id="remove_picture" name="remove_picture" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink w3-col m4">';
                 }
@@ -499,6 +500,23 @@ if (isset($_POST['banner'])) {
     </div><br /><hr />
 
     <h2>Account</h2>
+    <form id="github-link">
+        <b><legend>Github oauth</legend></b>
+        <p>Link your github account as a method to access your account.</p>
+        <input type="hidden" name="authtype" value="github" />
+        <?php if(empty($current_user->github_id)) { ?>
+            <button type="submit" name="github_link" class="w3-btn w3-round w3-padding-small w3-white w3-hover-light-grey w3-border w3-border-grey">
+                <i class="fa fa-github-square" aria-hidden="true"></i> 
+                Link github
+            </button>
+        <?php } else { ?>
+            <button type="submit" name="github_unlink" class="w3-btn w3-round w3-padding-small w3-red w3-hover-light-grey w3-border w3-border-grey">
+                <i class="fa fa-github-square" aria-hidden="true"></i> 
+                Unlink github
+            </button>
+        <?php } ?>
+    </form><br />
+
     <form id="password">
         <b><legend>Password</legend></b>
         <p>Your password to login to your account. Don't share this with anyone. Keep this saved somewhere, like a secure password manager.</p>

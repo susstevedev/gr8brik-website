@@ -91,6 +91,12 @@ $combinedString = $utils->generateRandomScreenName();
         <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="loginBtn" name="login">Register</button>
         
     </div>
+
+    <p>Or...</p>
+    <div id="sso" class="w3-container">
+        <a href="/ajax/auth.php?authtype=github" class="w3-btn w3-round w3-padding-small w3-white w3-hover-light-grey w3-border w3-border-grey" id="github" name="github"><i class="fa fa-github-square" aria-hidden="true"></i> Register with github</a>
+    </div>
+
     <?php include '../linkbar.php' ?>
 </body>
 </html>

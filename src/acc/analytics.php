@@ -29,26 +29,35 @@ if(!loggedin()) {
             if(!in_array('analytics', $cookie)) {
                 echo "<b>Analytics are disabled in your cookie settings.</b>";
             } else {
-                echo "<b>Analytics are enabled in your cookie settings.</b>";
+                echo "<b>Analytics are enabled in your cookie settings.</b><br />";
+                echo "<p>This page displays user information of those who have viewed your profile or content in the past <b>31 days</b>.</p>";
             }
 
-			$sql = "SELECT * FROM analytics WHERE their_user = " . login()->id . " ORDER BY time DESC";
+			$sql = "SELECT * FROM analytics WHERE their_user = " . login()->id . " AND time >= NOW() - INTERVAL 31 DAY ORDER BY time DESC";
             $result = $conn2->query($sql);
             $bb = new BBcode();
+            $rows = [];
 
-			while (in_array('analytics', $cookie) && $row = $result->fetch_assoc()) {
+            while(in_array('analytics', $cookie) && $row = $result->fetch_assoc()) {
+                $rows[] = $row;
+            }
+
+            $userIds = array_column($rows, 'my_user');
+            $users = User::getUsers($userIds);
+
+			foreach($rows as $row) {
                 $profile = $row['my_user'];
-                $usero = User::getUser($profile);
+                $usero = $users[$profile] ?? User::getUser($profile);
 
                 $url = "/user/" . $profile;
                 $post = "viewed your profile or other content you have published";
                 $user = $row['my_name'] ?? '[unknown]';
                 $desc = $usero->description;
-                $img = '../acc/users/pfps/' . $profile;
+                $img = $usero->picture;
                 $time = time_ago($row['time']);
 
                 echo "<article class='w3-card-4 w3-hover-shadow gr8-theme w3-light-grey w3-padding w3-large'>";
-                echo "<a href='" . $url . "'><img src='" . $img . "' style='width: 150px; height: 150px;' alt='" . $user . "' title='" . $user . "'>";
+                echo "<a href='" . $url . "'><img src='" . $img . "' width='150' height='150px' class='w3-round' alt='" . $user . "' title='" . $user . "'>";
                 echo "<span style='display: inline-block; vertical-align: top; padding: 5px;'>";
                 echo "<b>" . htmlspecialchars($user) . "</b>&nbsp;" . htmlspecialchars($post) . "</span></a>";
                 echo "<time class='w3-right w3-text-grey' datetime=''>" . $time . "</time>";
