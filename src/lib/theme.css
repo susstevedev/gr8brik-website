@@ -245,8 +245,40 @@ body.mode-dark .creation-page-meta {
     display:none;
 }
 
-#comment-text img {
+/* creations page comments and related */
+#comment-form #post textarea[name='comment-box'] {
+    height: 60px;
+}
+
+#comment-form #post-comment {
+    display: none;
+    opacity: 1;
+}
+
+.comment {
+    border-left: 4px solid #ccc;
+    padding-left: 15px;
+}
+
+.comment .comment-divider {
+    width: max-content;
+    height: max-content;
+}
+
+.comment .comment-profile-picture {
+    width: 50px;
+}
+
+.comment #comment-text img {
     max-width: 100%;
+}
+
+.comment #comment-text article {
+    min-height: 75px;
+}
+
+.reply-form-box {
+    display: none;
 }
 
 #user-conversation-wrapper .avatar {

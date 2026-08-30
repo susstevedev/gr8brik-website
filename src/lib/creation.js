@@ -376,18 +376,84 @@
             });
         });
 
-        $(document).on("click", "#post-comment", function () {
+        function renderComment(elm, comment, depth) {
+            let $clone = $($('#comment-template').html());
+            let marg = depth * 25;
+            let width = Math.max(40, 60 - (depth * 2));
+
+            $clone.find(".text").text(comment.text);
+            $clone.find(".comment-user").text(comment.username);
+            $clone.find(".comment-user").attr('href', '/@' + comment.username);
+            $clone.css({"margin-left": marg + 'px', "width": width + '%'});
+
+            $clone.find(".reply-btn").attr('data-id', comment.id);
+            $clone.find(".edit-btn").attr('data-id', comment.id);
+
+            if (comment.admin) {
+                $clone.find(".comment-user").addClass('w3-text-red w3-hover-text-yellow');
+            }
+
+            if (comment.picture) {
+                $clone.find(".comment-profile-picture img").attr('src', comment.picture);
+            }
+
+            if (comment.op) {
+                $clone.find(".is-op").html('<b>OP</b> -');
+            }
+
+            $clone.find(".date").text(comment.date);
+            $clone.find(".upvote-btn").attr('data-id', comment.id);
+            $clone.attr('data-testid', comment.id);
+            $clone.attr('data-level', depth);
+            $clone.attr('id', 'comment' + comment.id);
+
+            $("#comment-count").text(comment.replies);
+            elm.after($clone);
+        }
+
+        $("#comment-form").on("focusin focusout", function(event) {
+            var form_inside = $(event.relatedTarget).closest("#comment-form").length > 0;
+
+            if (event.type === 'focusin') {
+                $("#comment-form [name='comment-box']").stop().animate({ height: "80px" }, 'fast');
+                $("#comment-form #post-comment").stop().show();
+            } else if (event.type === 'focusout' && !form_inside) {
+                $("#comment-form [name='comment-box']").stop().animate({ height: "60px" }, 'fast'); 
+                $("#comment-form #post-comment").stop().fadeOut("fast");
+            }
+        });
+
+        $('.comment').on('click', function (event) {
+            if (event.target === this && event.offsetX < 10) {
+                const $comment = $(this);
+                const level = $comment.data('level');
+                const collapsed = !$comment.hasClass('collapsed');
+
+                $comment.toggleClass('collapsed', collapsed);
+
+                let $next = $comment.next();
+                while ($next.length && $next.data('level') > level) {
+                    $next.toggle(!collapsed);
+                    $next = $next.next();
+                }
+
+                $comment.find('.comment-body, [data-testid="gr8-comment-divider"]').slideToggle('fast');
+                $comment.find('.comment-profile-picture img').animate({width: collapsed ? '25px' : '50px', height: collapsed ? '25px' : '50px'}, 'fast');
+            }
+        });
+
+        $(document).on("click", "#post-comment", function (event) {
             event.preventDefault();
+            const btn = $(this);
 
             fetchCSRFToken(function () {
-                const btn = $(this);
                 const commentBox = $("#comment-form [name='comment-box']").val();
                 const prevCommentBtnText = $("#comment-btn-text").html();
                 const commentBtnText = $("#comment-btn-text");
-                const errorElm = $("#ajax-error");
                 const csrf = window.csrf_token;
 
                 if(!commentBox) {
+                    btn.hide();
                     return;
                 }
 
@@ -410,30 +476,9 @@
                             btn.prop("disabled", false);
                             var elm = $('#data-comment-wrapper');
 
-                            if (response.success && response.comment) {
-                                let $clone = $($('#comment-template').html());
-
-                                $clone.find(".comment-text").text(response.comment.text);
-                                $clone.find(".comment-user").text(response.comment.username);
-                                $clone.find(".comment-user").attr('href', '/user/' + response.comment.userid);
-
-                                if (response.comment.admin) {
-                                    $clone.find(".comment-user").addClass('w3-text-red w3-hover-text-yellow');
-                                }
-
-                                if (response.comment.picture) {
-                                    $clone.find(".comment-profile-picture img").attr('src', response.comment.picture);
-                                }
-
-                                $clone.find(".date").text(response.comment.date);
-                                $clone.find(".upvote-btn").attr('data-id', response.comment.id);
-                                $clone.attr('data-testid', response.comment.id);
-                                $clone.attr('id', 'comment' + response.comment.id);
-
-                                $("#comment-count").text(response.comment.replies);
-                                elm.append($clone);
-
-								window.mode();
+                            if (response.comment) {
+                                renderComment(elm, response.comment, 0);
+                                window.mode();
                                 $("html, body").animate({ scrollTop: $(document).height() }, "slow");
                             } else {
                                 window.location.reload();
@@ -450,6 +495,146 @@
                         console.error("error:", textStatus, errorThrown, jqXHR);
                         const response = JSON.parse(jqXHR.responseText);
                         showError(response.error);
+                    },
+                });
+            });
+        });
+
+        $(document).on('click', '.edit-btn, .cancel-btn', function(event) {
+            event.preventDefault();
+
+            let btn = $(this);
+            let container = btn.closest('.comment');
+
+            container.find('.comment-body .edit').toggleClass('w3-hide');
+            container.find('.comment-body .text').toggleClass('w3-hide');
+        });
+
+        $(document).on('click', '.save-btn', function(event) {
+            event.preventDefault();
+            let container = $(this).closest('.comment');
+            let commentId = container.attr('data-testid');
+            let newText = container.find('.edit-textarea').val().trim();
+
+            if(newText === "") {
+                showError("Comment cannot be empty");
+                return;
+            }
+
+            fetchCSRFToken(function () {
+                $.ajax({
+                    url: '/ajax/build',
+                    type: 'POST',
+                    data: {
+                        edit_comment: true,
+                        id: commentId,
+                        commentbox: newText,
+                        csrf_token: window.csrf_token
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        if(response.success && response.comment && response.comment.text && response.comment.edited_at) {
+                            if(container.find('.comment-body .edited-at')) {
+                                container.find('.comment-body .edited-at').text('(edited)');
+                                container.find('.comment-body .edited-at').attr('title', response.comment.edited_at);
+                            }
+
+                            container.find('.comment-body .text').html(response.comment.text).toggleClass('w3-hide');
+                            container.find('.edit-textarea').val(response.comment.text);
+                            container.find('.edit').toggleClass('w3-hide');
+                        } else if(response.error) {
+                            showError(response.error);
+                        }
+                    }
+                });
+            });
+        });
+
+        $(document).on('click', '.delete-btn', function() {
+            let btn = $(this);
+            let commentId = btn.data('id');
+            let container = $(`#comment-${commentId}`);
+
+            container.find('.delete').toggleClass('w3-hide');
+        });
+
+        $(document).on("click", ".reply-btn", function (event) {
+            event.preventDefault();
+            let container = $(this).closest('.comment .comment-body');
+            let comment = $(this).data('id');
+            let box = container.find('#reply-form-container-' + comment);
+
+            if (box.length > 0) {
+                box.slideUp('fast', function() {
+                    $(this).remove();
+                });
+            } else {
+                let $clone = $($('#reply-box').html());
+
+                $clone.attr('id', 'reply-form-container-' + comment);
+                $clone.find('.reply-box').attr('id', 'reply-box-' + comment);
+                $clone.find('.post-reply').attr('data-parent', comment);
+
+                $clone.hide();
+                container.append($clone);
+                $clone.slideDown('fast');
+            }
+        });
+
+        $(document).on("click", ".post-reply", function (event) {
+            event.preventDefault();
+            const btn = $(this);
+            const parent = btn.attr('data-parent');
+            const $parent_elm = $(this).closest('.comment');
+            const depth = parseInt($parent_elm.attr('data-level')) + 1;
+
+            fetchCSRFToken(function () {
+                const replyBox = $('#reply-box-' + parent).val();
+                const prevText = $("#comment-btn-text").html();
+                const commentText = $("#comment-btn-text");
+                const csrf = window.csrf_token;
+
+                if(!replyBox) {
+                    return;
+                }
+
+                commentText.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
+                btn.prop("disabled", true);
+
+                const data = {
+                    comment: true,
+                    buildId: embed_model,
+                    commentbox: replyBox,
+                    parent: parent,
+                    csrf_token: csrf
+                }
+
+                $.ajax({
+                    url: "/ajax/build",
+                    method: "POST",
+                    dataType: 'json',
+                    data: data,
+                    success: function (response) {
+                        if (response.success) {
+                            commentText.html(prevText);
+                            btn.prop("disabled", false);
+
+                            if (response.comment) {
+                                renderComment($parent_elm, response.comment, depth);
+                                window.mode();
+                                $parent_elm.find('#reply-form-container-' + parent).remove();
+                            } else {
+                                window.location.reload();
+                            }
+                        } else if (response.error) {
+                            commentText.html(prevText);
+                            btn.prop("disabled", false);
+                            showError(response.error);
+                        }
+                    },
+                    error: (xhr, text, err) => {
+                        commentText.html(prevText);
+                        console.error("error:", text, err, xhr);
                     },
                 });
             });
