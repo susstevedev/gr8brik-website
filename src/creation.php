@@ -290,7 +290,9 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                     <h3 class="creation-page-title" id="name"><?php echo $data['name'] ?></h3>
 
                     <p class="creation-page-meta">By 
-                        <b class="meta-author"><a id="user-link" class="<?php echo $data['model_admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>" href="/@<?php echo urlencode($data['username']) ?>"><i class="fa fa-at" aria-hidden="true"></i><?php echo $data['username'] ?></a></b>
+                        <b class="meta-author">
+                            <?php if(!User::isDeleted($data['userid'])) { ?><a id="user-link" class="<?php echo $data['model_admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>" href="/@<?php echo urlencode($data['username'])?>"><?php } ?><i class="fa fa-at" aria-hidden="true"></i><?php echo $data['username'] ?><?php if(!User::isDeleted($data['userid'])) { ?></a><?php } ?>
+                        </b>
                         • <span id="user-link-followers"><?php echo $data['followers'] ?> followers</span>
                     </p>
 
@@ -414,8 +416,8 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
                     </div>
 
-                    <div id="post" class="w3-rest">
-                        <textarea name="comment-box" id="comment-box" class="w3-input w3-col s12" placeholder="Add a comment... (@username mentions someone, BBcode supported)" rows='auto' cols='40'></textarea>
+                    <div id="post" class="w3-rest w3-hover-shadow w3-border w3-border-blue">
+                        <textarea name="comment-box" id="comment-box" class="w3-input w3-col s12" placeholder="Add a comment... (@userid mentions someone, BBcode supported)"></textarea>
                     </div>
 
                     <div class="w3-col s12 w3-margin-top">
@@ -448,119 +450,204 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 ?>
             </div>
 
-            <?php
-            $comment_data = json_decode(fetch_comments($model_id, $_SESSION['csrf']), true);
-            if ($comment_data && is_array($comment_data)) {
-                foreach ($comment_data as $comment) {
-                    if(!is_array($comment)) {
-                        continue;
-                    }
-            ?>
-
-                <?php if (!empty($comment['error'])) { ?>
-                    <ul>
-                        <?php foreach ($comment['error'] as $err) { ?>
-                            <li class="w3-text-red comment-error-<?php echo $comment['id'] ?>"><?php echo $err ?></li>
-                        <?php } ?>
-                    </ul>
-                <?php } ?>
-
-                <div id="comment<?php echo $comment['id'] ?>" data-testid="<?php echo $comment['id'] ?>" class="comment w3-row w3-section">
-                    <div class="w3-col" id="comment-profile-picture" style="width: 50px;">
-                        <img class="w3-bar-item w3-circle w3-card-2 w3-grey" width="50px" height="50px" src="<?php echo $comment['picture'] ? $comment['picture'] : '/img/no_image.png' ?>">
-                    </div>
-
-                    <div data-testid="gr8-comment-divider" class="w3-hide-small w3-col" style="width: max-content; height: max-content;">
-                        <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
-                    </div>
-
-                    <div id="comment-text" class="w3-col w3-card-2" style="width: 60%;">
-                        <article class="gr8-theme w3-light-grey w3-padding-small w3-round w3-border w3-border-grey" style="min-height: 75px;">
-                            <header class="w3-padding-bottom">
-                                <b>
-                                    <?php if (!User::isDeleted($comment['userid'])) { ?>
-                                        <a href="/@<?php echo urlencode($comment['username']) ?>" class="<?php echo $comment['user_admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>">
-                                    <?php } ?>
-                                    <?php echo $comment['username'] ?>
-                                    <?php if (!User::isDeleted($comment['userid'])) { ?>
-                                        </a>
-                                    <?php } ?>
-                                </b>
-
-                                <span class="w3-mobile w3-right">
-                                    <?php echo $comment['is_op'] ? '<b id="is-op" title="Original Poster">OP</b> - ' : '' ?>
-                                    <time title="<?php echo $comment['date'] ?>" datetime="<?php echo $comment['date'] ?>"><?php echo $comment['date'] ?></time> -
-                                    <span class="votes"><span class="count"><?php echo $comment['votes'] ?></span> favorites</span>
-                                </span>
-                            </header>
-
-                            <span class="w3-padding-bottom" style="word-wrap: break-word; white-space: normal;">
-                                <?php if (!empty($comment['comment'])) { ?>
-                                    <?php echo $comment['comment'] ?>
-                                <?php } else { ?>
-                                    <i>Comment was removed</i>
-                                <?php } ?>
-                            </span><br />
-
-                            <?php if(loggedin()) { ?>
-                                <?php if ($comment['voted'] === false) { ?>
-                                    <div class="tooltip">
-                                        <span class="w3-blue tooltiptext">Favorite Comment</span>
-                                        <button data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
-                                    </div>
-                                <?php } elseif ($comment['voted'] === true) { ?>
-                                    <div class="tooltip">
-                                        <span class="w3-blue tooltiptext">Unfavorite Comment</span>
-                                        <button data-id="<?php echo $comment['id'] ?>" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>
-                                    </div>
-                                <?php } ?>
-
-                                <div class="w3-right">
-                                    <?php if (trim($current_user->id) !== trim($comment['userid'])) { ?>
-                                        <div class="tooltip" id="data-report-comment">
-                                            <span class="w3-blue tooltiptext">Report this comment to moderators</span>
-                                            <button data-id="<?php echo $comment['id'] ?>" id="report-comment-button" name="flag-comment" class="fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round" /></button>
-                                        </div>
-                                    <?php } ?>
-
-                                    <?php if (trim($current_user->id) === trim($comment['userid']) || $current_user->admin) { ?>
-                                        <div class="tooltip" id="data-report-comment">
-                                            <span class="w3-blue tooltiptext"><?php echo $comment['hidden'] ? 'Restore' : 'Delete'; ?> this comment</span>
-                                            <button data-id="<?php echo $comment['id'] ?>" id="delete-comment-button" name="delete-comment" class="fa fa-trash w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
-                                        </div>
-                                    <?php } ?>
-                                </div>
-                            <?php } ?>
-                        </article>
-                    </div>
-                </div>
         <?php
+        $comment_data = json_decode(fetch_comments($model_id, $_SESSION['csrf']), true);
+
+        if ($comment_data && is_array($comment_data)) {
+            $grouped_comments = [];
+
+            if(isset($_GET['depth']) && isset($_GET['parent'])) {
+                ?>
+                    You are viewing the replies of a comment.<br />
+                    <a href="?depth=false">Go back</a>
+                <?php
+            }
+
+            foreach ($comment_data as $comment) {
+                if (!is_array($comment)) {
+                    continue;
+                }
+
+                $parent_id = $comment['parent'];
+                $grouped_comments[$parent_id][] = $comment;
+            }
+
+            function comment_tree(array $grouped_comments, $parent_id = null, $depth = 0) {
+                global $current_user;
+
+                if (!isset($grouped_comments[$parent_id])) {
+                    return;
+                }
+
+                foreach ($grouped_comments[$parent_id] as $comment) {
+                    $indentation = $depth * 25;
+                    ?>
+                    <div id="comment<?php echo $comment['id'] ?>" data-testid="<?php echo $comment['id'] ?>" data-level="<?php echo $depth ?>" data-parent="<?php echo $comment['parent'] ?>" class="comment w3-row w3-section" style="margin-left: <?php echo $indentation; ?>px;">
+                        <?php
+                            if($depth > 10) {
+                                ?>
+                                <a href="?depth=true&parent=<?php echo $parent_id?>">More comments...</a></div>
+                                <?php
+                                return;
+                            }
+                        ?>
+
+                        <div class="w3-col comment-profile-picture">
+                            <img class="w3-bar-item w3-round w3-card-2 w3-grey" loading="lazy" width="50" height="50" src="<?php echo $comment['picture'] ? $comment['picture'] : '/img/no_image.png' ?>">
+                        </div>
+
+                        <div data-testid="gr8-comment-divider" class="comment-divider w3-hide-small w3-col">
+                            <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
+                        </div>
+
+                        <div id="comment-text" class="comment-body w3-col" style="width: <?php echo max(40, 60 - ($depth * 2)); ?>%;">
+                            <article class="gr8-theme w3-light-grey w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
+                                <header class="w3-padding-bottom">
+                                    <b>
+                                        <?php if (!User::isDeleted($comment['userid'])) { ?>
+                                            <a href="/@<?php echo urlencode($comment['username']) ?>" class="<?php echo $comment['user_admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>">
+                                        <?php } ?>
+                                        <?php echo $comment['username'] ?>
+                                        <?php if (!User::isDeleted($comment['userid'])) { ?>
+                                            </a>
+                                        <?php } ?>
+                                    </b>
+
+                                    <span class="w3-mobile w3-right">
+                                        <?php echo ($comment['is_op'] ?? false) ? '<b class="is-op" title="Original Poster">OP</b> - ' : '' ?>
+                                        <time class="date" title="<?php echo $comment['date'] ?>" datetime="<?php echo $comment['date'] ?>"><?php echo $comment['date'] ?></time>
+                                        <time class="edited-at" title="<?php echo $comment['edited_at'] ?>" datetime="<?php echo $comment['edited_at'] ?>"><?php echo !empty($comment['edited_at']) ? '(edited)' : null ?></time> -
+                                        <span class="votes"><span class="count"><?php echo $comment['votes'] ?></span> favorites</span>
+                                    </span>
+                                </header>
+
+                                <?php if(!empty($comment['is_hidden'])) { ?>
+                                    <span class="w3-text-grey"><i class="fa fa-info-circle" aria-hidden="true"></i> <i>This comment has been removed</i></span><br />
+                                <?php } ?>
+
+                                <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;">
+                                    <?php if (!empty($comment['comment'])) { ?>
+                                        <?php echo $comment['comment'] ?>
+                                    <?php } else { ?>
+                                        <i>Comment was removed</i>
+                                    <?php } ?>
+                                </span>
+
+                                <?php if (loggedin() && trim($current_user->id) === trim($comment['userid'])) { ?>
+                                    <form class="edit w3-hide">
+                                        <textarea class="edit-textarea"><?php echo $comment['comment_og'] ?></textarea><br />
+                                        <button class="save-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Save</button>
+                                        <button class="cancel-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
+                                    </form>
+                                <?php } ?>
+                                <br />
+
+                                <?php if(loggedin()) { ?>
+                                    <?php if (($comment['voted'] ?? false) === false) { ?>
+                                        <div class="tooltip">
+                                            <span class="w3-blue tooltiptext">Favorite Comment</span>
+                                            <button data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
+                                        </div>
+                                    <?php } elseif (($comment['voted'] ?? false) === true) { ?>
+                                        <div class="tooltip">
+                                            <span class="w3-blue tooltiptext">Unfavorite Comment</span>
+                                            <button data-id="<?php echo $comment['id'] ?>" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>
+                                        </div>
+                                    <?php } ?>
+
+                                    <div class="w3-right">
+                                        <div class="tooltip">
+                                            <span class="w3-blue tooltiptext">Reply to this comment</span>
+                                            <button data-id="<?php echo $comment['id'] ?>" class="reply-btn fa fa-reply w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small"></button>
+                                        </div>
+
+                                        <?php if (trim($current_user->id) === trim($comment['userid'])) { ?>
+                                            <div class="tooltip">
+                                                <span class="w3-blue tooltiptext">Edit this comment</span>
+                                                <button data-id="<?php echo $comment['id'] ?>" class="edit-btn fa fa-pencil w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small"></button>
+                                            </div>
+                                        <?php } ?>
+
+                                        <?php if (trim($current_user->id) !== trim($comment['userid']) && !$current_user->admin) { ?>
+                                            <div class="tooltip" id="data-report-comment">
+                                                <span class="w3-blue tooltiptext">Report this comment to moderators</span>
+                                                <button data-id="<?php echo $comment['id'] ?>" id="report-comment-button" name="flag-comment" class="fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
+                                            </div>
+                                        <?php } ?>
+
+                                        <?php if (trim($current_user->id) === trim($comment['userid']) || $current_user->admin) { ?>
+                                            <div class="tooltip" id="data-report-comment">
+                                                <span class="w3-blue tooltiptext"><?php echo ($comment['is_hidden'] ?? false) ? 'Restore' : 'Delete'; ?> this comment</span>
+                                                <button data-id="<?php echo $comment['id'] ?>" id="delete-comment-button" name="delete-comment" class="fa fa-trash w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
+                                            </div>
+                                        <?php } ?>
+                                    </div>
+                                <?php } ?>
+                            </article>
+
+                            <!--<div id="reply-form-container-<?php echo $comment['id'] ?>" class="w3-margin reply-form-box" style="display:none;">
+                                <div class="w3-right w3-block">
+                                    <textarea name="reply-box" id="reply-box-<?php echo $comment['id'] ?>" class="reply-box w3-input w3-border w3-border-blue w3-hover-shadow" placeholder="Add a reply... (@userid mentions someone, BBcode supported)" rows="2"></textarea>
+                                    <button data-parent="<?php echo $comment['id'] ?>" class="post-reply w3-right w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
+                                        <span class="comment-btn-text"><i class="fa fa-reply" aria-hidden="true"></i> Post reply</span>
+                                    </button>
+                                </div>
+                            </div>-->
+                        </div>
+                    </div>
+                    <?php
+                    comment_tree($grouped_comments, $comment['id'], $depth + 1);
+                }
+            }
+
+            if(isset($_GET['depth']) && isset($_GET['parent'])) {
+                comment_tree($grouped_comments, $_GET['parent'], 0);
+            } else {
+                comment_tree($grouped_comments, 0, 0);
             }
         }
         ?>
-        
+
+        <template id="reply-box">
+            <div id="reply-form-container-" class="w3-margin reply-form-box">
+                <div class="w3-right w3-block">
+                    <textarea name="reply-box" id="reply-box-" class="reply-box w3-input w3-border w3-border-blue w3-hover-shadow" placeholder="Add a reply... (@userid mentions someone, BBcode supported)" rows="2"></textarea>
+                    <button data-parent="" class="post-reply w3-right w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
+                        <span class="comment-btn-text"><i class="fa fa-reply" aria-hidden="true"></i> Post reply</span>
+                    </button>
+                </div>
+            </div>
+        </template>
+
         <template id="comment-template">
             <div id="comment" data-testid="" class="comment w3-row w3-section">
-                <div class="comment-profile-picture w3-col" style="width: 50px;">
-                    <img class="w3-bar-item w3-round w3-card-2 w3-grey" width="50px" height="50px" src="/img/no_image.png">
+                <div class="comment-profile-picture w3-col">
+                    <img class="w3-bar-item w3-round w3-card-2 w3-grey" width="50" height="50" src="/img/no_image.png">
                 </div>
 
-                <div data-testid="gr8-comment-divider" class="w3-hide-small w3-col" style="width: max-content; height: max-content;">
+                <div data-testid="gr8-comment-divider" class="comment-divider w3-hide-small w3-col">
                     <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
                 </div>
 
-                <div class="comment-body w3-col w3-card-2" style="width: 60%;">
-                    <article class="gr8-theme w3-light-grey w3-padding-small w3-round w3-border w3-border-grey w3-text-black" style="min-height: 75px;">
+                <div class="comment-body w3-col" style="width: 60%;">
+                    <article class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round w3-border w3-border-grey w3-text-black">
                         <header class="w3-padding-bottom">
                             <b><a class="comment-user" href="/@"></a></b>
 
                             <span class="w3-mobile w3-right">
+                                <span class="is-op" title="Original Poster"></span>
                                 <span class="date"></span> -
                                 <span class="votes"><span class="count">0</span> favorites</span>
                             </span>
                         </header>
 
-                        <span class="comment-text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;"></span><br>
+                        <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;"></span>
+
+                        <form class="edit w3-hide">
+                            <textarea class="edit-textarea"></textarea><br />
+                            <button class="save-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Save</button>
+                            <button class="cancel-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
+                        </form><br />
 
                         <div class="tooltip">
                             <span class="w3-blue tooltiptext">Favorite Comment</span>
@@ -568,6 +655,16 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         </div>
 
                         <div class="w3-right">
+                            <div class="tooltip">
+                                <span class="w3-blue tooltiptext">Reply to this comment</span>
+                                <button data-id="" class="reply-btn fa fa-reply w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small"></button>
+                            </div>
+
+                            <div class="tooltip">
+                                <span class="w3-blue tooltiptext">Edit this comment</span>
+                                <button data-id="" class="edit-btn fa fa-pencil w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small"></button>
+                            </div>
+
                             <div class="tooltip" id="data-report-comment">
                                 <span class="w3-blue tooltiptext">Delete this comment</span>
                                 <button id="delete-comment-button" name="delete-comment" class="fa fa-trash w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>

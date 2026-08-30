@@ -253,15 +253,30 @@ if(isset($_POST['delete'])) {
         exit('No user found');
     }
 
+    $ignore = isset($_POST['ignore']) ? $_POST['ignore'] : 0;
+
+    if (!empty($_POST['until']) && !$ignore) {
+        $date = new DateTime($_POST['until']);
+
+        if ($date) {
+            $until = $date->format('Y-m-d H:i:s');
+        } else {
+            exit('Invalid ban date');
+        }
+    } else {
+        $until = null;
+    }
+
     $profile_id = (int)$_GET['id'];
     $email = $email = hash('sha256', strtolower(trim($data['email'])));
     $reason = isset($_POST['reason']) ? trim($_POST['reason']) : 'banned by admin request';
+    $rand = bin2hex(random_bytes(32));
 
     if($current_user->admin != false) {
-        $sql = "UPDATE users SET deactive = 1, verify_token = 1 WHERE id = $profile_id";
+        $sql = "UPDATE users SET deactive = 1, verify_token = '$rand' WHERE id = '$profile_id'";
         $result = $conn->query($sql);
         if ($result) {
-            $sql = "INSERT IGNORE INTO blacklist (value, type, reason) VALUES ('$email', 'email', '$reason')";
+            $sql = "INSERT IGNORE INTO blacklist (value, type, reason, ignore_at) VALUES ('$email', 'email', '$reason', '$until')";
             $result = $conn->query($sql);
             header('refresh:0');
             exit;
@@ -471,9 +486,17 @@ if(isset($_POST['delete'])) {
             <div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-center">
                 <div class="w3-container">
                     <span onclick="document.getElementById('modal-delete').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
-                        <form method='post' action=''>
-                        <h2>Are you sure you want to hard ban this user?</h2>
-                        <textarea name="reason" placeholder="Moderator note about this ban" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea>
+                    <form method='post' action=''>
+                        <h2>Are you sure you want to ban this user?</h2>
+
+                        <label for="until">Ban until:</label>
+                        <input type="date" class="w3-round w3-hover-opacity" id="until" name="until" min="<?php echo date('Y-m-d') ?>" max="2056-12-31"><br />
+
+                        <input type="checkbox" id="ignore" name="ignore" value="1">
+                        <label for="ignore">Permanent ban</label><br />
+
+                        <textarea name="reason" placeholder="Moderator note about this ban" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea><br />
+
                         <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span>
                         <input type="submit" value="Yes" name="delete" class="w3-btn w3-large w3-white w3-hover-red">
                     </form>
