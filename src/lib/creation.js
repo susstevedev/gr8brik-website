@@ -143,13 +143,18 @@
                             if (response.success) {
                                 showSuccess(response.success);
 								let comment_selector = '#comment' + comment_id;
-								let comment_error_selector = '.comment-error-' + comment_id;
+                                let comment_txt_selector = '#comment' + comment_id + ' .comment-body .text';
+								let comment_error_selector = '#comment' + comment_id + ' .comment-body .comment-error';
 
                                 $("#deleteCommentForm")[0].reset();
 
 								if(response.type === 'delete') {
-									$(comment_selector).remove();
-								} else if(response.type === 'restore') {
+                                    if(response.admin === true) {
+                                        $(comment_txt_selector).addClass('w3-text-red');
+                                    } else {
+                                        $(comment_selector).remove();
+                                    }
+                                } else if(response.type === 'restore') {
 									$(comment_error_selector).remove();
 								}
                             } else {
@@ -378,13 +383,13 @@
 
         function renderComment(elm, comment, depth) {
             let $clone = $($('#comment-template').html());
-            let marg = depth * 25;
-            let width = Math.max(40, 60 - (depth * 2));
+            let marg = depth * 25 + 'px';
+            let width = Math.max(40, 60 - (depth * 2)) + '%';
 
             $clone.find(".text").text(comment.text);
-            $clone.find(".comment-user").text(comment.username);
-            $clone.find(".comment-user").attr('href', '/@' + comment.username);
-            $clone.css({"margin-left": marg + 'px', "width": width + '%'});
+            $clone.find(".comment-user").text(comment.username).attr('href', '/@' + comment.username);
+            $clone.find(".comment-body").css("width", width);
+            $clone.css("margin-left", marg);
 
             $clone.find(".reply-btn").attr('data-id', comment.id);
             $clone.find(".edit-btn").attr('data-id', comment.id);
@@ -402,6 +407,7 @@
             }
 
             $clone.find(".date").text(comment.date);
+            $clone.find(".votes .count").text(comment.favs);
             $clone.find(".upvote-btn").attr('data-id', comment.id);
             $clone.attr('data-testid', comment.id);
             $clone.attr('data-level', depth);
