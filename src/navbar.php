@@ -29,10 +29,10 @@
                     <span><i class='fa fa-cog w3-padding-small' aria-hidden='true'></i>Account Settings</span>
                 </a>
                 
-                <a href="/user/<?php echo $current_user->id ?>" class='w3-bar-item w3-button'>
+                <a href="/@<?php echo $current_user->username ?? null ?>" class='w3-bar-item w3-button'>
                     <span><i class='fa fa-user-o w3-padding-small' aria-hidden='true'></i>My Profile</span>
                 </a>
-                
+
                 <a href='/acc/notifications' class='w3-bar-item w3-button'>
                     <span><i class='fa fa-bell-o w3-padding-small' aria-hidden='true'></i>Notifications <span class='w3-red w3-tag w3-round'><?php echo (int)$current_user->alert ?></span></span>
                 </a>

@@ -9,7 +9,7 @@
 </head>
 <body class="w3-light-blue w3-container">
 <?php include('navbar.php') ?>
-<center><br /><br />
+<br /><br /><div class="w3-center">
 
 <h4>Last updated <?php echo gmdate("M d, Y",filemtime('privacy.php')); ?></h4>
 
@@ -43,7 +43,7 @@ Please be aware of the following conditions upon account deletion:
 <ul>
     <li>Analytics are deleted around once every month.</li>
     <li>Your username will be permanently blacklisted to prevent impersonation and platform abuse.</li>
-    <li>Publicly available community contributions, including forum threads, comment layouts, and models, will be permanently reassigned to a system-controlled guest profile (ID 0). The text content of these posts will remain visible to preserve the context of public discussions.</li>
+    <li>Publicly available community contributions, including forum threads, comment layouts, and creations, will be permanently reassigned to a system-controlled guest profile (ID 0). The text content of these posts will remain visible to preserve the context of public discussions.</li>
     <li>If you accidentally included personally identifying information (such as your real name, address, or phone number) within the text of a public post or comment, you must email us directly and specify exactly which content blocks you need manually modified or removed.</li>
 </ul>
 
@@ -51,7 +51,7 @@ Please be aware of the following conditions upon account deletion:
 
 <p>By using our website, you hereby consent to our Privacy Policy and agree to its <a href="http://<?php echo $_SERVER['HTTP_HOST'] ?>/terms.php">Terms and Conditions.</a></p>
 <hr />
-</center><br /><br />
+</div><br /><br />
 <?php include('linkbar.php') ?>
 </body>
 </html>

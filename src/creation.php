@@ -149,13 +149,11 @@ if (isset($_POST['delete_comment'])) {
             if ($row = $result->fetch_assoc()) {
                 if(trim($row['user']) === trim($current_user->id) || $current_user->admin) {
                     $sql2 = "UPDATE comments SET hidden = 1 WHERE id = ?";
-                    $sql3 = "UPDATE model SET replies = replies - 1 WHERE id = ?";
 					$type = 'delete';
                     $model_id = $row['model'];
 
                     if($row['hidden']) {
                         $sql2 = "UPDATE comments SET hidden = 0 WHERE id = ?";
-                        $sql3 = "UPDATE model SET replies = replies + 1 WHERE id = ?";
 						$type = 'restore';
                     }
 
@@ -163,11 +161,7 @@ if (isset($_POST['delete_comment'])) {
                     $stmt2->bind_param("i", $comment_id);
 
                     if ($stmt2->execute()) {
-                        $stmt_count = $conn->prepare($sql3);
-                        $stmt_count->bind_param("i", $model_id);
-                        $stmt_count->execute();
-
-                        echo json_encode(['success' => 'Comment updated', 'type' => $type]);
+                        echo json_encode(['success' => 'Comment updated', 'type' => $type, 'admin' => $current_user->admin ? true : false]);
                     } else {
                         echo json_encode(['error' => 'Error deleting comment']);
                     }
@@ -501,7 +495,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         </div>
 
                         <div id="comment-text" class="comment-body w3-col" style="width: <?php echo max(40, 60 - ($depth * 2)); ?>%;">
-                            <article class="gr8-theme w3-light-grey w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
+                            <article class="<?php echo $comment['votes'] >= 100 ? 'w3-orange' : 'gr8-theme w3-light-grey' ?> w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
                                 <header class="w3-padding-bottom">
                                     <b>
                                         <?php if (!User::isDeleted($comment['userid'])) { ?>
@@ -522,7 +516,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 </header>
 
                                 <?php if(!empty($comment['is_hidden'])) { ?>
-                                    <span class="w3-text-grey"><i class="fa fa-info-circle" aria-hidden="true"></i> <i>This comment has been removed</i></span><br />
+                                    <span class="comment-error w3-text-grey"><i class="fa fa-info-circle" aria-hidden="true"></i> <i>This comment has been removed</i></span><br />
                                 <?php } ?>
 
                                 <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;">
