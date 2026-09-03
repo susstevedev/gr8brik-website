@@ -192,6 +192,9 @@ class Notifications
     }
 
     public function toHTML($notifs) {
+        global $current_user;
+        $id = $current_user->id ?? 0;
+
         foreach ($notifs as $group_name => $group) {
             if(!is_array($group)) {
                 continue;
@@ -280,6 +283,34 @@ class Notifications
                         $url = "/topic/" . urlencode($content);
                         $title = !empty($row2['title']) ? $row2['title'] : "[unknown]";
                         $post = "replied to by";
+                    }
+
+                    $stmt2->close();
+                    break;
+                case 'direct_message':
+                    $stmt2 = $this->db->prepare("SELECT userid, profileid FROM `" . DB_NAME . "`.`message_group` WHERE id = ?");
+                    $stmt2->bind_param("i", $content);
+                    $stmt2->execute();
+                    $res2 = $stmt2->get_result();
+
+                    if ($row2 = $res2->fetch_assoc()) {
+                        $url = "/acc/messages?m=" . urlencode($content);
+                        $userid = $row2['userid'];
+                        $profileid = $row2['profileid'];
+
+                        //Simple logic to display the opposite users name
+                        //Copied from messages.php because I'm lazy asf
+                        if ((int)$id === (int)$userid) {
+                            $usero = User::getUser($profileid);
+                            $title = $usero->username . ' messaged you';
+                            $img = $usero->picture;
+                        } elseif ((int)$id === (int)$profileid) {
+                            $usero = User::getUser($userid);
+                            $title = $usero->username . ' messaged you';
+                            $img = $usero->picture;
+                        }
+
+                        $post = "message by";
                     }
 
                     $stmt2->close();

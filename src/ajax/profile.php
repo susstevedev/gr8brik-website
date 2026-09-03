@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 $bbcode = new BBCode;

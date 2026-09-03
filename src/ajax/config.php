@@ -235,9 +235,9 @@ class Cookie {
                 return true;
             }
 
-            if($_SESSION['last_analytics'] && time() - $_SESSION['last_analytics'] < 3600) { //every hour
+            /*if($_SESSION['last_analytics'] && time() - $_SESSION['last_analytics'] < 3600) { //every hour
                 return false;
-            }
+            }*/
 
             return true;
         } else {
@@ -245,33 +245,57 @@ class Cookie {
         }
     }
 
-    public static function analytics_user(mixed $db, int $id, int $me) {
-        global $current_user;
-
+    public static function analytics_user(mixed $db, int $id, int $me, ?string $content = 'No string hast been provided! Sorcery!') {
         if(!loggedin()) {
             return false;
         }
-
-        $usero = User::getUser($id);
 
         if(!Cookie::allow_analytics()) {
             return false;
         }
 
-        $stmt = $db->prepare("INSERT INTO analytics (their_name, my_name, my_user, their_user) VALUES (?, ?, ?, ?)");
-        $user = $usero->username;
-        $me_user = $current_user->username ?? null;
-        $stmt->bind_param("ssii", $user, $me_user, $me, $id);
+        $stmt = $db->prepare("INSERT INTO analytics (my_user, their_user, content_string, type) VALUES (?, ?, ?, 'user')");
+        $stmt->bind_param("iis", $me, $id, $content);
         $stmt->execute();
         return $db->insert_id ?? true;
     }
 
-    public static function del_old_analytics(mixed $db, int $days = 30) {
+    public static function analytics_creation(mixed $db, int $id, int $me, ?string $content = 'No string hast been provided! Sorcery!') {
+        if(!loggedin()) {
+            return false;
+        }
+
+        if(!Cookie::allow_analytics()) {
+            return false;
+        }
+
+        $stmt = $db->prepare("INSERT INTO analytics (my_user, their_user, content_string, type) VALUES (?, ?, ?, 'creation')");
+        $stmt->bind_param("iis", $me, $id, $content);
+        $stmt->execute();
+        return $db->insert_id ?? true;
+    }
+
+    public static function analytics_forum(mixed $db, int $id, int $me, ?string $content = 'No string hast been provided! Sorcery!') {
+        if(!loggedin()) {
+            return false;
+        }
+
+        if(!Cookie::allow_analytics()) {
+            return false;
+        }
+
+        $stmt = $db->prepare("INSERT INTO analytics (my_user, their_user, content_string, type) VALUES (?, ?, ?, 'forum')");
+        $stmt->bind_param("iis", $me, $id, $content);
+        $stmt->execute();
+        return $db->insert_id ?? true;
+    }
+
+    public static function del_old_analytics(mixed $db, ?int $days = 30, ?int $lasttime = 43200) {
         if ($days <= 0) {
             return false;
         }
 
-        if (isset($_SESSION['last_analytics_cleanup']) && (time() - $_SESSION['last_analytics_cleanup'] < 86400)) { //24 hours
+        if (isset($_SESSION['last_analytics_cleanup']) && (time() - $_SESSION['last_analytics_cleanup'] < $lasttime)) { //default is 12 hours
             return false;
         }
 

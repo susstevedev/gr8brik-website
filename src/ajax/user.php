@@ -9,7 +9,7 @@ if(isset($_GET['ajax'])) {
 }
 
 function login() {
-    global $id, $token, $users_row;
+    global $id, $token;
     if (!loggedin()) {
         return false;
     }
@@ -29,9 +29,7 @@ function login() {
 
     if ($session_res->num_rows <= 0) {
         $session_stmt->close();
-        $conn->close();
-        logout();
-        return false;
+        return logout(true);
     }
 
     $token = $session_res->fetch_assoc();
@@ -43,6 +41,7 @@ function login() {
 
     $user = User::getUser($id);
     $user->id = $id;
+
     return $user;
 }
 
@@ -56,16 +55,18 @@ if (loggedin()) {
     if (rand(1, 20) <= 1) {
         regenerate_session();
         delete_old_sessions();
-        Cookie::del_old_analytics($conn, 15);
+        Cookie::del_old_analytics($conn, 15, 3600);
 
         $lock_file = __DIR__ . '/.cleanup_lock';
-        $currentTime = time();
+        $t = time();
         clearstatcache(true, $lock_file);
-        
-        if (!file_exists($lock_file) || ($currentTime - filemtime($lock_file) > 3600)) {
+
+        if (!file_exists($lock_file) || ($t - filemtime($lock_file) > 3600)) {
             delete_inactive_users();
             @touch($lock_file);
         }
+
+        unset($t);
     }
 }
 
@@ -358,33 +359,26 @@ if(isset($_GET['seen_warn_status']) && basename($_SERVER['PHP_SELF']) === "user.
 	exit;
 }
 
-if (isset($_GET['ajax'])) {
+if (isset($_GET['ajax']) && basename($_SERVER['PHP_SELF']) === "user.php") {
     header('Content-type: application/json');
 
-    if (loggedin()) {
-        $id = $current_user->id;
-    } else {
-        echo json_encode(['error' => 'User is not authenticated or no userid was provided.']);
+    if(!loggedin()) {
+        echo json_encode(['error' => 'User is not authenticated']);
         exit;
     }
+    $id = $current_user->id;
 
-    $your_followers_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE profileid = ? LIMIT 1");
-    $your_followers_stmt->bind_param("i", $id);
-    $your_followers_stmt->execute();
-    $your_followers_res = $your_followers_stmt->get_result();
+    $followers_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE profileid = ? LIMIT 1");
+    $followers_stmt->bind_param("i", $id);
+    $followers_stmt->execute();
+    $res = $followers_stmt->get_result();
+    $followers_count = $res->fetch_assoc()['count'] ?? 0;
 
-    if ($your_followers_res->num_rows != 0) {
-        $your_followers_row = $your_followers_res->fetch_assoc()['count'];
-    }
-
-    $who_youre_following_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE userid = ? LIMIT 1");
-    $who_youre_following_stmt->bind_param("i", $id);
-    $who_youre_following_stmt->execute();
-    $who_youre_following_res = $who_youre_following_stmt->get_result();
-
-    if ($who_youre_following_res->num_rows != 0) {
-        $who_youre_following_row = $who_youre_following_res->fetch_assoc()['count'];
-    }
+    $following_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE userid = ? LIMIT 1");
+    $following_stmt->bind_param("i", $id);
+    $following_stmt->execute();
+    $res = $following_stmt->get_result();
+    $following_count = $res->fetch_assoc()['count'] ?? 0;
 
     $logindata = json_encode([
         'success' => true,
@@ -392,75 +386,24 @@ if (isset($_GET['ajax'])) {
         'pfp' => $current_user->picture,
         'user' => $current_user->username,
         'alert' => $current_user->alert,
+        'is_verified' => empty($current_user->verify_token) ? true : false,
         'stats' => [
-            'followers' => $your_followers_row ?? 0,
-            'following' => $who_youre_following_row ?? 0,
+            'followers' => $followers_count ?? 0,
+            'following' => $following_count ?? 0,
         ]
     ]);
     echo $logindata;
     exit;
 }
 
-if (isset($_GET['ajaxv2'])) {
-    header('Content-type: application/json');
-
-    if (loggedin() && !isset($_GET['userid'])) {
-        $id = $current_user->id;
-    } else {
-        $id = $_GET['userid'] ?? 0;
-
-        if(!isset($_GET['userid'])) {
-            echo json_encode(['error' => 'User is not authenticated or no userid was provided.']);
-            exit;
-        }
-    }
-    $usero = User::getUser($id);
-
-    $your_followers_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE profileid = ? LIMIT 1");
-    $your_followers_stmt->bind_param("i", $id);
-    $your_followers_stmt->execute();
-    $your_followers_res = $your_followers_stmt->get_result();
-
-    if ($your_followers_res->num_rows != 0) {
-        $your_followers_row = $your_followers_res->fetch_assoc()['count'];
-    }
-
-    $who_youre_following_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE userid = ? LIMIT 1");
-    $who_youre_following_stmt->bind_param("i", $id);
-    $who_youre_following_stmt->execute();
-    $who_youre_following_res = $who_youre_following_stmt->get_result();
-
-    if ($who_youre_following_res->num_rows != 0) {
-        $who_youre_following_row = $who_youre_following_res->fetch_assoc()['count'];
-    }
-
-    if(!isset($_GET['userid'])) {
-        $logindata = json_encode([
-            'success' => true,
-            'id' => $usero->id,
-            'pfp' => $usero->picture,
-            'user' => $usero->username,
-            'alert' => $usero->alert,
-            'stats' => [
-                'followers' => $your_followers_row ?? 0,
-                'following' => $who_youre_following_row ?? 0,
-            ]
-        ]);
-    } else {
-        $logindata = json_encode((array)$usero);
-    }
-
-    echo $logindata;
-    exit;
-}
-
 function logout(?bool $redirect = false) {
+    global $conn;
+
     $token_raw = $_SESSION['tokenid'] ?? $_COOKIE['token'] ?? null;
 
     if ($token_raw !== null) {
         $token_hashed = hash('sha256', $token_raw);
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        
+
         if (!$conn->connect_error) {
             $stmt = $conn->prepare("DELETE FROM sessions WHERE id = ? LIMIT 1");
             $stmt->bind_param("s", $token_hashed);
@@ -476,7 +419,7 @@ function logout(?bool $redirect = false) {
     }
 
     if (isset($_COOKIE['token'])) {
-        setcookie('token', '', [ 'expires' => time() - 3600 ]);
+        setcookie('token', '');
         unset($_COOKIE['token']);
     }
 
@@ -488,7 +431,7 @@ function logout(?bool $redirect = false) {
 
 function regenerate_session() {
     require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
-    global $conn, $current_user;
+    global $conn;
 
     if (!loggedin()) {
         return false;
@@ -496,7 +439,6 @@ function regenerate_session() {
 
     $old_token = hash('sha256', $_SESSION['tokenid']);
     $user_ip = $_SERVER['REMOTE_ADDR'];
-    
     $raw_ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
     $user_agent = get_browser_name($raw_ua) . ", " . get_system_name($raw_ua);
 
@@ -518,8 +460,7 @@ function regenerate_session() {
             $stmt_kill->bind_param("s", $old_token);
             $stmt_kill->execute();
             $stmt_kill->close();
-            logout();
-            return false;
+            return logout(true);
         }
 
         if ((int)$stored['remember'] !== 1) {
@@ -534,12 +475,7 @@ function regenerate_session() {
     $new_token = hash('sha256', $new_raw_token);
     $active = (string)time();
 
-    $stmt = $conn->prepare("
-        UPDATE sessions 
-        SET id = ?, timestamp = ?, login_from = ?, user_agent = ? 
-        WHERE id = ? AND remember = 1
-    ");
-    
+    $stmt = $conn->prepare("UPDATE sessions SET id = ?, timestamp = ?, login_from = ?, user_agent = ? WHERE id = ? AND remember = 1");
     if (!$stmt) {
         return false;
     }
@@ -551,7 +487,6 @@ function regenerate_session() {
         $_SESSION['tokenid'] = $new_raw_token;
         return true;
     } else {
-        error_log("mysql error: " . $stmt->error);
         $stmt->close();
         return false;
     }

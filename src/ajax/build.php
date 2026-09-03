@@ -506,6 +506,10 @@ function fetch_build($model_id, $csrf) {
         exit($conn->connect_error);
     }
 
+    if ($conn2->connect_error) {
+        exit($conn2->connect_error);
+    }
+
     if (!is_numeric($model_id)){
         return json_encode([
             "message" => 'Invalid ID provided for creation',
@@ -552,21 +556,22 @@ function fetch_build($model_id, $csrf) {
     $views = $row2['views'];
     $votes = $row2['likes'];
     $decoded_description = $bbcode->toHTML($row2['description'], true, true);
-       
-    if ($conn2->connect_error) {
-        exit($conn2->connect_error);
-    }
+    $name = $bbcode->toHTML($row2['name'] ?? 'Untited creation', true, true);
 
     $row = User::getUser($userid);
     $username = $row->username;
 
+    if (!isset($name) || empty($name)) {
+        $name = $username . "'s creation";
+    }
+
     $did_track = false;
     if(loggedin()) {
-        if(Cookie::analytics_user($conn2, $userid, $current_user->id)) {
+        if(Cookie::analytics_creation($conn2, $userid, $current_user->id, $name)) {
             $did_track = true;
         }
     }
-    
+
     $stmt = $conn2->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
     $stmt->bind_param("s", $userid);
     $stmt->execute();
@@ -656,7 +661,7 @@ function fetch_build($model_id, $csrf) {
         'model' => $row2['model'],
         'description' => $decoded_description,
         'tags' => $model_tags,
-        'name' => htmlspecialchars($row2['name']),
+        'name' => $name,
         'date' => date("F j, Y, g:i a", strtotime($row2['date'])),
         'screenshot' => $row2['screenshot'],
         'views' => $views,
@@ -704,14 +709,14 @@ function fetch_comments($model_id, $csrf) {
     $model_id = (int)$model_id;
     $id = loggedin() ? (int)$current_user->id : 0;
 
-    if($current_user->admin !== true) {
+    if(loggedin() && $current_user->admin !== true) {
 	    $sql = "SELECT * FROM comments WHERE model = $model_id AND hidden = 0 ORDER BY id ASC";
     } else {
         $sql = "SELECT * FROM comments WHERE model = $model_id ORDER BY id ASC";
     }
 
     $result = $conn->query("SELECT * FROM model WHERE id = '$model_id' AND removed = 0");
-    if($result->num_rows === 0 && $current_user->admin != true) {
+    if($result->num_rows === 0 && (loggedin() && $current_user->admin != true)) {
         return;
     }
 
@@ -914,6 +919,12 @@ if(isset($_POST['comment'])) {
         $result = $stmtCountGet->get_result();
         $reply_count = $result->fetch_assoc()['replies'];
 
+        $stmtFavsGet = $conn->prepare("SELECT votes FROM comments WHERE id = ? AND hidden = 0");
+        $stmtFavsGet->bind_param("i", $last_id);
+        $stmtFavsGet->execute();
+        $result = $stmtFavsGet->get_result();
+        $favs_count = $result->fetch_assoc()['votes']; //the rare case that someone favorites a comment right after publish. it is (technically) possible.
+
         $notifications = new Notifications($conn2);
         $notifications->subscribe($id, 'comment', $model_id);
         $notifications->subscribe($id, 'comment_reply', $last_id);
@@ -937,7 +948,8 @@ if(isset($_POST['comment'])) {
                 'parent' => $parent,
                 'picture' => $current_user->picture,
                 'date' => time_ago(date('Y-m-d H:i:s', $date)),
-                'replies' => $reply_count
+                'replies' => $reply_count,
+                'favs' => $favs_count
             ],
         ]);
         exit;

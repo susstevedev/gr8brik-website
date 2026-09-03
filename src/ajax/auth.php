@@ -100,7 +100,7 @@ class AccountManager
 
 		$message = "Hi! Thank you for creating an account.\n\nPlease click the link below to verify your email address:\n\n";
 		$message .= $protocol . $_SERVER['HTTP_HOST'] . "/acc/verify.php?code=" . $token . "\n\n";
-		$message .= 'Note: if you didn\'t request this email, ignore this email. If you didn\'t create this account, email us back and we\'ll delete it.';
+		$message .= 'Note: if you didn\'t request this email, ignore it. If you didn\'t create this account, email us back and we\'ll delete it.';
 
 		$mail = new \PHPMailer\PHPMailer\PHPMailer(true);
 
@@ -118,6 +118,43 @@ class AccountManager
 			$mail->addAddress($email);
 
 			$mail->Subject = "Email verification";
+			$mail->Body = $message;
+
+			$mail->send();
+			return true;
+		} catch (\PHPMailer\PHPMailer\Exception $e) {
+			error_log($mail->ErrorInfo);
+			return false;
+		}
+	}
+
+    public static function send_reset_email(string $token, string $email) {
+		require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/phpmailer/Exception.php';
+		require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/phpmailer/PHPMailer.php';
+		require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/phpmailer/SMTP.php';
+
+		$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
+
+		$message = "Hi! You recently requested that your password be reset.\n\nPlease click the link below to reset your password:\n\n";
+		$message .= $protocol . $_SERVER['HTTP_HOST'] . "/acc/reset_pwd.php?code=" . $token . "\n\n";
+		$message .= 'Note: if you didn\'t request this email, ignore it. If you didn\'t create this account, email us back and we\'ll delete it.';
+
+		$mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+
+		try {
+			$mail->isSMTP();
+
+			$mail->Host = 'smtp.gmail.com';
+			$mail->SMTPAuth = true;
+			$mail->Username = GMAIL_USER;
+			$mail->Password = GMAIL_APP_PWD;
+			$mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+			$mail->Port = 587;
+
+			$mail->setFrom(DB_MAIL);
+			$mail->addAddress($email);
+
+			$mail->Subject = "Reset password";
 			$mail->Body = $message;
 
 			$mail->send();
@@ -448,7 +485,7 @@ class AccountManager
                 'deactive' => null
             ];
 
-            //self::send_verify_email($token_raw, $email, $username);
+            self::send_verify_email($token_raw, $email, $username);
             return $this->login_final($conn, $row, 1);
         }
     }
@@ -539,7 +576,7 @@ class AccountManager
                 'deactive' => null
             ];
 
-            //self::send_verify_email($token_raw, $email, $username);
+            self::send_verify_email($token_raw, $email, $username);
             return $this->login_final($conn, $row, 1);
         }
     }
@@ -598,17 +635,138 @@ class AccountManager
             return ['success' => true];
         }
     }
+
+    public function forgot_pwd(mysqli $conn, string $email) {
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return ['error' => "Invalid email address format"];
+        }
+
+        if ($email) {
+            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND verify_token IS NULL");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $user = $result->fetch_assoc();
+            $stmt->close();
+
+            if ($user) {                    
+                $stmt = $conn->prepare("DELETE FROM pwd_resets WHERE email = ?");
+                $stmt->bind_param("s", $email);
+                $stmt->execute();
+                $stmt->close();
+
+                $token = bin2hex(random_bytes(32)); 
+                $token_hash = hash('sha256', $token);
+                $expiry = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+                $stmt = $conn->prepare("INSERT INTO pwd_resets (email, token, expires) VALUES (?, ?, ?)");
+                $stmt->bind_param("sss", $email, $token_hash, $expiry);
+                $stmt->execute();
+                $stmt->close();
+
+                self::send_reset_email($token, $email);
+            }
+        }
+        return ['success' => true, 'message' => 'If an account with that email exists, a reset link has been sent.'];
+    }
+
+    public function reset_pwd(mysqli $conn, string $token) {
+        if (empty($token)) {
+            return ['success' => false, 'error' => 'Invalid token'];
+        }
+
+        $hash = hash('sha256', $token);
+
+        $stmt = $conn->prepare("SELECT email FROM pwd_resets WHERE token = ? AND expires > NOW()");
+        $stmt->bind_param("s", $hash);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        $stmt->close();
+
+        if (!$row) {
+            return ['success' => false, 'error' => 'Invalid token'];
+        }
+
+        return ['success' => true, 'email' => $row['email']];
+    }
+
+    public function change_pwd(mysqli $conn, string $pwd, string $token) {
+        $token_check = self::reset_pwd($conn, $token);
+        if (!$token_check['success']) {
+            return ['success' => false, 'error' => "Invalid reset token"];
+        }
+        $email = $token_check['email'];
+
+        if (strlen($pwd) < 8) {
+            return ['success' => false, 'error' => 'Password must be at least 8 characters long'];
+        }
+
+        $stmt = $conn->prepare("SELECT password FROM users WHERE email = ? AND deactive IS NULL");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $hash = $result->fetch_assoc()['password'] ?? null;
+        $stmt->close();
+
+        if ($hash && self::reset_pwd($conn, $token)) {
+            $new = password_hash($pwd, PASSWORD_DEFAULT);
+            $stmt = $conn->prepare("UPDATE users SET password = ?, salt = NULL WHERE email = ?");
+            $stmt->bind_param("ss", $new, $email);
+
+            if ($stmt->execute()) {
+                $stmt->close();
+
+                $stmt = $conn->prepare("DELETE FROM pwd_resets WHERE email = ?");
+                $stmt->bind_param("s", $email);
+                $stmt->execute();
+                $stmt->close();
+
+                return ['success' => true, 'message' => 'Your password was updated successfully.'];
+            } else {
+                return ['success' => false, 'error' => "An unknown error occured while changing password."];
+            }
+        } else {
+            return ['success' => false, 'error' => "User not found"];
+        }
+    }
 }
 
 if (isset($_POST['login'])) {
     $accManager = new AccountManager();
-    echo json_encode($accManager->login_user($_POST['mail'], $_POST['pwd'], $_POST['remember']));
+
+    $identifier = $_POST['mail'] ?? null;
+    $pwd = $_POST['pwd'] ?? null;
+    $remember = $_POST['remember'] ?? null;
+
+    echo json_encode($accManager->login_user($identifier, $pwd, $remember));
     exit;
 }
 
 if (isset($_POST['register'])) {
     $accManager = new AccountManager();
-    echo json_encode($accManager->register_user(htmlspecialchars($_POST['name']), htmlspecialchars($_POST['pwd']), htmlspecialchars($_POST['mail'])));
+
+    $username = $_POST['name'] ?? null;
+    $pwd = $_POST['pwd'] ?? null;
+    $mail = $_POST['mail'] ?? null;
+
+    echo json_encode($accManager->register_user($username, $pwd, $mail));
+    exit;
+}
+
+if (isset($_POST['forgot_pwd'])) {
+    $accManager = new AccountManager();
+    $mail = isset($_POST['mail']) ? $_POST['mail'] : null;
+    echo json_encode($accManager->forgot_pwd($conn, $mail));
+    exit;
+}
+
+if (isset($_POST['change_pwd'])) {
+    $accManager = new AccountManager();
+    $token = isset($_POST['token']) ? $_POST['token'] : null;
+    $pwd = isset($_POST['pwd']) ? $_POST['pwd'] : null;
+
+    echo json_encode($accManager->change_pwd($conn, $pwd, $token));
     exit;
 }
 
