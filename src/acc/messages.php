@@ -1,8 +1,14 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
+$bbcode = new BBCode;
+
 if (loggedin()) {
     $id = $current_user->id;
+} else {
+    header('Location: login.php');
 }
 
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
@@ -31,37 +37,43 @@ if (isset($_GET['group'])) {
             exit;
         }
 
-        $result2 = $conn->query("SELECT id, username, picture FROM users WHERE id IN ($userid, $profileid)");
+        $result2 = $conn->query("SELECT id, username, picture, age FROM users WHERE id IN ($userid, $profileid) AND deactive IS NULL");
         $username1 = $picture1 = $username2 = $picture2 = '';
 
         while ($row2 = $result2->fetch_assoc()) {
             if ((int)$row2['id'] === (int)$userid) {
                 $username1 = $row2['username'];
                 $picture1 = $row2['picture'];
+                $joined1 = $row2['age'];
             }
             if ((int)$row2['id'] === (int)$profileid) {
                 $username2 = $row2['username'];
                 $picture2 = $row2['picture'];
+                $joined2 = $row2['age'];
             }
         }
 
         //Simple logic to display the opposite users name
         if ((int)$id === (int)$userid) {
             $group_user = $username2;
-            $group_picture = $picture2;
+            $group_picture = $picture2 ?? '/img/no_image.png';
+            $group_joined = 'Joined ' . time_ago($joined2);
         } elseif ((int)$id === (int)$profileid) {
             $group_user = $username1;
-            $group_picture = $picture1;
+            $group_picture = $picture1 ?? '/img/no_image.png';
+            $group_joined = 'Joined ' . time_ago($joined1);
         }
 
         header("HTTP/1.0 200 OK");
         $data[] = [
             'success' => true,
-            'user1' => '@' . htmlspecialchars(strtolower($username1)),
-            'user2' => '@' . htmlspecialchars(strtolower($username2)),
+            'user1' => '@' . htmlspecialchars($username1),
+            'user2' => '@' . htmlspecialchars($username2),
             'user' => htmlspecialchars($group_user),
             'picture' => '<img src="' . htmlspecialchars($group_picture) . '" class="w3-round" width="50px" height="50px">',
+            'pictureurl' => $group_picture,
             'id' => $row['id'],
+            'joined' => $group_joined,
         ];
     }
 
@@ -81,7 +93,7 @@ if ((isset($_GET['message']))) {
         $id = $row['id'];
         $group = $row['groupid'];
         $userid = $row['userid'];
-        $post = $row['message'];
+        $post = $bbcode->toHTML($row['message'], true, true);
         $timestamp = $row['timestamp'];
 
         $message = htmlentities($message, ENT_QUOTES, 'UTF-8');
@@ -92,7 +104,7 @@ if ((isset($_GET['message']))) {
             exit;
         }
 
-        $sql = "SELECT * FROM users WHERE id = $userid";
+        $sql = "SELECT * FROM users WHERE id = $userid AND deactive IS NULL";
         $result2 = $conn->query($sql);
         $row2 = $result2->fetch_assoc();
         $username = $row2['username'];
@@ -109,7 +121,7 @@ if ((isset($_GET['message']))) {
             'success' => true,
             'id' => $id,
             'groupid' => $group,
-            'user' => '@' . htmlspecialchars(strtolower($username)),
+            'user' => '@' . htmlspecialchars($username),
             'message' => $post,
             'color' => $p_color,
             'timestamp' => time_ago(date('Y-m-d H:i:s', $timestamp)),
@@ -130,12 +142,20 @@ if (isset($_POST['comment'])) {
         exit($conn2->connect_error);
     }
 
-    if ($comment === "" || $comment === null) {
+    if ($comment === "" || $comment === null || empty($comment)) {
         echo json_encode(['success' => false, 'error' => "Message shall contain text."]);
         exit;
     }
 
-    $groupid = $_POST['groupid'];
+    $groupid = (int)$_POST['groupid'];
+
+    $sql = "SELECT * FROM message_group WHERE id = $groupid";
+    $result = $conn->query($sql);
+
+    if($result->num_rows === 0){
+        echo json_encode(['success' => false, 'error' => "No group with this Id exists. It may have been deleted by a platform admin."]);
+        exit;
+    }
 
     $date = time();
     $sql = "INSERT INTO direct_message (userid, groupid, message, timestamp) VALUES (?, ?, ?, ?)";
@@ -146,6 +166,13 @@ if (isset($_POST['comment'])) {
         echo json_encode(['success' => false, 'error' => "An error has occured. Please try again later."]);
         exit;
     } else {
+        $notifications = new Notifications($conn2);
+
+        if(!$notifications->is_subscriber('direct_message', $groupid, $id)) {
+            $notifications->subscribe($id, 'direct_message', $groupid);
+        }
+
+	    $notifications->notify_subscribers('direct_message', $groupid, $id);
         $stmt2->close();
         echo json_encode(['success' => true]);
         exit;
@@ -171,7 +198,7 @@ if (isset($_POST['group_create'])) {
         exit;
     }
 
-    $result = $conn2->query("SELECT * FROM users WHERE username = '$comment'");
+    $result = $conn2->query("SELECT * FROM users WHERE username = '$comment' AND deactive IS NULL");
     if ($result->num_rows === 0) {
         echo json_encode(['success' => false, 'error' => "User not found"]);
         exit;
@@ -217,14 +244,20 @@ if (isset($_POST['group_create'])) {
 
     $sql = "INSERT INTO message_group (userid, profileid) VALUES (?, ?)";
     $stmt2 = $conn2->prepare($sql);
-    $stmt2->bind_param("ii", $id, $profileid);
+    $stmt2->bind_param("ii", $user_one, $user_two);
 
     if (!$stmt2->execute()) {
         echo json_encode(['success' => false, 'error' => "An error has occured. Please try again later."]);
         exit;
     } else {
+        $groupid = $conn2->insert_id;
+        $notifications = new Notifications($conn2);
+
+        $notifications->subscribe($user_one, 'direct_message', $groupid);
+        $notifications->subscribe($user_two, 'direct_message', $groupid);
+
         $stmt2->close();
-        echo json_encode(['success' => true]);
+        echo json_encode(['success' => true, 'groupid' => $groupid]);
         exit;
     }
 }
@@ -267,8 +300,9 @@ if (isset($_POST['group_create'])) {
                         let res2 = JSON.parse(res);
 
                         groups = res2.map(group => `
-                            <div class='w3-light-grey w3-padding-small w3-text-black w3-hover-green' style="cursor:pointer;" id="${group.id}" onclick='load_message(${group.id})'>
-                                <p>${group.picture} - ${group.user}</p>
+                            <div class='w3-light-grey w3-padding-small w3-round w3-text-black w3-hover-grey' style="cursor:pointer;" id="${group.id}" onclick='load_message(${group.id})'>
+                                <p><img src="${group.pictureurl}" class="w3-circle" width="50px" height="50px"> ${group.user}</p>
+                                <p class="w3-text-grey">${group.joined}</p>
                             </div><br />
                         `);
                         $("#groups").append(groups).fadeIn();
@@ -296,17 +330,17 @@ if (isset($_POST['group_create'])) {
                         let form = `
                         <div id="comment-form w3-half">
                         	<div id="post">
-                            	<textarea name="comment-box" id="comment-box" class="w3-input w3-hover-shadow" placeholder="Message..." rows="auto" cols="40"></textarea>
+                            	<textarea name="comment-box" id="comment-box" class="w3-input w3-hover-light-grey" placeholder="Message... (bbcode supported)" rows="auto" cols="40"></textarea>
                         	</div>
-                        	<button id="post-comment" class="w3-btn w3-blue w3-hover-shadow w3-padding-small w3-border">
+                        	<button id="post-comment" class="w3-btn w3-blue w3-hover-light-grey w3-padding-small w3-border">
                         		<span>Send</span>
                         	</button></div>
                         `;
 
                         if (res2) {
                             messages = res2.map(message => `
-                            	<div style="background-color: ${message.color}; color: #000;" class='w3-padding-small w3-margin-bottom w3-margin-top w3-card-2' id="${message.id}">
-                                	<p>${message.user} ${message.timestamp}</p>
+                            	<div style="background-color: ${message.color}; color: #000;" class='w3-padding-small w3-round w3-margin-bottom w3-margin-top w3-card-2' id="${message.id}">
+                                	<p><a href="/${message.user}">${message.user}</a> sent ${message.timestamp}</p>
                                 	<p>${message.message}</p>
                             	</div>
                         	`);
@@ -342,7 +376,9 @@ if (isset($_POST['group_create'])) {
                     },
                     success: function(response) {
                         if (response.success) {
-                            window.location.reload();
+                            var url = new URL(window.location.href);
+                            url.searchParams.set("m", groupid);
+                            window.location.href = url;
                         } else {
                             commentBtnText.html('Send');
                             btn.prop("disabled", false);
@@ -376,8 +412,9 @@ if (isset($_POST['group_create'])) {
                     },
                     success: function(response) {
                         if (response.success) {
-                            alert('Message sent');
-                            window.location.reload();
+                            var url = new URL(window.location.href);
+                            url.searchParams.set("m", response.groupid);
+                            window.location.href = url;
                         } else {
                             commentBtnText.html('Send');
                             btn.prop("disabled", false);
@@ -393,6 +430,13 @@ if (isset($_POST['group_create'])) {
                     }
                 });
             }
+
+            var url = new URL(window.location.href);
+            var message = url.searchParams.get("m");
+
+            if(message) {
+                load_message(message);
+            }
         });
     </script>
 
@@ -400,9 +444,9 @@ if (isset($_POST['group_create'])) {
         <div class="w3-third" id="groups" style="display:none">
             <div id="group-form">
                 <div id="post">
-                    <textarea name="direct-box" id="direct-box" class="w3-input w3-hover-shadow" placeholder="Username" rows="auto" cols="40"></textarea>
+                    <input name="direct-box" id="direct-box" class="w3-input w3-hover-light-grey" placeholder="Username" rows="auto" cols="40" />
                 </div>
-                <button id="group_create" onclick="create_group();" class="w3-btn w3-blue w3-hover-shadow w3-padding-small w3-border">
+                <button id="group_create" onclick="create_group();" class="w3-btn w3-blue w3-hover-light-grey w3-padding-small w3-border">
                     <span>Message user</span>
                 </button>
             </div><br />

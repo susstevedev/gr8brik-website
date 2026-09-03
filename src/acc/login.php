@@ -98,18 +98,21 @@ if (loggedin()) {
         </div>
     </div>
 
-    <div id="error" style="display: none;" class="w3-red w3-card-2 w3-padding-small w3-round-small"><span class="fa fa-times-circle-o" aria-hidden="true"></span>&nbsp;<span id="error-text"></span></div>
+    <div id="error" style="display: none;" class="login-input w3-red w3-card-2 w3-padding w3-round"><span class="fa fa-times-circle-o" aria-hidden="true"></span>&nbsp;<span id="error-text"></span></div>
     <div id="welcome-large">
         <h2>Login</h2>
     </div>
     <div id="loginForm" class="w3-container">
-        <span>Don't have an account? <a href="register">Register</a></span><br />
+        <p>Don't have an account? <a href="register">Register</a></p>
+
+        <p><input class="login-input w3-input w3-border" type="email" name="mail" size="50px" placeholder="Email or username"></p>
+        <p><a href="forgot_pwd">Forgot password?</a></p>
+        <p><input class="login-input w3-input w3-border" type="password" name="pwd" size="50px" placeholder="Password"></p>
         
-        <p><input class="login-input w3-border" type="email" name="mail" size="50px" placeholder="Email or username"></p>
-        <p><input class="login-input w3-border" type="password" name="pwd" size="50px" placeholder="Password"></p>
-        
-        <input type="checkbox" name="remember">
-		<label for="remember">Remember my session</label><br />
+        <p>
+            <input type="checkbox" name="remember">
+		    <label for="remember">Remember me</label>
+        </p>
 
         <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="loginBtn" name="login">Login</button>
     </div>

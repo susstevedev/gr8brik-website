@@ -77,9 +77,9 @@ $combinedString = $utils->generateRandomScreenName();
     <h2>Register Account</h2>
     <div id="loginForm" class="w3-container">
         <p>Already have an account? <a href="login">Login</a></p>
-        <p><input class="w3-border" value="<?php echo $combinedString; ?>" type="text" name="name" size="50px" placeholder="Unique username that is under 15 characters long"></p>
-        <p><input class="w3-border" type="email" name="mail" size="50px" placeholder="Email address"></p>
-        <p><input class="w3-border" type="password" name="pwd" size="50px" placeholder="Password that is at least 8 characters long"></p>
+        <p><input class="login-input w3-input w3-border" value="<?php echo $combinedString; ?>" type="text" name="name" size="50px" placeholder="Unique username that is under 15 characters long"></p>
+        <p><input class="login-input w3-input w3-border" type="email" name="mail" size="50px" placeholder="Email address"></p>
+        <p><input class="login-input w3-input w3-border" type="password" name="pwd" size="50px" placeholder="Password that is at least 8 characters long"></p>
         
         <p>By registering, you are agreeing:</p>
         <ul>
@@ -95,6 +95,7 @@ $combinedString = $utils->generateRandomScreenName();
     <p>Or...</p>
     <div id="sso" class="w3-container">
         <a href="/ajax/auth.php?authtype=github" class="w3-btn w3-round w3-padding-small w3-white w3-hover-light-grey w3-border w3-border-grey" id="github" name="github"><i class="fa fa-github-square" aria-hidden="true"></i> Register with github</a>
+        <a href="/ajax/auth.php?authtype=google" class="w3-btn w3-round w3-padding-small w3-white w3-hover-light-grey w3-border w3-border-grey" id="google" name="google"><i class="fa fa-google" aria-hidden="true"></i> Register with google</a>
     </div>
 
     <?php include '../linkbar.php' ?>
