@@ -33,5 +33,29 @@ The Gr8brik website's source code (updated every couple of weeks)
 | Privacy Policy             | `/privacy.php`      | [`/privacy.php`](/src/info/privacy.php)                |
 | Rules/Community guidelines | `/topic/17`         | N/A                                                    |
 
+# Setup
+## Constants file ([`/ajax/constants/constants.php`](/src/ajax/constants/constants.php))
+
+```
+<?php
+  define('DB_NAME', 'membership');
+  define('DB_NAME2', 'creations');
+  define('DB_NAME3', 'forum');
+  define('DB_MAIL', 'me@mymailserver.com');
+  define('MODEL_STORAGE_LIMIT', 50 * 1024 * 1024);
+  define('DB_SERVER', 'localhost:3000');
+  define('DB_USER', 'my_mysql_user');
+  define('DB_PASSWORD', 'my_mysql_pwd');
+  
+  //all after this are optional but required for oauth and mail
+  define('GMAIL_APP_PWD', 'my_gmail_app_pwd');
+  define('GOOGLE_CLIENT_ID', 'my_google_oauth_client_id');
+  define('GOOGLE_CLIENT_SECRET', 'super-secret-google');
+  define('GMAIL_USER', 'mygmailoremailwithgoogle@gmail.com');
+  define('GITHUB_CLIENT_ID', 'my_github_oauth_client_id');
+  define('GITHUB_CLIENT_PWD', 'super-secret-github');
+?>
+```
+
 ## Disclaimer
 For privacy reasons, user data is not included in this repository.
