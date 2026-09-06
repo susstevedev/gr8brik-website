@@ -87,6 +87,34 @@
 
 				container.find('.delete').toggleClass('w3-hide');
 			});
+
+			$(document).on('submit', '#commentboxcontainer', function(event) {
+				event.preventDefault();
+				let newText = $('textarea[name="commentbox"]').val().trim();
+
+				if(newText === "") {
+					alert("Reply cannot be empty");
+					return;
+				}
+
+				$.ajax({
+					url: '',
+					type: 'POST',
+					data: {
+						comment: true,
+						commentbox: newText
+					},
+					dataType: 'json',
+					success: function(response) {
+						if(response.success && response.id) {
+							window.location.hash = 'comment-' + response.id;
+							window.location.reload();
+						} else {
+							alert(response.message || "Error updating message.");
+						}
+					}
+				});
+			});
 		});
 	});
 })();

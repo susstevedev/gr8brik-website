@@ -23,16 +23,18 @@
                 } else {
                     followedBy = "nobody you know";
                 }
+
                 $("#followedby-wrapper").html(`Followed by ${followedBy}`);
-                $("#followedby-wrapper").css({
-                    "display": "inline",
-                    "font-size": "15px",
-                    "text-shadow": "0px 0px 0px #fff"
-                })
+                $("#followedby-wrapper").css({"display": "inline","font-size": "15px","text-shadow": "0px 0px 0px #fff"});
             },
-            error: function (jqXHR, textStatus, errorThrown) {
-                var response = JSON.parse(jqXHR.responseText);
-                console.error('Server status code: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
+            error: function (xhr, text, err) {
+                console.error(xhr.status + ' ' + err);
+                if(xhr.status !== 401) {
+                    $("#followedby-wrapper").html('[server error while getting followed users]');
+                } else {
+                    $("#followedby-wrapper").html('Please login to view followed users');
+                }
+                $("#followedby-wrapper").css({"display": "inline","font-size": "15px","text-shadow": "0px 0px 0px #fff"});
             }
         });
 
@@ -46,8 +48,6 @@
                 data: { getUserBuilds: true, userid: userid, page: page },
                 dataType: "json",
                 success: function (response) {
-                    window.pages.c = page;
-
                     let elm = $('#creationstab div')
                     elm.children().not('#gr8-creation-template').remove();
 
@@ -126,8 +126,6 @@
                 data: { getUserForums: true, userid: userid, page: page },
                 dataType: "json",
                 success: function (response) {
-                    window.pages.f = page;
-
                     var elm = $('#poststab .w3-row')
                     elm.children().not('#gr8-posts-template').remove();
 
@@ -142,6 +140,7 @@
                             $clone.find(".link-name").attr("href", "/topic/" + r.id);
 
                             elm.append($clone);
+                            window.mode();
                         });
                     } else if (response.posts === null) {
                         $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div><br />`).appendTo(elm);
@@ -165,8 +164,6 @@
                 data: { getUserComments: true, userid: userid, page: page },
                 dataType: "json",
                 success: function (response) {
-                    window.pages.r = page;
-
                     var elm = $('#commentstab .w3-row')
                     elm.children().not('#gr8-comment-template').remove();
 
@@ -189,6 +186,7 @@
                             }
 
                             elm.append($clone);
+                            window.mode();
                         });
                     } else if (response.comments === null) {
                         $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div><br />`).appendTo(elm);
@@ -204,7 +202,6 @@
                 }
             });
         }
-
 
         $("#reportForm").submit(function (e) {
             e.preventDefault();
@@ -248,14 +245,10 @@
             });
         });
 
-        window.pages.c = 1;
-        window.pages.f = 1;
-        window.pages.r = 1;
-
         var tabPages = {
-            '#creationstab': { page: parseInt(window.pages.c), fetch: getUserBuilds },
-            '#commentstab': { page: parseInt(window.pages.r), fetch: getUserComments },
-            '#poststab': { page: parseInt(window.pages.f), fetch: getUserForums }
+            '#creationstab': { page: 1, fetch: getUserBuilds },
+            '#commentstab': { page: 1, fetch: getUserComments },
+            '#poststab': { page: 1, fetch: getUserForums }
         };
 
         $(".foward-button, .back-button").on("click", function () {

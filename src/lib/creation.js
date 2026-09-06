@@ -414,7 +414,12 @@
             $clone.attr('id', 'comment' + comment.id);
 
             $("#comment-count").text(comment.replies);
-            elm.after($clone);
+
+            if(depth > 0) {
+                elm.after($clone);
+            } else {
+                elm.children().last().after($clone);
+            }
         }
 
         $("#comment-form").on("focusin focusout", function(event) {
