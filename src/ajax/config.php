@@ -17,6 +17,7 @@ ini_set('display_errors', '1');
 
 // constants
 require_once 'constants.php';
+require_once 'ipban.php';
 require_once 'what_browser.php';
 
 class SessHandler implements SessionHandlerInterface {
@@ -25,7 +26,7 @@ class SessHandler implements SessionHandlerInterface {
     private string $dbUser;
     private string $dbPassword;
     private string $dbName;
-    private ?int $userId = null;
+    private mixed $userId = null;
 
     public function __construct(string $server, string $user, string $password, string $name) {
         $this->dbServer = $server;
@@ -34,8 +35,8 @@ class SessHandler implements SessionHandlerInterface {
         $this->dbName = $name;
     }
 
-    public function user(?int $user): void {
-        $this->userId = $user;
+    public function user(mixed $user): void {
+        $this->userId = $user ?? null;
     }
 
     public function open($save_path, $session_name):bool {
@@ -55,7 +56,8 @@ class SessHandler implements SessionHandlerInterface {
     }
 
     public function read($id):string {
-        $stmt = $this->db->query("SELECT data FROM php_sessions WHERE id = '$id'");
+        $id = hash('sha256', $id);
+        $stmt = $this->db->query("SELECT data FROM php_sessions WHERE id = '$id' AND active = 1");
         $row = $stmt->fetch_assoc();
 
         if($row) {
@@ -68,16 +70,27 @@ class SessHandler implements SessionHandlerInterface {
     }
 
     public function write($id, $data):bool {
-        $time = time();
-        $ip = $_SERVER['REMOTE_ADDR'] ?? null;
-        $useragent = UA ?? null; //UA is defined in what_browser.php
+        $id = hash('sha256', $id);
+        $ip = $_SERVER['REMOTE_ADDR'];
+        $useragent = UA; //UA is defined in what_browser.php
         $userid = $this->userId;
-        $stmt = $this->db->query("REPLACE INTO php_sessions (id, data, timestamp, ip, ua, userid) VALUES ('$id', '$data', '$time', '$ip', '$useragent', '$userid')");
+        $timestamp = time();
+        $stmt = $this->db->query("
+            INSERT INTO php_sessions (id, data, timestamp, ip, ua, userid, active) 
+            VALUES ('$id', '$data', '$timestamp', '$ip', '$useragent', '$userid', 1)
+            ON DUPLICATE KEY UPDATE
+                data = IF(active = 1, VALUES(data), data),
+                timestamp = IF(active = 1, VALUES(timestamp), timestamp),
+                ip = IF(active = 1, VALUES(ip), ip),
+                ua = IF(active = 1, VALUES(ua), ua),
+                userid = IF(active = 1, VALUES(userid), userid)
+        ");
         return $stmt;
     }
 
     public function destroy($id):bool {
-        $stmt = $this->db->query("DELETE FROM php_sessions WHERE id = '$id'");
+        $id = hash('sha256', $id);
+        $stmt = $this->db->query("DELETE FROM php_sessions WHERE id = '$id' AND active = 1");
         return $stmt;
     }
 
@@ -108,31 +121,55 @@ if (!isset($_SESSION['requests'])) {
     $_SESSION['requests'] = [];
 }
 
-$_SESSION['requests'] = array_filter($_SESSION['requests'], function ($timestamp) {
-    return $timestamp > time() - 60;
+$_SESSION['requests'] = array_filter($_SESSION['requests'] ?? [], function ($timestamp) {
+    return $timestamp > time() - 80;
 });
 
-if (count($_SESSION['requests']) >= 60) {
+$_SESSION['requests'][] = time();
+$requests = count($_SESSION['requests']);
+
+if ($requests >= 50) {
+    if ($requests >= 80) {
+        $db = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
+        if (!$db->connect_error) {
+            $ipbano = new IpBans($db);
+            $ban = $ipbano->getBan();
+            $ipbano->displayBan($ban);
+        }
+
+        if (!$db->connect_error) {
+            $ip = $_SERVER['REMOTE_ADDR'];
+            $date = date("Y-m-d H:i:s");
+            $until = date('Y-m-d H:i:s', strtotime('+1 hour'));
+            $reason = "IP banned for one hour due to spam.";
+
+            $block = $db->prepare("INSERT INTO ip_bans (ip, ban_at, ban_until, reason) VALUES (?, ?, ?, ?)");
+            $block->bind_param("ssss", $ip, $date, $until, $reason);
+            $block->execute();
+            $block->close();
+            $db->close();
+        }
+    }
+
     $oldest = min($_SESSION['requests']);
-    $remaining = 60 - (time() - $oldest);
-    $requests = $_SESSION['requests'];
+    $remaining = max(1, 80 - (time() - $oldest)); 
     $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
     $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
-
-    $isJson = (stripos($contentType, 'application/json') !== false) || (stripos($accept, 'application/json') !== false);
+    $json = (stripos($contentType, 'application/json') !== false) || (stripos($accept, 'application/json') !== false);
 
     http_response_code(429);
     header("Retry-After: " . $remaining);
-    if (!$isJson) {
-        echo 'You are sending too many requests. Please wait ' .  $remaining . ' seconds.';
+    $message = 'You are sending too many requests. Please wait ' . $remaining . ' seconds. All: ' . $requests;
+
+    if (!$json) {
+        echo $message;
     } else {
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => 'You are sending too many requests. Please wait ' .  $remaining . ' seconds.']);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => $message, 'message' => $message, 'success' => false, 'code' => '429']);
     }
     exit;
 }
-
-$_SESSION['requests'][] = time();
 
 if (!isset($_SESSION['csrf']) || !isset($_SESSION['csrf_last_updated']) || $_SESSION['csrf_last_updated'] - time() >= 5) {
     $_SESSION['csrf'] = bin2hex(random_bytes(32));
@@ -141,74 +178,13 @@ if (!isset($_SESSION['csrf']) || !isset($_SESSION['csrf_last_updated']) || $_SES
 
 define('csrf', $_SESSION['csrf']);
 
-// ip ban system
-// checks for blacklisted ip address
-function check_blacklisted_ip() {
-    $soft_ver = 'alpha 0.1.2 (06/20/26)';
-    $app_name = 'Gr8Brik';
-    $repo_name = 'susstevedev/ip-ban-system-php';
-    $repo_url = 'https://github.com/susstevedev/ip-ban-system-php';
-    $piko_url = 'https://cdn.jsdelivr.net/npm/@picocss/pico@latest/css/pico.min.css';
-    
-    $db = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if ($db->connect_error) {
-        exit($db->connect_error);
-    }
-    
-    $ip = $_SERVER['REMOTE_ADDR'];
-    
-    if (!isset($_SESSION['country_code']) || !isset($_SESSION['region'])) {
-        $geo_url = 'https://get.geojs.io/v1/ip/geo/' . $ip . '.json';
-        $geo_response = @file_get_contents($geo_url);
-
-        if ($geo_response !== false) {
-            $geo_data = json_decode($geo_response);
-            $_SESSION['country_code'] = isset($geo_data->country_code) ? $geo_data->country_code : 'UNKNOWN';
-            $_SESSION['region'] = isset($geo_data->region) ? $geo_data->region : 'UNKNOWN';
-        } else {
-            $_SESSION['country_code'] = 'UNKNOWN';
-        }
-    }
-
-    $geo_banned = false;
-    $restricted_countries = ['GB', 'AU'];
-	$restricted_states = [
-    	'Connecticut', 'Florida', 'Idaho', 'Louisiana', 
-    	'Mississippi', 'Nebraska', 'Tennessee', 'Utah'
-	];
-
-	if (in_array($_SESSION['country_code'], $restricted_countries, true) || in_array($_SESSION['region'], $restricted_states, true)) {
-        $geo_banned = true;
-        $ban_until = '[unknown]';
-        $ban_at = '[unknown]';
-        $reason = 'Users from a province with "age verification" laws are not allowed to use our services.';
-    } else {
-        $stmt = $db->prepare("SELECT id, ban_at, ban_until, reason FROM ip_bans WHERE ip = ?");
-        $stmt->bind_param("s", $ip);
-        $stmt->execute();
-
-        if ($stmt->num_rows > 0) {
-            $stmt->bind_result($id, $ban_at, $ban_until, $reason);
-            $stmt->fetch();
-            $geo_banned = true;
-        }
-        $stmt->close();
-    }
-    
-    if(isset($id) && isset($ban_until) && $ban_until > date("Y-m-d H:i:s") || $geo_banned === true) {
-        http_response_code(403);
-        echo "<html><head><title>IP address banned - " . $app_name . "</title><link rel='stylesheet' href='" . $piko_url . "'></head>";
-        echo "<body><center><div id='root'><br /><h1>Your IP address has been banned!</h1>";
-        echo "<b>" . $reason . "</b>";
-        echo "<p>Banned at <b>" . $ban_at . "</b>, until <b>" . $ban_until . "</b>.</p>";
-        echo "<p>To get unbanned, you will have to contact <b><a href='mailto:" . DB_MAIL . "'>" . DB_MAIL . "</a></b> and provide the reason you got banned along with why you should be unbanned.</p>";
-        echo "<p>Additionally, you can ask for your account to be deleted.</p>";
-        echo "<p><small><a href='" . $repo_url . "'>" . $repo_name . "</a> " . $soft_ver . ".</small></p>";
-        echo "</div></center></body></html>";
-        exit;
-    }
+$db = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+if ($db->connect_error) {
+    exit($db->connect_error);
 }
-check_blacklisted_ip();
+$ipbano = new IpBans($db);
+$ban = $ipbano->getBan();
+$ipbano->displayBan($ban);
 
 class Cookie {
     public static function controls() {

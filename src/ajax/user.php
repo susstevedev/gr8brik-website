@@ -9,7 +9,7 @@ if(isset($_GET['ajax'])) {
 }
 
 function login() {
-    global $id, $token;
+    global $id;
     if (!loggedin()) {
         return false;
     }
@@ -29,19 +29,17 @@ function login() {
 
     if ($session_res->num_rows <= 0) {
         $session_stmt->close();
-        return logout(true);
+        return logout(false);
     }
 
-    $token = $session_res->fetch_assoc();
-    $session_stmt->close();
-
+    $id = $session_res->fetch_assoc()['user'];
     $_SESSION['tokenid'] = $token_raw;
-    $id = $token['user'];
-    $_SESSION['userid'] = $token['user'];
+    $_SESSION['userid'] = $id;
+
+    $session_stmt->close();
 
     $user = User::getUser($id);
     $user->id = $id;
-
     return $user;
 }
 
@@ -72,8 +70,10 @@ if (loggedin()) {
 
 class User {
     public ?int $id;
+    public ?string $blog_user_id;
     public ?string $email;
     public ?string $github_id;
+    public ?string $google_id;
     public ?string $username;
     public ?string $picture;
     public ?string $banner;
@@ -87,20 +87,16 @@ class User {
     public ?string $deactive;
 
     public function __construct(?array $data = []) {
-        $this->id = $data['id'] ?? 0;
-        $this->github_id = $data['github_id'] ?? null;
-        $this->email = $data['email'] ?? null;
-        $this->username = $data['username'] ?? '[deleted]';
-        $this->picture = $data['picture'] ?? ($this->email ? $this->userGravatar($this->email, 256) : '/img/no_image.png');
-        $this->banner = $data['banner'] ?? null;
-        $this->description = $data['description'] ?? null;
-        $this->twitter = $data['twitter'] ?? null;
-        $this->bsky = $data['bsky'] ?? null;
-        $this->admin = $data['admin'] ?? false;
-        $this->alert = $data['alert'] ?? 0;
-        $this->age = $data['age'] ?? null;
-        $this->verify_token = $data['verify_token'] ?? null;
-        $this->deactive = $data['deactive'] ?? null;
+        $reflect = new ReflectionClass($this);
+        $properties = $reflect->getProperties(ReflectionProperty::IS_PUBLIC);
+
+        foreach ($properties as $property) {
+            $key = $property->getName();
+            $this->$key = $data[$key] ?? null;
+        }
+
+        $this->username ??= '[removed]';
+        $this->picture ??= $this->email ? $this->userGravatar($this->email, 256) : '/img/no_image.png';
     }
 
     public static function isDeleted(?int $id): bool {
@@ -460,7 +456,7 @@ function regenerate_session() {
             $stmt_kill->bind_param("s", $old_token);
             $stmt_kill->execute();
             $stmt_kill->close();
-            return logout(true);
+            return logout(false);
         }
 
         if ((int)$stored['remember'] !== 1) {

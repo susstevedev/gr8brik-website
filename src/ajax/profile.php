@@ -312,6 +312,10 @@ class UserContent {
             return ['success' => false, 'error' => "Database connection failed"];
         }
 
+        if (!loggedin()) {
+            return ['success' => false, 'error' => "Sign in to view creations of a user"];
+        }
+
         $limit = 9;
         $offset = ($page - 1) * $limit;
         $user = User::getUser($userid);
@@ -357,7 +361,6 @@ class UserContent {
         }
 
         if (!loggedin()) {
-            http_response_code(401);
             return ['success' => false, 'error' => "Sign in to view liked creations of a user"];
         }
 
@@ -424,6 +427,10 @@ class UserContent {
         if ($conn_creations->connect_error) {
             echo $conn_creations->connect_error;
             exit;
+        }
+
+        if (!loggedin()) {
+            return ['success' => false, 'error' => "Sign in to view comments of a user"];
         }
 
         $user = User::getUser($userid);
@@ -520,6 +527,10 @@ class UserContent {
         if ($conn_forum->connect_error) {
             echo $conn_forum->connect_error;
             exit;
+        }
+
+        if (!loggedin()) {
+            return ['success' => false, 'error' => "Sign in to forum posts of a user"];
         }
 
         $user = User::getUser($userid);

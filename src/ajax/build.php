@@ -736,13 +736,7 @@ function fetch_comments($model_id, $csrf) {
     if (loggedin() && !empty($rows)) {
         $commentIds = array_map('intval', array_column($rows, 'id'));
         $ids = implode(',', $commentIds);
-
-        $res = $conn->query(
-            "SELECT comment_id
-            FROM comment_votes
-            WHERE user_id = $id
-            AND comment_id IN ($ids)"
-        );
+        $res = $conn->query("SELECT comment_id FROM comment_votes WHERE user_id = $id AND comment_id IN ($ids)");
 
         while ($fav = $res->fetch_assoc()) {
             $fav_ids[(int)$fav['comment_id']] = true;
