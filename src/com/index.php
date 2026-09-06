@@ -14,11 +14,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
         <div class="w3-center">
 		
 			<a href="post">
-                <button class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo">Create a Topic</button>
+                <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Create a Topic</button>
             </a><br /><br />
 			
-            <input value="<?php if (isset($_GET['q'])) { echo $_GET['q']; } ?>" type="text" id="search-input-2" placeholder="search for...">
-            <button id="search-button-2" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo"><i class="fa fa-search" aria-hidden="true"></i></button>
+            <input value="<?php if (isset($_GET['q'])) { echo $_GET['q']; } ?>" type="text" id="search-input-2 w3-input w3-border w3-border-grey" placeholder="search for...">
+            <button id="search-button-2" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-round-small w3-border w3-border-indigo"><i class="fa fa-search" aria-hidden="true"></i></button>
 
             <?php
 			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
@@ -33,9 +33,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                 }
                 $pUp = $page + 1;
 
-                $count_result = $conn->query("SELECT COUNT(*) as post_count FROM messages WHERE parent IS NULL OR parent = 0");
+                $count_result = $conn->query("SELECT COUNT(*) as post_count FROM messages WHERE (parent IS NULL OR parent = 0) AND deleted_at IS NULL");
                 $post_count = $count_result->fetch_assoc()['post_count'];
-                $reply_count_result = $conn->query("SELECT COUNT(*) as post_count FROM messages WHERE parent IS NOT NULL");
+                $reply_count_result = $conn->query("SELECT COUNT(*) as post_count FROM messages WHERE (parent IS NOT NULL OR parent != 0) AND deleted_at IS NULL");
 
                 $stats = array(
                     'post_count' => $post_count,
@@ -48,13 +48,13 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                 <?php
                     echo "<li>" . $stats['post_count'] . " posts</li>";
                     echo "<li>" . $stats['reply_count'] . " replies</li>";
-                    echo "<li>" . $stats['total_pages'] . " total page</li>";
+                    echo "<li>" . $stats['total_pages'] . " total pages</li>";
                     echo "<li>On page " . $page . "</li>";
                 ?>
             </ul>
             
-            <a href="?page=<?php echo $pDown ?>"><button class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo">Back</button></a>
-            <a href="?page=<?php echo $pUp ?>"><button class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo">Foward</button></a><hr />
+            <a href="?page=<?php echo $pDown ?>"><button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button></a>
+            <a href="?page=<?php echo $pUp ?>"><button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button></a><hr />
 
             <script>
             $(document).ready(function() {
@@ -84,9 +84,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
             <br /><table class="gr8-theme w3-table w3-card-2 w3-light-grey" style="color:black;">
             <thead>
                 <tr>
-                    <th>Post</th>
+                    <th>Title</th>
                     <th>Date</th>
-                    <th>User</th>
+                    <th>User name</th>
                     <th>Last post by</th>
                 </tr>
             </thead>
@@ -108,8 +108,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                         $username = $user_row->username;
                   
                         if($last_posted != 0) {
-                          $user_row = User::getUser($last_posted);
-                          $last_post_username = $user_row->username;
+                          $last_post_username = User::getUser($last_posted)->username;
                         } else {
                           $last_posted = $post_user;
                           $last_post_username = $username;
@@ -131,18 +130,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                         }
 
                         echo "<tr><td><a href='/topic/" . $id . "?p=" . $last_page . "'><i class='fa fa-map-pin w3-padding-small w3-text-grey' aria-hidden='true' title='Pinned Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
-                        echo "<td>" . $date . "</td>";
-                        if(User::isDeleted($post_user)) {
-                            echo "<td><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</td>";
-                        } else {
-                            echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
-                        }
-
-                        if(User::isDeleted($last_posted)) {
-                            echo "<td><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</tr>";
-                        } else {
-                            echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";
-                        }
+                        echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
+                        echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
+                        echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></td></tr>";
                     $username = null;
                     $last_post_username = null;
                 }
@@ -166,8 +156,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                     $username = $user_row->username;
                     
                     if($last_posted != 0) {
-                        $user_row = User::getUser($last_posted);
-                        $last_post_username = $user_row->username;
+                        $last_post_username = User::getUser($last_posted)->username;
                     } else {
                       $last_posted = $post_user;
                       $last_post_username = $username;
@@ -189,18 +178,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                     }
 
                     echo "<tr><td><a href='/topic/" . $id . "?p=" . $last_page . "'><i class='fa fa-users w3-padding-small w3-text-grey' aria-hidden='true' title='General Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
-                    echo "<td>" . $date . "</td>";
-                    if(User::isDeleted($post_user)) {
-                        echo "<td><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</td>";
-                    } else {
-                        echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
-                    }
-
-                    if(User::isDeleted($last_posted)) {
-                        echo "<td><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</tr>";
-                    } else {
-                        echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";
-                    }
+                    echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
+                    echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
+                    echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></tr>";
                     $username = null;
                     $last_post_username = null;
                 }
@@ -237,9 +217,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                         $date = date("Y-m-d H:i:s", $date);
 
                         echo "<tr><td><a href='http://blog.gr8brik.rf.gd/t/" . $id . "' target='_blank'><i class='fa fa-pencil-square w3-padding-small w3-text-grey' aria-hidden='true' title='Blog Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
-                        echo "<td>" . $date . "</td>";
-                        echo "<td><i class='fa fa-user' aria-hidden='true'></i>" . htmlspecialchars($username) . "</td></tr>";
-                        $username = '';
+                        echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
+                        echo "<td><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($username) . "</td></tr>";
+                        $username = null;
                 }
 
             ?>

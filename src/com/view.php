@@ -14,7 +14,7 @@ if ($conn->connect_error) {
     exit($conn->connect_error);
 }
 
-$stmt = $conn->prepare("SELECT id, userid, username, title, timestamp, views, status FROM messages WHERE id = ? AND (parent IS NULL OR parent = 0) AND deleted_at IS NULL LIMIT 1");
+$stmt = $conn->prepare("SELECT id, userid, username, title, timestamp, edited, views, status FROM messages WHERE id = ? AND (parent IS NULL OR parent = 0) AND deleted_at IS NULL LIMIT 1");
 $stmt->bind_param("i", $post_id);
 $stmt->execute();
 
@@ -85,7 +85,7 @@ if (isset($_POST['comment_edit'])) {
 		exit;
     }
 
-    $sql = "SELECT userid FROM messages WHERE id = ? AND deleted_at IS NULL AND (parent IS NOT NULL AND parent != 0) LIMIT 1";
+    $sql = "SELECT userid FROM messages WHERE id = ? AND deleted_at IS NULL LIMIT 1";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $commentid);
     $stmt->execute();
@@ -103,7 +103,7 @@ if (isset($_POST['comment_edit'])) {
 		exit;
     }
 
-    if (!$current_user->admin || (int)$mrow['userid'] !== (int)$id) {
+    if ((int)$mrow['userid'] !== (int)$id) {
 		echo json_encode(['success' => false, 'message' => 'You are not allowed to edit this message.']);
 		exit;
     }
@@ -170,14 +170,29 @@ if (isset($_POST['comment_delete'])) {
 }
 
 if (isset($_POST['comment'])) {
-    $comment = $_POST['commentbox'];
+    header('Content-Type: application/json');
+
+    $comment = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
     if ($conn->connect_error) {
-        exit("Connection failed: " . $conn->connect_error);
+        echo json_encode(['success' => false, 'message' => 'Database connection has failed']);
+		exit;
     }
 
     if ($comment === "" || $comment === null) {
-        echo "Message shall contain text.";
-        exit;
+		echo json_encode(['success' => false, 'message' => 'Message shall contain text.']);
+		exit;
+    }
+
+    $stmt = $conn->prepare("SELECT 1 FROM messages WHERE id = ? AND (parent IS NULL OR parent = 0) LIMIT 1");
+    $stmt->bind_param("i", $post_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $mrow = $result->fetch_assoc();
+    $stmt->close();
+
+    if (!$mrow) {
+		echo json_encode(['success' => false, 'message' => 'Message with that ID does not exist.']);
+		exit;
     }
 
     $username = isset($_POST['username']) ? trim($_POST['username']) : null;
@@ -188,7 +203,8 @@ if (isset($_POST['comment'])) {
 
     if (isset($category) && $category == "nolist" && loggedin() === false) {
         if (!$username) {
-            exit('No username provided.');
+            echo json_encode(['success' => false, 'message' => 'No username provided.']);
+		    exit;
         }
 
         $date = date("Y-m-d H:i:s");
@@ -197,7 +213,8 @@ if (isset($_POST['comment'])) {
         $stmt2->bind_param("siss", $username, $post_id, $comment, $date);
     } else {
         if (!$loggedin) {
-            exit('Please login to post messages.');
+            echo json_encode(['success' => false, 'message' => 'You are not logged in.']);
+		    exit;
         }
 
         $date = date("Y-m-d H:i:s");
@@ -207,10 +224,11 @@ if (isset($_POST['comment'])) {
     }
 
     if (!$stmt2->execute()) {
-        echo "An error has occured. Please try again later.";
+        echo json_encode(['success' => false, 'message' => 'An error has occured. Please try again later.']);
         exit;
     }
 
+    $reply_id = $conn->insert_id;
     $stmt2->close();
 
     $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
@@ -230,8 +248,9 @@ if (isset($_POST['comment'])) {
     $notifications->notify_subscribers('forum_reply', $post_id, $id);
 
     $stmt3->close();
-    header('Refresh:0');
-    exit;
+
+    echo json_encode(['success' => true, 'id' => $reply_id ?? null]);
+	exit;
 }
 ?>
 <!DOCTYPE html>
@@ -250,11 +269,8 @@ if (isset($_POST['comment'])) {
     require_once $_SERVER['DOCUMENT_ROOT'] . "/ajax/time.php";
     $bbcode = new BBCode;
 
-    $post_id = htmlspecialchars($_GET['id']);
     $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
-    if ($page < 1) {
-        $page = 1;
-    }
+    $page = $page < 1 ? 1 : (int)$page;
     $limit = 10;
     $offset = ($page - 1) * $limit;
 
@@ -284,28 +300,67 @@ if (isset($_POST['comment'])) {
     <?php
     $sql = "SELECT * FROM messages WHERE (parent = $post_id OR id = $post_id) AND deleted_at IS NULL LIMIT $limit OFFSET $offset";
     $comResult = $conn->query($sql);
+    $rows = [];
+    $blocked = [];
 
     if ($comResult->num_rows > 0) {
         while ($row = $comResult->fetch_assoc()) {
-            $c_user = $row['userid'];
-            $c_comment = $row['content'];
-            $c_date = $row['timestamp'];
+            $rows[] = $row;
+        }
+    }
+
+    if (!empty($rows)) {
+        $userIds = array_column($rows, 'user');
+        $users = User::getUsers($userIds);
+
+        if (loggedin()) {
+            $userId = $current_user->id;
+            $result = $conn2->query("SELECT userid, profileid FROM user_blocks WHERE userid = $userId OR profileid = $userId");
+
+            while ($row = $result->fetch_assoc()) {
+                $block_userid = (int)$row['userid'];
+                $block_profileid = (int)$row['profileid'];
+
+                if ($block_userid === $userId) {
+                    $blocked[$block_profileid]['you_blocked'] = true;
+                }
+
+                if ($block_profileid === $userId) {
+                    $blocked[$userid]['they_blocked'] = true;
+                }
+            }
+        }
+
+        foreach($rows as $row) {
+            $c_user = $row['userid'] ?? null;
+            $c_comment = $row['content'] ?? '[empty]';
+            $c_date = $row['timestamp'] ?? time();
             $decoded_comment = htmlentities($c_comment, ENT_QUOTES, 'UTF-8');
-            $c_edited = $row['edited'];
+            $c_edited = $row['edited'] ?? null;
 
             $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
             if ($conn2->connect_error) {
                 exit($conn2->connect_error);
             }
 
-            $c_user_o = User::getUser($c_user);
+            $c_user_o = $users[$c_user] ?? User::getUser($c_user);
             $c_username = htmlspecialchars($c_user_o->username);
             $isAdmin = $c_user_o->admin === 1 ? "w3-text-red" : "";
             $pfp = $c_user_o->picture;
 
-			if (!User::isDeleted($c_user)) {
+            $c_user_exists = !User::isDeleted($c_user);
+
+			if ($c_user_exists) {
 				$user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user' AND deleted_at IS NULL");
 				$user_post_count = $user_post_count_result->fetch_assoc()['reply_count'] ?? 0;
+
+                if(loggedin()) {
+                    //todo add message for if you are also blocking
+                    //not that hard will probably be done soon
+                    if ($blocked[$c_user]['they_blocked'] ?? false) {
+                        continue;
+                    }
+                }
 			}
 
     ?>
@@ -313,13 +368,13 @@ if (isset($_POST['comment'])) {
             <div id="comment-<?php echo $row['id'] ?>" class="reply w3-row" style="display:flex;width:100%;">
                 <div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-margin-right w3-col m3 l3">
                     <img id="pfp" src="<?php echo $pfp ?>"><br />
-                    <?php if (!User::isDeleted($c_user)) { ?>
+                    <?php if ($c_user_exists) { ?>
                         <a href="../user/<?php echo $c_user ?>">
                     <?php } ?>
                         <span class="<?php echo $isAdmin ?>" style="text-overflow: ellipsis;">
                             <?php echo $c_username ?>
                         </span>
-                    <?php if (!User::isDeleted($c_user)) { ?>
+                    <?php if ($c_user_exists) { ?>
                         </a>
                     <?php } ?>
                     <br />
@@ -327,7 +382,7 @@ if (isset($_POST['comment'])) {
 					<?php if(!empty($c_edited)) { ?>
 						<time title="<?php echo $c_edited ?>" datetime="<?php echo $c_edited ?>">Edited <?php echo time_ago($c_edited) ?></time><br />
 					<?php }
-					if (!User::isDeleted($c_user)) { ?>
+					if ($c_user_exists) { ?>
 						<span><?php echo $user_post_count ?> total posts</span>
 					<?php } ?>
                 </div>
@@ -341,12 +396,10 @@ if (isset($_POST['comment'])) {
 					<span class="w3-display-bottomleft">
 						<?php
 						if (loggedin()) {
-							if ($current_user->admin || trim($current_user->id) === trim($c_user)) {
+							if ($row['parent'] === $post_id && ($current_user->admin || trim($current_user->id) === trim($c_user))) {
 								?>
 								<div class="delete gr8-theme w3-hide w3-light-grey w3-round-small w3-padding-small w3-margin-bottom">
-									<!-- <form id='delete_comment' method='post'><input type='hidden' name='commentid' value="<?php echo $row['id'] ?>"/></form> -->
 									<p>Are you sure you want to delete this comment?</p>
-									<!--<button form='delete_comment' type='submit' name='comment_delete' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-margin-right w3-border w3-border-pink'>Yes</button>-->
 									<button class="confirm-delete-btn w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" data-id="<?php echo $row['id'] ?>">Yes</button>
 									<button class="cancel-delete-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
 								</div>
@@ -367,18 +420,39 @@ if (isset($_POST['comment'])) {
         ?>
         <br />
     <?php
-        echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>&nbsp;';
-        echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page + 1) . '">Next</a>';
+        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>&nbsp;';
+        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page + 1) . '">Next</a>';
     } else {
         echo "<p>No replies yet.</p><br />";
-        echo '<a class="w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>';
+        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>';
     }
 
-    $words = ['Spark something about flying cows', 'Start a MOC contest', 'Pigs! Its all about pigs!', 'Undefined!', 'Dont use Javascript on the server side!', 'Oops, I think I changed the padding on that button by ~0.01% of a pixel!', 'Moderation! Amazing!', 'Woaw!', 'Obviously', 'Sixty five, sixty six, sixty... why do I bother. You already get it.'];
-    $randomKeys = array_rand($words);
-    $randomWord = $words[$randomKeys];
+    $words = [
+        'Spark something about flying cows',
+        'Start a MOC contest',
+        'Pigs! Its all about pigs!',
+        '[color=red]Undefined![/color]',
+        '[s]Don\'t use Javascript on the server side![/s]',
+        'Oops, I think I changed the padding on that button by ~0.01% of a pixel!',
+        'Moderation! Amazing!',
+        '[i]Did you ever hear the tragedy of Darth Plagueis "the wise"? I thought not. It\'s not a story the Jedi would tell you. It\'s a Sith legend. Darth Plagueis was a Dark Lord of the Sith, so powerful and so wise he could use the Force to influence the midichlorians to create life... He had such a knowledge of the dark side that he could even keep the ones he cared about from dying. The dark side of the Force is a pathway to many abilities some consider to be unnatural. He became so powerful... the only thing he was afraid of was losing his power, which eventually, of course, he did. Unfortunately, he taught his apprentice everything he knew, then his apprentice killed him in his sleep. It\'s ironic he could save others from death, but not himself.[/i]',
+        'Woaw!',
+        'Obviously',
+        'Sixty five, sixty six, sixty... why do I bother. You already get it.',
+        'Dislike 👎😒',
+        'Big fan of user @' . rand(1, 20) . '\'s creations',
+        '[object Object] said the console!',
+        'Rahhhh',
+        '"[i]Gr8 b8, m8. I rel8, str8 appreci8, and congratul8. I r8 this b8 an 8/8. Plz no h8, I\'m str8 ir8. Cre8 more, can\'t w8. We should convers8, I won\'t ber8, my number is 8888888, ask for N8. No calls l8 or out of st8. If on a d8, ask K8 to loc8. Even with a full pl8, I always have time to communic8 so don\'t hesit8[/i]"'
+    ];
+
+    $randomWord = $words[array_rand($words)];
+    $randomWordDisplay = htmlentities($randomWord);
+    $randomWordBB = $bbcode->toHTML($randomWord, true, true);
 
     echo "<br /><hr />";
+    echo "<p title='" . $randomWordDisplay . "'>Word of the refresh: " . $randomWordBB . "</p>";
+
     if ($category === "pinnedLocked" || $category === "locked") {
         echo "<b id='commentboxcontainer'>This conversation is locked. New replies cannot be posted.</b><br />";
     } else if ($category === "nolist") {
@@ -387,18 +461,20 @@ if (isset($_POST['comment'])) {
         } else {
             $forum_anonymous_username = $_SESSION['forum_anonymous_username'];
         }
+
         echo "<b>You can only post anonymous comments on unlisted forums.</b>";
         echo "<br /><form id='commentboxcontainer' method='post' action=''>";
         echo "<input type='text' value='" . $forum_anonymous_username . "' placeholder='Name' name='username' /><br />";
-        echo "<textarea name='commentbox' placeholder='" . $randomWord . "' rows='4' cols='50'></textarea><br />";
-        echo "<input type='submit' value='Reply' name='comment' class='w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo' />";
+        echo "<textarea name='commentbox' placeholder='" . $randomWordDisplay . "' rows='4' cols='50'></textarea><br />";
+        echo "<input type='submit' value='Reply' name='comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo' />";
         echo "</form><br />";
     } else {
         if (loggedin()) {
-            echo "<br /><form id='commentboxcontainer' method='post' action=''>";
-            echo "<textarea name='commentbox' placeholder='" . $randomWord . "' rows='4' cols='50'></textarea><br />";
-            echo "<input type='submit' value='Reply' name='comment' class='w3-btn w3-blue w3-hover-white w3-mobile w3-border w3-border-indigo' />";
-            echo "</form><br />";
+            echo "<a href='#commentboxlink'>permalink to replybox</a>";
+            echo "<br /><a id='commentboxlink'><form id='commentboxcontainer' method='post' action=''>";
+            echo "<textarea name='commentbox' placeholder='" . $randomWordDisplay . "' rows='4' cols='50'></textarea><br />";
+            echo "<input type='submit' value='Reply' name='comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo' />";
+            echo "</form></a><br />";
         } else {
             echo "<b id='commentboxcontainer'>Please <a href='../acc/login'>login</a> to post a reply.</b><br />";
         }
