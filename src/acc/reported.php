@@ -59,7 +59,7 @@ if (isset($_POST['accept'])) {
                 exit('Couldn\'t remove comment.');
             }
         } else if ($content_type === 'profile') {
-            $stmt = $connuser->prepare("UPDATE users SET deactive = 1, verify_token = 1 WHERE id = ?");
+            $stmt = $connuser->prepare("UPDATE users SET deactive = '9999-12-31' WHERE id = ?");
             $stmt->bind_param("i", $content_id);
 
             if ($stmt->execute()) {
