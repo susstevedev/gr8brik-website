@@ -1,4 +1,4 @@
-<nav id="navbar" class="w3-sidebar w3-bar-block w3-hide-small w3-hide-medium w3-large w3-card-2 w3-light-grey">
+<nav id="navbar" class="w3-sidebar w3-bar-block w3-hide-small w3-large w3-card-2 w3-light-grey">
     <a href="/" class="w3-bar-item w3-button"><img src="/img/logo/192.png" style="width: 25px; height: 25px; border-radius: 15px;">Gr8Brik </b><span class="w3-green w3-tag w3-round">BETA</span></a>
     <a href="/modeler" class="w3-bar-item w3-button"><i class="fa fa-cubes" aria-hidden="true"></i>Modeler</a>
     <a href="/list?sort=all" class="w3-bar-item w3-button"><i class="fa fa-building-o" aria-hidden="true"></i>Creations</a>
@@ -84,7 +84,7 @@
     });
 </script>
 
-<div id="mobilenav" class="w3-hide-large w3-light-grey gr8-theme w3-card-2 w3-show-medium w3-bottom w3-padding w3-center" style="width: 100%; z-index: 1000;">
+<div id="mobilenav" class="w3-hide-large w3-hide-medium w3-light-grey gr8-theme w3-card-2 w3-show-small w3-bottom w3-padding w3-center" style="width: 100%; z-index: 1000;">
     <a href="/index"><span class="w3-padding-small"><img src="/img/logo/192.png" width="30px" height="30px" class="w3-round"></span></a>
     <a href="/modeler"><span class="fa fa-cubes w3-xlarge w3-padding-small"></span></a>
     <a href="/list"><span class="fa fa-building-o w3-xlarge w3-padding-small"></span></a>

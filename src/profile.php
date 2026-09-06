@@ -249,7 +249,7 @@ if(isset($_POST['delete'])) {
         exit('Invalid user ID!');
     }
 
-    if(User::isDeleted($_GET['id'])) {
+    if(User::isDeleted((int)$_GET['id'])) {
         exit('No user found');
     }
 
@@ -273,12 +273,14 @@ if(isset($_POST['delete'])) {
     $rand = bin2hex(random_bytes(32));
 
     if($current_user->admin != false) {
-        $sql = "UPDATE users SET deactive = 1, verify_token = '$rand' WHERE id = '$profile_id'";
+        $sql = "UPDATE users SET deactive = '9999-12-31', verify_token = '$rand' WHERE id = '$profile_id'";
         $result = $conn->query($sql);
         if ($result) {
-            $sql = "INSERT IGNORE INTO blacklist (value, type, reason, ignore_at) VALUES ('$email', 'email', '$reason', '$until')";
-            $result = $conn->query($sql);
-            header('refresh:0');
+            $result2 = $conn->query("INSERT IGNORE INTO blacklist (value, type, reason, ignore_at) VALUES ('$email', 'email', '$reason', '$until')");
+            $result3 = $conn->query("UPDATE php_sessions SET active = 0 WHERE userid = '$profile_id'");
+            $result4 = $conn->query("UPDATE sessions SET timestamp = 0 WHERE user = '$profile_id'");
+
+            header('refresh:1');
             exit;
         } else {
             exit('An SQL error occured!');
@@ -504,113 +506,26 @@ if(isset($_POST['delete'])) {
             </div>
         </div>
 
-            <div id="modal-warn" class="w3-modal">
-				<div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-round w3-padding w3-center">
-					<div class="w3-container">
-						<span onclick='document.getElementById("modal-warn").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
-							<h2>Are you sure you want to warn this user?</h2>
-                            <textarea name="reason" placeholder="Moderator note about this warning (required)" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea><br />
-                            <span name="close" class="w3-btn w3-large w3-white w3-hover-blue w3-round" onclick='document.getElementById("warn").style.display="none"'>No</span>
-							<input type="submit" value="Yes" name="warn" class="w3-btn w3-large w3-white w3-hover-red w3-round">
-						</form>
-					</div>
-				</div>
-			</div><br />
+        <div id="modal-warn" class="w3-modal">
+            <div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-round w3-padding w3-center">
+                <div class="w3-container">
+                    <span onclick='document.getElementById("modal-warn").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
+                        <h2>Are you sure you want to warn this user?</h2>
+                        <textarea name="reason" placeholder="Moderator note about this warning (required)" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea><br />
+                        <span name="close" class="w3-btn w3-large w3-white w3-hover-blue w3-round" onclick='document.getElementById("warn").style.display="none"'>No</span>
+                        <input type="submit" value="Yes" name="warn" class="w3-btn w3-large w3-white w3-hover-red w3-round">
+                    </form>
+                </div>
+            </div>
+        </div><br />
+    <?php } ?>
 
-            <div id="modal-ban" class="w3-modal">
-				<div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-center">
-					<div class="w3-container">
-						<span onclick='document.getElementById("modal-ban").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
-							<h2>Are you sure you want to soft ban this user?</h2>
-                            <p><div class="w3-row-padding"><select class="w3-select" name="day">
-                                <option value="01" disabled selected>day</option>
-                                <option>01</option>
-                                <option>02</option>
-                                <option>03</option>
-                                <option>04</option>
-                                <option>05</option>
-                                <option>06</option>
-                                <option>07</option>
-                                <option>09</option>
-                                <option>10</option>
-                                <option>11</option>
-                                <option>12</option>
-                                <option>13</option>
-                                <option>14</option>
-                                <option>15</option>
-                                <option>16</option>
-                                <option>17</option>
-                                <option>18</option>
-                                <option>19</option>
-                                <option>20</option>
-                                <option>21</option>
-                                <option>22</option>
-                                <option>23</option>
-                                <option>24</option>
-                                <option>25</option>
-                                <option>26</option>
-                                <option>27</option>
-                                <option>28</option>
-                                <option>29</option>
-                                <option>30</option>
-                                <option>31</option>
-                            </select>
-                            <br/>
-                            <select class="w3-select" name="month">
-                                <option value="1" disabled selected>month</option>
-                                <option value="1">Jan</option>
-                                <option value="2">Feb</option>
-                                <option value="3">Mar</option>
-                                <option value="4">Apr</option>
-                                <option value="5">May</option>
-                                <option value="6">Jun</option>
-                                <option value="7">Jul</option>
-                                <option value="8">Aug</option>
-                                <option value="9">Sep</option>
-                                <option value="10">Oct</option>
-                                <option value="11">Nov</option>
-                                <option value="12">Dec</option>
-                            </select>
-                            <br/>
-                                <select class="w3-select" name="year">
-                                <option value="2026" disabled selected>year</option>
-                                <option value="2026">2026</option>
-                                <option value="2027">2027</option>
-                                <option value="2028">2028</option>
-                                <option value="2029">2029</option>
-                                <option value="2030">2030</option>
-                                <option value="2031">2031</option>
-                                <option value="2032">2032</option>
-                                <option value="2033">2033</option>
-                                <option value="2034">2034</option>
-                                <option value="2035">2035</option>
-                                <option value="2036">2036</option>
-                                <option value="2037">2037</option>
-                                <option value="2038">2038</option>
-                                <option value="2038">2038</option>
-                                <option value="2040">2040</option>
-                                <option value="2041">2041</option>
-                                <option value="2042">2042</option>
-                                <option value="2043">2043</option>
-                                <option value="2044">2044</option>
-                                <option value="2045">2045</option>
-                                <option value="2046">2046</option>
-                            </select></div></p>
-                            <textarea name="reason" placeholder="Moderator note about this ban (required)" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea>
-                            <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick='document.getElementById("ban").style.display="none"'>No</span>
-							<input type="submit" value="Yes" name="ban" class="w3-btn w3-large w3-white w3-hover-red">
-						</form>
-					</div>
-				</div>
-			</div><br />
-        <?php } ?>
-
-    <span id="data-user-actions">
+    <span id="data-user-actions" class="w3-panel">
         <div class="tab" id="creationstab">
             <a href="#creations" id="creations"></a>
-            <div class="w3-row-padding">
+            <div class="w3-row">
                 <template id="gr8-creation-template">
-                    <div class="w3-col l4 m6 s12 w3-margin-bottom">
+                    <div class="w3-col l4 m6 s12 w3-padding-small">
                         <div class="gr8-theme creation w3-card-2 w3-light-grey w3-padding creation-card">
                             <a href="/build/" class="creation-link">
                                 <img src="" loading="lazy" class="cre-image w3-hover-opacity w3-card-2 w3-grey creation-thumbnail">
@@ -667,9 +582,9 @@ if(isset($_POST['delete'])) {
         
         <div class="tab" id="likestab">
 		    <a href="#likes" id="likes"></a>
-			<div class="w3-row-padding">
+			<div class="w3-row">
                 <template id="gr8-likes-template">
-                    <div class="w3-col l4 m6 s12 w3-margin-bottom">
+                    <div class="w3-col l4 m6 s12 w3-padding-small">
                         <div class="gr8-theme liked w3-card-2 w3-light-grey w3-padding creation-card">
                             <a href="/build/" class="creation-link">
                                 <img src="" loading="lazy" class="cre-image w3-hover-opacity w3-card-2 w3-grey creation-thumbnail">
