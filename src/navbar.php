@@ -13,7 +13,7 @@
     <?php if(loggedin()) { ?>
         <div class='w3-dropdown-click w3-bar-block'>
             <button class='gr8-theme w3-button w3-bar-item' onclick="dropdown('dropdown-main-sidenav')">
-                <i class='fa fa-at' aria-hidden='true'></i>&nbsp;<?php echo htmlspecialchars($current_user->username) ?><i class='fa fa-angle-down w3-right' aria-hidden='true'></i>
+                <i class='fa fa-at' aria-hidden='true'></i>&nbsp;<?php echo htmlspecialchars($current_user->username) ?> <?php echo $current_user->private_profile ? "<i class='fa fa-lock w3-text-yellow' aria-hidden='true'></i>" : null ?> <i class='fa fa-angle-down w3-right' aria-hidden='true'></i>
 
                 <span class='w3-red w3-tag w3-round'>
                     <?php
@@ -53,9 +53,9 @@
                     <span><i class='fa fa-lock w3-padding-small' aria-hidden='true'></i>Sessions</span>
                 </a>
                 
-                <a href='/acc/login?status=logout' class='w3-bar-item w3-button'>
+                <span class='logout w3-bar-item w3-button'>
                     <span><i class='fa fa-sign-out w3-padding-small' aria-hidden='true'></i>Logout</span>
-                </a>
+                </span>
             </div>
         </div>
     <?php } else { ?>
@@ -69,21 +69,6 @@
     </div>
 </nav>
 
-<script>
-    $(document).ready(function() {
-        $('#search-input').on('keyup', function(e) {
-            if (e.keyCode === 13) {
-                load_search();
-            }
-        })
-        $('#search-button').on('click', function() {
-            load_search();
-        });
-        
-        window.loadFeaturedCreations();
-    });
-</script>
-
 <div id="mobilenav" class="w3-hide-large w3-hide-medium w3-light-grey gr8-theme w3-card-2 w3-show-small w3-bottom w3-padding w3-center" style="width: 100%; z-index: 1000;">
     <a href="/index"><span class="w3-padding-small"><img src="/img/logo/192.png" width="30px" height="30px" class="w3-round"></span></a>
     <a href="/modeler"><span class="fa fa-cubes w3-xlarge w3-padding-small"></span></a>
@@ -96,3 +81,17 @@
 
 <div class="w3-main gr8-main"><br />
 	<span id="popup-wrapper-global"></span>
+
+    <div id="modal-set-logout" class="w3-modal">
+        <div class="w3-modal-content gr8-theme w3-card-2 w3-center w3-light-grey w3-animate-bottom">
+            <div class="w3-container">
+                <span class="close w3-button w3-red w3-hover-white w3-padding w3-display-topright">&times;</span>
+                <form method='get' action='/acc/login.php'>
+                    <h2>Are you sure you want to logout?</h2>
+                    <input type="hidden" value="logout" name="status">
+                    <span name="close" class="close w3-btn w3-large w3-white w3-hover-blue w3-round-small">No</span>
+                    <input type="submit" value="Yes" name="logout" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">
+                </form>
+            </div>
+        </div>
+    </div>

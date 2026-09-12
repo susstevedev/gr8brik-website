@@ -254,6 +254,7 @@ if(isset($_POST['delete'])) {
     }
 
     $ignore = isset($_POST['ignore']) ? $_POST['ignore'] : 0;
+    $use_email = isset($_POST['use_email']) ? $_POST['use_email'] : 0;
 
     if (!empty($_POST['until']) && !$ignore) {
         $date = new DateTime($_POST['until']);
@@ -261,32 +262,64 @@ if(isset($_POST['delete'])) {
         if ($date) {
             $until = $date->format('Y-m-d H:i:s');
         } else {
-            exit('Invalid ban date');
+            header("HTTP/1.0 500 Internal Server Error");
+            $error = "Invalid ban date";
+            header('refresh:3');
         }
     } else {
         $until = null;
     }
 
     $profile_id = (int)$_GET['id'];
-    $email = $email = hash('sha256', strtolower(trim($data['email'])));
     $reason = isset($_POST['reason']) ? trim($_POST['reason']) : 'banned by admin request';
     $rand = bin2hex(random_bytes(32));
 
-    if($current_user->admin != false) {
-        $sql = "UPDATE users SET deactive = '9999-12-31', verify_token = '$rand' WHERE id = '$profile_id'";
-        $result = $conn->query($sql);
-        if ($result) {
-            $result2 = $conn->query("INSERT IGNORE INTO blacklist (value, type, reason, ignore_at) VALUES ('$email', 'email', '$reason', '$until')");
-            $result3 = $conn->query("UPDATE php_sessions SET active = 0 WHERE userid = '$profile_id'");
-            $result4 = $conn->query("UPDATE sessions SET timestamp = 0 WHERE user = '$profile_id'");
+    if($use_email) {
+        $identifier = hash('sha256', strtolower(trim($data['email'])));
+        $type = 'email';
+    } else {
+        $identifier = strtolower(trim($data['username']));
+        $type = 'username';
+    }
 
-            header('refresh:1');
-            exit;
+    if($current_user->admin != false) {
+        $sql_block = "INSERT IGNORE INTO blacklist (value, type, reason, ignore_at) VALUES (?, ?, ?, ?)";
+        $sql_delete = "UPDATE php_sessions SET active = 0 WHERE userid = ?";
+        $sql_delete_2 = "UPDATE sessions SET timestamp = 0 WHERE user = ?";
+
+        $stmt_block = $conn->prepare($sql_block);
+        $stmt_block->bind_param("ssss", $identifier, $type, $reason, $until);
+        $result2 = $stmt_block->execute();
+        $stmt_block->close();
+
+        if(!$result2) {
+            header("HTTP/1.0 500 Internal Server Error");
+            $error = "Couldn't ban this user at this time";
+            header('refresh:3');
         } else {
-            exit('An SQL error occured!');
+            $stmt_delete = $conn->prepare($sql_delete);
+            $stmt_delete->bind_param("i", $profile_id);
+            $result3 = $stmt_delete->execute();
+            $stmt_delete->close();
+
+            $stmt_delete = $conn->prepare($sql_delete_2);
+            $stmt_delete->bind_param("i", $profile_id);
+            $result4 = $stmt_delete->execute();
+            $stmt_delete->close();
+
+            if(!$result3 || !$result4) {
+                header("HTTP/1.0 500 Internal Server Error");
+                $error = "Couldn't log this user out when banning the account";
+                header('refresh:3');
+            } else {
+                header('refresh:1');
+                exit;
+            }
         }
     } else {
-        exit('User is not an administrator!');
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "User is not an administrator!";
+        header('refresh:3');
     }
 }
 ?>
@@ -496,6 +529,9 @@ if(isset($_POST['delete'])) {
 
                         <input type="checkbox" id="ignore" name="ignore" value="1">
                         <label for="ignore">Permanent ban</label><br />
+
+                        <input type="checkbox" id="use_email" name="use_email" value="1">
+                        <label for="use_email">Ban using email for presistance if the user deletes the account</label><br />
 
                         <textarea name="reason" placeholder="Moderator note about this ban" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea><br />
 
