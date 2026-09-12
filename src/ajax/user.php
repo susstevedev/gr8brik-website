@@ -84,6 +84,7 @@ class User {
     public ?int $alert;
     public ?string $age;
     public ?string $verify_token;
+    public ?string $private_profile;
     public ?string $deactive;
 
     public function __construct(?array $data = []) {
@@ -110,7 +111,7 @@ class User {
         }
 
         $stmt = $conn->prepare("
-            SELECT username, deactive
+            SELECT deactive
             FROM users
             WHERE id = ?
         ");
@@ -124,10 +125,8 @@ class User {
             $conn->close();
             return true; 
         }
-
         $row = $res->fetch_assoc();
         $stmt->close();
-        $conn->close();
 
         if (empty($row)) {
             return true;
@@ -135,6 +134,178 @@ class User {
 
         if ($row['deactive'] !== null) {
             return true;
+        }
+
+        return false;
+    }
+
+    public static function isPrivate(?int $id): bool {
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        if ($conn->connect_error) {
+            return false;
+        }
+
+        if (empty($id)) {
+            return false;
+        }
+
+        $stmt = $conn->prepare("SELECT private_profile FROM users WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+
+        $res = $stmt->get_result();
+        $row = $res->fetch_assoc()['private_profile'];
+        $stmt->close();
+
+        if ((bool)$row === true) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public static function isFollowing(?int $id): bool {
+        global $current_user;
+
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        if ($conn->connect_error) {
+            return false;
+        }
+
+        if (empty($id) || !loggedin()) {
+            return false;
+        }
+
+        $me = $current_user->id ?? 0;
+
+        $stmt = $conn->prepare("SELECT 1 FROM follow WHERE (userid = ? AND profileid = ?) OR (profileid = ? AND userid = ?) LIMIT 1");
+    	$stmt->bind_param("iiii", $me, $id, $me, $id);
+    	$stmt->execute();
+    	$res = $stmt->get_result();
+    	$stmt->close();
+
+        if ($res->num_rows !== 0) {
+            return true;
+        }
+
+        return false;
+    }
+
+    public static function isMe(?int $id): bool {
+        global $current_user;
+
+        if (empty($id) || !loggedin()) {
+            return false;
+        }
+
+        $me = (int)$current_user->id ?? 0;
+
+        if ($id === $me || $id == $me) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks block relations of users
+     * Returns false or an array with data
+     */
+    public static function isBlocking(?int $profileid) {
+        global $current_user, $conn;
+
+        if(!loggedin()) {
+            return false;
+        }
+
+        $you = false;
+        $them = false;
+        $type = null;
+        $userid = $current_user->id ?? 0; //clarification: this is your user id profileid is their userid
+
+        $stmt = $conn->prepare("SELECT userid, profileid FROM user_blocks WHERE (userid = ? AND profileid = ?) OR (userid = ? AND profileid = ?) LIMIT 1");
+    	$stmt->bind_param("iiii", $userid, $profileid, $profileid, $userid);
+    	$stmt->execute();
+        $block_result = $stmt->get_result();
+
+        if ($block_result && $block_result->num_rows > 0) {
+            $stmt->close();
+
+            while ($row = $block_result->fetch_assoc()) {
+                if ($row['userid'] === $userid && $row['profileid'] === $profileid) {
+                    $you = true;
+                } elseif ($row['userid'] === $profileid && $row['profileid'] === $userid) {
+                    $them = true;
+                }
+            }
+
+            if ($you && $them) {
+                $message = "You blocked this user, and they blocked you.";
+                $type = 'both';
+            } elseif ($you) {
+                $message = "You blocked this user.";
+                $type = 'you';
+            } elseif ($them) {
+                $message = "You're blocked from this user.";
+                $type = 'them';
+            } else {
+                return false;
+            }
+
+            return array('message' => $message, 'type' => $type);
+        }
+
+        return false;
+    }
+
+    /**
+     * Mini version of the ban helper from auth.php
+     * I was tired of including it so much
+     */
+    public static function isBanned(?string $value = null, ?string $type = 'username') {
+        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        if($conn->connect_error) { return false; };
+
+        if ($type !== 'username' && $type !== 'email') {
+            return false;
+        }
+
+        $conditions = [];
+        $params = [];
+        $paramTypes = "";
+
+        if ($type === 'email') {
+            $conditions[] = "(value = ? AND type = 'email')";
+            $params[] = strtolower(trim($value));
+            $paramTypes .= "s";
+        }
+
+		if ($type === 'email') {
+            $conditions[] = "(value = ? AND type = 'email')";
+            $params[] = hash('sha256', strtolower(trim($value)));
+            $paramTypes .= "s";
+        }
+
+        if ($type === 'username') {
+            $conditions[] = "(value = ? AND type = 'username')";
+            $params[] = strtolower(trim($value));
+            $paramTypes .= "s";
+        }
+
+        $sql = "SELECT * FROM blacklist WHERE (" . implode(" OR ", $conditions) . ") AND (created_at IS NULL OR created_at <= CURRENT_TIMESTAMP()) AND (ignore_at IS NULL OR ignore_at >= CURRENT_TIMESTAMP()) LIMIT 1";
+
+        $stmt = $conn->prepare($sql);
+        if (!$stmt) {
+            return false;
+        }
+
+        $stmt->bind_param($paramTypes, ...$params);
+        $stmt->execute();
+        $res = $stmt->get_result();
+
+        if ($row = $res->fetch_assoc()) {
+            $row['reason'] = !empty($row['reason']) ? $row['reason'] : null;
+            return $row;
         }
 
         return false;
@@ -180,7 +351,6 @@ class User {
         }
 
         $stmt->close();
-        $conn->close();
         return $users;
     }
 

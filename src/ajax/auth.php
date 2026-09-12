@@ -194,7 +194,7 @@ class AccountManager
             $paramTypes .= "s";
         }
 
-        $sql = "SELECT reason FROM blacklist WHERE (" . implode(" OR ", $conditions) . ") AND (created_at IS NULL OR created_at <= CURRENT_TIMESTAMP()) AND (ignore_at IS NULL OR ignore_at >= CURRENT_TIMESTAMP()) LIMIT 1";
+        $sql = "SELECT * FROM blacklist WHERE (" . implode(" OR ", $conditions) . ") AND (created_at IS NULL OR created_at <= CURRENT_TIMESTAMP()) AND (ignore_at IS NULL OR ignore_at >= CURRENT_TIMESTAMP()) LIMIT 1";
 
         $stmt = $db->prepare($sql);
         if (!$stmt) {
@@ -206,7 +206,9 @@ class AccountManager
         $res = $stmt->get_result();
 
         if ($row = $res->fetch_assoc()) {
-            return !empty($row['reason']) ? $row['reason'] : "Email or username is not valid.";
+            $row['reason'] = !empty($row['reason']) ? $row['reason'] : "Email or username is not valid.";
+            //return !empty($row['reason']) ? $row['reason'] : "Email or username is not valid.";
+            return $row;
         }
 
         return false;
@@ -245,7 +247,7 @@ class AccountManager
 
         if (!$row) {
             http_response_code(400);
-            return ['error' => "Invalid combination of email or username and password. (no account)"];
+            return ['error' => "Invalid combination of email or username and password."];
         }
 
         $db_hashed_pwd = null;
@@ -264,20 +266,15 @@ class AccountManager
             return ['error' => "Invalid combination of email or username and password."];
         }
 
-        $userid = $row['id'];
-        $login_from = $_SERVER['REMOTE_ADDR'];
         $user_agent = htmlspecialchars($_SERVER['HTTP_USER_AGENT']);
         $user_agent = get_browser_name($user_agent) . ", " . get_system_name($user_agent);
-        $time = time();
-        $token_raw = bin2hex(random_bytes(32));
-        $token_hashed = hash('sha256', $token_raw);
 
         if ($db_hashed_pwd !== null) {
             $new_hash = password_hash($pwd, PASSWORD_DEFAULT);
             $updateStmt = $conn->prepare("UPDATE users SET password = ?, salt = NULL WHERE id = ?");
             $updateStmt->bind_param("si", $new_hash, $row['id']);
             if (!$updateStmt->execute()) {
-                return ['error' => "Error rehashing password. Contact " . DB_MAIL];
+                return ['error' => "Wow, that's a really old account. We couldn't rehash the password. Contact " . DB_MAIL];
             }
         }
 
@@ -349,7 +346,7 @@ class AccountManager
         }
 
         //Account email blacklist system
-        $isBanned = AccountManager::isBanned($conn, $email);
+        $isBanned = User::isBanned($email, 'email');
         if ($isBanned !== false) {
             http_response_code(400);
             return ['error' => "Email address is not valid"];
@@ -463,7 +460,7 @@ class AccountManager
             return ['error' => "Invalid email address format"];
         }
 
-        $isBanned = AccountManager::isBanned($conn, $email);
+        $isBanned = User::isBanned($email, 'email');
         if ($isBanned !== false) {
             http_response_code(400);
             return ['error' => "Email address is not avaliable"];
@@ -555,7 +552,7 @@ class AccountManager
             return ['error' => "Invalid email address format"];
         }
 
-        $isBanned = AccountManager::isBanned($conn, $email);
+        $isBanned = User::isBanned($email, 'email');
         if ($isBanned !== false) {
             http_response_code(400);
             return ['error' => "Email address is not avaliable"];
@@ -590,10 +587,37 @@ class AccountManager
         $token_raw = bin2hex(random_bytes(32));
         $token_hashed = hash('sha256', $token_raw);
 
-        $isBanned = self::isBanned($conn, $row['email'], $row['username']);
+        $isBanned = User::isBanned($row['email'], 'email');
+        if(!$isBanned) {
+            $isBanned = User::isBanned($row['username'], 'username');
+        }
+
         if ($isBanned !== false) {
-            http_response_code(400);
-            return ['error' => $isBanned];
+            http_response_code(500);
+            $until = isset($isBanned['ignore_at']) ? 'until ' . $isBanned['ignore_at'] : 'indefinitely';
+            $reason = isset($isBanned['reason']) ? $isBanned['reason'] : null;
+            $text = "Your account has been suspended by an administrator " . $until . ".";
+
+            if($reason) {
+                $text .= " The reason provided by an administrator is as follows:";
+            }
+
+            return [
+                'title' => 'Account suspension',
+                'popup' => $text,
+                'error' => false,
+                'extras' => $reason,
+                'links' => [
+                    0 => [
+                        'btn' => 'Okay',
+                        'goto' => false,
+                    ],
+                    1 => [
+                        'btn' => 'Appeal',
+                        'goto' => '/appeal.php',
+                    ],
+                ],
+            ];
         }
 
         if (!empty($row['deactive'])) {
@@ -601,8 +625,10 @@ class AccountManager
             if (mysqli_query($conn, $sql)) {
                 http_response_code(500);
                 return [
+                    'title' => 'Account reactivation',
                     'popup' => "Do you want to reactivate your account?",
-                    'error' => "Do you want to reactivate your account?",
+                    'error' => false,
+                    'extras' => false,
                     'goto' => "/acc/index?reactive=1&token=" . $token_hashed,
                     'btn' => "Yes"
                 ];

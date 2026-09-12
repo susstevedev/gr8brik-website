@@ -18,13 +18,19 @@ if (isset($_GET['followed_by'])) {
     $profile_id = $_GET['followed_by'];
     $current_user_id = $current_user->id ?? 0;
 
+    if(User::isDeleted($profile_id) || (User::isPrivate($profile_id) && !User::isFollowing($profile_id))) {
+        http_response_code(404);
+        echo json_encode(['error' => 'invalid account id', 'success' => false]);
+        exit;
+    }
+
     //selects user follow row(s), selects users actual account, fliters invalid accounts
     $query = "
-        SELECT DISTINCT u.id, u.picture, u.username 
+        SELECT DISTINCT u.id, u.picture, u.username, u.email
         FROM follow f1
         INNER JOIN follow f2 ON f1.userid = f2.profileid
         INNER JOIN users u ON f1.userid = u.id
-        LEFT JOIN blacklist blist ON u.username = blist.value AND blist.type = 'username'
+        LEFT JOIN blacklist blist ON (u.username = blist.value AND blist.type = 'username') OR (u.email = blist.value AND blist.type = 'email')
         WHERE f1.profileid = ? 
           AND f2.userid = ?
           AND blist.value IS NULL
@@ -201,7 +207,8 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     $is_following = false;
 
     if(loggedin()) {
-        $blocks = user_blocks($profile_id, $conn);
+        //$blocks = user_blocks($profile_id, $conn);
+        $blocks = User::isBlocking($profile_id);
 
         if($blocks && is_array($blocks)) {
             if($blocks['type'] !== 'you') {
@@ -229,6 +236,19 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
     if ($conn2->connect_error) {
         exit($conn2->connect_error);
+    }
+
+    /*if(!$is_following && User::isPrivate($profile_id)) {
+        return [
+            "message" => 'This profile is private, and you are not following them.',
+            "error" => 'PRIV_PROFILE'
+        ];
+    }*/
+
+    if(!$is_following && User::isPrivate($profile_id)) {
+        $bsky = null;
+        $usero->description = null;
+        $usero->twitter = null;
     }
 
     if(User::isDeleted($profile_id) || AccountManager::isBanned($conn, $usero->email, $usero->username)) {
@@ -324,6 +344,10 @@ class UserContent {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
+        if(!User::isFollowing($userid) && User::isPrivate($userid)) {
+            return ['success' => false, 'error' => "This profile is private."];
+        }
+
         $stmt = $creation_conn->prepare("SELECT * FROM model WHERE user = ? AND visibility = 'public' AND removed = 0 ORDER BY date DESC LIMIT $limit OFFSET $offset;");
         $stmt->bind_param("i", $userid);
         $stmt->execute();
@@ -368,6 +392,10 @@ class UserContent {
 
         if(!$user || User::isDeleted($userid)) {
             return ['success' => false, 'error' => "What user is this?"];
+        }
+
+        if(!User::isFollowing($userid) && User::isPrivate($userid)) {
+            return ['success' => false, 'error' => "This profile is private."];
         }
 
         $stmt = $creation_conn->prepare('SELECT * FROM votes WHERE user = ?');
@@ -437,6 +465,10 @@ class UserContent {
 
         if(!$user || User::isDeleted($userid)) {
             return ['success' => false, 'error' => "What user is this?"];
+        }
+
+        if(!User::isFollowing($userid) && User::isPrivate($userid)) {
+            return ['success' => false, 'error' => "This profile is private."];
         }
 
         // comments and replies
@@ -537,6 +569,10 @@ class UserContent {
 
         if(!$user || User::isDeleted($userid)) {
             return ['success' => false, 'error' => "What user is this?"];
+        }
+
+        if(!User::isFollowing($userid) && User::isPrivate($userid)) {
+            return ['success' => false, 'error' => "This profile is private."];
         }
 
         $profile_stmt = $conn_forum->prepare("SELECT * FROM messages WHERE userid = ? AND (parent = 0 OR parent IS NULL) ORDER BY id DESC LIMIT $limit OFFSET $offset;");

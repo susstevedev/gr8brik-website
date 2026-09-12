@@ -725,6 +725,7 @@ function fetch_comments($model_id, $csrf) {
     $comments = [];
     $fav_ids = [];
     $blocked = [];
+    $privated = [];
 
     while ($row = $comResult->fetch_assoc()) {
         $rows[] = $row;
@@ -732,35 +733,48 @@ function fetch_comments($model_id, $csrf) {
 
     $userIds = array_column($rows, 'user');
     $users = User::getUsers($userIds);
+    $notifications = new Notifications($conn2);
 
-    if (loggedin() && !empty($rows)) {
-        $commentIds = array_map('intval', array_column($rows, 'id'));
-        $ids = implode(',', $commentIds);
-        $res = $conn->query("SELECT comment_id FROM comment_votes WHERE user_id = $id AND comment_id IN ($ids)");
+    if (!empty($rows)) {
+        $userIds = array_column($rows, 'user');
+        $users = User::getUsers($userIds);
 
-        while ($fav = $res->fetch_assoc()) {
-            $fav_ids[(int)$fav['comment_id']] = true;
-        }
+        if(loggedin()) {
+            $commentIds = array_map('intval', array_column($rows, 'id'));
+            $userId = (int)$current_user->id;
+            $ids = implode(',', $commentIds);
+            $res = $conn->query("SELECT comment_id FROM comment_votes WHERE user_id = $id AND comment_id IN ($ids)");
 
-        $userId = (int)$current_user->id;
-
-        $result = $conn2->query("
-            SELECT userid, profileid
-            FROM user_blocks
-            WHERE userid = $userId
-            OR profileid = $userId
-        ");
-
-        while ($row = $result->fetch_assoc()) {
-            $userid = (int)$row['userid'];
-            $profileid = (int)$row['profileid'];
-
-            if ($userid === $userId) {
-                $blocked[$profileid]['you_blocked'] = true;
+            while ($fav = $res->fetch_assoc()) {
+                $fav_ids[(int)$fav['comment_id']] = true;
             }
 
-            if ($profileid === $userId) {
-                $blocked[$userid]['they_blocked'] = true;
+            $result = $conn2->query("
+                SELECT userid, profileid
+                FROM user_blocks
+                WHERE userid = $userId
+                OR profileid = $userId
+            ");
+
+            while ($row = $result->fetch_assoc()) {
+                $userid = (int)$row['userid'];
+                $profileid = (int)$row['profileid'];
+
+                if ($userid === $userId) {
+                    $blocked[$profileid]['you_blocked'] = true;
+                }
+
+                if ($profileid === $userId) {
+                    $blocked[$userid]['they_blocked'] = true;
+                }
+            }
+        }
+
+        foreach ($users as $c_user) {
+            $c_user_id = (int)$c_user->id ?? 0;
+
+            if(((bool)$c_user->private_profile && !User::isFollowing($c_user_id) && !User::isMe($c_user_id))) {
+                $privated[$c_user_id] = true;
             }
         }
     }
@@ -769,12 +783,30 @@ function fetch_comments($model_id, $csrf) {
         $comment_id = $row['id'];
         $comment_votes = Numbers::format($row['votes']);
         $is_op = $row['is_op'];
-        $c_user = $row['user'];
+        $c_user = (int)$row['user'];
+        $c_user_removed = false;
         $comment = $bbcode->toHTML($row['comment'], true, true);
         $comment_og = $row['comment'];
         $userRow = $users[$c_user] ?? User::getUser($c_user);
         $date = time_ago(date('Y-m-d H:i:s', is_numeric($row['date']) ? $row['date'] : 0));
         $edited_at = null;
+        $c_user_privated = $privated[$c_user] ?? false;
+
+        if(User::isBanned($userRow->username, 'username')) {
+            $c_user_removed = true;
+        }
+
+        if(User::isDeleted($c_user)) {
+            $c_user_removed = true;
+            $message = "The account that had posted this reply has been deleted.";
+            $comment = null;
+        }
+
+        if($c_user_privated) {
+            $c_user_removed = true;
+            $message = "The account that had posted this reply is private.";
+            $comment = null;
+        }
 
         if((int)$row['edited_at'] !== 0) {
             $edited_at = time_ago(date('Y-m-d H:i:s', is_numeric($row['edited_at']) ? $row['edited_at'] : 0));
@@ -784,19 +816,23 @@ function fetch_comments($model_id, $csrf) {
         $theyBlocked = $blocked[$c_user]['they_blocked'] ?? false;
         if(loggedin()) {
             if ($youBlocked && $theyBlocked) {
-                $message[] = "You blocked @" . $userRow->username . ", and they blocked you. Their comments and profile will not be visible.";
+                $c_user_removed = true;
+                $message = "You blocked @" . $userRow->username . ", and they blocked you. Their comments and profile will not be visible.";
                 $comment = null;
             } elseif ($youBlocked) {
-                $message[] = "You blocked @" . $userRow->username . ". Your comments and profile will not be visible to them.";
+                $message = "You blocked @" . $userRow->username . ". Your comments and profile will not be visible to them.";
             } elseif ($theyBlocked) {
-                $message[] = "You're blocked from @" . $userRow->username . ". Their comments and profile will not be visible.";
+                $c_user_removed = true;
+                $message = "You're blocked from @" . $userRow->username . ". Their comments and profile will not be visible.";
                 $comment = null;
             }
         }
 
         $comments[] = [
+            'message' => $message ?? null,
             'id' => $comment_id,
             'userid' => $c_user,
+            'user_removed' => $c_user_removed,
             'user_admin' => $userRow->admin || 0,
             'username' => $userRow->username,
             'is_op' => $is_op,
@@ -808,16 +844,17 @@ function fetch_comments($model_id, $csrf) {
             'date' => $date,
             'edited_at' => $edited_at,
             'votes' => $comment_votes,
-            'voted' => isset($fav_ids[$comment_id])
+            'voted' => isset($fav_ids[$comment_id]),
+            'conversation_subbed' => $notifications->get_subscribers('comment_reply', $comment_id),
         ];
-        $message = [];
+        $message = null;
     }
 
     $comResult->free();
     return json_encode($comments); 
 }
 
-if(isset($_GET['build_comments'])) {
+if(isset($_GET['comments'])) {
     header('Content-Type: application/json');
     $model_id = htmlspecialchars((int)$_GET['buildId']);
     $comment_data = fetch_comments($model_id, $_SESSION['csrf']);
@@ -835,32 +872,27 @@ if(isset($_POST['comment'])) {
     $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     if ($_SESSION['csrf'] !== $_POST['csrf_token']) {
-        http_response_code(401);
         echo json_encode(['error' => 'Your cross-site-request-forgery token seems to be invalid.']);
         exit;
     }
 
     if(!loggedin()) {
-        http_response_code(401);
         echo json_encode(['error' => 'Please login to comment.']);
         exit;
     }
     $id = $current_user->id;
 
     if($current_user->verify_token != NULL) {
-        http_response_code(401);
         echo json_encode(['error' => 'Please verify your account to comment.']);
         exit;
     }
 
     if(strlen($comment) > 500) {
-        http_response_code(400);
         echo json_encode(['error' => 'Comment must be less than 500 characters.']);
         exit;
     }
 
     if(empty($comment)) {
-        http_response_code(400);
         echo json_encode(['error' => 'Comment must contain text.']);
         exit;
     }
@@ -871,12 +903,28 @@ if(isset($_POST['comment'])) {
     $result = $stmt4->get_result();
 
     if($result->num_rows === 0) {
-        http_response_code(404);
         echo json_encode(['error' => 'Creation not found.']);
         exit;
     }
 
     $userid = $result->fetch_assoc()['user'] ?? null;
+
+    $stmt_blocked = $conn2->prepare("SELECT * FROM user_blocks WHERE (userid = ? AND profileid = ?) OR (profileid = ? AND userid = ?)");
+    $stmt_blocked->bind_param("iiii", $id, $userid, $id, $userid);
+    $stmt_blocked->execute();
+    $result = $stmt_blocked->get_result();
+
+    if($result->num_rows !== 0) {
+        $row = $result->fetch_assoc();
+
+        if($row['userid'] === $id && $row['profileid'] === $userid) {
+            echo json_encode(['error' => 'You have blocked the creator of this creation.']);
+            exit;
+        } else if($row['profileid'] === $id && $row['userid'] === $userid) {
+            echo json_encode(['error' => 'The creator of this creation has blocked you.']);
+            exit;
+        }
+    }
 
     if(!empty($parent)) {
         $stmt_reply = $conn->prepare("SELECT user FROM comments WHERE id = ? AND hidden = 0");
@@ -885,9 +933,30 @@ if(isset($_POST['comment'])) {
         $result = $stmt_reply->get_result();
 
         if($result->num_rows === 0) {
-            http_response_code(404);
             echo json_encode(['error' => 'The comment that you are trying to reply to does not exist.']);
             exit;
+        }
+
+        $c_user = $result->fetch_assoc()['user'];
+
+        $stmt_blocked = $conn2->prepare("SELECT * FROM user_blocks WHERE (userid = ? AND profileid = ?) OR (profileid = ? AND userid = ?)");
+        $stmt_blocked->bind_param("iiii", $id, $c_user, $id, $c_user);
+        $stmt_blocked->execute();
+        $result = $stmt_blocked->get_result();
+
+        if($result->num_rows !== 0) {
+            $row = $result->fetch_assoc();
+
+            if($row['userid'] === $id && $row['profileid'] === $c_user) {
+                echo json_encode(['error' => 'You have blocked the user you are trying to reply to.']);
+                exit;
+            } else if($row['profileid'] === $id && $row['userid'] === $c_user) {
+                echo json_encode(['error' => 'The person you are trying to reply to has you blocked.']);
+                exit;
+            } else {
+                echo json_encode(['error' => 'You or the user you are replying to have blocked one or the other.']);
+                exit;
+            }
         }
     }
 
@@ -929,7 +998,6 @@ if(isset($_POST['comment'])) {
             $notifications->notify_subscribers('comment_reply', $parent, $id);
         }
 
-        http_response_code(200);
         echo json_encode([
             'success' => 'Comment sent.',
             'comment' => [
@@ -950,7 +1018,6 @@ if(isset($_POST['comment'])) {
     } else {
         $stmt2->close();
         $conn->close();
-        http_response_code(500);
         echo json_encode(['error' => 'Could not send comment. Please try again later.']);
         exit;
     }
