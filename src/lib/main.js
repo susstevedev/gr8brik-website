@@ -176,8 +176,7 @@ $(document).ready(function() {
     }
 
     //browser-update.org script
-    //make sure to update every couple of months!!! please!!! REMEMBER!!!
-    var $buoop = {required:{e:-4,f:-3,o:-3,s:-1,c:-3},insecure:true,style:"corner",api:2026.3 }; 
+    var $buoop = {required:{e:-4,f:-3,o:-3,s:-1,c:-3},insecure:true,style:"corner",api:2026.6 }; 
     function $buo_f() { 
         var e = document.createElement("script"); 
         e.src = "//browser-update.org/update.js";
@@ -209,8 +208,27 @@ $(document).ready(function() {
         mode();
     });
 
+    $("#modal-set-logout .close").click(function(event) {
+        $('#modal-set-logout').toggle();
+    });
+
+    $("#navbar .logout").click(function(event) {
+        $('#modal-set-logout').toggle();
+    });
+
+    $('#search-input').on('keyup', function(e) {
+        if (e.keyCode === 13) {
+            load_search();
+        }
+    })
+
+    $('#search-button').on('click', function() {
+        load_search();
+    });
+
     $(['/img/loading.gif', '/img/no_image.png']).preload();
     mode();
+    loadFeaturedCreations();
     getWarnStatus();
     twemoji.size = '72x72';
     twemoji.parse(document.getElementsByClassName('gr8-main')[0], {base: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@latest/assets/'})

@@ -448,7 +448,7 @@
                     $next = $next.next();
                 }
 
-                $comment.find('.comment-body, [data-testid="gr8-comment-divider"]').slideToggle('fast');
+                $comment.find('.comment-body, [data-testid="gr8-comment-divider"], .comment-error').slideToggle('fast');
                 $comment.find('.comment-profile-picture img').animate({width: collapsed ? '25px' : '50px', height: collapsed ? '25px' : '50px'}, 'fast');
             }
         });
