@@ -1,6 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
+$bbcode = new BBCode;
 
 $frame = '<center><p>sure easter egg why not</p><iframe width="640px" height="480px" src="https://www.youtube-nocookie.com/embed/2dZy3cd9KFY" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></center>';
 
@@ -85,33 +87,38 @@ if(isset($_POST['accept']) && $current_user->admin) {
 
             if($query->num_rows != 0 && $current_user->admin) {
                 while ($query->fetch()) {
-                    $query2 = $conn->prepare("SELECT username, email, picture FROM users WHERE id = ?");
+                    $query2 = $conn->prepare("SELECT username, email, picture FROM users WHERE id = ? AND deactive IS NULL");
                     $query2->bind_param("i", $user);
                     $query2->execute();
                     $result = $query2->get_result();
 
                     $row = $result->fetch_assoc();
-                    $email = hash('sha256', strtolower(trim($row['email'])));
-                    $username = $row['username'];
+                    $email_hash = hash('sha256', strtolower(trim($row['email'])));
+                    $email = strtolower(trim($row['email']));
+                    $username = strtolower(trim($row['username']));
+                    $username_format = htmlspecialchars($row['username'] ?? '[deleted]');
 
-                    $query_blacklist = $conn->prepare("SELECT value, reason FROM blacklist WHERE (value = ? AND type = 'username') OR (value = ? AND type = 'email')");
-                    $query_blacklist->bind_param("ss", $username, $email);
+                    $query_blacklist = $conn->prepare("SELECT value, reason FROM blacklist WHERE ((value = ? AND type = 'username') OR (value = ? AND type = 'email') OR (value = ? AND type = 'email')) AND (ignore_at IS NULL OR ignore_at >= CURRENT_TIMESTAMP())");
+                    $query_blacklist->bind_param("sss", $username, $email, $email_hash);
                     $query_blacklist->execute();
                     $query_blacklist->store_result();
                     $query_blacklist->bind_result($value, $ban_reason);
                     $query_blacklist->fetch();
 
-                    $username = htmlspecialchars($username ?? '[]');
+                    if(!isset($value)) {
+                        continue;
+                    }
+
                     $query2->free_result();
                     ?>
 
-                    <article class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>
+                    <article class='w3-card-2 gr8-theme w3-light-grey w3-padding-small w3-round-small'>
                         <header>
-                            <img src='<?php echo $row['picture'] ?>' id='pfp' style='border-radius: 50%;'><br />
-                            <h3><a href='/user/<?php echo $user ?>'><?php echo $username ?></a></h3>
+                            <img src='<?php echo $row['picture'] ?? '/img/no_image.png' ?>' id='pfp' style='border-radius: 50%;'><br />
+                            <h3><a href='/@<?php echo $username ?>'><?php echo $username_format ?></a></h3>
                         </header>
-                        <h4>Reason user wants to be unbanned:<br /><?php echo $reason ?></h4>
-                        <h4>Reason for ban:<br /><?php echo $ban_reason ?></h4>
+                        <h4>Reason user wants to be unbanned:<br /><?php echo $bbcode->toHTML($reason, true, true) ?></h4>
+                        <h4>Reason for ban:<br /><?php echo $ban_reason ?? '[no reason provided]' ?></h4>
                         <form method='post' action='appeals.php?value=<?php echo $value ?>&user=<?php echo $user ?>'>
                             <input type='submit' value='Keep user banned' name='deny' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>
                             <input type='submit' value='Unban user' name='accept' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo'>

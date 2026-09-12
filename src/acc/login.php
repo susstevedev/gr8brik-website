@@ -2,7 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
 if (loggedin()) {
-    if (isset($_GET['status']) && $_GET['status'] === 'logout') {
+    if (isset($_GET['status']) && ($_GET['status'] === 'logout' || $_GET['status'] === 'loggedout')) {
         logout(true);
         exit;
     } else {
@@ -62,41 +62,78 @@ if (loggedin()) {
                     error: function(jqXHR, textStatus, errorThrown) {
                         $("#loginBtn").html(prevBtnText);
                 		$("#loginBtn").prop("disabled", false);
-                        
+
                         var response = JSON.parse(jqXHR.responseText);
                         console.error('Server status code: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
                         
                         if(response.popup) {
-                            $("#popup").show();
-                            $("#popup-text").text(response.popup);
-                            $("#popup-btn").attr("href", response.goto);
-                            $("#popup-btn").text(response.btn);
+                            let $popup = $('#popup-template-contain');
+                            let $clone = $($('#popup-template').html());
+
+                            $clone.find("#popup-title").text(response.title);
+                            $clone.find("#popup-text").text(response.popup);
+
+                            if(response.extras) {
+                                $clone.find("#popup-extra").removeClass('w3-hide').text(response.extras);
+                            }
+
+                            if(response.links) {
+                                response.links.forEach(elm => {
+                                    let $btnclone = $($clone.find('.popup-goto').html());
+                                    if(elm.goto) {
+                                        $btnclone.find('a').attr("href", elm.goto);
+                                    } else {
+                                        $btnclone.find('a').addClass('popup-close');
+                                    }
+
+                                    $btnclone.find('a').text(elm.btn);
+                                    $btnclone.find('a').removeClass('w3-hide');
+                                    $clone.find('.popup-buttons').append($btnclone);
+                                });
+                            }
+                            $popup.append($clone);
+                            $popup.find("#popup").show();
+
+                            $(".popup-close").click(function(event) {
+                                $("#popup").remove();
+                            });
+                        } else {
+                            $("#error").show()
+                            $("#error-text").text(response.error);
+                            $("#error").delay(5000).fadeOut(2500, function() {
+                                $("#error-text").text('');
+                            });
                         }
-                        
-                        $("#error").show()
-                        $("#error-text").text(response.error);
-                        $("#error").delay(5000).fadeOut(2500, function() {
-                        	$("#error-text").text('');
-                        });
                     }
                 });
             });
         });
     </script>
 
-    <div id="popup" class="w3-modal w3-card-2">
-        <div class="gr8-theme w3-round-small w3-light-grey w3-modal-content">
-            <header class="w3-container w3-round-small w3-blue"> 
-                <span onclick="document.getElementById('popup').style.display='none'" 
-                class="w3-button w3-display-topright">&times;</span>
-                <h2>Important Modal</h2>
-            </header>
-            <div class="w3-container">
-                <p id="popup-text"></p>
-                <a href="" class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo" id="popup-btn"></a>
+    <template id="popup-template">
+        <div id="popup" class="w3-modal w3-card-2">
+            <div class="gr8-theme w3-round w3-light-grey w3-modal-content">
+                <header class="w3-container">
+                    <span class="popup-close w3-button w3-display-topright">&times;</span>
+                    <h2 id="popup-title"></h2>
+                </header>
+
+                <div class="w3-container">
+                    <p id="popup-text"></p>
+                    <p class="w3-hide w3-round w3-padding w3-border w3-border-grey" id="popup-extra"></p>
+                    <div class="popup-buttons">
+                        <span class="popup-goto w3-hide">
+                            <span class="w3-padding-small">
+                                <a class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo"></a>
+                            </span>
+                        </span>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
+    </template>
+
+    <div id="popup-template-contain"></div>
 
     <div id="error" style="display: none;" class="login-input w3-red w3-card-2 w3-padding w3-round"><span class="fa fa-times-circle-o" aria-hidden="true"></span>&nbsp;<span id="error-text"></span></div>
     <div id="welcome-large">

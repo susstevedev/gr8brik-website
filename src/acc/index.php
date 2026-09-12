@@ -13,12 +13,15 @@ if (isset($_GET['reactive'])) {
     $new_tokenrow = $new_tokendata->fetch_assoc();
     $user = (int)$new_tokenrow['user'];
 
-    $stmt_2 = $conn->prepare("UPDATE users SET deactive = NULL WHERE id = ? LIMIT 1");
-    $stmt_2->bind_param("i", $user);
-    if ($stmt_2->execute()) {
-        setcookie('token', $new_token, time() + (10 * 365 * 24 * 60 * 60), "/");
+    $stmt2 = $conn->prepare("UPDATE users SET deactive = NULL WHERE id = ? LIMIT 1");
+    $stmt2->bind_param("i", $user);
+    if ($stmt2->execute()) {
+        $stmt3 = $conn->prepare("DELETE FROM sessions WHERE id = ? LIMIT 1");
+        $stmt3->bind_param("s", $new_token);
+        $stmt3->execute();
+
         echo "<h2>Account has been reactivated, please login after this.</h2>";
-        header('Location: index.php');
+        header('Location:login.php');
         exit;
     }
 }
