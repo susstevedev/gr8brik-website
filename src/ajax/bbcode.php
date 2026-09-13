@@ -12,12 +12,15 @@ class BBCode
 {
   protected $bbcode_table = array();
 
+  protected $db;
+
   public function __construct()
   {
 
+    $this->db = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+
     // Replace [code]...[/code] with <pre><code>...</code></pre>
     $this->bbcode_table["/\[code\](.*?)\[\/code\]/is"] = function ($match) {
-      //$escapedCode = preg_replace('/\[\/?([^\]]+)\]/', '&#91;$1&#93;', $match[1]);
       $escapedCode = str_replace(['[',']'],['&#91;','&#93;'],$match[1]);
       return "<pre style='background-color:grey;color:white;padding:2px;'><code>$escapedCode</code></pre>";
     };
@@ -37,16 +40,14 @@ class BBCode
 
     // Replace @user_id (or @user_name) with <a href="/user/user_id">@user_name</a>
     // Also replace #searchquery with <a href="/list?q=searchquery">#searchquery</a>
-    $this->bbcode_table["/(?<!\[url\])(?<!\[img\])(?<!\[)(?<!&)(@|#)([\p{L}\p{N}_\-.]+)(?!\])(?!;)(?!<)(?!>)(?!:)/ui"] = function ($match) {
+    /*$this->bbcode_table["/(?<!\[url\])(?<!\[img\])(?<!\[)(?<!&)(@|#)([\p{L}\p{N}_\-.]+)(?!\])(?!;)(?!<)(?!>)(?!:)/ui"] = function ($match) {
       if ($match[1] === '@') {
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-        if ($conn->connect_error) {
+        if ($this->db->connect_error) {
           return "@{$match[2]}";
         }
 
-        $username = $conn->real_escape_string($match[2]);
-        $matchResult = $conn->query("SELECT id, username FROM users WHERE username = '$username' OR id = '$username'");
+        $username = $this->db->real_escape_string($match[2]);
+        $matchResult = $this->db->query("SELECT id, username FROM users WHERE username = '$username' OR id = '$username'");
 
         if ($matchResult && $matchRow = $matchResult->fetch_assoc()) {
           return "<a class=\"gr8-username-embed\" href=\"/user/{$matchRow['id']}\"><b>@{$matchRow['username']}</b></a>";
@@ -59,6 +60,27 @@ class BBCode
         //return "<a href=\"{$match[1]}\" target=\"_blank\">$match[1]</a>";
         return "@{$match[2]}";
       }
+    };*/
+
+
+    // Replace [user]user_id_or_username[/user] with @username
+    $this->bbcode_table["/\[user\](.*?)\[\/user\]/is"] = function ($match) {
+      if ($this->db->connect_error) {
+        return "@{$match[1]}";
+      }
+
+      $str = $this->db->real_escape_string($match[1]);
+      $username = '[deleted]';
+      $picture = '/img/no_image.png';
+
+      $matchResult = $this->db->query("SELECT id, username, picture FROM users WHERE (id = '$str' OR username = '$str') AND deactive IS NULL AND private_profile != 1");
+
+      if ($matchResult && $matchRow = $matchResult->fetch_assoc()) {
+        $username = htmlspecialchars($matchRow['username'] ?? '[deleted]');
+        $picture = $matchRow['picture'] ?? '/img/no_image.png';
+      }
+
+      return "<a class=\"gr8-username-embed w3-round w3-border w3-yellow\" href=\"/@{$username}\"><img src=\"{$picture}\" class=\"w3-round\" width=\"18px\" height=\"18px\" />{$username}</a>";
     };
 
 
@@ -197,52 +219,6 @@ class BBCode
 
   //edited by me
 
-  /*public function Smilify(&$subject)
-  {
-    $smilies = array(
-      ':|'  => 'neutral',
-      ':-|' => 'neutral',
-      ':-o' => 'e_surprised',
-      ':-O' => 'e_surprised',
-      ':o'  => 'e_surprised',
-      ':O'  => 'e_surprised',
-      ';)'  => 'e_wink',
-      ';-)' => 'e_wink',
-      ':p'  => 'razz',
-      ':-p' => 'razz',
-      ':P'  => 'razz',
-      ':-P' => 'razz',
-      ':D'  => 'e_biggrin',
-      ':-D' => 'e_biggrin',
-      '8)'  => 'cool',
-      '8-)' => 'cool',
-      ':)'  => 'e_smile',
-      ':-)' => 'e_smile',
-      ':('  => 'e_sad',
-      ':-(' => 'e_sad',
-    );
-
-    $sizes = array(
-      'e_biggrin' => 18,
-      'cool' => 20,
-      'haha' => 20,
-      'neutral' => 20,
-      'e_surprised' => 20,
-      'e_sad' => 20,
-      'e_smile' => 18,
-      'razz' => 20,
-      'e_wink' => 20,
-    );
-
-    $replace = array();
-    foreach ($smilies as $smiley => $imgName) {
-      $size = $sizes[$imgName];
-      array_push($replace, '<img src="/img/emote/icon_' . $imgName . '.gif" data-textog="' . $subject . '" title="emojis are from phpbb" alt="' . $smiley . '" xwidth="' . $size . '" xheight="' . $size . '" />');
-    }
-    $subject = str_replace(array_keys($smilies), $replace, $subject);
-    return $subject;
-  }*/
-
   public function Smilify(&$subject)
   {
     $smilies = array(
@@ -347,5 +323,32 @@ class BBCode
     }
     $subject = str_replace(array_keys($smilies), $replace, $subject);
     return $subject;
+  }
+
+  /**
+   * Function to turn @username into [user]1234[/user]
+   */
+  public function Screennameify($str) {
+    preg_match_all('/@([a-zA-Z0-9_]+)/', $str, $matches);
+
+    if (!empty($matches[1])) {
+      $usernames = array_unique($matches[1]);
+      $placeholders = implode(',', array_fill(0, count($usernames), '?'));
+      $stmt = $this->db->prepare("SELECT id, username FROM users WHERE username IN ($placeholders) AND deactive IS NULL AND private_profile != 1");
+      $stmt->execute($usernames);
+      $result = $stmt->get_result();
+
+      $map = [];
+      while ($row = $result->fetch_assoc()) {
+        $map[$row['username']] = $row['id'];
+      }
+
+      return preg_replace_callback('/@([a-zA-Z0-9_]+)/', function($match) use ($map) {
+          $user = $map[$match[1]] ?? $match[1];
+          return "[user]" . $user . "[/user]";
+      }, $str);
+    } else {
+      return $str;
+    }
   }
 }

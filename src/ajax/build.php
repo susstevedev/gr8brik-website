@@ -864,7 +864,7 @@ if(isset($_GET['comments'])) {
 if(isset($_POST['comment'])) {
     header('Content-Type: application/json');
 
-	$comment = $_POST['commentbox'];
+    $comment = isset($_POST['commentbox']) ? $_POST['commentbox'] : 0;
     $parent = isset($_POST['parent']) ? (int)$_POST['parent'] : 0;
     $csrf = $_POST['csrf_token'];
     $model_id = $_POST['buildId'];
@@ -962,6 +962,7 @@ if(isset($_POST['comment'])) {
 
 	$date = time();
     $is_op = $id === $userid ? 1 : 0;
+    $comment = $bbcode->Screennameify($comment);
 
     $sql = "INSERT INTO comments (user, model, comment, parent, date, is_op) VALUES (?, ?, ?, ?, ?, ?) LIMIT 1";
     $stmt2 = $conn->prepare($sql);
@@ -1002,7 +1003,7 @@ if(isset($_POST['comment'])) {
             'success' => 'Comment sent.',
             'comment' => [
                 'id' => $last_id,
-                'text' => $comment,
+                'text' => $bbcode->toHTML($comment, true, true),
                 'username' => $current_user->username,
                 'userid' => $current_user->id,
                 'admin' => $current_user->admin,
