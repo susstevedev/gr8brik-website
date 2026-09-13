@@ -538,12 +538,12 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 <br />
 
                                 <?php if(loggedin()) { ?>
-                                    <?php if ($comment['voted'] === false && !$comment['user_removed']) { ?>
+                                    <?php if ($comment['voted'] === false) { ?>
                                         <div class="tooltip">
                                             <span class="w3-blue tooltiptext">Favorite Comment</span>
-                                            <button data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
+                                            <button <?php echo $comment['user_removed'] ? 'disabled' : null ?> data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
                                         </div>
-                                    <?php } elseif ($comment['voted'] === true && !$comment['user_removed']) { ?>
+                                    <?php } elseif ($comment['voted'] === true) { ?>
                                         <div class="tooltip">
                                             <span class="w3-blue tooltiptext">Unfavorite Comment</span>
                                             <button data-id="<?php echo $comment['id'] ?>" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>
@@ -566,7 +566,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 
                                         <div class="tooltip">
                                             <span class="w3-blue tooltiptext">Reply to this comment</span>
-                                            <button data-id="<?php echo $comment['id'] ?>" class="reply-btn fa fa-reply w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small"></button>
+                                            <button <?php echo $comment['user_removed'] ? 'disabled' : null ?> data-id="<?php echo $comment['id'] ?>" class="reply-btn fa fa-reply w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small"></button>
                                         </div>
 
                                         <?php if (trim($current_user->id) === trim($comment['userid'])) { ?>
@@ -584,7 +584,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                         <?php } ?>
 
                                         <?php if (trim($current_user->id) === trim($comment['userid']) || $current_user->admin) { ?>
-                                            <div class="tooltip" id="data-report-comment">
+                                            <div class="tooltip" id="data-delete-comment">
                                                 <span class="w3-blue tooltiptext"><?php echo ($comment['is_hidden'] ?? false) ? 'Restore' : 'Delete'; ?> this comment</span>
                                                 <button data-id="<?php echo $comment['id'] ?>" id="delete-comment-button" name="delete-comment" class="fa fa-trash w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
                                             </div>
