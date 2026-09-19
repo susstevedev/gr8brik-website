@@ -84,7 +84,7 @@ class User {
     public ?int $alert;
     public ?string $age;
     public ?string $verify_token;
-    public ?string $private_profile;
+    public ?bool $private_profile;
     public ?string $deactive;
 
     public function __construct(?array $data = []) {

@@ -95,7 +95,7 @@ class BBCode
       $id = (int)$match[1] ?? 0;
 
       if(!empty($id)) {
-        return "<br /><img src='/ajax/image?imgbb_image=true&id=" . $id . "'/>";
+        return "<br /><span class='gr8-comment-attachment' data-id='" . $id . "'><img src='/ajax/image?imgbb_image=true&id=" . $id . "'/></span>";
       } else {
         return "[deleted attachment]";
       }
