@@ -401,6 +401,11 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
             <?php if ($data['message']) { ?>
                 <p><div class="gr8-theme w3-light-grey w3-round w3-padding"><?php echo $data['message'] ?></div></p>
             <?php } elseif (loggedin()) { ?>
+                <div id="comment-view-toggle" class="w3-col s12 w3-margin-bottom w3-bar">
+                    <button class="edit w3-bar-item w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Edit</button>
+                    <button class="preview w3-bar-item w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Preview</button>
+                </div>
+
                 <div id="comment-form" class="w3-half w3-row w3-display-container">
                     <div class="w3-left xw3-margin-right" id="comment-profile-picture">
                         <img class="w3-round" width="50px" height="50px" src="<?php echo $current_user->picture ?>">
@@ -411,15 +416,66 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                     </div>
 
                     <div id="post" class="w3-rest w3-hover-shadow w3-border w3-border-blue">
-                        <textarea name="comment-box" id="comment-box" class="w3-input w3-col s12" placeholder="Add a comment... (@userid mentions someone, BBcode supported)"></textarea>
+                        <textarea name="comment-box" id="comment-box" class="w3-input w3-col s12" placeholder="Add a comment... (@username mentions someone, BBcode supported)"></textarea>
                     </div>
 
+                    <article class="comment-preview w3-rest gr8-theme w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
+                        <header class="w3-padding-bottom">
+                            <b>
+                                <a href="/@<?php echo urlencode($current_user->username) ?>" class="<?php echo $current_user->admin ? 'w3-text-red w3-hover-text-yellow' : ''; ?>"><?php echo $current_user->username ?></a>
+                            </b>
+
+                            <span class="w3-mobile w3-right">
+                                <span class="date"></span>
+                            </span>
+                        </header>
+
+                        <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;" data-preview-text="">
+                            My comments text
+                        </span>
+                    </article>
+
                     <div class="w3-col s12 w3-margin-top">
-                        <button id="post-comment" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
+                        <button id="post-comment" class="comment-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
                             <span id="comment-btn-text"><i class="fa fa-paper-plane-o" aria-hidden="true"></i> Post comment</span>
+                        </button>
+
+                        <button id="attach-image" class="comment-button w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">
+                            <span id="attach-image-btn-text"><i class="fa fa-image" aria-hidden="true"></i> Add attachment</span>
                         </button>
                     </div>
                 </div>
+
+                <!--<div id="comment-preview-form" class="w3-row w3-section">
+                    <div class="w3-col w3-hide-small" id="comment-profile-picture">
+                        <img class="w3-bar-item w3-round w3-card-2 w3-grey" width="50px" height="50px" src="<?php echo $current_user->picture ?>">
+                    </div>
+
+                    <div class="w3-col w3-hide-small">
+                        <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
+                    </div>
+
+                    <article class="gr8-theme w3-col w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
+                        <header class="w3-padding-bottom">
+                            <b>
+                                <a href="/@<?php echo urlencode($current_user->username) ?>" class="<?php echo $current_user->admin ? 'w3-text-red w3-hover-text-yellow' : ''; ?>"><?php echo $current_user->username ?></a>
+                            </b>
+
+                            <span class="w3-mobile w3-right">
+                                <time class="date" title="0 seconds ago" datetime="0 seconds ago">0 seconds ago</time>
+                                - <span class="votes">0 favorites</span>
+                            </span>
+                        </header>
+
+                        <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;">
+                            My comments text
+                        </span>
+                    </article>
+                </div>-->
+
+                <form id="attach-upload" method="post" action="">
+                    <input type="file" name="imagefile" id="imagefile">
+                </form>
             <?php } else { ?>
                 <div>
                     <a href="/acc/login" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo"><i class="fa fa-paper-plane-o" aria-hidden="true"></i> Login to post comments</a>
@@ -592,15 +648,6 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                     </div>
                                 <?php } ?>
                             </article>
-
-                            <!--<div id="reply-form-container-<?php echo $comment['id'] ?>" class="w3-margin reply-form-box" style="display:none;">
-                                <div class="w3-right w3-block">
-                                    <textarea name="reply-box" id="reply-box-<?php echo $comment['id'] ?>" class="reply-box w3-input w3-border w3-border-blue w3-hover-shadow" placeholder="Add a reply... (@userid mentions someone, BBcode supported)" rows="2"></textarea>
-                                    <button data-parent="<?php echo $comment['id'] ?>" class="post-reply w3-right w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
-                                        <span class="comment-btn-text"><i class="fa fa-reply" aria-hidden="true"></i> Post reply</span>
-                                    </button>
-                                </div>
-                            </div>-->
                         </div>
                     </div>
                     <?php
