@@ -386,7 +386,7 @@
             let marg = depth * 25 + 'px';
             let width = Math.max(40, 60 - (depth * 2)) + '%';
 
-            $clone.find(".text").text(comment.text);
+            $clone.find(".text").html(comment.text);
             $clone.find(".comment-user").text(comment.username).attr('href', '/@' + comment.username);
             $clone.find(".comment-body").css("width", width);
             $clone.css("margin-left", marg);
@@ -427,10 +427,10 @@
 
             if (event.type === 'focusin') {
                 $("#comment-form [name='comment-box']").stop().animate({ height: "80px" }, 'fast');
-                $("#comment-form #post-comment").stop().show();
+                $("#comment-form .comment-button").stop().show();
             } else if (event.type === 'focusout' && !form_inside) {
                 $("#comment-form [name='comment-box']").stop().animate({ height: "60px" }, 'fast'); 
-                $("#comment-form #post-comment").stop().fadeOut("fast");
+                $("#comment-form .comment-button").stop().hide();
             }
         });
 
@@ -451,6 +451,121 @@
                 $comment.find('.comment-body, [data-testid="gr8-comment-divider"], .comment-error').slideToggle('fast');
                 $comment.find('.comment-profile-picture img').animate({width: collapsed ? '25px' : '50px', height: collapsed ? '25px' : '50px'}, 'fast');
             }
+        });
+
+        $(document).on("click", "#comment-view-toggle button", function (event) {
+            event.preventDefault();
+            var btn = $(this);
+            var comment_box = $("#comment-form [name='comment-box']").val() || $("#comment-form [name='comment-box']").attr('placeholder');
+            var preview_selector = $('#comment-form .comment-preview .text');
+            var preview_date_selector = $('#comment-form .comment-preview .w3-right .date');
+
+            if(btn.hasClass('edit')) {
+                $('#comment-form #post').show();
+                $('#comment-form .comment-preview').hide();
+            } else if(btn.hasClass('preview')) {
+                $('#comment-form #post').hide();
+
+                if($.trim(comment_box).length === 0) {
+                    $('#comment-form .comment-preview').show();
+                    return;
+                }
+
+                if($.trim(comment_box) === $.trim(atob(preview_selector.attr('data-preview-text')))) {
+                    $('#comment-form .comment-preview').show();
+                    return;
+                }
+
+                fetchCSRFToken(function () {
+                    $.ajax({
+                        url: "../ajax/build",
+                        dataType: 'json',
+                        data: {
+                            comment_preview: true,
+                            commentbox: comment_box,
+                            csrf_token: window.csrf_token
+                        },
+                        type: 'POST',
+                        success: function(res) {
+                            if (res && res.success && res.comment) {
+                                preview_selector.html(res.comment.text);
+                                preview_date_selector.text(res.comment.edited_at);
+
+                                // base64 to basically excape characters
+                                preview_selector.attr('data-preview-text', btoa(comment_box));
+                            } else if (res && res.message && !res.success) {
+                                showError(res.message);
+                            } else {
+                                showError("Couldn\'t load the preview");
+                            }
+
+                            if(res && !res.success) {
+                                preview_selector.html(comment_box);
+                                preview_selector.attr('data-preview-text', btoa(comment_box));
+                            }
+
+                            $('#comment-form .comment-preview').show();
+                        },
+                        error: function(xhr, text, error) {
+                            showError("Couldn\'t load the preview");
+                            console.log(xhr, text, error);
+                        }
+                    });
+                });
+            }
+        });
+
+        $(document).on("click", "#attach-image", function (event) {
+            event.preventDefault();
+            $("#attach-upload #imagefile").click();
+        });
+
+        $(document).on("change", "#attach-upload #imagefile", function (event) {
+            event.preventDefault();
+
+            var btn = $(this);
+            var btntext = $('#attach-image #attach-image-btn-text');
+            var prevbtntext = btntext.html();
+
+            var comment_box = $("#comment-form [name='comment-box']");
+
+            var file_data = $('#attach-upload #imagefile').prop('files')[0];
+            var form_data = new FormData();
+
+            form_data.append('imagefile', file_data);
+            form_data.append('upload', 'true');
+
+            btntext.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
+            btn.prop("disabled", true);
+
+            $.ajax({
+                url: "../ajax/image",
+                dataType: 'json',
+                contentType: false,
+                processData: false,
+                data: form_data,
+                type: 'POST',
+                success: function(res) {
+                    btntext.html(prevbtntext);
+                    btn.prop("disabled", false);
+
+                    if (res && res.success && res.image && res.insert) {
+                        showSuccess(res.message);
+
+                        comment_box.val(comment_box.val() + ($.trim(comment_box.val()).length === 0 ? "" : "\n") + res.insert);
+                    } else if (res && res.message && !res.success) {
+                        showError(res.message);
+                    } else {
+                        showError('An error occured while uploading the image');
+                    }
+                },
+                error: function(xhr, text, error) {
+                    btntext.html(prevbtntext);
+                    btn.prop("disabled", false);
+
+                    showError("An error occured while uploading the image");
+                }
+            });
         });
 
         $(document).on("click", "#post-comment", function (event) {

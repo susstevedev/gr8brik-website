@@ -250,9 +250,8 @@ body.mode-dark .creation-page-meta {
     height: 60px;
 }
 
-#comment-form #post-comment {
+#comment-form .comment-button, #comment-form .comment-preview, #attach-upload #imagefile {
     display: none;
-    opacity: 1;
 }
 
 #data-comment-wrapper .comment {
