@@ -314,19 +314,22 @@ if (isset($_POST['comment'])) {
         $users = User::getUsers($userIds);
 
         if (loggedin()) {
-            $userId = $current_user->id;
-            $result = $conn2->query("SELECT userid, profileid FROM user_blocks WHERE userid = $userId OR profileid = $userId");
+            foreach($userIds as $userId) {
+                $result = $conn2->query("SELECT userid, profileid FROM user_blocks WHERE userid = $userId OR profileid = $userId");
 
-            while ($row = $result->fetch_assoc()) {
-                $block_userid = (int)$row['userid'];
-                $block_profileid = (int)$row['profileid'];
+                while ($row = $result->fetch_assoc()) {
+                    print_r($row);
 
-                if ($block_userid === $userId) {
-                    $blocked[$block_profileid]['you_blocked'] = true;
-                }
+                    $block_userid = (int)$row['userid'];
+                    $block_profileid = (int)$row['profileid'];
 
-                if ($block_profileid === $userId) {
-                    $blocked[$userid]['they_blocked'] = true;
+                    if ($block_userid === $userId && $userId !== $block_profileid) {
+                        $blocked[$block_profileid]['you_blocked'] = true;
+                    }
+
+                    if ($block_profileid === $userId && $userId !== $block_userid) {
+                        $blocked[$userid]['they_blocked'] = true;
+                    }
                 }
             }
         }
@@ -349,6 +352,7 @@ if (isset($_POST['comment'])) {
             $pfp = $c_user_o->picture;
 
             $c_user_exists = !User::isDeleted($c_user);
+            $c_user_blocked = $blocked[$c_user]['they_blocked'] ?? false;
 
 			if ($c_user_exists) {
 				$user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user' AND deleted_at IS NULL");
@@ -357,7 +361,8 @@ if (isset($_POST['comment'])) {
                 if(loggedin()) {
                     //todo add message for if you are also blocking
                     //not that hard will probably be done soon
-                    if ($blocked[$c_user]['they_blocked'] ?? false) {
+                    if ($c_user_blocked) {
+                        print_r($blocked);
                         continue;
                     }
                 }
@@ -387,7 +392,7 @@ if (isset($_POST['comment'])) {
 					<?php } ?>
                 </div>
                 <div class="gr8-theme w3-display-container w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-col m9 l9">
-                    <pre class="comment-text"><?php echo $bbcode->toHTML($bbcode->Smilify($decoded_comment), false, true) ?></pre>
+                    <pre class="comment-text"><?php echo $bbcode->toHTML($bbcode->Smilify($decoded_comment), false, true) ?></pre><br />
 					<form class="edit w3-hide">
 						<textarea class="edit-textarea"><?php echo $decoded_comment ?></textarea><br />
 						<button class="save-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Save</button>
@@ -399,7 +404,7 @@ if (isset($_POST['comment'])) {
 							if ($row['parent'] === $post_id && ($current_user->admin || trim($current_user->id) === trim($c_user))) {
 								?>
 								<div class="delete gr8-theme w3-hide w3-light-grey w3-round-small w3-padding-small w3-margin-bottom">
-									<p>Are you sure you want to delete this comment?</p>
+									<p>Are you sure you want to delete this reply?</p>
 									<button class="confirm-delete-btn w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" data-id="<?php echo $row['id'] ?>">Yes</button>
 									<button class="cancel-delete-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
 								</div>
@@ -440,9 +445,12 @@ if (isset($_POST['comment'])) {
         'Obviously',
         'Sixty five, sixty six, sixty... why do I bother. You already get it.',
         'Dislike 👎😒',
-        'Big fan of user @' . rand(1, 20) . '\'s creations',
+        'Big fan of user [user]8[/user]\'s models on Mecabricks!',
+        'Just a regular LARPER!',
         '[object Object] said the console!',
         'Rahhhh',
+        'TERFs suck',
+        'Don\'t tell 15 year olds to end their lives because they said "me when... (something about getting a bf).',
         '"[i]Gr8 b8, m8. I rel8, str8 appreci8, and congratul8. I r8 this b8 an 8/8. Plz no h8, I\'m str8 ir8. Cre8 more, can\'t w8. We should convers8, I won\'t ber8, my number is 8888888, ask for N8. No calls l8 or out of st8. If on a d8, ask K8 to loc8. Even with a full pl8, I always have time to communic8 so don\'t hesit8[/i]"'
     ];
 
@@ -470,11 +478,26 @@ if (isset($_POST['comment'])) {
         echo "</form><br />";
     } else {
         if (loggedin()) {
-            echo "<a href='#commentboxlink'>permalink to replybox</a>";
-            echo "<br /><a id='commentboxlink'><form id='commentboxcontainer' method='post' action=''>";
-            echo "<textarea name='commentbox' placeholder='" . $randomWordDisplay . "' rows='4' cols='50'></textarea><br />";
-            echo "<input type='submit' value='Reply' name='comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo' />";
-            echo "</form></a><br />";
+            ?>
+                <a href='#commentboxlink'>permalink to replybox</a><br />
+                <a id='commentboxlink'>
+                    <form id='commentboxcontainer' method='post' action=''>
+                        <textarea name='commentbox' placeholder='<?php echo $randomWordDisplay ?>' rows='4' cols='50'></textarea><br />
+                    </form>
+
+                    <button id="post-reply" name='comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo'>
+                        <span id="post-reply-text"><i class="fa fa-comment-o" aria-hidden="true"></i> Reply</span>
+                    </button>
+
+                    <button id="attach-image" class="w3-btn w3-white w3-hover-opacity w3-round-small w3-border w3-border-grey">
+                        <span id="attach-image-btn-text"><i class="fa fa-image" aria-hidden="true"></i> Attach image</span>
+                    </button>
+                </a><br />
+
+                <form id="attach-upload" method="post" action="">
+                    <input type="file" name="imagefile" id="imagefile">
+                </form>
+            <?php
         } else {
             echo "<b id='commentboxcontainer'>Please <a href='../acc/login'>login</a> to post a reply.</b><br />";
         }
