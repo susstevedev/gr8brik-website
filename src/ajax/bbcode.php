@@ -84,6 +84,24 @@ class BBCode
     };
 
 
+    // Replace [attachment]attachment_id[/attachment] with <img src="..."/>
+    $this->bbcode_table["/\[attachment\](.*?)\[\/attachment\]/is"] = function ($match) {
+      if ($this->db->connect_error) {
+        return "{$match[1]}";
+      }
+
+      require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/imgbb.php';
+
+      $id = (int)$match[1] ?? 0;
+
+      if(!empty($id)) {
+        return "<br /><img src='/ajax/image?imgbb_image=true&id=" . $id . "'/>";
+      } else {
+        return "[deleted attachment]";
+      }
+    };
+
+
     // Replace [b]...[/b] with <strong>...</strong>
     $this->bbcode_table["/\[b\](.*?)\[\/b\]/is"] = function ($match) {
       return "<strong>$match[1]</strong>";

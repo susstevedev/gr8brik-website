@@ -3,7 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
 $bbcode = new BBCode;
 
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
@@ -1067,6 +1067,24 @@ if (isset($_POST['edit_comment'])) {
         }
     } else {
         echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
+    }
+    exit;
+}
+
+if (isset($_POST['comment_preview']) && isset($_POST['commentbox'])) {
+    header('Content-Type: application/json');
+
+    if ($_SESSION['csrf'] === $_POST['csrf_token']) {
+        if (loggedin()) {
+            $comment_text = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
+            $date = time();
+
+            echo json_encode(['success' => true, 'comment' => ['text' => $bbcode->toHTML($comment_text, true, true), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Not logged in']);
+        }
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Oops! Your CSRF token seems to be invalid.']);
     }
     exit;
 }

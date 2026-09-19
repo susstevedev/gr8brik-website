@@ -519,7 +519,7 @@ if (isset($_POST['picture'])) {
                 exit(json_encode(['success' => false, 'error' => 'DB connection failure.']));
             }
 
-            $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ?");
+            $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ? AND deactive IS NULL");
             $stmt->bind_param("ss", $db_pfp, $id);
             if ($stmt->execute()) {
                 http_response_code(200);
@@ -554,7 +554,7 @@ if (isset($_POST['remove_picture'])) {
         exit(json_encode(['success' => false, 'error' => 'You do not have an uploaded profile image.']));
     }
 
-    $stmt = $conn->prepare("UPDATE users SET picture = NULL WHERE id = ?");
+    $stmt = $conn->prepare("UPDATE users SET picture = NULL WHERE id = ? AND deactive IS NULL");
     $stmt->bind_param("s", $id);
 
     if ($stmt->execute()) {
