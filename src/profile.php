@@ -11,14 +11,14 @@ if(isset($_GET['name'])) {
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
-if(loggedin()) {
-    $userid = $current_user->id;
-}
-
 $data = fetch_profile($_GET['id'] ?? urldecode($_GET['name']), $_SESSION['csrf'], $use_username);
+$userid = loggedin() ? $current_user->id : null;
 
-if($data['message'] != null | !empty($data['message'])) {
+if(isset($data) && !$data['success'] && !empty($data['message'])) {
     $error = $data['message'];
+    $error_title = $data['title'] ?? null;
+    $error_picture = $data['picture'] ?? null;
+    $error_code = $data['code'] ?? null;
 }
 
 if(isset($data) && isset($data['userid'])) {
@@ -26,225 +26,99 @@ if(isset($data) && isset($data['userid'])) {
 }
 
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+$interactions = new UserInteractions();
 
 if (isset($_POST['follow'])) {
-    if(!isset($userid)) {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to follow this user";
-    }
-
-    if(User::isDeleted($_GET['id'])) {
-       $error = "No user found";
-    }
-
     $profile_id = (int)$_GET['id'];
-    $time = time();
+    $p_data = $interactions->followUser($profile_id);
+    $error_title = $p_data['title'] ?? 'Follow';
 
-    if((int)$userid === $profile_id) {
+    if($data['success']) {
+        header("HTTP/1.0 200 OK");
+        $message = $p_data['message'] ?? 'Successful';
+        header('refresh:3');
+    } else {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "You cannot follow yourself";
-    }
-
-    if(!User::isVerified()) {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "User account is not verified";
-    }
-
-    if(!isset($error)) {
-        $sql_follow = "INSERT INTO follow (userid, profileid, date) VALUES (?, ?, ?)";
-        $stmt_follow = $conn->prepare($sql_follow);
-        $stmt_follow->bind_param("iii", $userid, $profile_id, $time);
-        $result = $stmt_follow->execute();
-        $stmt_follow->close();
-
-        $notification = new Notifications($conn);
-        $notification->notify_subscribers('profile', $profile_id, $userid);
-
-        if ($result) {
-            header("HTTP/1.0 200 OK");
-            $message = "Followed this user with success";
-            header('refresh:3');
-        } else {
-            header("HTTP/1.0 500 Internal Server Error");
-            $error = "An error occured while following this user";
-            header('refresh:3');
-        }
+        $error = $p_data['message'] ?? 'An error has occured';
+        header('refresh:3');
     }
 }
 
 if(isset($_POST['unfollow'])) {
-    if(!isset($userid)) {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to unfollow this user";
-    }
-
-    if(User::isDeleted($_GET['id'])) {
-       $error = "No user found";
-    }
-
     $profile_id = (int)$_GET['id'];
+    $p_data = $interactions->unfollowUser($profile_id);
+    $error_title = $p_data['title'] ?? 'Unfollow';
 
-    if(!isset($error)) {
-        $sql = "DELETE FROM follow WHERE userid = '$userid' AND profileid = '$profile_id'";
-        $result = $conn->query($sql);
-        if ($result) {
-            header("HTTP/1.0 200 OK");
-            $message = "Unfollowed this user with success";
-            header('refresh:3');
-        } else {
-            header("HTTP/1.0 500 Internal Server Error");
-            $error = "An error occured while unfollowing this user";
-            header('refresh:3');
-        }
+    if($p_data['success']) {
+        header("HTTP/1.0 200 OK");
+        $message = $p_data['message'] ?? 'Successful';
+        header('refresh:3');
+    } else {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = $p_data['message'] ?? 'An error has occured';
+        header('refresh:3');
     }
 }
 
 if (isset($_POST['block'])) {
-    if(!isset($userid)) {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to block this user";
-    }
-
-    if(User::isDeleted($_GET['id'])) {
-        exit('No user found');
-    }
-
     $profile_id = (int)$_GET['id'];
-    $time = time();
+    $p_data = $interactions->blockUser($profile_id);
+    $error_title = $p_data['title'] ?? 'Block and unfollow';
 
-    if((int)$userid === $profile_id) {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "You cannot block yourself";
-    }
-    
-    $stmt = $conn->prepare("SELECT * FROM follow WHERE userid = ? AND profileid = ?");
-    $stmt->bind_param("ii", $userid, $profile_id);
-    $result = $stmt->execute();
-    $stmt->close();
-    if($result) {
-    	$stmt = $conn->prepare("DELETE FROM follow WHERE userid = ? AND profileid = ?");
-    	$stmt->bind_param("ii", $userid, $profile_id);
-    	$result = $stmt->execute();
-    	$stmt->close();
-
-    	if (!$result) {
-        	header("HTTP/1.0 500 Internal Server Error");
-        	$error = "An error occured while blocking this user";
-    	}
-    }
-
-    $sql_block = "INSERT INTO user_blocks (userid, profileid, date) VALUES (?, ?, ?)";
-    $stmt_block = $conn->prepare($sql_block);
-    $stmt_block->bind_param("iii", $userid, $profile_id, $time);
-    $result = $stmt_block->execute();
-    $stmt_block->close();
-
-    if ($result) {
+    if($p_data['success']) {
         header("HTTP/1.0 200 OK");
-        $message = "Blocked this user with success";
+        $message = $p_data['message'] ?? 'Successful';
         header('refresh:3');
     } else {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "An error has happened while blocking this user";
+        $error = $p_data['message'] ?? 'An error has occured';
         header('refresh:3');
     }
 }
 
 if(isset($_POST['unblock'])) {
-    if(!isset($userid)) {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to unblock this user";
-    }
-
-    if(User::isDeleted($_GET['id'])) {
-       $error = "No user found";
-    }
-
     $profile_id = (int)$_GET['id'];
+    $p_data = $interactions->unblockUser($profile_id);
+    $error_title = $p_data['title'] ?? 'Unblock';
 
-    $sql = "DELETE FROM user_blocks WHERE userid = '$userid' AND profileid = '$profile_id'";
-    $result = $conn->query($sql);
-    if ($result) {
+    if($p_data['success']) {
         header("HTTP/1.0 200 OK");
-        $message = "Unblocked this user with success";
+        $message = $p_data['message'] ?? 'Successful';
         header('refresh:3');
     } else {
         header("HTTP/1.0 500 Internal Server Error");
-        $error = "An error has happened while unblocking this user";
+        $error = $p_data['message'] ?? 'An error has occured';
         header('refresh:3');
     }
 }
 
-if(isset($_POST['ban'])) {
-    $profile_id = (int)$_GET['id'];
-    $reason = mysqli_real_escape_string($conn, $_POST['reason']);
-    $day = $_POST['day'];
-	$month = $_POST['month'];
-	$year = $_POST['year'];
-	$ban_date = mktime(0, 0, 0, $month, $day, $year);
-	$duration = $ban_date - time();
-    $start_date = time();
-    $end_date = $start_date + $duration;
-    $email = hash('sha256', strtolower($data['email']));
-
-    if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-        exit('Invalid user ID!');
-    }
-
-    if(User::isDeleted($_GET['id'])) {
-        exit('No user found');
-    }
-
-    if ($duration <= 0) {
-        exit('Ban date must be in the future!');
-    }
-		
-    if($current_user->admin != false) {
-        $sql = "INSERT INTO bans (user, email, reason, start_date, end_date) VALUES ($profile_id, '$email', '$reason', $start_date, $end_date)";
-        $result = $conn->query($sql);
-        if ($result) {
-            $sql2 = "DELETE FROM sessions WHERE user = $profile_id";
-            $result2 = $conn->query($sql2);
-            if($result2) {
-                header('refresh:0');
-                exit;
-            }
-        } else {
-            exit('An SQL error occured!');
-        }
-    } else {
-        exit('User is not an administrator!');
-    }
-}
+$admin = new UserAdmin();
 
 if(isset($_POST['warn'])) {
+    $reason = isset($_POST['reason']) ? $_POST['reason'] : null;
     $profile_id = (int)$_GET['id'];
-    $reason = mysqli_real_escape_string($conn, $_POST['reason']);
-    $start_date = time();
+    $p_data = $admin->warnUser($profile_id, $reason);
+    $error_title = $p_data['title'] ?? 'Warn';
 
-    if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-        exit('Invalid user ID!');
-    }
-
-    if(User::isDeleted($_GET['id'])) {
-        exit('No user found');
-    }
-		
-    if($current_user->admin != false) {
-        $sql = "INSERT INTO warnings (user, reason, timestamp) VALUES ($profile_id, '$reason', $start_date)";
-        $result = $conn->query($sql);
-        if ($result) {
-           	header('refresh:0');
-        	exit;
-        } else {
-            exit('An SQL error occured!');
-        }
+    if($p_data['success']) {
+        header("HTTP/1.0 200 OK");
+        $message = $p_data['message'] ?? 'Successful';
+        header('refresh:3');
     } else {
-        exit('User is not an administrator!');
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = $p_data['message'] ?? 'An error has occured';
+        header('refresh:3');
     }
 }
 
-if(isset($_POST['delete'])) {
+/*if(isset($_POST['delete'])) {
+    $error_title = 'Removing user';
+
+    if(!loggedin()) {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = "Please login to remove this user";
+    }
+
     if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
         exit('Invalid user ID!');
     }
@@ -278,8 +152,8 @@ if(isset($_POST['delete'])) {
         $identifier = hash('sha256', strtolower(trim($data['email'])));
         $type = 'email';
     } else {
-        $identifier = strtolower(trim($data['username']));
-        $type = 'username';
+        $identifier = $profile_id;
+        $type = 'userid';
     }
 
     if($current_user->admin != false) {
@@ -321,6 +195,47 @@ if(isset($_POST['delete'])) {
         $error = "User is not an administrator!";
         header('refresh:3');
     }
+}*/
+
+if(isset($_POST['delete'])) {
+    $profile_id = (int)$_GET['id'];
+
+    $ignore = filter_has_var(INPUT_POST,'ignore') ? true : false;
+    $use_email = filter_has_var(INPUT_POST,'use_email') ? true : false;
+    $until = isset($_POST['until']) ? $_POST['until'] : null;
+    $reason = isset($_POST['reason']) ? $_POST['reason'] : null;
+    $email = isset($data['email']) ? $data['email'] : null;
+
+    $p_data = $admin->removeUser($profile_id, $ignore, $use_email, $until, $reason, $email);
+    $error_title = $p_data['title'] ?? 'Warn';
+
+    if($p_data['success']) {
+        header("HTTP/1.0 200 OK");
+        $message = $p_data['message'] ?? 'Successful';
+        header('refresh:3');
+    } else {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = $p_data['message'] ?? 'An error has occured';
+        header('refresh:3');
+    }
+}
+
+if(isset($_POST['unban-submit'])) {
+    $profile_id = (int)$_GET['id'];
+    $email = isset($data['email']) ? $data['email'] : null;
+
+    $p_data = $admin->unblacklistUser($profile_id, $email);
+    $error_title = $p_data['title'] ?? 'Unban';
+
+    if($p_data['success']) {
+        header("HTTP/1.0 200 OK");
+        $message = $p_data['message'] ?? 'Successful';
+        header('refresh:3');
+    } else {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = $p_data['message'] ?? 'An error has occured';
+        header('refresh:3');
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -331,7 +246,7 @@ if(isset($_POST['delete'])) {
 
     <script type="text/javascript">
         $(document).ready(function() {
-            window.userid = '<?php echo $_GET['id'] ?>';
+            window.userid = '<?php echo (int)$_GET['id'] ?>';
         });
     </script>
     <script type="text/javascript" src="/lib/profile.js"></script>
@@ -340,8 +255,25 @@ if(isset($_POST['delete'])) {
 
     <?php include 'navbar.php' ?>
 
-    <?php if(isset($error)) { ?>
-        <div class="message w3-padding w3-round w3-red"><?php echo $error ?></div><br /><br />
+    <?php if(isset($error) && isset($error_title)) { ?>
+        <div class="message-wrapper w3-light-grey w3-card-2 w3-padding w3-round w3-center">
+            <div class="message-img"><img src="<?php echo $error_picture ?? '/img/logo/simplev2.png' ?>" class="w3-border w3-border-grey w3-round" width="50px" height="50px" /></div>
+            <div class="message-title"><h4><?php echo $error_title ?></h4></div>
+            <div class="message"><p><?php echo $error ?></p></div>
+            <?php if(isset($error_code) && $error_code === 'profile_private' && loggedin()) {?>
+                <form id="followUser" action="" method="post"></form>
+                <input id="button-follow" name="follow" form="followUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" type="submit" value="Follow user">
+            <?php } ?>
+
+            <?php if(isset($error_code) && $error_code === 'profile_private' && !loggedin()) {?>
+                <a href="/acc/login" id="button-follow" name="follow" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Login to follow user</a>
+            <?php } ?>
+
+            <?php if(isset($error_code) && $error_code === 'account_banned' && loggedin() && $current_user->admin) {?>
+                <form id="unbanUser" action="" method="post"></form>
+                <input id="unban-submit" name="unban-submit" form="unbanUser" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-border w3-border-pink" type="submit" value="Unban user">
+            <?php } ?>
+        </div>
         <?php exit; ?>
     <?php } ?>
 
@@ -376,6 +308,10 @@ if(isset($_POST['delete'])) {
                 <span id="username" class="w3-text-red"><?php echo $data['username'] ?></span>
             <?php } else { ?>
                 <span id="username"><?php echo $data['username'] ?></span>
+            <?php } ?>
+
+            <?php if($data['is_private']) { ?>
+                <i class='fa fa-lock w3-text-yellow' title="This profile has been privated. You can only view public contibutions if you follow them." aria-hidden='true'></i>
             <?php } ?>
 
             <span style="font-size:20px;">
@@ -527,10 +463,10 @@ if(isset($_POST['delete'])) {
                         <label for="until">Ban until:</label>
                         <input type="date" class="w3-round w3-hover-opacity" id="until" name="until" min="<?php echo date('Y-m-d') ?>" max="2056-12-31"><br />
 
-                        <input type="checkbox" id="ignore" name="ignore" value="1">
+                        <input type="checkbox" id="ignore" name="ignore">
                         <label for="ignore">Permanent ban</label><br />
 
-                        <input type="checkbox" id="use_email" name="use_email" value="1">
+                        <input type="checkbox" id="use_email" name="use_email">
                         <label for="use_email">Ban using email for presistance if the user deletes the account</label><br />
 
                         <textarea name="reason" placeholder="Moderator note about this ban" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea><br />
@@ -634,7 +570,9 @@ if(isset($_POST['delete'])) {
                         </div>
                     </div>
                 </template>
-		    </div>
+		    </div><br />
+            <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
+            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button>
         </div>
     </span>
 
