@@ -64,58 +64,6 @@ if ($conn2->connect_error) {
     exit($conn2->connect_error);
 }
 
-if(isset($_GET['who_you_follow'])) {
-    header('Content-Type: application/json');
-    $followed_by = array();
-    $sql = "SELECT DISTINCT profileid FROM follow WHERE userid = '$id' ORDER BY id DESC";
-    $result = $conn2->query($sql);
-
-    while ($row = $result->fetch_assoc()) {
-        $profileid = $row['profileid'];
-        $sql2 = "SELECT * FROM users WHERE id = '$profileid'";
-        $result2 = $conn2->query($sql2);
-        if($result2->num_rows > 0) {
-            $row2 = $result2->fetch_assoc();
-            $followed_by[] = array(
-                'username' => htmlspecialchars($row2['username']),
-                'profileid' => $profileid, 
-                'random' => uniqid()
-            );
-            $result2->free();
-        }
-    }
-    $result->free();
-    header("HTTP/1.0 200 OK");
-    echo json_encode($followed_by);
-    exit;
-}
-
-if(isset($_GET['who_follows_you'])) {
-    header('Content-Type: application/json');
-    $followed_by = array();
-    $sql = "SELECT DISTINCT userid FROM follow WHERE profileid = '$id' ORDER BY id DESC";
-    $result3 = $conn2->query($sql);
-
-    while ($row3 = $result3->fetch_assoc()) {
-        $userid = $row3['userid'];
-        $sql2 = "SELECT * FROM users WHERE id = '$userid'";
-        $result4 = $conn2->query($sql2);
-        if($result4->num_rows > 0) {
-            $row4 = $result4->fetch_assoc();
-            $followed_by[] = array(
-                'username' => htmlspecialchars($row4['username']),
-                'userid' => $userid
-            );
-            $result4->free();
-        }
-    }
-    $result3->free();
-    header("HTTP/1.0 200 OK");
-    echo json_encode($followed_by);
-    $conn2->close();
-    exit;
-}
-
 function user_blocks(int $profileid, mixed $db) {
     global $current_user;
 
@@ -176,8 +124,10 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
 
     if (empty($csrf) || $csrf != $_SESSION['csrf']) {
         return [
-            "message" => 'No CSRF token provided, or it is invalid!',
-            "error" => 'INVALID_CSRF'
+            "success" => false,
+            "code" => 'csrf_missing',
+            "title" => 'Something something tech-related',
+            "message" => 'No CSRF (cross-site-request-forgery) token provided, or it is invalid!',
         ];
     }
 
@@ -194,28 +144,67 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         $usero = User::getUser($profile_id);
     }
 
-    if (!isset($usero) || User::isDeleted($profile_id) || AccountManager::isBanned($conn, $usero->email, $usero->username)) {
+    if (!isset($usero) || User::isDeleted($profile_id)) {
         http_response_code(404);
         return [
-            "message" => 'User not found.',
-            "error" => 'USR_NOT_FND'
+            "success" => false,
+            "code" => 'not_found',
+            "title" => '404 Not Found',
+            "message" => 'User not found. Probably easier to find a flat stud 1x1 in your old unsorted bin of parts.',
         ];
+    }
+
+    $banrow = User::isBannedByID($profile_id);
+
+    if ($banrow) {
+        http_response_code(403);
+        $until = isset($banrow['ignore_at']) ? ('until ' . date("d M Y", strtotime($banrow['ignore_at']))) : 'indefinitely';
+
+        $arr = [
+            "success" => false,
+            "picture" => $usero->picture_small,
+            "code" => 'account_banned',
+            "title" => 'Account suspended',
+            "message" => 'This account has been suspended ' . $until . '.<br />When an account is suspended, the owner can\'t sign in or interact with content. However, they can appeal the ban.',
+        ];
+
+        if(loggedin() && $current_user->admin) {
+            $arr['email'] = $usero->email;
+        }
+
+        return $arr;
     }
 
     $bsky = $usero->bsky ?? null;
     $is_blocking = false;
     $is_following = false;
+    $is_me = User::isMe($userid);
+    $is_private = User::isPrivate($profile_id);
+
+    if(!$is_me && !$is_following && $is_private) {
+        http_response_code(403);
+
+        return [
+            "success" => false,
+            "picture" => $usero->picture_small,
+            "code" => 'profile_private',
+            "title" => 'Profile private',
+            "message" => 'The owner of this account has privated their profile.<br />When an account is private, other users can\'t view the profile unless they are following said user, or said user is following them.',
+        ];
+    }
 
     if(loggedin()) {
-        //$blocks = user_blocks($profile_id, $conn);
         $blocks = User::isBlocking($profile_id);
 
         if($blocks && is_array($blocks)) {
             if($blocks['type'] !== 'you') {
                 header("HTTP/1.0 403 Forbidden");
                 return [
+                    "success" => false,
+                    "picture" => $usero->picture_small,
+                    "code" => 'user_blocking',
+                    "title" => 'User blocked you',
                     "message" => htmlspecialchars($blocks['message']),
-                    "error" => 'ACC_BLOCKED_USR'
                 ];
             } else {
                 $is_blocking = true;
@@ -223,7 +212,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         }
 
         $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ? AND profileid = ?");
-    	$stmt->bind_param("ss", $userid, $profile_id);
+    	$stmt->bind_param("ii", $userid, $profile_id);
     	$stmt->execute();
     	$is_following = $stmt->get_result()->fetch_assoc()['following'];
     	$stmt->close();
@@ -238,59 +227,39 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         exit($conn2->connect_error);
     }
 
-    /*if(!$is_following && User::isPrivate($profile_id)) {
-        return [
-            "message" => 'This profile is private, and you are not following them.',
-            "error" => 'PRIV_PROFILE'
-        ];
-    }*/
+    $stmt = $conn2->prepare("SELECT COUNT(*) as all_models FROM model WHERE user = ?");
+    $stmt->bind_param("s", $profile_id);
+    $stmt->execute();
+    $model_count = $stmt->get_result()->fetch_assoc()['all_models'] ?? 0;
+    $stmt->close();
 
-    if(!$is_following && User::isPrivate($profile_id)) {
-        $bsky = null;
-        $usero->description = null;
-        $usero->twitter = null;
-    }
+    $stmt = $conn2->prepare("SELECT SUM(views) as total_views FROM model WHERE user = ?");
+    $stmt->bind_param("s", $profile_id);
+    $stmt->execute();
+    $views = $stmt->get_result()->fetch_assoc()['total_views'] ?? 0;
+    $stmt->close();
 
-    if(User::isDeleted($profile_id) || AccountManager::isBanned($conn, $usero->email, $usero->username)) {
-        $model_count = '';
-        $views = '';
-        $likes = '';
-        $followers = '';
-        $following = '';
-    } else {
-        $stmt = $conn2->prepare("SELECT COUNT(*) as all_models FROM model WHERE user = ?");
-        $stmt->bind_param("s", $profile_id);
-        $stmt->execute();
-        $model_count = $stmt->get_result()->fetch_assoc()['all_models'] ?? 0;
-        $stmt->close();
+    $stmt = $conn2->prepare("SELECT SUM(likes) as total_likes FROM model WHERE user = ?");
+    $stmt->bind_param("s", $profile_id);
+    $stmt->execute();
+    $likes = $stmt->get_result()->fetch_assoc()['total_likes'] ?? 0;
+    $stmt->close();
 
-        $stmt = $conn2->prepare("SELECT SUM(views) as total_views FROM model WHERE user = ?");
-        $stmt->bind_param("s", $profile_id);
-        $stmt->execute();
-        $views = $stmt->get_result()->fetch_assoc()['total_views'] ?? 0;
-        $stmt->close();
+    $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
+    $stmt->bind_param("s", $profile_id);
+    $stmt->execute();
+    $followers = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
+    $stmt->close();
 
-        $stmt = $conn2->prepare("SELECT SUM(likes) as total_likes FROM model WHERE user = ?");
-        $stmt->bind_param("s", $profile_id);
-        $stmt->execute();
-        $likes = $stmt->get_result()->fetch_assoc()['total_likes'] ?? 0;
-        $stmt->close();
-
-        $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
-        $stmt->bind_param("s", $profile_id);
-        $stmt->execute();
-        $followers = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
-        $stmt->close();
-
-        $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ?");
-        $stmt->bind_param("s", $profile_id);
-        $stmt->execute();
-        $following = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
-        $stmt->close();
-    }
+    $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ?");
+    $stmt->bind_param("s", $profile_id);
+    $stmt->execute();
+    $following = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
+    $stmt->close();
 
     $message = null;
     $data = [
+        'success' => true,
         'userid' => $profile_id,
         'username' => htmlspecialchars($usero->username),
         'admin' => (string)$usero->admin,
@@ -298,14 +267,15 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         'twitter' => isset($usero->twitter) ? htmlspecialchars($usero->twitter) : '',
         'bsky' => $bsky,
         'age' => isset($usero->age) ? htmlspecialchars($usero->age) : '',
-        'picture' => htmlspecialchars($usero->picture),
+        'picture' => htmlspecialchars($usero->picture_small ?? $usero->picture),
         'model_count' => $model_count,
         'followers' => $followers,
         'following' => $following,
         'views' => $views,
         'likes' => $likes,
         'is_following' => (bool)$is_following,
-        'is_blocking' => $is_blocking,
+        'is_blocking' => (bool)$is_blocking,
+        'is_private' => (bool)$is_private,
         'message' => $message,
         'email' => $adm_email ?? null
     ];
@@ -313,12 +283,636 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     return $data;
 }
 
-if(isset($_GET['user'])) {
+//replacement for the old one
+if(isset($_GET['profile']) && (isset($_GET['actorId']) || isset($_GET['actorName']))) {
     header('Content-Type: application/json');
-    $profile_name = $_GET['user'];
-    $data = fetch_profile($profile_name, $_SESSION['csrf']);
+
+    $profile = $_GET['actorId'] ?? $_GET['actorName'] ?? null;
+    $use_name = isset($_GET['actorName']) ? true : false;
+
+    $data = fetch_profile($profile, $_SESSION['csrf'], $use_name);
     echo json_encode($data);
     exit;
+}
+
+/**
+ * User related interactions (blocking, following, etc)
+ */
+class UserInteractions {
+    public int $userid;
+    public object $current_user;
+    public mysqli $conn;
+
+    public function __construct() {
+        global $current_user;
+
+        if(!loggedin() || !isset($current_user)) {
+            return;
+        }
+
+        $this->userid = $current_user->id;
+        $this->current_user = $current_user;
+        $this->conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    }
+
+    /**
+     * Follows a user
+     */
+    public function followUser(int $profile_id) {
+        $error_title = 'Follow user';
+
+        if(!loggedin()) {
+            $error = "Please login to follow this user";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(User::isDeleted($profile_id)) {
+            $error = "No user found";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        $time = time();
+
+        if((int)$this->userid === $profile_id) {
+            $error = "You cannot follow yourself";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if($this->current_user->verify_token !== NULL) {
+            $error = "User account is not verified";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($error)) {
+            $sql_follow = "INSERT INTO follow (userid, profileid, date) VALUES (?, ?, ?)";
+            $stmt_follow = $this->conn->prepare($sql_follow);
+            $stmt_follow->bind_param("iii", $this->userid, $profile_id, $time);
+            $result = $stmt_follow->execute();
+
+            $notification = new Notifications($this->conn);
+            $notification->notify_subscribers('profile', $profile_id, $this->userid);
+
+            if ($result) {
+                $stmt_follow->close();
+
+                $message = "Followed this user with success";
+                return [
+                    'success' => true,
+                    'message' => $message,
+                    'title' => 'Success!'
+                ];
+            } else {
+                $error = "An error occured while following this user";
+                return [
+                    'success' => false,
+                    'message' => $error,
+                    'title' => $error_title
+                ];
+            }
+        }
+    }
+
+    /**
+     * Unfollows a user
+     */
+    public function unfollowUser(int $profile_id) {
+        $error_title = 'Unfollow user';
+
+        if(!loggedin()) {
+            $error = "Please login to unfollow this user";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(User::isDeleted($profile_id)) {
+            $error = "No user found";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if((int)$this->userid === $profile_id) {
+            $error = "You cannot unfollow yourself";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if($this->current_user->verify_token !== NULL) {
+            $error = "User account is not verified";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($error)) {
+            $sql_follow = "DELETE FROM follow WHERE userid = ? AND profileid = ?";
+            $stmt_follow = $this->conn->prepare($sql_follow);
+            $stmt_follow->bind_param("ii", $this->userid, $profile_id);
+            $result = $stmt_follow->execute();
+
+            if ($result) {
+                $stmt_follow->close();
+
+                $message = "Unollowed this user with success";
+                return [
+                    'success' => true,
+                    'message' => $message,
+                    'title' => 'Success!'
+                ];
+            } else {
+                $error = "An error occured while unfollowing this user";
+                return [
+                    'success' => false,
+                    'message' => $error,
+                    'title' => $error_title
+                ];
+            }
+        }
+    }
+
+    /**
+     * Blocks a user
+     */
+    public function blockUser(int $profile_id) {
+        $error_title = 'Block user';
+        $time = time();
+
+        if(!loggedin()) {
+            $error = "Please login to block this user";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(User::isDeleted($profile_id)) {
+            $error = "No user found";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if((int)$this->userid === $profile_id) {
+            $error = "You cannot block yourself";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if($this->current_user->verify_token !== NULL) {
+            $error = "User account is not verified";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($error)) {
+            $sql_follow = "DELETE FROM follow WHERE userid = ? AND profileid = ?";
+            $stmt_follow = $this->conn->prepare($sql_follow);
+            $stmt_follow->bind_param("ii", $this->userid, $profile_id);
+            $result = $stmt_follow->execute();
+
+            if ($result) {
+                $stmt_follow->close();
+
+                $sql_block = "INSERT INTO user_blocks (userid, profileid, date) VALUES (?, ?, ?)";
+                $stmt_block = $this->conn->prepare($sql_block);
+                $stmt_block->bind_param("iii", $userid, $profile_id, $time);
+                $result = $stmt_block->execute();
+                $stmt_block->close();
+
+                if ($result) {
+                    $message = "Blocked this user with success";
+                    return [
+                        'success' => true,
+                        'message' => $message,
+                        'title' => 'Success!'
+                    ];
+                } else {
+                    $error = "An error has happened while blocking this user";
+                    return [
+                        'success' => true,
+                        'message' => $error,
+                        'title' => 'Success!'
+                    ];
+                }
+            } else {
+                $error = "An error occurred while unfollowing this user";
+                return [
+                    'success' => false,
+                    'message' => $error,
+                    'title' => $error_title
+                ];
+            }
+        }
+    }
+
+    /**
+     * Unblocks a user
+     */
+    public function unblockUser(int $profile_id) {
+        $error_title = 'Unblock user';
+
+        if(!loggedin()) {
+            $error = "Please login to unblock this user";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(User::isDeleted($profile_id)) {
+            $error = "No user found";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if((int)$this->userid === $profile_id) {
+            $error = "You cannot unblock yourself";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if($this->current_user->verify_token !== NULL) {
+            $error = "User account is not verified";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($error)) {
+            $sql_follow = "DELETE FROM user_blocks WHERE userid = ? AND profileid = ?";
+            $stmt_follow = $this->conn->prepare($sql_follow);
+            $stmt_follow->bind_param("ii", $this->userid, $profile_id);
+            $result = $stmt_follow->execute();
+
+            if ($result) {
+                $stmt_follow->close();
+
+                $message = "Unblocked this user with success";
+                return [
+                    'success' => true,
+                    'message' => $message,
+                    'title' => 'Success!'
+                ];
+            } else {
+                $error = "An error occurred while unblocking this user";
+                return [
+                    'success' => false,
+                    'message' => $error,
+                    'title' => $error_title
+                ];
+            }
+        }
+    }
+}
+
+/**
+ * UserInteractions but for site admins, basically
+ */
+class UserAdmin {
+    public int $userid;
+    public object $current_user;
+    public mysqli $conn;
+
+    public function __construct() {
+        global $current_user;
+
+        if(!loggedin() || !isset($current_user)) {
+            return;
+        }
+
+        if(!$current_user->admin) {
+            return;
+        }
+
+        $this->userid = $current_user->id;
+        $this->current_user = $current_user;
+        $this->conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    }
+
+    /**
+     * Warns a user
+     */
+    public function warnUser(int $profile_id, string $reason) {
+        $error_title = 'Warn user';
+
+        if(!loggedin()) {
+            $error = "Please login to warn this user";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($this->current_user) || !$this->current_user->admin || $this->current_user->verify_token !== NULL) {
+            $error = "An authentication error has occurred";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(User::isDeleted($profile_id)) {
+            $error = "No user found";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        $time = time();
+        $reason = isset($reason) ? $reason : null;
+
+        if((int)$this->userid === $profile_id) {
+            $error = "You cannot warn yourself";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!$reason) {
+            $error = "No reason has been provided";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($error)) {
+            $sql_warn = "INSERT INTO warnings (user, reason, timestamp) VALUES (?, ?, ?)";
+            $stmt_warn = $this->conn->prepare($sql_warn);
+            $stmt_warn->bind_param("iii", $profile_id, $reason, $time);
+            $result = $stmt_warn->execute();
+
+            if ($result) {
+                $stmt_warn->close();
+
+                $message = "Warned this user with success";
+                return [
+                    'success' => true,
+                    'message' => $message,
+                    'title' => 'Success!'
+                ];
+            } else {
+                $error = "An error occured while warning this user";
+                return [
+                    'success' => false,
+                    'message' => $error,
+                    'title' => $error_title
+                ];
+            }
+        }
+    }
+
+    /**
+     * Blacklists a user's details, preventing them from using the platform
+     */
+    public function removeUser(int $profile_id, bool $ignore, bool $use_email, ?string $until, ?string $reason, ?string $email) {
+        $error_title = 'Remove user';
+        $reason = isset($reason) ? trim($reason) : 'banned by admin request';
+        $until = isset($until) ? $until : null;
+
+        if(!loggedin()) {
+            $error = "Please login to remove this user";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($this->current_user) || !$this->current_user->admin || $this->current_user->verify_token !== NULL) {
+            $error = "An authentication error has occurred";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(User::isDeleted($profile_id)) {
+            $error = "No user found";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if (!empty($until) && !$ignore) {
+            $date = new DateTime($until);
+
+            if ($date) {
+                $until = $date->format('Y-m-d H:i:s');
+            } else {
+                $error = "Invalid ban until date provided by client";
+                return [
+                    'success' => false,
+                    'message' => $error,
+                    'title' => $error_title
+                ];
+            }
+        } else {
+            $until = null;
+        }
+
+        if($use_email && !empty($email)) {
+            $identifier = hash('sha256', strtolower(trim($email)));
+            $type = 'email';
+        } else {
+            $identifier = $profile_id;
+            $type = 'userid';
+        }
+
+        if(!isset($error)) {
+            $stmt_block = $this->conn->prepare("INSERT IGNORE INTO blacklist (value, type, reason, ignore_at) VALUES (?, ?, ?, ?)");
+            $stmt_block->bind_param("ssss", $identifier, $type, $reason, $until);
+            $result_block = $stmt_block->execute();
+            $stmt_block->close();
+
+            if(!$result_block) {
+                $error = "Couldn't ban this user at this time";
+                return [
+                    'success' => false,
+                    'message' => $error,
+                    'title' => $error_title
+                ];
+            } else {
+                $queries = [["UPDATE php_sessions SET active = 0 WHERE userid = ?", "i", $profile_id], ["UPDATE sessions SET timestamp = 0 WHERE user = ?", "i", $profile_id]];
+
+                if($use_email && !empty($email)) {
+                    $queries[] = ["UPDATE users SET deactive = '9999-12-31' WHERE id = ?", "i", $profile_id];
+                }
+
+                foreach ($queries as [$sql, $type, $id]) {
+                    $stmt = $this->conn->prepare($sql);
+                    $stmt->bind_param($type, $id);
+
+                    if (!$stmt->execute()) {
+                        $stmt->close();
+
+                        return [
+                            'success' => false,
+                            'message' => "Couldn't log this user out when banning the account",
+                            'title' => $error_title
+                        ];
+                    }
+
+                    $stmt->close();
+                }
+
+                $message = "Blacklisted this user with success";
+                return [
+                    'success' => true,
+                    'message' => $message,
+                    'title' => 'Success!'
+                ];
+            }
+        }
+    }
+
+    /**
+     * Undoes what removeUser does
+     */
+    public function unblacklistUser(int $profile_id, string $email) {
+        $error_title = 'Unblacklist user';
+
+        if(!loggedin()) {
+            $error = "Please login to unremove this user";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($this->current_user) || !$this->current_user->admin || $this->current_user->verify_token !== NULL) {
+            $error = "An authentication error has occurred";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(User::isDeleted($profile_id)) {
+            $error = "No user found";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if((int)$this->userid === $profile_id) {
+            $error = "You cannot unremove yourself";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if($this->current_user->verify_token !== NULL) {
+            $error = "User account is not verified";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        $email = hash('sha256', strtolower(trim($email)));
+
+        $sql_follow = "SELECT id FROM blacklist WHERE (value = ? AND type = 'userid') OR (value = ? AND type = 'email') LIMIT 1";
+        $stmt_follow = $this->conn->prepare($sql_follow);
+        $stmt_follow->bind_param("ss", $profile_id, $email);
+        $stmt_follow->execute();
+        $result = $stmt_follow->get_result();
+
+        if($result->num_rows <= 0) {
+            $error = "User account is not blacklisted";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($error)) {
+            $sql_follow = "DELETE FROM blacklist WHERE (type = 'userid' AND value = ?) OR (type = 'email' AND value = ?)";
+            $stmt_follow = $this->conn->prepare($sql_follow);
+            $stmt_follow->bind_param("ss", $profile_id, $email);
+            $result = $stmt_follow->execute();
+
+            if ($result) {
+                $stmt_follow->close();
+
+                $message = "Unblacklisted this user with success";
+                return [
+                    'success' => true,
+                    'message' => $message,
+                    'title' => 'Success!'
+                ];
+            } else {
+                $error = "An error occurred while unblacklisting this user";
+                return [
+                    'success' => false,
+                    'message' => $error,
+                    'title' => $error_title
+                ];
+            }
+        }
+    }
 }
 
 class UserContent {
@@ -330,6 +924,10 @@ class UserContent {
 
         if ($creation_conn->connect_error) {
             return ['success' => false, 'error' => "Database connection failed"];
+        }
+
+        if($page < 1) {
+            return ['success' => false, 'error' => 'Invalid page number'];
         }
 
         if (!loggedin()) {
@@ -344,11 +942,11 @@ class UserContent {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if(!User::isFollowing($userid) && User::isPrivate($userid)) {
+        if(!User::isMe($userid) && !User::isFollowing($userid) && User::isPrivate($userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
-        $stmt = $creation_conn->prepare("SELECT * FROM model WHERE user = ? AND visibility = 'public' AND removed = 0 ORDER BY date DESC LIMIT $limit OFFSET $offset;");
+        $stmt = $creation_conn->prepare("SELECT * FROM model WHERE user = ? AND visibility = 'public' AND removed = 0 ORDER BY date DESC LIMIT $limit OFFSET $offset");
         $stmt->bind_param("i", $userid);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -377,16 +975,24 @@ class UserContent {
         return ['success' => true, 'creations' => $creations];
     }
 
-    public function returnLikedModels($userid) {
+    public function returnLikedModels($userid, $page) {
         $creation_conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 
 		if ($creation_conn->connect_error) {
             return ['success' => false, 'error' => "Database connection failed"];
         }
 
+        if($page < 1) {
+            return ['success' => false, 'error' => 'Invalid page number'];
+        }
+
         if (!loggedin()) {
             return ['success' => false, 'error' => "Sign in to view liked creations of a user"];
         }
+
+        $limit = 9;
+        $offset = ($page - 1) * $limit;
+        $user = User::getUser($userid);
 
         $user = User::getUser($userid);
 
@@ -394,12 +1000,12 @@ class UserContent {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if(!User::isFollowing($userid) && User::isPrivate($userid)) {
+        if(!User::isMe($userid) && !User::isFollowing($userid) && User::isPrivate($userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
-        $stmt = $creation_conn->prepare('SELECT * FROM votes WHERE user = ?');
-        $stmt->bind_param('i', $userid);
+        $stmt = $creation_conn->prepare('SELECT * FROM votes WHERE user = ? ORDER BY id DESC LIMIT ? OFFSET ?');
+        $stmt->bind_param('iss', $userid, $limit, $offset);
         $stmt->execute();
         $result = $stmt->get_result();
 
@@ -418,7 +1024,12 @@ class UserContent {
             if ($result2->num_rows != 0) {
                 while ($row2 = $result2->fetch_assoc()) {
                     $model_user_id = $row2['user'] ?? null;
-                    $row2['username'] = User::getUser($model_user_id)->username ?? null;
+                    $usero = User::getUser($model_user_id);
+                    $row2['username'] = $usero->username ?? null;
+
+                    if(User::isDeleted($model_user_id) || User::isBannedByID($model_user_id) || (User::isPrivate($model_user_id) && !User::isFollowing($model_user_id) && !User::isMe($model_user_id))) {
+                        continue;
+                    }
 
                     if (empty($row2['name'])) {
                         $row2['name'] = $row2['username'] . "'s creation";
@@ -457,6 +1068,10 @@ class UserContent {
             exit;
         }
 
+        if($page < 1) {
+            return ['success' => false, 'error' => 'Invalid page number'];
+        }
+
         if (!loggedin()) {
             return ['success' => false, 'error' => "Sign in to view comments of a user"];
         }
@@ -467,7 +1082,7 @@ class UserContent {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if(!User::isFollowing($userid) && User::isPrivate($userid)) {
+        if(!User::isMe($userid) && !User::isFollowing($userid) && User::isPrivate($userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
@@ -561,6 +1176,10 @@ class UserContent {
             exit;
         }
 
+        if($page < 1) {
+            return ['success' => false, 'error' => 'Invalid page number'];
+        }
+
         if (!loggedin()) {
             return ['success' => false, 'error' => "Sign in to forum posts of a user"];
         }
@@ -571,7 +1190,7 @@ class UserContent {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if(!User::isFollowing($userid) && User::isPrivate($userid)) {
+        if(!User::isMe($userid) && !User::isFollowing($userid) && User::isPrivate($userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
@@ -605,11 +1224,7 @@ if(isset($_GET['getUserBuilds'])) {
         exit;
     }
 
-    $page = $_GET['page'];
-    if(!isset($page) || $page === null || $page < 1) {
-        $page = 1;
-    }
-    
+    $page = $_GET['page'] ?? 0;
     $UserContent = new UserContent();
     $creations = $UserContent->returnModels($_GET['userid'], $page);
 
@@ -625,11 +1240,7 @@ if(isset($_GET['getUserForums'])) {
         exit;
     }
 
-    $page = $_GET['page'];
-    if(!isset($page) || $page === null || $page < 1) {
-        $page = 1;
-    }
-    
+    $page = $_GET['page'] ?? 0;
     $UserContent = new UserContent();
     $posts = $UserContent->returnForums($_GET['userid'], $page);
 
@@ -643,8 +1254,9 @@ if(isset($_GET['getUserLiked'])){
         exit;
     }
 
+    $page = $_GET['page'] ?? 0;
     $UserContent = new UserContent();
-    $result = $UserContent->returnLikedModels($_GET['userid']);
+    $result = $UserContent->returnLikedModels($_GET['userid'], $page);
     echo json_encode($result);
     exit;
 }
@@ -657,11 +1269,11 @@ if(isset($_GET['getUserComments'])) {
         exit;
     }
 
-    $page = $_GET['page'];
-    if(!isset($page) || $page === null || $page < 1) {
+    $page = $_GET['page'] ?? 0;
+    /*if(!isset($page) || $page === null || $page < 1) {
         echo json_encode(['success' => false, 'error' => 'Invalid page number']);
         exit;
-    }
+    }*/
     
     $UserContent = new UserContent();
     $comments = $UserContent->returnComments($_GET['userid'], $page);

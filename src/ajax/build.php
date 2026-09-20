@@ -792,7 +792,7 @@ function fetch_comments($model_id, $csrf) {
         $edited_at = null;
         $c_user_privated = $privated[$c_user] ?? false;
 
-        if(User::isBanned($userRow->username, 'username')) {
+        if(User::isBannedByID($c_user)) {
             $c_user_removed = true;
         }
 

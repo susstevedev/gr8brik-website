@@ -409,7 +409,7 @@ class AccountManager
 
         $usernameutils = new ScreenNameUtils();
         $username_rand = $usernameutils->generateRandomScreenName();
-        $username = trim($data['login'] ?? $username_rand);
+        $username = preg_replace('/[^A-Za-z0-9._-]/', '', $data['name'] ?? $username_rand);
 
         //SCENARIO 1 - account is linked
         $stmt = $conn->prepare("SELECT id, username, email, deactive FROM users WHERE github_id = ? AND deactive IS NULL LIMIT 1");
@@ -445,16 +445,6 @@ class AccountManager
         }
 
         //SCENARIO 3 - account creation
-        $username_available = $usernameutils->check_username_available($username);
-        if (!$username_available['available']) {
-            $username_available = $usernameutils->check_username_available($username_rand);
-            if (!$username_available['available']) {
-                http_response_code(400);
-                return ['error' => "Github username was unavaliable and random username was also unavaliable."];
-            }
-            $username = $username_rand;
-        }
-
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             http_response_code(400);
             return ['error' => "Invalid email address format"];
@@ -587,10 +577,7 @@ class AccountManager
         $token_raw = bin2hex(random_bytes(32));
         $token_hashed = hash('sha256', $token_raw);
 
-        $isBanned = User::isBanned($row['email'], 'email');
-        if(!$isBanned) {
-            $isBanned = User::isBanned($row['username'], 'username');
-        }
+        $isBanned = User::isBannedByID($userid);
 
         if ($isBanned !== false) {
             http_response_code(500);
@@ -629,8 +616,16 @@ class AccountManager
                     'popup' => "Do you want to reactivate your account?",
                     'error' => false,
                     'extras' => false,
-                    'goto' => "/acc/index?reactive=1&token=" . $token_hashed,
-                    'btn' => "Yes"
+                    'links' => [
+                        0 => [
+                            'btn' => 'Cancel',
+                            'goto' => false,
+                        ],
+                        1 => [
+                            'btn' => 'Reactivate',
+                            'goto' => "/acc/index?reactive=1&token=" . $token_hashed,
+                        ],
+                    ],
                 ];
             }
         }
@@ -668,7 +663,7 @@ class AccountManager
         }
 
         if ($email) {
-            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND verify_token IS NULL");
+            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND verify_token IS NULL AND deactive IS NULL");
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -737,7 +732,7 @@ class AccountManager
 
         if ($hash && self::reset_pwd($conn, $token)) {
             $new = password_hash($pwd, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("UPDATE users SET password = ?, salt = NULL WHERE email = ?");
+            $stmt = $conn->prepare("UPDATE users SET password = ?, salt = NULL WHERE email = ? AND deactive IS NULL");
             $stmt->bind_param("ss", $new, $email);
 
             if ($stmt->execute()) {

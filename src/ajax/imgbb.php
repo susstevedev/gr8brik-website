@@ -36,6 +36,10 @@ class ImgBB {
             return ['success' => false, 'message' => 'Session expired or doesn\'t exist'];
         }
 
+        if($current_user->verify_token !== NULL) {
+            return ['success' => false, 'message' => 'Please verify your account to upload images'];
+        }
+
         if (!file_exists($image['tmp_name'])) {
             return ['success' => false, 'message' => 'Image does not exist'];
         }

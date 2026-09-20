@@ -1,7 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/auth.php';
 
 $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
@@ -66,7 +65,7 @@ class ScreenNameUtils {
             return ['available' => false, 'reason' => 'Username must be at least 3 characters.'];
         }
 
-        $isBanned = AccountManager::isBanned($conn, null, $new);
+        $isBanned = User::isBanned($new, 'username');
         if($isBanned !== false) {
             return ['available' => false, 'reason' => 'This username is unavailable. Please choose another.'];
         }
@@ -110,7 +109,7 @@ class AccountSettings {
 
         $changed = time();
 
-        $stmt = $conn->prepare("UPDATE users SET username = ?, changed = ? WHERE id = ?");
+        $stmt = $conn->prepare("UPDATE users SET username = ?, changed = ? WHERE id = ? AND deactive IS NULL");
         $stmt->bind_param("sss", $new, $changed, $id);
         if ($stmt->execute()) {
             return ['success' => 'Username updated'];
@@ -140,7 +139,7 @@ class AccountSettings {
 
         $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-        $stmt_2 = $conn->prepare("UPDATE users SET twitter = ? WHERE id = ?");
+        $stmt_2 = $conn->prepare("UPDATE users SET twitter = ? WHERE id = ? AND deactive IS NULL");
         $stmt_2->bind_param("ss", $new, $id);
         if ($stmt_2->execute()) {
             return ['success' => 'Your profile has been updated with the new Twitter account.', 'code' => '200', 'version' => 'NEW'];
@@ -205,7 +204,7 @@ class AccountSettings {
             }
         }
 
-        $stmt_2 = $conn->prepare("UPDATE users SET bsky = ? WHERE id = ?");
+        $stmt_2 = $conn->prepare("UPDATE users SET bsky = ? WHERE id = ? AND deactive IS NULL");
         $stmt_2->bind_param("ss", $new, $id);
         if ($stmt_2->execute()) {
             return ['success' => 'Your profile has been updated with the new Bluesky account.', 'code' => '200', 'version' => 'NEW'];
@@ -235,7 +234,7 @@ class AccountSettings {
         }
 
         $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        $stmt_2 = $conn->prepare("UPDATE users SET description = ? WHERE id = ?");
+        $stmt_2 = $conn->prepare("UPDATE users SET description = ? WHERE id = ? AND deactive IS NULL");
 
         $stmt_2->bind_param("si", $new, $id);
         if ($stmt_2->execute()) {
@@ -273,7 +272,7 @@ class AccountSettings {
         if ($hash) {
             if (password_verify($oldPassword, $hash)) {
                 $newPwd = password_hash($newPassword, PASSWORD_DEFAULT);
-                $stmt = $conn->prepare("UPDATE users SET password = ?, salt = NULL WHERE id = ?");
+                $stmt = $conn->prepare("UPDATE users SET password = ?, salt = NULL WHERE id = ? AND deactive IS NULL");
                 $stmt->bind_param("si", $newPwd, $userid);
 
                 if ($stmt->execute()) {
@@ -310,7 +309,7 @@ class AccountSettings {
             return ['error' => 'Invalid email address format'];
         }
 
-        $isBanned = AccountManager::isBanned($conn, $new);
+        $isBanned = User::isBanned($new, 'email');
         if ($isBanned !== false) {
             return ['error' => "Email address is not valid"];
         }
@@ -328,7 +327,7 @@ class AccountSettings {
 
         if($result->num_rows != 0) {
             if($row['email'] === $old) {
-                $sql2 = "UPDATE users SET email = '$new', verify_token = '$rand' WHERE id = '$id'";
+                $sql2 = "UPDATE users SET email = '$new', verify_token = '$rand' WHERE id = '$id' AND deactive IS NULL";
                 $email = AccountManager::send_verify_email($rand, $new);
 
                 if ($conn->query($sql2) === TRUE && $email) {
@@ -362,7 +361,7 @@ class AccountSettings {
             return ['error' => 'Not authenticated'];
         }
 
-        $stmt = $conn->prepare("SELECT id FROM users WHERE github_id = ? AND id != ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT id FROM users WHERE github_id = ? AND id != ? AND deactive IS NULL LIMIT 1");
         $stmt->bind_param("si", $github_id, $userid);
         $stmt->execute();
         if ($stmt->get_result()->fetch_assoc()) {
@@ -390,7 +389,7 @@ class AccountSettings {
             return ['error' => 'Not authenticated'];
         }
 
-        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ? AND deactive IS NULL LIMIT 1");
         $stmt->bind_param("i", $userid);
         $stmt->execute();
         $user = $stmt->get_result()->fetch_assoc();
@@ -508,19 +507,65 @@ if (isset($_POST['picture'])) {
         }
     }
 
-    if ($okay) {
-        $db_pfp = '/acc/users/pfps/' . $current_user->id . '.webp';
-        $upload = "../acc/users/pfps/" . $current_user->id . ".webp";
+    if($okay) {
+        if (!imageistruecolor($image)) {
+            imagepalettetotruecolor($image);
+        }
 
-        if (imagewebp($image, $upload, 50)) {
+        imagealphablending($image, true);
+        imagesavealpha($image, true);
+    }
+
+    if($okay) {
+        $crop_dim = 200;
+
+        $orig_width = imagesx($image);
+        $orig_height = imagesy($image);
+
+        $crop_x = ($orig_width - $crop_dim) / 2;
+        $crop_y = ($orig_height - $crop_dim) / 2;
+
+        $c_options = [
+            'x' => $crop_x,
+            'y' => $crop_y,
+            'width' => $crop_dim,
+            'height' => $crop_dim
+        ];
+
+        $image_cropped = imagecrop($image, $c_options);
+        if($image_cropped === false) {
+            $error = "Image could not be cropped.";
+            $okay = false;
+        }
+
+        $tiny_image_scale = imagescale($image_cropped, 50, 50);
+        if($tiny_image_scale === false) {
+            $error = "Smaller image could not be scaled.";
+            $okay = false;
+        }
+    }
+
+    if ($okay) {
+        $pfp_id = bin2hex(random_bytes(16));
+
+        $db_pfp = '/acc/users/pfps/' . $pfp_id . '.webp';
+        $db_pfp_tiny = '/acc/users/pfps/small/' . $pfp_id . '.webp';
+
+        $upload = "../acc/users/pfps/" . $pfp_id . ".webp";
+        $upload_tiny = "../acc/users/pfps/small/" . $pfp_id . ".webp";
+
+        $image_webp = @imagewebp($image_cropped, $upload, 50);
+        $tiny_image_webp = @imagewebp($tiny_image_scale, $upload_tiny, 50);
+
+        if ($image_webp && $tiny_image_webp) {
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
             if ($conn->connect_error) {
                 http_response_code(500);
                 exit(json_encode(['success' => false, 'error' => 'DB connection failure.']));
             }
 
-            $stmt = $conn->prepare("UPDATE users SET picture = ? WHERE id = ? AND deactive IS NULL");
-            $stmt->bind_param("ss", $db_pfp, $id);
+            $stmt = $conn->prepare("UPDATE users SET picture = ?, picture_small = ? WHERE id = ? AND deactive IS NULL");
+            $stmt->bind_param("sss", $db_pfp, $db_pfp_tiny, $id);
             if ($stmt->execute()) {
                 http_response_code(200);
                 exit(json_encode(['success' => true, 'message' => 'Profile picture updated.', 'image' => $db_pfp]));
@@ -546,6 +591,7 @@ if (isset($_POST['remove_picture'])) {
     }
 
     $old_pfp = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture;
+    $old_pfp_small = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture_small;
 
     if (strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($old_pfp)) {
         unlink($old_pfp);
@@ -554,7 +600,11 @@ if (isset($_POST['remove_picture'])) {
         exit(json_encode(['success' => false, 'error' => 'You do not have an uploaded profile image.']));
     }
 
-    $stmt = $conn->prepare("UPDATE users SET picture = NULL WHERE id = ? AND deactive IS NULL");
+    if (strpos($current_user->picture_small, '/acc/users/pfps/') !== false && file_exists($old_pfp_small)) {
+        unlink($old_pfp_small);
+    }
+
+    $stmt = $conn->prepare("UPDATE users SET picture = NULL, picture_small = NULL WHERE id = ? AND deactive IS NULL");
     $stmt->bind_param("s", $id);
 
     if ($stmt->execute()) {
