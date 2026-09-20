@@ -29,10 +29,12 @@
             },
             error: function (xhr, text, err) {
                 console.error(xhr.status + ' ' + err);
-                if(xhr.status !== 401) {
-                    $("#followedby-wrapper").html('[server error while getting followed users]');
+                if(xhr.status === 401) {
+                    $("#followedby-wrapper").html('Please login to view followed users.');
+                } else if(xhr.status === 404) {
+                    $("#followedby-wrapper").html('This user\'s profile either doesn\'t exist, is private, or deactivated.');
                 } else {
-                    $("#followedby-wrapper").html('Please login to view followed users');
+                    $("#followedby-wrapper").html('Internal server error');
                 }
                 $("#followedby-wrapper").css({"display": "inline","font-size": "15px","text-shadow": "0px 0px 0px #fff"});
             }
@@ -80,11 +82,11 @@
             });
         }
 
-        window.getUserLiked = function () {
+        window.getUserLiked = function (page) {
             $.ajax({
                 url: "/ajax/profile",
                 method: "GET",
-                data: { getUserLiked: true, userid: userid },
+                data: { getUserLiked: true, userid: userid, page: page },
                 dataType: "json",
                 success: function (response) {
                     let elm = $('#likestab div')
@@ -248,11 +250,12 @@
         var tabPages = {
             '#creationstab': { page: 1, fetch: getUserBuilds },
             '#commentstab': { page: 1, fetch: getUserComments },
-            '#poststab': { page: 1, fetch: getUserForums }
+            '#poststab': { page: 1, fetch: getUserForums },
+            '#likestab': { page: 1, fetch: getUserLiked }
         };
 
         $(".foward-button, .back-button").on("click", function () {
-            var $tab = $(this).closest("#creationstab, #commentstab, #poststab");
+            var $tab = $(this).closest("#creationstab, #commentstab, #poststab, #likestab");
             var tabId = `#${$tab.attr('id')}`;
             var tabConfig = tabPages[tabId];
 
@@ -280,6 +283,6 @@
         getUserBuilds(1);
         getUserForums(1);
         getUserComments(1);
-        getUserLiked();
+        getUserLiked(1);
     });
 })();
