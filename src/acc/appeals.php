@@ -40,7 +40,7 @@ if(isset($_POST['accept']) && $current_user->admin) {
     $user = $conn->real_escape_string($_GET['user']);
     $value = $conn->real_escape_string($_GET['value']);
 
-	$sql = "DELETE FROM blacklist WHERE (value = '$value' AND type = 'username') OR (value = '$value' AND type = 'email') LIMIT 1"; 
+	$sql = "DELETE FROM blacklist WHERE (value = '$value' AND type = 'username') OR (value = '$value' AND type = 'userid') OR (value = '$value' AND type = 'email') LIMIT 1"; 
     $result_unblacklist = $conn->query($sql);
 
     $sql = "UPDATE users SET deactive = NULL WHERE id = $user"; 
@@ -98,8 +98,8 @@ if(isset($_POST['accept']) && $current_user->admin) {
                     $username = strtolower(trim($row['username']));
                     $username_format = htmlspecialchars($row['username'] ?? '[deleted]');
 
-                    $query_blacklist = $conn->prepare("SELECT value, reason FROM blacklist WHERE ((value = ? AND type = 'username') OR (value = ? AND type = 'email') OR (value = ? AND type = 'email')) AND (ignore_at IS NULL OR ignore_at >= CURRENT_TIMESTAMP())");
-                    $query_blacklist->bind_param("sss", $username, $email, $email_hash);
+                    $query_blacklist = $conn->prepare("SELECT value, reason FROM blacklist WHERE ((value = ? AND type = 'username') OR (value = ? AND type = 'email') OR (value = ? AND type = 'email') OR (value = ? AND type = 'userid')) AND (ignore_at IS NULL OR ignore_at >= CURRENT_TIMESTAMP())");
+                    $query_blacklist->bind_param("ssss", $username, $email, $email_hash, $user);
                     $query_blacklist->execute();
                     $query_blacklist->store_result();
                     $query_blacklist->bind_result($value, $ban_reason);

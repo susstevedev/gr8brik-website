@@ -31,6 +31,7 @@ if (isset($_POST['accept'])) {
         $row = $result->fetch_assoc();
         $content_id = $row['reportable_id'];
         $content_type = $row['reportable_type'];
+        $destruct = isset($_POST['permadelete']) ? $_POST['permadelete'] : 0;
 
         if ($content_type === 'creation') {
             $stmt = $conn->prepare("UPDATE model SET removed = 0 WHERE id = ?");
@@ -63,6 +64,10 @@ if (isset($_POST['accept'])) {
             $stmt->bind_param("i", $content_id);
 
             if ($stmt->execute()) {
+                if($destruct) {
+                    delete_inactive_users($content_id, true, true);
+                }
+
                 $stmt_del = $conn->prepare("DELETE FROM reports WHERE reportable_id = ?");
                 $stmt_del->bind_param("i", $pid);
                 $stmt_del->execute();
@@ -124,7 +129,7 @@ if (isset($_POST['deny'])) {
 
         $empty = "<center><b>No content reported. You're all caught up!</b><br />";
 
-        $sql = "SELECT * FROM reports";
+        $sql = "SELECT * FROM reports ORDER BY id DESC";
         $result = $conn->query($sql);
         if ($result->num_rows !== 0) {
             while ($row = $result->fetch_assoc()) {
@@ -199,6 +204,12 @@ if (isset($_POST['deny'])) {
                     <h4><?php echo $row['description'] ?: '<i>no description</i>' ?></h4>
                     <form method='post' action=''>
                         <input type='hidden' value='<?php echo $row['id'] ?>' name='id'>
+
+                        <?php if($reported_type === 'profile') { ?>
+                            <input type="checkbox" class="w3-check" id="permadelete" name="permadelete" value="1">
+                            <label for="permadelete">Perma delete account (will also blacklist the email)</label><br />
+                        <?php } ?>
+
                         <input type='submit' value='Keep <?php echo $reported_type ?>' name='deny' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>
                         <input type='submit' value='Remove <?php echo $reported_type ?>' name='accept' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo'>
                     </form>
