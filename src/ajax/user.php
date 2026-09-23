@@ -91,22 +91,42 @@ class User {
     public ?bool $private_profile;
     public ?string $deactive;
 
+    private const FIELDS = [
+        'id',
+        'blog_user_id',
+        'email',
+        'github_id',
+        'google_id',
+        'username',
+        'picture',
+        'picture_small',
+        'banner',
+        'description',
+        'twitter',
+        'bsky',
+        'admin',
+        'alert',
+        'age',
+        'verify_token',
+        'private_profile',
+        'deactive',
+    ];
+
     /**
      * Constuct user from database array using the defined public variables
      * Sets value as null if not found in array
-     */
-    public function __construct(?array $data = []) {
-        $reflect = new ReflectionClass($this);
-        $properties = $reflect->getProperties(ReflectionProperty::IS_PUBLIC);
-
-        foreach ($properties as $property) {
-            $key = $property->getName();
-            $this->$key = $data[$key] ?? null;
+    */
+    public function __construct(?array $data = [])
+    {
+        foreach (self::FIELDS as $field) {
+            $this->$field = $data[$field] ?? null;
         }
 
-        $this->username ??= '[removed]';
-        $this->picture_small ??= $this->picture ? $this->picture : ($this->email ? $this->userGravatar($this->email, 50) : '/img/no_image.png');
+        $this->username ??= '[deleted]';
+        $this->deactive ??= true;
+        $this->private_profile ??= true;
         $this->picture ??= $this->email ? $this->userGravatar($this->email, 200) : '/img/no_image.png';
+        $this->picture_small ??= $this->picture ?? ($this->email ? $this->userGravatar($this->email, 50) : '/img/no_image.png');
     }
 
     /**

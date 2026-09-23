@@ -748,6 +748,15 @@ class UserAdmin {
             ];
         }
 
+        if((int)$this->userid === $profile_id) {
+            $error = "You cannot unremove yourself";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
         if (!empty($until) && !$ignore) {
             $date = new DateTime($until);
 
