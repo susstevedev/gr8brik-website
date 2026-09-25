@@ -5,7 +5,6 @@
 
 	require_once 'user.php';
     require_once 'imgbb.php';
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 
     class CustomParts {
         public mysqli $db;
@@ -55,14 +54,19 @@
                 return ['success' => false, 'message' => "LDraw part ID is missing from request."];
             }
 
+            if(!isset($data['color'])) {
+                return ['success' => false, 'message' => "LDraw part color is missing from request."];
+            }
+
             if(!isset($data['matrix']) || !isset($data['matrix']['world']) || !isset($data['matrix']['local']) || !isset($data['matrix']['size'])) {
                 return ['success' => false, 'message' => "Matrix or children is missing from request."];
             }
 
-            if(!isset($data['texture']) || !isset($data['texture']['url'])) {
-                return ['success' => false, 'message' => "Texture URL is missing from request."];
+            if(!isset($data['texture']) || !isset($data['texture']['url']) || !isset($data['texture']['thumbnail'])) {
+                return ['success' => false, 'message' => "Texture URL or thumbnail is missing from request."];
             }
 
+            $thumbnail = isset($data['texture']['thumbnail']) ? $data['texture']['thumbnail'] : null;
             $matrix_world = json_encode($data['matrix']['world']);
             $matrix_local = json_encode($data['matrix']['local']);
             $matrix_size = json_encode($data['matrix']['size']);
@@ -72,6 +76,10 @@
                 $base64Data = $matches[2];
             } else {
                 return ['success' => false, 'message' => "Invalid base64 image."];
+            }
+
+            if (!preg_match('/^data:([^;]+);base64,(.*)$/', $thumbnail, $thumbnail_matches)) {
+                return ['success' => false, 'message' => "Invalid base64 thumbnail image."];
             }
 
             $decodedData = base64_decode($base64Data);
@@ -97,12 +105,12 @@
             $ImgBBO = new ImgBB($this->membership_db, $this->imgbb_api_key);
             $imgbb_res = $ImgBBO->upload($imgbb_image);
 
-            if(!$imgbb_res || $imgbb_res['success'] !== true || !$imgbb_res['image'] || !$imgbb_res['image']['url']) {
+            if(!$imgbb_res || $imgbb_res['success'] !== true || !$imgbb_res['image'] || !$imgbb_res['image']['url'] || !$imgbb_res['id']) {
                 return ['success' => false, 'message' => "Failed to upload image to ImgBB"];
             }
 
-            $stmt = $this->db->prepare("INSERT INTO parts (userid, part, texture, reference, name, matrix_local, matrix_world, size) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("isssssss", $id, $data['ldraw'], $imgbb_res['image']['url'], $reference, $name, $matrix_local, $matrix_world, $matrix_size);
+            $stmt = $this->db->prepare("INSERT INTO parts (userid, part, texture, reference, name, matrix_local, matrix_world, size, attachment_id, thumbnail, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("isssssssssi", $id, $data['ldraw'], $imgbb_res['image']['url'], $reference, $name, $matrix_local, $matrix_world, $matrix_size, $imgbb_res['id'], $thumbnail, $data['color']);
 
             if($stmt->execute()) {
                 $partid = $this->db->insert_id;
@@ -117,8 +125,11 @@
                         'reference' => $reference,
                         'name' => $name,
                         'ldraw' => $data['ldraw'],
+                        'color' => $data['color'],
                         'texture' => [
-                            'url' => $imgbb_res['image']['url']
+                            'url' => $imgbb_res['image']['url'],
+                            'thumbnail' => $thumbnail,
+                            'attachment_id' => $imgbb_res['id']
                         ],
                         'matrix' => [
                             'world' => $data['matrix']['world'],
@@ -148,26 +159,40 @@
                 }
 
                 $username = $usero->username ?? null;
+                $attachment_id = $row['attachment_id'];
 
-                return [
-                    'success' => true,
-                    'message' => 'Part found',
-                    'id' => $row['id'],
-                    'part' => [
-                        'user' => $username,
-                        'reference' => $row['reference'] ?? null,
-                        'name' => $row['name'] ?? null,
-                        'ldraw' => $row['part'] ?? null,
-                        'texture' => [
-                            'url' => $row['texture'] ?? null,
-                        ],
-                        'matrix' => [
-                            'world' => json_decode($row['matrix_world']) ?? null,
-                            'local' => json_decode($row['matrix_local']) ?? null,
-                            'size' => json_decode($row['size']) ?? null,
+                $attach_stmt = $this->membership_db->prepare("SELECT url FROM attachments WHERE id = ? AND is_deleted = 0");
+                $attach_stmt->bind_param("i", $attachment_id);
+                $attach_stmt->execute();
+                $attach_res = $attach_stmt->get_result();
+                $attachment = $attach_res->fetch_assoc();
+
+                if($attachment) {
+                    return [
+                        'success' => true,
+                        'message' => 'Part found',
+                        'id' => $row['id'],
+                        'part' => [
+                            'user' => $username,
+                            'reference' => $row['reference'] ?? null,
+                            'name' => $row['name'] ?? null,
+                            'ldraw' => $row['part'] ?? null,
+                            'color' => $row['color'] ?? 15,
+                            'texture' => [
+                                'url' => $attachment['url'] ?? null,
+                                'thumbnail' => $row['thumbnail'] ?? null,
+                                'attachment_id' => $attachment_id ?? null
+                            ],
+                            'matrix' => [
+                                'world' => json_decode($row['matrix_world']) ?? null,
+                                'local' => json_decode($row['matrix_local']) ?? null,
+                                'size' => json_decode($row['size']) ?? null,
+                            ]
                         ]
-                    ]
-                ];
+                    ];
+                } else {
+                    return ['success' => false, 'message' => "Image not found in database."];
+                }
             } else {
                 return ['success' => false, 'message' => "Part not found in database."];
             }
@@ -215,7 +240,7 @@
     if(isset($data['all'])) {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(400);
-            echo json_encode(["success" => false, "message" => "use POST please"]);
+            echo json_encode(["error" => true, "message" => "use POST please"]);
             exit;
         }
 
@@ -238,12 +263,41 @@
             exit;
         }
 
-        $parts_stmt = $conn->prepare("SELECT id, name, part, reference, texture FROM parts WHERE userid = ? ORDER BY id DESC");
+        /*$parts_stmt = $cooldb->prepare("SELECT id, name, part, reference, attachment_id FROM parts WHERE userid = ? ORDER BY id DESC");
         $parts_stmt->bind_param("i", $id);
         $parts_stmt->execute();
         $parts = $parts_stmt->get_result();
 
         while ($row = $parts->fetch_assoc()) {
+            $attachment_id = $row['attachment_id'] ?? null;
+
+            $attach_stmt = $membership_db->prepare("SELECT url FROM attachments WHERE id = ? AND is_deleted = 0");
+            $attach_stmt->bind_param("i", $attachment_id);
+            $attach_stmt->execute();
+            $attach_res = $attach_stmt->get_result();
+            $attachment = $attach_res->fetch_assoc();
+
+            if($attachment) {
+                $res = array_merge($row, $attachment);
+                $parts_arr[] = $res;
+            }
+        }*/
+
+        $query = "
+            SELECT p.id, p.name, p.part, p.reference, p.attachment_id, p.thumbnail, p.color, a.url 
+            FROM " . DB_NAME2 . ".parts p
+            INNER JOIN " . DB_NAME . ".attachments a ON p.attachment_id = a.id
+            WHERE p.userid = ? AND a.is_deleted = 0
+            ORDER BY p.id DESC
+        ";
+
+        $parts_stmt = $cooldb->prepare($query);
+        $parts_stmt->bind_param("i", $id);
+        $parts_stmt->execute();
+        $result = $parts_stmt->get_result();
+
+        $parts_arr = [];
+        while ($row = $result->fetch_assoc()) {
             $parts_arr[] = $row;
         }
 
