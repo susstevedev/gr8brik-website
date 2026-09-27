@@ -19,13 +19,7 @@ class SessionManager
 
     function revokeSession()
     {
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
-        if ($conn->connect_error) {
-            http_response_code(500);
-            return ['success' => false, 'error' => "Database connection failed"];
-        }
-
+        $conn = Database::get(DB_NAME);
         $session = $this->session;
 
         $check = $conn->prepare("SELECT id FROM sessions WHERE id = ?");
@@ -69,7 +63,7 @@ class AccountManager
             return ['error' => "Please login to verify an account"];
         }
 
-		$check = $db->prepare("SELECT id, verify_token FROM users WHERE verify_token = ? AND verify_token IS NOT NULL");
+		$check = $db->prepare("SELECT id, verify_token FROM users WHERE verify_token = ? AND verify_token IS NOT NULL AND deactive IS NULL AND suspended = 0");
         $check->bind_param("s", $token);
         $check->execute();
         $result = $check->get_result();
@@ -81,7 +75,7 @@ class AccountManager
 
 		$row = $result->fetch_assoc();
         $userid = $row['id'];
-        $stmt = $db->prepare("UPDATE users SET verify_token = NULL WHERE id = ?");
+        $stmt = $db->prepare("UPDATE users SET verify_token = NULL WHERE id = ? AND verify_token IS NOT NULL AND deactive IS NULL AND suspended = 0");
         $stmt->bind_param("i", $userid);
 
         if ($stmt->execute()) {
@@ -167,12 +161,7 @@ class AccountManager
 
     public function login_user($user, $pwd, $remember)
     {
-        $conn = mysqli_connect(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if (mysqli_connect_errno()) {
-            http_response_code(500);
-            return ['error' => "Database connection failed"];
-        }
-
+        $conn = Database::get(DB_NAME);
         $remember = ($remember === 'true' || $remember === 1) ? 1 : 0;
 
         if($remember === 1 && !in_array('site-prefs', Cookie::controls())) {
@@ -336,11 +325,7 @@ class AccountManager
 
     public function github_auth($data)
     {
-        $conn = mysqli_connect(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if (mysqli_connect_errno()) {
-            http_response_code(500);
-            return ['success' => false, 'error' => "Database connection failed"];
-        }
+        $conn = Database::get(DB_NAME);
 
         if (loggedin()) {
             http_response_code(400);
@@ -425,11 +410,7 @@ class AccountManager
 
     public function google_auth($data)
     {
-        $conn = mysqli_connect(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if (mysqli_connect_errno()) {
-            http_response_code(500);
-            return ['success' => false, 'error' => "Database connection failed"];
-        }
+        $conn = Database::get(DB_NAME);
 
         if (loggedin()) {
             http_response_code(400);

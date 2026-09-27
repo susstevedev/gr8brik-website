@@ -2,7 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/account_settings.php';
 
-if(loggedin() === true) {
+if(loggedin()) {
     header('Location: index.php');
 }
 
@@ -74,7 +74,7 @@ $combinedString = $utils->generateRandomScreenName();
         <span id="error-text"></span>
     </div>
 
-    <h2>Register Account</h2>
+    <h2>Create Account</h2>
     <div id="loginForm" class="w3-container">
         <p>Already have an account? <a href="login">Login</a></p>
         <p><input class="login-input w3-input w3-border" value="<?php echo $combinedString; ?>" type="text" name="name" size="50px" placeholder="Unique username that is under 15 characters long"></p>
@@ -85,11 +85,13 @@ $combinedString = $utils->generateRandomScreenName();
         <ul>
             <li>To our <a href="/terms.php">Terms and Conditions</a>.</li>
             <li>To our <a href="/privacy.php">Privacy Policy</a>.</li>
+            <li>To our <a href="/rules">Community Guidelines</a>.</li>
             <li>That you are at least 13 years old or have parental consent to register an account.</li>
             <li>That you do not live in the UK or a province with "age verification" or "data verification" laws.</li>
+            <li>That you are not registering an account with a malicious intent</li>
         </ul>
-        <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="loginBtn" name="login">Register</button>
-        
+        <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="loginBtn" name="login">Create Account</button>
+
     </div>
 
     <p>Or...</p>

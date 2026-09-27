@@ -3,7 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 
-if (!loggedin()) {
+if (!loggedin() || !isset($current_user)) {
     header('Location:login.php');
 }
 ?>
@@ -20,7 +20,7 @@ if (!loggedin()) {
         include '../navbar.php';
         include 'panel.php';
 
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $id = $current_user->id ?? 0;
 

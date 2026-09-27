@@ -26,10 +26,7 @@ if(!loggedin()) {
 
 	<div class="w3-center">
 		<?php
-            $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-            if ($conn2->connect_error) {
-                exit($conn2->connect_error);
-            }
+            $conn2 = Database::get(DB_NAME);
 
 			if(isset($_GET['code'])) {
 				$token = $_GET['code'];

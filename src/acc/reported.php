@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
-if (!loggedin()) {
+if (!loggedin() || !isset($current_user)) {
     header('Location: http://www.youtube.com/watch?v=2dZy3cd9KFY');
 }
 
@@ -10,16 +10,8 @@ if ((int)$current_user->admin != 1) {
 }
 
 if (isset($_POST['accept'])) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-    if ($conn->connect_error) {
-        exit($conn->connect_error);
-    }
-
-    $connuser = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if ($connuser->connect_error) {
-        exit($connuser->connect_error);
-    }
-
+    $conn = Database::get(DB_NAME2);
+    $connuser = Database::get(DB_NAME);
     $pid = $_POST['id'];
 
     $stmt = $conn->prepare("SELECT * FROM reports WHERE id = ?");
@@ -85,11 +77,7 @@ if (isset($_POST['accept'])) {
 }
 
 if (isset($_POST['deny'])) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-    if ($conn->connect_error) {
-        exit($conn->connect_error);
-    }
-
+    $conn = Database::get(DB_NAME2);
     $pid = $_POST['id'];
 
     $stmt = $conn->prepare("DELETE FROM reports WHERE reportable_id = ?");
@@ -122,11 +110,7 @@ if (isset($_POST['deny'])) {
 
     <div class="w3-row">
         <?php
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-        if ($conn->connect_error) {
-            exit($conn->connect_error);
-        }
-
+        $conn = Database::get(DB_NAME2);
         $empty = "<center><b>No content reported. You're all caught up!</b><br />";
 
         $sql = "SELECT * FROM reports ORDER BY id DESC";
@@ -219,10 +203,8 @@ if (isset($_POST['deny'])) {
         } else {
             echo $empty;
         }
-        $conn->close();
         ?>
     </div>
-
 
     <?php include '../linkbar.php' ?>
 </body>
