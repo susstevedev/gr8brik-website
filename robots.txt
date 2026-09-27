@@ -1,0 +1,10 @@
+# This file will prevent robots from indexing this folder.
+
+User-agent: *
+Disallow: 
+Disallow: /acc/users/
+Disallow: /ajax/
+Disallow: /ajax/constants/
+Disallow: /oops.html
+Disallow: /cre
+Sitemap: sitemap2.php

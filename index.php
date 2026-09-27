@@ -1,0 +1,100 @@
+<?php
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+if (loggedin()) {
+    header('Location:list.php');
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>LDraw and WebGL based LEGO&reg; building webapp with social features in your web browser.</title>
+    <?php include 'header.php' ?>
+    <script src="/lib/homepage.js" type="text/javascript"></script>
+</head>
+
+<body class="w3-container w3-light-blue">
+    <?php include 'navbar.php' ?>
+
+    <div class="w3-container w3-light-grey w3-card-2 w3-text-grey">
+        <h2>GR8BRIK<span class="w3-opacity">.rf.gd</span></h2>
+    </div><br />
+    <center>
+        <article class="main-text w3-container">
+            <div class="img-cell w3-content w3-card-2 w3-light-grey w3-padding-small w3-left w3-round" style="max-width:525px;position:relative;">
+                <a href="#feed"><img class="slides" src="img/feed.jpg"></a>
+                <a href="#community"><img class="slides" src="img/com.jpg"></a>
+                <a href="#creations"><img class="slides" src="img/creations.jpg"></a>
+                <a href="#uploads"><img class="slides" src="img/upload.jpg"></a>
+
+                <a style="position:absolute;top:45%; left:10px;" onclick="plusDivs(-1)"><button class="w3-btn w3-blue w3-round w3-padding w3-large w3-hover-white"><i class="fa fa-arrow-left"></i></button></a>
+                <a style="position:absolute; top:45%; right:10px;" onclick="plusDivs(1)"><button class="w3-btn w3-blue w3-round w3-padding w3-large w3-hover-white"><i class="fa fa-arrow-right"></i></button></a>
+            </div>
+
+            <p style="word-wrap: break-word;">Gr8brik is an LDraw and WebGL based LEGO building webapp with social features in running completly your web browser. No download or installation needed, optionally store your creations in your account.</p>
+            <a href="/modeler" target="_blank"><button class="w3-btn w3-large w3-light-grey w3-hover-opacity w3-round-small w3-border w3-border-grey">Start Building!</button></a> <a href="/acc/login?goto=/acc/creations" target="_blank">
+                <button class="w3-btn w3-large w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Login or register</button>
+            </a><br />
+            <p>
+                <a href="/com/view?id=17">Community Guidelines</a> • <a href="/terms">Terms and Conditions</a> • <a href="/privacy">Privacy Policy</a><br />
+            </p>
+        </article>
+    </center>
+
+    <hr />
+    <div class="w3-container grid">
+        <article id="community">
+            <h2>Awesome community</h2>
+            <p>The community section is a forum to post about Gr8Brik and other tools. You can view posts of others, reply to them, and create your own posts.</p>
+            <a href="/com/"><button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Community</button></a>
+        </article>
+        <hr />
+
+        <article id="creations">
+            <h2>Cool user creations</h2>
+            <p>You can view, download, edit, and also comment on other users creations. You can also report creations that do not follow the rules.</p>
+            <a href="/list"><button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Creations</button></a>
+        </article>
+        <hr />
+
+        <article id="uploads">
+            <h2>Fast, quick, and easy modeler</h2>
+            <p>The modeler let's you create and edit 3D ldraw and gr8brik models. Free without download or installation.</p>
+            <a href="/modeler"><button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Create</button></a>
+        </article>
+        <hr />
+    </div>
+
+    <div class="container">
+        <h2>Featured Creations</h2>
+        <span aria-busy="true" id="featured-builds-loader"><img src="/img/loading.gif" width="25px" height="25px" /></span>
+        <span id="featured-builds" class="w3-row-padding" style="display: none;">
+            <template id="gr8-creation-template">
+                <div class="w3-col l4 m6 s12 w3-margin-bottom">
+                    <div class="gr8-theme liked w3-card-2 w3-light-grey w3-padding creation-card">
+                        <a href="/build/" class="creation-link">
+                            <img src="" loading="lazy" class="cre-image w3-hover-opacity w3-card-2 w3-grey creation-thumbnail">
+                            <h4 class="creation-title"></h4>
+                        </a>
+                        <div class="creation-meta">
+                            <span class="meta-author">
+                                By <a href=""><i class="fa fa-at" aria-hidden="true"></i></a>, <span></span>
+                            </span>
+
+                            <div class="meta-stats">
+                                <span class="views"><i class="fa fa-eye"></i> </span> •
+                                <span class="favs"><i class="fa fa-star"></i> </span> •
+                                <span class="comments"><i class="fa fa-comments"></i> </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </span>
+    </div>
+
+    <?php include('linkbar.php'); ?>
+
+</body>
+
+</html>

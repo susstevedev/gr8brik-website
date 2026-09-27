@@ -1,0 +1,13 @@
+{
+  "hostname": "www.gr8brik.rf.gd",
+  "apiKey": "ckey_01d9f4ad018c16287ca6f3938a0f",
+  "secret": "csec_3e875f0a9eb58d0982bbba1acb11ef57cdee0af9f671aa18",
+  "license": "This API key is provided free of charge. Use of this key or the API it accesses is at your own risk with no warranty or liability. By using this key you agree to properly attribute ALTCHA on your website as described in the documentation (https://altcha.org/docs/api/api_keys#attribution-for-free-api-keys). Terms of Service apply ((https://altcha.org/terms-of-service).",
+  "verification": {
+    "DNS": {
+      "name": "@",
+      "type": "TXT",
+      "value": "altcha-verification=12e265bcf73a6a44"
+    }
+  }
+}

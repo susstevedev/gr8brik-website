@@ -1,0 +1,21 @@
+PARSER_USE_BBCODE
+
+[size=200]Document is not finished and I'm in the process of writing it.[/size]
+
+[size=300]Modeler intro[/size]
+The Gr8brik modeler is a complex application for new users. This article hopes to make it easier to use.
+
+[size=200]Start[/size]
+Heading to [url]/modeler[/url] will give you a screen that looks something like this:
+[url=https://ibb.co/XrQtYwgr][img]https://i.ibb.co/fzgHDc5z/image.png[/img][/url]
+You're probably thinking to yourself right now: [quote]How do I even use this?[/quote]
+
+We're going to assume you want to build a simple tree model. Let's start by adding the part [b]Brick 2 x 2 Round Reinforced[/b] to our scene.
+[url=https://ibb.co/r2rF1pqw][img]https://i.ibb.co/B2McS6vC/image.png[/img][/url]
+I'm going to click on the search field with the text "search parts..." and search "round". Then we can scroll until we see the part. Then click on the part. It should appear in the scene and look like this:
+[url=https://ibb.co/GQQ0w3xW][img]https://i.ibb.co/fdd2RG1k/image.png[/img][/url]
+
+Now we have to change the color. Simply scroll back up and click on the red color icon. Ignore the number on the side for now (it should be set to 0). I changed the color to the preset brown (hex [u]#[/u][url=https://www.color-hex.com/color/812a00]812a00[/url]).
+[url=https://ibb.co/4gY55qtw][img]https://i.ibb.co/84dSSCsn/image.png[/img][/url]
+
+[size=200]Document is not finished and I'm in the process of writing it.[/size]

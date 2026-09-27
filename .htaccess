@@ -1,0 +1,40 @@
+php_value display_errors On
+php_value mbstring.http_input auto
+php_value date.timezone America/New_York
+RewriteEngine On
+
+# RewriteCond %{HTTP_HOST} ^www.(.*)$ [NC]
+# RewriteRule ^ https://%1%{REQUEST_URI} [L,R=301]
+# RewriteCond %{HTTPS} off
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Will probably do custom error messages later
+ErrorDocument 301 default
+ErrorDocument 400 default
+ErrorDocument 401 default
+ErrorDocument 403 default
+ErrorDocument 404 default
+ErrorDocument 429 default
+ErrorDocument 500 "<h1>Internal Server Error</h1><p>The server encountered an internal error or misconfiguration and was unable to complete your request.</p><p>Please contact the server administrator at <a href='mailto:mail@gr8brik.rf.gd'>mail@gr8brik.rf.gd</a> to inform them of the time this error occurred, and the actions you performed just before this error.</p><p>More information about this error may be available in the server error log.</p>"
+ErrorDocument 503 default
+
+RewriteRule ^modeler/?$ /mod/new/index.html [QSA,L]
+RewriteRule ^user/([0-9]+)/?$ /profile.php?id=$1 [QSA,L]
+RewriteRule ^@(.*)$ /profile.php?name=$1 [B,QSA,L]
+RewriteRule ^build/([0-9]+)/?$ /creation.php?id=$1 [QSA,L]
+RewriteRule ^topic/([0-9]+)/?$ /com/view.php?id=$1 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule !.*.php$ %{REQUEST_FILENAME}.php [QSA,L]
+
+RewriteRule ^acc/creations/edit/([0-9]+)/?$ /acc/creations?edit=$1 [QSA,L]
+
+Redirect 301 /github https://github.com/susstevedev/gr8brik-new
+RewriteRule ^sitemap.xml /sitemap2.php [QSA,L]
+Redirect 301 /new_appeal.php /appeal.php
+Redirect 403 /important.php
+
+# RewriteRule ^index.php /oops.html [QSA,L]
+# RewriteCond %{HTTP:Cookie} admin=yes [NC]
+# RewriteRule .* - [L]
+# RewriteRule .* - [R=503,L]

@@ -1,0 +1,3 @@
+RewriteCond %{HTTP:Cookie} is_admin=yes [NC]
+RewriteRule .* - [L]
+RewriteRule .* - [R=503,L]

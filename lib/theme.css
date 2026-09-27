@@ -1,0 +1,368 @@
+.tooltip {
+  position: relative;
+  display: inline-block;
+  border-bottom: 0.5px dotted black;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  width: 220px;
+  top: 100%;
+  left: 50%;
+  margin-left: -60px;
+  background-color: black;
+  color: #fff;
+  text-align: center;
+  padding: 5px 0;
+  border-radius: 6px;
+  position: absolute;
+  z-index: 1;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+}
+	
+body {
+    font-family: sans-serif;
+    font-size: 100%;
+    font-display: swap;
+    text-shadow: 1.5px 1.5px 1.5px rgba(0, 0, 0, 0.1);
+}
+
+/* treat pre tags as normal text */
+pre {
+    font-family: sans-serif;
+    font-size: 100%;
+    max-width: 100%;
+    white-space: pre-line;
+    line-height: normal;
+    text-shadow: none;
+}
+
+a {
+    transition: all 0.2s ease-in;
+}
+
+a:hover {
+    color: #0000FF;
+}
+
+.w3-button, .w3-btn, .w3-hover-opacity, .w3-hover-shadow {
+    transition: all 0.2s ease-in;
+}
+
+input {
+    padding-bottom: 5px;
+    border: none;
+    outline: none;
+    transition: all 0.2s ease-in-out;
+}
+
+.w3-main, .linkbar, .consoleErrorBox {
+    margin-left: 18% !important;
+    -webkit-overflow-scrolling: touch;
+}
+
+.altcha-footer, .altcha-logo {
+    display: none !important;
+}
+
+/* creation card */
+.creation-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.creation-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.creation-thumbnail {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+}
+
+.creation-title {
+    margin-top: 10px;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.creation-meta {
+    font-size: 0.85em;
+    margin-top: auto;
+    padding-top: 10px;
+    color: #555;
+}
+
+body.mode-dark .creation-meta {
+    color: #ddd;
+}
+
+.creation-meta .meta-stats {
+    margin-top: 4px;
+    border-top: 1px solid #ddd;
+    padding-top: 4px;
+}
+
+/* creation card on the creations main page */
+
+.creation-page-title {
+    font-weight: bold;
+}
+
+.creation-page-meta {
+    margin-top: auto;
+    padding-top: 10px;
+    color: #555;
+}
+
+body.mode-dark .creation-page-meta {
+    color: #ddd;
+}
+
+.login-input {
+    width: 50%;
+}
+
+#gdpr-cookie-message {
+    margin-left: 20%;
+    margin-right: 20%;
+    position: absolute;
+    display: inline-block;
+    z-index: 9999;
+    top: 0;
+    color: #fff;
+    background-color: #333333;
+    padding: 10px;
+    width: auto;
+    height: auto;
+    border-radius: 2px;
+    box-shadow: 2px 2px 2px 2px rgba(0, 0, 0, 0.1);
+}
+
+#gdpr-cookie-accept, #gdpr-cookie-advanced {
+    transition: all 0.2s ease-in-out;
+    background-color: #0096FF;
+    color: #fff;
+    border: none;
+    border-radius: 2px;
+    padding: 6px;
+    cursor: pointer;
+    margin-right: 5px !important;
+}
+
+#gdpr-cookie-accept:hover, #gdpr-cookie-advanced:hover {
+    background-color: #87ceeb;
+}
+	
+#navbar {
+	position: fixed;
+	left: 0;
+    top: 0;
+	width: 18%;
+    line-height: 175%;
+}
+
+.gr8-navbarsearch-input:focus, .gr8-navbarsearch-input:active, .gr8-navbarsearch-input:hover { 
+    border: #add8e6 2px solid !important;
+}
+
+.gr8-navbarsearch-input {
+    border-radius: 6px;
+}
+
+.gr8-navbarsearch {
+    background-color: #fff;
+    cursor: pointer;
+    padding-right: 6px;
+    padding-left: 6px;
+    padding-top: 6px !important;
+    border-radius: 6px;
+}
+
+.gr8-navbarsearch-parent a:hover {
+    color: #add8e6 !important;
+}
+
+.gr8-navbarsearch-parent {
+    color: #000;
+    display: inline-flex;
+    height: 32px;
+    padding-right: 0px;
+    padding-left: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+	
+#offset {
+	margin-left: 25%;
+}
+    
+#pfp {
+    width: 100px;
+    height: 100px;
+}
+
+.pfp-post {
+    width: 50px; 
+    height: 50px;
+    margin-right: 10px;
+    float: left;
+}
+
+#post {
+    display: flex;
+    position: relative;
+}
+
+.file-pfp {
+    width: 250px;
+    height: 250px;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: 50% 50%;
+    background-color: #000;
+    cursor: pointer; 
+}
+        
+.file-banner {
+    width: 25vw;
+    height: 25vh;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: 50% 50%;
+    background-color: #000;
+    cursor: pointer; 
+}
+
+#ajax-success,#ajax-error {
+    display:none;
+}
+
+/* creations page comments and related */
+#comment-form #post textarea[name='comment-box'] {
+    height: 60px;
+}
+
+#comment-form .comment-button, #comment-form .comment-preview, #attach-upload #imagefile {
+    display: none;
+}
+
+#data-comment-wrapper .comment {
+    border-left: 4px solid #ccc;
+    padding-left: 15px;
+}
+
+#data-comment-wrapper .comment .comment-divider {
+    width: max-content;
+    height: max-content;
+}
+
+#data-comment-wrapper .comment .comment-profile-picture {
+    width: 50px;
+}
+
+#data-comment-wrapper .comment #comment-text img {
+    max-width: 100%;
+}
+
+#data-comment-wrapper .comment #comment-text article {
+    min-height: 75px;
+}
+
+.reply-form-box {
+    display: none;
+}
+
+#user-conversation-wrapper .avatar {
+    transition: all 0.15s ease-in;
+    margin-left: -25px;
+    border-bottom: none;
+}
+
+#user-conversation-wrapper .avatar:first-child {
+    margin-left: 0;
+}
+
+#user-conversation-wrapper:hover {
+    .avatar {
+        margin-left: 0;
+    }
+}
+
+img.emoji {
+    height: 1.2em;
+    width: 1.2em;
+    margin: 0;
+}
+
+.upvote-btn:hover,.downvote-btn:hover {
+    transform: translateY(-1px);
+}
+
+#model-embed {
+    width: 65%;
+    height: 50vh;
+}
+
+.model-screenshot {
+    margin: 20px;
+    height: 50%;
+}
+
+/* copied from homepage */
+ .main-text {
+    max-width: 75%;
+}
+
+.img-cell .slides {
+    width: 500px;
+    height: 250px;
+    display: none;
+}
+
+@media only screen and (max-width: 768px) {
+    .main-text {
+        min-width: 100%;
+        max-width: 100%;
+    }
+
+    body {
+        margin: 0px !important;
+        padding: 0px 0px 0px 0px !important;
+    }
+
+	#offset {
+		margin-left: 0px;
+	}
+
+    #pfp {
+        width: 50px; 
+        height: 50px;
+    }
+
+    #gdpr-cookie-message {
+        width: 100%;
+        margin-left: 0px;
+        margin-right: 0px;
+        padding: 0px 0px 0px 0px;
+    }
+
+    .w3-main, .linkbar {
+        margin-left: 0px !important;
+    }
+
+    .creation-page-meta span {
+        display: inline;
+    }
+
+    #model-embed, [data-testid="description"] {
+        width: 100% !important;
+    }
+}

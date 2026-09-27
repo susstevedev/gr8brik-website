@@ -1,0 +1,12 @@
+# constants.php includes sensitive database keys/passwords
+# it should NEVER be uploaded to GitHub
+
+# --- credentials ---
+**/ajax/constants.php
+**/ajax/constants/
+.env
+
+# --- user generated content ---
+**/acc/users/
+cre/
+**/cre/
