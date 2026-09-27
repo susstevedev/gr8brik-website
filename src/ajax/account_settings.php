@@ -2,7 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 
-$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+$conn = Database::get(DB_NAME);
 
 class ScreenNameUtils {
     public function generateRandomScreenName() {
@@ -19,8 +19,8 @@ class ScreenNameUtils {
     public function check_username_available(string $new) {
         global $current_user;
         global $conn;
-        
-        /*$reserved_names = array(
+
+        $reserved_names = array(
             'administrator', 
             'admin',
             'susstevedev',
@@ -28,9 +28,7 @@ class ScreenNameUtils {
             'the_an0nym',
             'missbricker',
             'gr8brik'
-        );*/
-
-        $reserved_names = array('gr8brik');
+        );
 
         if(empty($new) || $new === null) {
             return ['available' => false, 'reason' => 'Please provide a username.'];
@@ -70,8 +68,12 @@ class ScreenNameUtils {
             return ['available' => false, 'reason' => 'This username is unavailable. Please choose another.'];
         }
 
-        $result = $conn->query("SELECT * FROM users WHERE username = '$new' AND deactive IS NULL");
-        if($result->num_rows != 0 || in_array($new, $reserved_names)) {
+        $stmt = $conn->prepare("SELECT username FROM users WHERE username = ? AND username IS NOT NULL LIMIT 1");
+        $stmt->bind_param("s", $new);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if($result->num_rows !== 0 || in_array($new, $reserved_names)) {
             return ['available' => false, 'reason' => 'This username has been taken. Please choose another.'];
         }
 
@@ -137,7 +139,7 @@ class AccountSettings {
             return ['error' => $error_message];
         }
 
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
 
         $stmt_2 = $conn->prepare("UPDATE users SET twitter = ? WHERE id = ? AND deactive IS NULL");
         $stmt_2->bind_param("ss", $new, $id);
@@ -155,7 +157,7 @@ class AccountSettings {
         global $current_user;
         $id = $current_user->id;
 
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
 
         if($current_user->verify_token != NULL) {
             header("HTTP/1.0 500 Internal Server Error");
@@ -233,7 +235,7 @@ class AccountSettings {
             return ['error' => 'About section must be under 1,000 characters.'];
         }
 
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
         $stmt_2 = $conn->prepare("UPDATE users SET description = ? WHERE id = ? AND deactive IS NULL");
 
         $stmt_2->bind_param("si", $new, $id);
@@ -248,7 +250,7 @@ class AccountSettings {
     public function password_change($oldPassword, $newPassword, $confirmPassword) {
         global $current_user;
 
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
 
         if(!loggedin()) {
             header("HTTP/1.0 403 Forbidden");
@@ -294,14 +296,13 @@ class AccountSettings {
 
     public function mail_change($new, $old) {
         global $current_user;
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
 
         if(!loggedin()) {
             header("HTTP/1.0 403 Forbidden");
             return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
         }
 
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
         $id = $current_user->id;
         $rand = bin2hex(random_bytes(32));
 
@@ -351,7 +352,7 @@ class AccountSettings {
     }
 
     public function link_github_account($userid, $github_id) {
-        $conn = mysqli_connect(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
         if (mysqli_connect_errno()) {
             return ['error' => "Database connection failed"];
         }
@@ -379,7 +380,7 @@ class AccountSettings {
     }
 
     public function unlink_github_account($userid) {
-        $conn = mysqli_connect(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
         if (mysqli_connect_errno()) {
             return ['error' => "Database connection failed"];
         }
@@ -558,11 +559,7 @@ if (isset($_POST['picture'])) {
         $tiny_image_webp = @imagewebp($tiny_image_scale, $upload_tiny, 50);
 
         if ($image_webp && $tiny_image_webp) {
-            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-            if ($conn->connect_error) {
-                http_response_code(500);
-                exit(json_encode(['success' => false, 'error' => 'DB connection failure.']));
-            }
+            $conn = Database::get(DB_NAME);
 
             $stmt = $conn->prepare("UPDATE users SET picture = ?, picture_small = ? WHERE id = ? AND deactive IS NULL");
             $stmt->bind_param("sss", $db_pfp, $db_pfp_tiny, $id);
@@ -584,10 +581,12 @@ if (isset($_POST['picture'])) {
 }
 
 if (isset($_POST['remove_picture'])) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if ($conn->connect_error) {
+    $conn = Database::get(DB_NAME);
+
+    if(!loggedin()) {
         http_response_code(500);
-        exit(json_encode(['success' => false, 'error' => 'DB connection failure.']));
+        echo json_encode(['success' => false, 'error' => 'login first']);
+        exit;
     }
 
     $old_pfp = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture;
@@ -609,125 +608,10 @@ if (isset($_POST['remove_picture'])) {
 
     if ($stmt->execute()) {
         http_response_code(200);
-        exit(json_encode(['success' => true, 'message' => 'Profile picture removed.', 'image' => login()->picture]));
+        exit(json_encode(['success' => true, 'message' => 'Profile picture removed.', 'image' => $current_user->picture ?? null]));
     } else {
         http_response_code(500);
         exit(json_encode(['success' => false, 'error' => 'Error removing profile picture. Please try again later.']));
-    }
-}
-
-if (isset($_GET['get_notifications'])) {
-    header('Content-Type: application/json');
-
-    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if ($conn2->connect_error) {
-        exit($conn2->connect_error);
-    }
-
-    $stmt_2 = $conn2->prepare("SELECT * FROM notifications WHERE user = ? ORDER BY timestamp DESC");
-    $stmt_2->bind_param("i", $_SESSION['userid']);
-    $stmt_2->execute();
-    $result = $stmt_2->get_result();
-
-    $notifications = [];
-
-    while($row = $result->fetch_assoc()) {
-
-        $profile = $row['profile'];
-
-        $stmtUser = $conn2->prepare("SELECT username FROM users WHERE id = ?");
-        $stmtUser->bind_param("i", $profile);
-        $stmtUser->execute();
-        $userRow = $stmtUser->get_result()->fetch_assoc();
-
-        $user = $userRow['username'];
-        $post = null;
-
-        if($row['category'] == 1) {
-            $url = "/user/" . $profile;
-            $post = "followed you";
-            $img  = "../acc/users/pfps/" . $profile;
-
-        } elseif ($row['category'] == 2){
-
-            $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-            $stmt3 = $conn3->prepare("SELECT name, screenshot FROM model WHERE id = ?");
-            $stmt3->bind_param("i", $row['content']);
-            $stmt3->execute();
-            $row3 = $stmt3->get_result()->fetch_assoc();
-            $conn3->close();
-
-            if($row3) {
-                $img = $row3['screenshot'];
-                $url = "/build/" . $row['content'];
-                $post = "commented on " . $row3['name'];
-            }
-
-        } elseif($row['category'] == 3) {
-
-            $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-            $stmt3 = $conn3->prepare("SELECT title FROM messages WHERE id = ?");
-            $stmt3->bind_param("i", $row['content']);
-            $stmt3->execute();
-            $row3 = $stmt3->get_result()->fetch_assoc();
-            $conn3->close();
-
-            $title = $row3['title'] ?? "[deleted]";
-            $img = "/img/com.jpg";
-            $url = "/com/" . $row['content'];
-            $post = "replied to " . $title;
-        }
-
-        if (is_numeric($row['timestamp'])) {
-            $time = time_ago(date("Y-m-d H:i:s", $row['timestamp']));
-        } else {
-            $time = "A long time ago";
-        }
-        
-        if($_SERVER['HTTPS'] != 'off') {
-            $proto = "https";
-        } else {
-            $proto = "http";
-        }
-
-        $notifications[] = [
-        	"url"  => $proto . "://" . $_SERVER['HTTP_HOST'] . $url,
-        	"img"  => $proto . "://" . $_SERVER['HTTP_HOST'] . $img,
-            "message" => $user . " " . $post,
-        	"time" => $time
-       	];
-    }
-
-    echo json_encode($notifications);
-    exit;
-}
-
-if(isset($_GET['clear_notifications'])) {
-    header('Content-Type: application/json');
-    if(!loggedin()) {
-        http_response_code(200);
-        exit;
-    }
-
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $id = (int)$current_user->id;
-
-    if((int)$current_user->alert != 0) {
-        $stmt_2 = $conn->prepare("UPDATE users SET alert = 0 WHERE id = ? LIMIT 1");
-        $stmt_2->bind_param("i", $id);
-
-        if ($stmt_2->execute()) {
-            http_response_code(200);
-            echo json_encode(['success' => 'Cleared inbox notifications. Would you like to reload the web page?']);
-            exit;
-        } else {
-            http_response_code(500);
-            echo json_encode(['error' => 'Error clearing inbox notifications.']);
-            exit;
-        }
-    } else {
-        http_response_code(200);
-        exit;
     }
 }
 
