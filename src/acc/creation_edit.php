@@ -1,11 +1,14 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-if(!loggedin()) {
+if(!loggedin() || !isset($current_user)) {
     header('Location:/index.php');
     exit;
 }
+
+exit('This is an outdated page. Creations are now edited via AJAX.');
+
 $model_id = $_GET['id'];
-$user_id = $current_user->id;
+$user_id = $current_user->id ?? 0;
 
 if (isset($_POST['edit'])) {
     $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);

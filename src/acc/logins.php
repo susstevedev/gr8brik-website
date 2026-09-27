@@ -23,15 +23,11 @@ if(!loggedin()) {
     ?>
 
 		<?php
-            $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-            if ($conn2->connect_error) {
-                exit($conn2->connect_error);
-            }
+            $conn2 = Database::get(DB_NAME);
 
 			$sql = "SELECT * FROM sessions WHERE user = '$id' ORDER BY timestamp DESC";
             $result = $conn2->query($sql);
-
-            $sessionAmount = mysqli_num_rows($result);
+            $sessionAmount = $result->num_rows;
 
             echo "<h4><span id='session-amount'>" . $sessionAmount . "</span> active sessions. You are currently on " . UA . ".</h4>";
 
@@ -57,7 +53,6 @@ if(!loggedin()) {
                 $i++;
             }
             $result->free();
-            $conn2->close();
 		
 		?><br /><br />
 
@@ -91,16 +86,6 @@ if(!loggedin()) {
             
             console.log($('#session-amount').text());
             console.log(parseInt($('#session-amount').text()) - 1);
-            
-            /*$(document).on("click", "#sessionModal #original", function() {
-                $(this).hide();
-                $("#complete").show();
-            });
-            
-            $(document).on("click", "#sessionModal #complete", function() {
-                $(this).hide();
-                $("#original").show();
-            }); */
             
             $(document).on("click", "#original", function() {
                 $(this).hide();

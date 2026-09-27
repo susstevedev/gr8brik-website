@@ -5,17 +5,14 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 $bbcode = new BBCode;
 
-if (loggedin()) {
-    $id = $current_user->id;
+if (loggedin() || !isset($current_user)) {
+    $id = $current_user->id ?? 0;
 } else {
     header('Location: login.php');
     exit;
 }
 
-$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-if ($conn->connect_error) {
-    exit($conn->connect_error);
-}
+$conn = Database::get(DB_NAME);
 
 if (isset($_GET['group'])) {
     $sql = "SELECT
@@ -105,7 +102,7 @@ if (isset($_GET['group'])) {
 
 if ((isset($_GET['message']))) {
     $message = isset($_GET['message']) ? (int)$_GET['message'] : null;
-    $uid = $current_user->id;
+    $uid = $current_user->id ?? 0;
 
     if(empty($message)) {
         echo json_encode([
@@ -216,12 +213,8 @@ if ((isset($_GET['message']))) {
 if (isset($_POST['comment'])) {
     header('Content-type: application/json');
     $comment = isset($_POST['commentbox']) ? htmlentities($_POST['commentbox']) : null;
-    $id = $current_user->id;
-
-    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if ($conn2->connect_error) {
-        exit($conn2->connect_error);
-    }
+    $id = $current_user->id ?? 0;
+    $conn2 = Database::get(DB_NAME);
 
     if ($comment === "" || $comment === null || empty($comment)) {
         echo json_encode(['success' => false, 'error' => "Message shall contain text."]);

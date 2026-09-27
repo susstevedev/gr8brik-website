@@ -3,150 +3,10 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
 
-if (isset($_GET['featured'])) {
-    header('Content-type: application/json');
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-    $i = 0;
-
-    if ($conn->connect_error || $conn2->connect_error) {
-        header('HTTP/1.0 500 Internal Server Error');
-        exit("fail  " . $conn->connect_error . " / " . $conn2->connect_error);
-    }
-
-    /*$unique = filter_input(INPUT_GET, 'unique', FILTER_SANITIZE_STRING);
-        if (!$unique) {
-            header('HTTP/1.0 403 Forbidden');
-            exit(json_encode(["error" => "unique id missing"]));
-        }
-        */
-
-    $stmt = $conn2->prepare("SELECT model_id FROM featured ORDER BY id DESC");
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if (!$result) {
-        header('HTTP/1.0 500 Internal Server Error');
-        exit("query error " . $conn2->error);
-    }
-
-    $builds = [];
-
-    while ($row = $result->fetch_assoc()) {
-        $build_count = $result->num_rows;
-        $model_id = $row['model_id'];
-
-        $stmt = $conn2->prepare("SELECT * FROM model WHERE id = ?");
-        $stmt->bind_param("s", $model_id);
-        $stmt->execute();
-        $result2 = $stmt->get_result();
-
-        if ($result2 && $row2 = $result2->fetch_assoc()) {
-            $truncated_name = substr($row2['name'], 0, 30);
-            if (strlen($row2['name']) >= 30) {
-                $truncated_name .= "...";
-            }
-
-            $userid = $row2['user'];
-
-            $stmt2 = $conn->prepare("SELECT * FROM users WHERE id = ?");
-            $stmt2->bind_param("s", $userid);
-            $stmt2->execute();
-            $result3 = $stmt2->get_result();
-
-            if ($result3 && $user = $result3->fetch_assoc()) {
-                $truncated_username = substr($user['username'], 0, 15);
-                if (strlen($user['username']) >= 15) {
-                    $truncated_username .= "...";
-                }
-
-                $builds[] = [
-                    'fetched_at' => $_SERVER['REQUEST_TIME'],
-                    'model_id' => $row2['id'],
-                    'user' => $user['id'],
-                    'username' => $truncated_username,
-                    'title' => $truncated_name,
-                    'views' => $row2['views'],
-                    'likes' => $row2['likes']
-                ];
-            }
-        }
-        if (++$i == 5) break;
-    }
-
-    echo json_encode(['build_count' => $build_count, 'builds' => $builds]);
-    exit;
-}
-
-if (isset($_GET['feature_v2'])) {
-    header('Content-type: application/json');
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-
-    if ($conn->connect_error || $conn2->connect_error) {
-        header('HTTP/1.0 500 Internal Server Error');
-        exit("Could not connect to database");
-    }
-
-
-    $stmt = $conn2->prepare("SELECT * FROM model WHERE feature = 1 ORDER BY date DESC LIMIT 5");
-    $stmt->execute();
-    $result2 = $stmt->get_result();
-    $build_count = $result2->num_rows;
-    $builds = [];
-
-    while ($row2 = $result2->fetch_assoc()) {
-
-        $truncated_name = substr($row2['name'], 0, 30);
-        if (strlen($row2['name']) >= 30) {
-            $truncated_name .= "...";
-        }
-
-        $userid = $row2['user'];
-
-        $stmt2 = $conn->prepare("SELECT * FROM users WHERE id = ?");
-        $stmt2->bind_param("s", $userid);
-        $stmt2->execute();
-        $result3 = $stmt2->get_result();
-
-        if ($result3 && $user = $result3->fetch_assoc()) {
-            $truncated_username = substr($user['username'], 0, 15);
-            if (strlen($user['username']) >= 15) {
-                $truncated_username .= "...";
-            }
-
-            $builds[] = [
-                'model_id' => $row2['id'],
-                'user' => $user['id'],
-                'username' => $truncated_username,
-                'pfp' => $user['picture'],
-                'title' => $truncated_name,
-                'views' => $row2['views'],
-                'likes' => $row2['likes'],
-                'thumb' => $row2['screenshot'] //new addition!
-            ];
-        }
-    }
-
-    echo json_encode([
-        'fetched_at_int' => $_SERVER['REQUEST_TIME'],
-        'fetched_at_str' => date("Y-m-d H:i:s", $_SERVER['REQUEST_TIME']),
-        'build_count' => $build_count,
-        'builds' => $builds
-    ]);
-    exit;
-}
+$conn = Database::get(DB_NAME);
+$conn2 = Database::get(DB_NAME2);
 
 if (isset($_GET['feature_v3'])) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-
-    if ($conn->connect_error || $conn2->connect_error) {
-        header('HTTP/1.0 500 Internal Server Error');
-        exit("Could not connect to database");
-    }
-
-
     $stmt = $conn2->prepare("SELECT * FROM model WHERE feature = 1 ORDER BY date DESC LIMIT 6");
     $stmt->execute();
     $result2 = $stmt->get_result();
@@ -202,9 +62,9 @@ if (isset($_GET['feature_v3'])) {
 
 <body class="w3-container">
     <?php
-    include 'com/bbcode.php';
-    include 'navbar.php';
-    $bbcode = new BBCode;
+        include 'com/bbcode.php';
+        include 'navbar.php';
+        $bbcode = new BBCode;
     ?>
 
     <div class="w3-container">
@@ -284,11 +144,11 @@ if (isset($_GET['feature_v3'])) {
 
     <div class="w3-row-padding" id="main-creations-grid">
         <?php
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
         $is_search = false;
 
-        if (loggedin()) {
+        if (loggedin() && isset($current_user)) {
+            $id = $current_user->id ?? 0;
+
             $stmt = $conn->prepare('SELECT * FROM follow WHERE userid = ?');
             $stmt->bind_param('i', $id);
             $stmt->execute();
@@ -331,21 +191,6 @@ if (isset($_GET['feature_v3'])) {
 
             echo '<div class="w3-col s12"><p>Search results for <b>' . htmlspecialchars($query) . '</b></p></div>';
         }
-
-        /*if (isset($_GET['t']) && $_GET['t']) {
-            $is_search = true;
-            $query = trim($_GET['t']);
-            $search = "%$query%";
-
-            $sql = "SELECT m.* FROM model m JOIN tags t ON m.id = t.model_id WHERE t.tag_name LIKE ? LIMIT 12 OFFSET " . (int)$offset;
-
-            $stmt = $conn2->prepare($sql);
-            $stmt->bind_param('s', $search);
-            $stmt->execute();
-            $result2 = $stmt->get_result();
-
-            echo '<div class="w3-col s12"><p>Models tagged <b>' . htmlspecialchars($query) . '</b></p></div>';
-        }*/
 
         if (isset($_GET['t']) && $_GET['t']) {
             $is_search = true;

@@ -4,7 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/account_settings.php';
 
 if (isset($_GET['reactive'])) {
     $new_token = $conn->real_escape_string($_GET['token']);
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    $conn = Database::get(DB_NAME);
 
     $stmt = $conn->prepare("SELECT * FROM sessions WHERE id = ? LIMIT 1");
     $stmt->bind_param("s", $new_token);
@@ -26,12 +26,12 @@ if (isset($_GET['reactive'])) {
     }
 }
 
-if (!loggedin()) {
+if (!loggedin() || !isset($current_user)) {
     header('Location:login.php');
 }
 
 if (isset($_POST['banner'])) {
-    $id = $current_user->id;
+    $id = $current_user->id ?? 0;
     $uploadOkay = 1;
 
     if ($current_user->verify_token !== NULL) {

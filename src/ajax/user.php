@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
-$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+$conn = Database::get(DB_NAME);
 $loggedin = loggedin();
 
 if(isset($_GET['ajax'])) {
@@ -14,11 +14,8 @@ function login() {
         return false;
     }
 
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if ($conn->connect_error) {
-        return false;
-    }
-    
+    $conn = Database::get(DB_NAME);
+
     $token_raw = $_SESSION['tokenid'] ?? $_COOKIE['token'];
     $token_hashed = hash('sha256', $token_raw);
 
@@ -135,10 +132,7 @@ class User {
      * Checks if a users account doesn't exist or is marked for later deletion
      */
     public static function isDeleted(?int $id): bool {
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if ($conn->connect_error) {
-            return true;
-        }
+        $conn = Database::get(DB_NAME);
 
         if (empty($id)) {
             return true;
@@ -156,7 +150,6 @@ class User {
 
         if ($res->num_rows === 0) {
             $stmt->close();
-            $conn->close();
             return true; 
         }
         $row = $res->fetch_assoc();
@@ -177,10 +170,7 @@ class User {
      * Check if a users profile is private
      */
     public static function isPrivate(?int $id): bool {
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if ($conn->connect_error) {
-            return false;
-        }
+        $conn = Database::get(DB_NAME);
 
         if (empty($id)) {
             return false;
@@ -206,11 +196,7 @@ class User {
      */
     public static function isFollowing(?int $id): bool {
         global $current_user;
-
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if ($conn->connect_error) {
-            return false;
-        }
+        $conn = Database::get(DB_NAME);
 
         if (empty($id) || !loggedin()) {
             return false;
@@ -236,11 +222,7 @@ class User {
      */
     public static function areMutuals(?int $id): bool {
         global $current_user;
-
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if ($conn->connect_error) {
-            return false;
-        }
+        $conn = Database::get(DB_NAME);
 
         if (empty($id) || !loggedin()) {
             return false;
@@ -338,15 +320,13 @@ class User {
     public static function isBanned(?string $value = null, ?string $type = 'username') {
         if (empty($value)) { return false; }
 
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if ($conn->connect_error) { return false; }
+        $conn = Database::get(DB_NAME);
 
         if ($type === 'email') {
             $value = hash('sha256', strtolower(trim($value)));
         } elseif ($type === 'username') {
             $value = strtolower(trim($value));
         } elseif ($type !== 'userid') {
-            $conn->close();
             return false;
         }
 
@@ -358,7 +338,6 @@ class User {
 
         $stmt = $conn->prepare($sql);
         if (!$stmt) {
-            $conn->close();
             return false;
         }
 
@@ -368,7 +347,6 @@ class User {
         $row = $res->fetch_assoc();
 
         $stmt->close();
-        $conn->close();
 
         if ($row) {
             $row['reason'] = !empty($row['reason']) ? $row['reason'] : null;
@@ -383,14 +361,12 @@ class User {
      * This is helpful if the user has an existing account
      */
     public static function isBannedByID(int $id) {
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if($conn->connect_error) { return false; }
+        $conn = Database::get(DB_NAME);
 
         $stmt = $conn->prepare("SELECT username, email FROM users WHERE id = ? AND deactive IS NULL");
         $stmt->bind_param("i", $id);
 
         if(!$stmt->execute()) {
-            $conn->close();
             return false;
         }
 
@@ -420,7 +396,6 @@ class User {
 
             $stmt = $conn->prepare($sql);
             if (!$stmt) {
-                $conn->close();
                 return false;
             }
 
@@ -429,14 +404,11 @@ class User {
             $res = $stmt->get_result();
             $row = $res->fetch_assoc();
             $stmt->close();
-            $conn->close(); 
 
             if ($row) {
                 $row['reason'] = !empty($row['reason']) ? $row['reason'] : null;
                 return $row;
             }
-        } else {
-            $conn->close(); 
         }
 
         return false;
@@ -446,7 +418,7 @@ class User {
      * Grabs and constucts a user object from an ID
      */
     public static function getUser(?int $id = 0) {
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
 
         $user_stmt = $conn->prepare("SELECT * FROM users WHERE id = ? AND deactive IS NULL");
         $user_stmt->bind_param("i", $id);
@@ -466,7 +438,7 @@ class User {
             return [];
         }
 
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
         $ids = array_unique(array_map('intval', $ids));
         $placeholders = implode(', ', array_fill(0, count($ids), '?'));
 
@@ -496,7 +468,7 @@ class User {
      * Like getUser, but with a name instead of an ID
      */
     public static function getUserByName(?string $username) {
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
 
         $user_stmt = $conn->prepare("SELECT * FROM users WHERE username = ? AND deactive IS NULL");
         $user_stmt->bind_param("s", $username);
@@ -511,7 +483,7 @@ class User {
      * Like getUser, but with an email address instead of an ID
      */
     public static function getUserByEmail(?string $email) {
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn = Database::get(DB_NAME);
 
         $user_stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND deactive IS NULL");
         $user_stmt->bind_param("s", $email);
@@ -567,7 +539,7 @@ class User {
 
 function get_warn_status() {
     global $current_user;
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    $conn = Database::get(DB_NAME);
 
     if(loggedin()) {
         $id = $current_user->id ?? 0;
@@ -635,7 +607,7 @@ function get_warn_status() {
 function seen_warn_status() {
     global $current_user;
 
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+    $conn = Database::get(DB_NAME);
     $id = $current_user->id;
 
     if(loggedin()) {
@@ -720,7 +692,6 @@ function logout(?bool $redirect = false) {
             $stmt->bind_param("s", $token_hashed);
             $stmt->execute();
             $stmt->close();
-            $conn->close();
         }
     }
 
@@ -1013,14 +984,9 @@ function delete_old_sessions() {
 }*/
 
 function delete_inactive_users($userid = null, $blacklist_email = false, $blacklist_username = false) {
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
-
-    if ($conn->connect_error || $conn2->connect_error || $conn3->connect_error) {
-        echo "<div class='w3-light-grey w3-border w3-center w3-border-grey w3-round w3-card-2'>Database connection failed</div>";
-        return false;
-    }
+    $conn = Database::get(DB_NAME);
+    $conn2 = Database::get(DB_NAME2);
+    $conn3 = Database::get(DB_NAME3);
 
     $user_ids = [];
     $user_pics = [];
@@ -1051,9 +1017,6 @@ function delete_inactive_users($userid = null, $blacklist_email = false, $blackl
     }
 
     if (empty($user_ids)) {
-        $conn->close();
-        $conn2->close();
-        $conn3->close();
         return true;
     }
 
@@ -1186,9 +1149,6 @@ function delete_inactive_users($userid = null, $blacklist_email = false, $blackl
         return false;
     }
 
-    $conn->close();
-    $conn2->close();
-    $conn3->close();
     return true;
 }
 

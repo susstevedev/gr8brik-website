@@ -1,6 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-if(!loggedin()) {
+if(!loggedin() || !isset($current_user)) {
     header('Location:login.php');
 }
 ?>
@@ -51,7 +51,7 @@ if(!loggedin()) {
     </div>
 
     <?php
-        $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $conn2 = Database::get(DB_NAME);
         if ($conn2->connect_error) {
             exit($conn2->connect_error);
         }

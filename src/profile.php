@@ -25,7 +25,6 @@ if(isset($data) && isset($data['userid'])) {
 	$_GET['id'] = $data['userid'];
 }
 
-$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 $interactions = new UserInteractions();
 
 if (isset($_POST['follow'])) {

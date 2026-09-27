@@ -6,8 +6,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
 $bbcode = new BBCode;
 
-$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+$conn = Database::get(DB_NAME2);
+$conn2 = Database::get(DB_NAME);
 
 if(isset($_GET['storage'])) {
     header('Content-Type: application/json');
@@ -19,8 +19,8 @@ if(isset($_GET['storage'])) {
             exit;
         }
 
-        $user = $current_user->id;
-        $name_user = $current_user->id;
+        $user = $current_user->id ?? 0;
+        $name_user = $current_user->username ?? null;
     } else {
         $user = (int)$_GET['user'];
 
@@ -185,7 +185,6 @@ if (isset($_POST['save_build'])) {
 
         $_SESSION['last_request'] = time();
         $stmt->close();
-        $conn->close();
 
         echo json_encode(['success' => "Your creation was saved successfully!", 'screenshot' => $screenshot_path, 'creation' => $file_name]);
         exit;
@@ -217,7 +216,7 @@ $CREATION_SAVE_STRINGS = [
 if (isset($_POST['save_build_v2'])) {
     header('Content-Type: application/json');
 
-    if (!loggedin()) {
+    if (!loggedin() || !isset($current_user)) {
         http_response_code(401);
         echo json_encode(['error' => $CREATION_SAVE_STRINGS['NO_LOGIN']]);
         exit;
@@ -726,6 +725,7 @@ function fetch_comments($model_id, $csrf) {
     $fav_ids = [];
     $blocked = [];
     $privated = [];
+    $suspended = [];
 
     while ($row = $comResult->fetch_assoc()) {
         $rows[] = $row;
@@ -776,6 +776,10 @@ function fetch_comments($model_id, $csrf) {
             if(((bool)$c_user->private_profile && !User::isFollowing($c_user_id) && !User::isMe($c_user_id))) {
                 $privated[$c_user_id] = true;
             }
+
+            if(((bool)$c_user->suspended)) {
+                $suspended[$c_user_id] = true;
+            }
         }
     }
 
@@ -791,8 +795,9 @@ function fetch_comments($model_id, $csrf) {
         $date = time_ago(date('Y-m-d H:i:s', is_numeric($row['date']) ? $row['date'] : 0));
         $edited_at = null;
         $c_user_privated = $privated[$c_user] ?? false;
+        $c_user_banned = $suspended[$c_user] ?? false;
 
-        if(User::isBannedByID($c_user)) {
+        if($c_user_banned) {
             $c_user_removed = true;
         }
 
@@ -868,19 +873,18 @@ if(isset($_POST['comment'])) {
     $parent = isset($_POST['parent']) ? (int)$_POST['parent'] : 0;
     $csrf = $_POST['csrf_token'];
     $model_id = $_POST['buildId'];
-	$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
     if ($_SESSION['csrf'] !== $_POST['csrf_token']) {
         echo json_encode(['error' => 'Your cross-site-request-forgery token seems to be invalid.']);
         exit;
     }
 
-    if(!loggedin()) {
+    if(!loggedin() || !isset($current_user)) {
         echo json_encode(['error' => 'Please login to comment.']);
         exit;
     }
-    $id = $current_user->id;
+
+    $id = $current_user->id ?? 0;
 
     if($current_user->verify_token != NULL) {
         echo json_encode(['error' => 'Please verify your account to comment.']);
@@ -1018,7 +1022,6 @@ if(isset($_POST['comment'])) {
         exit;
     } else {
         $stmt2->close();
-        $conn->close();
         echo json_encode(['error' => 'Could not send comment. Please try again later.']);
         exit;
     }
@@ -1028,9 +1031,8 @@ if (isset($_POST['edit_comment'])) {
     header('Content-Type: application/json');
 
     if ($_SESSION['csrf'] === $_POST['csrf_token']) {
-        if (loggedin()) {
-            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-            $id = $current_user->id;
+        if (loggedin() && isset($current_user)) {
+            $id = $current_user->id ?? 0;
             $comment_text = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
             $comment_id = isset($_POST['id']) ? (int)$_POST['id'] : null;
             $date = time();
@@ -1089,8 +1091,8 @@ if (isset($_POST['comment_preview']) && isset($_POST['commentbox'])) {
     exit;
 }
 
-if (loggedin()) {
-    $id = $current_user->id;
+if (loggedin() && isset($current_user)) {
+    $id = $current_user->id ?? 0;
 
     if (isset($_POST['downvote'])) {
         header('Content-Type: application/json');
@@ -1101,6 +1103,7 @@ if (loggedin()) {
         }
 
         $model_id = (int)$_POST['model_id'];
+        $likes = $vote_count = null;
 
         $stmt = $conn->prepare("SELECT likes FROM model WHERE id = ? LIMIT 1");
         $stmt->bind_param("i", $model_id);
@@ -1148,6 +1151,7 @@ if (loggedin()) {
         }
 
         $model_id = (int)$_POST['model_id'];
+        $likes = $model_user = $vote_count = null;
 
         $stmt = $conn->prepare("SELECT user, likes FROM model WHERE id = ? AND removed = 0 LIMIT 1");
         $stmt->bind_param("i", $model_id);

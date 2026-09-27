@@ -6,7 +6,7 @@ $bbcode = new BBCode;
 
 $frame = '<center><p>sure easter egg why not</p><iframe width="640px" height="480px" src="https://www.youtube-nocookie.com/embed/2dZy3cd9KFY" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></center>';
 
-if(loggedin()) {
+if(loggedin() && isset($current_user)) {
     if(!$current_user->admin){
         echo $frame;
         exit;
@@ -74,16 +74,12 @@ if(isset($_POST['accept']) && $current_user->admin) {
         include('../navbar.php');
         include('panel.php');
 
-            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+            $conn = Database::get(DB_NAME);
 
             $query = $conn->prepare("SELECT user, reason FROM appeals");
             $query->execute();
             $query->store_result();
             $query->bind_result($user, $reason);
-
-            if(!$current_user->admin) {
-                "<h2>Invalid permissions</h2>";
-            }
 
             if($query->num_rows != 0 && $current_user->admin) {
                 while ($query->fetch()) {

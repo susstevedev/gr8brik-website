@@ -35,11 +35,7 @@
     </form>
     <?php
         //this is ass code 0/10 why why why wnhy why
-
-        $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if ($conn->connect_error) {
-            exit($conn->connect_error);
-        }
+        $conn = Database::get(DB_NAME);
                                                                                                                             
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         if($page < 1) {

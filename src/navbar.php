@@ -10,7 +10,7 @@
         <input class="w3-input w3-border gr8-navbarsearch-input" type="text" id="search-input" placeholder="Search for...">
     </div><hr />
 
-    <?php if(loggedin()) { ?>
+    <?php if(loggedin() && isset($current_user)) { ?>
         <div class='w3-dropdown-click w3-bar-block'>
             <button class='gr8-theme w3-button w3-bar-item' onclick="dropdown('dropdown-main-sidenav')">
                 <i class='fa fa-at' aria-hidden='true'></i>&nbsp;<?php echo htmlspecialchars($current_user->username) ?> <?php echo $current_user->private_profile ? "<i class='fa fa-lock w3-text-yellow' aria-hidden='true'></i>" : null ?> <i class='fa fa-angle-down w3-right' aria-hidden='true'></i>

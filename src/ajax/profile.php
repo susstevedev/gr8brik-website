@@ -30,11 +30,10 @@ if (isset($_GET['followed_by'])) {
         FROM follow f1
         INNER JOIN follow f2 ON f1.userid = f2.profileid
         INNER JOIN users u ON f1.userid = u.id
-        LEFT JOIN blacklist blist ON (u.username = blist.value AND blist.type = 'username') OR (u.email = blist.value AND blist.type = 'email')
         WHERE f1.profileid = ? 
           AND f2.userid = ?
-          AND blist.value IS NULL
           AND u.deactive IS NULL
+          AND u.suspended = 0
         ORDER BY u.id DESC
     ";
 
@@ -57,11 +56,6 @@ if (isset($_GET['followed_by'])) {
     http_response_code(200);
     echo json_encode($followed_by);
     exit;
-}
-
-$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-if ($conn2->connect_error) {
-    exit($conn2->connect_error);
 }
 
 function user_blocks(int $profileid, mixed $db) {
@@ -131,10 +125,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         ];
     }
 
-    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-    if ($conn->connect_error) {
-        exit($conn->connect_error);
-    }
+    $conn = Database::get(DB_NAME);
 
     if($use_name === true) {
         $usero = User::getUserByName($profile_id);
@@ -150,14 +141,13 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
             "success" => false,
             "code" => 'not_found',
             "title" => '404 Not Found',
-            "message" => 'User not found. Probably easier to find a flat stud 1x1 in your old unsorted bin of parts.',
+            "message" => 'This profile wasn\'t found. Maybe you typed the username wrong?',
         ];
     }
 
-    $banrow = User::isBannedByID($profile_id);
-
-    if ($banrow) {
+    if ((bool)$usero->suspended === true) {
         http_response_code(403);
+        $banrow = User::isBannedByID($profile_id);
         $until = isset($banrow['ignore_at']) ? ('until ' . date("d M Y", strtotime($banrow['ignore_at']))) : 'indefinitely';
 
         $arr = [
@@ -222,10 +212,8 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         }
     }
 
-    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-    if ($conn2->connect_error) {
-        exit($conn2->connect_error);
-    }
+    $conn2 = Database::get(DB_NAME2);
+    $conn3 = Database::get(DB_NAME3);
 
     $stmt = $conn2->prepare("SELECT COUNT(*) as all_models FROM model WHERE user = ?");
     $stmt->bind_param("s", $profile_id);
@@ -257,6 +245,12 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     $following = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
     $stmt->close();
 
+    $stmt = $conn3->prepare("SELECT COUNT(*) as reply_count FROM messages WHERE userid = ? AND deleted_at IS NULL");
+    $stmt->bind_param("i", $profile_id);
+    $stmt->execute();
+    $user_post_count = $stmt->get_result()->fetch_assoc()['reply_count'] ?? 0;
+    $stmt->close();
+
     $message = null;
     $data = [
         'success' => true,
@@ -271,6 +265,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         'model_count' => $model_count,
         'followers' => $followers,
         'following' => $following,
+        'forum_posts' => $user_post_count,
         'views' => $views,
         'likes' => $likes,
         'is_following' => (bool)$is_following,
@@ -312,7 +307,7 @@ class UserInteractions {
 
         $this->userid = $current_user->id;
         $this->current_user = $current_user;
-        $this->conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $this->conn = Database::get(DB_NAME);
     }
 
     /**
@@ -796,7 +791,7 @@ class UserAdmin {
                     'title' => $error_title
                 ];
             } else {
-                $queries = [["UPDATE php_sessions SET active = 0 WHERE userid = ?", "i", $profile_id], ["UPDATE sessions SET timestamp = 0 WHERE user = ?", "i", $profile_id]];
+                $queries = [["UPDATE php_sessions SET active = 0 WHERE userid = ?", "i", $profile_id], ["UPDATE sessions SET timestamp = 0 WHERE user = ?", "i", $profile_id], ["UPDATE users SET suspended = 1 WHERE id = ?", "i", $profile_id]];
 
                 if($use_email && !empty($email)) {
                     $queries[] = ["UPDATE users SET deactive = '9999-12-31' WHERE id = ?", "i", $profile_id];
@@ -871,15 +866,6 @@ class UserAdmin {
             ];
         }
 
-        if($this->current_user->verify_token !== NULL) {
-            $error = "User account is not verified";
-            return [
-                'success' => false,
-                'message' => $error,
-                'title' => $error_title
-            ];
-        }
-
         $email = hash('sha256', strtolower(trim($email)));
 
         $sql_follow = "SELECT id FROM blacklist WHERE (value = ? AND type = 'userid') OR (value = ? AND type = 'email') LIMIT 1";
@@ -898,28 +884,31 @@ class UserAdmin {
         }
 
         if(!isset($error)) {
-            $sql_follow = "DELETE FROM blacklist WHERE (type = 'userid' AND value = ?) OR (type = 'email' AND value = ?)";
-            $stmt_follow = $this->conn->prepare($sql_follow);
-            $stmt_follow->bind_param("ss", $profile_id, $email);
-            $result = $stmt_follow->execute();
+            $queries = [["DELETE FROM blacklist WHERE (type = 'userid' AND value = ?) OR (type = 'email' AND value = ?)", "ss", [$profile_id, $email]], ["UPDATE users SET deactive = NULL AND suspended = 0 WHERE id = ?", "i", [$profile_id]]];
 
-            if ($result) {
-                $stmt_follow->close();
+            foreach ($queries as [$sql, $type, $vals]) {
+                $stmt = $this->conn->prepare($sql);
+                $stmt->bind_param($type, ...$vals);
 
-                $message = "Unblacklisted this user with success";
-                return [
-                    'success' => true,
-                    'message' => $message,
-                    'title' => 'Success!'
-                ];
-            } else {
-                $error = "An error occurred while unblacklisting this user";
-                return [
-                    'success' => false,
-                    'message' => $error,
-                    'title' => $error_title
-                ];
+                if (!$stmt->execute()) {
+                    $stmt->close();
+
+                    return [
+                        'success' => false,
+                        'message' => "An error occurred while unblacklisting this user",
+                        'title' => $error_title
+                    ];
+                }
+
+                $stmt->close();
             }
+
+            $message = "Unblacklisted this user with success";
+            return [
+                'success' => true,
+                'message' => $message,
+                'title' => 'Success!'
+            ];
         }
     }
 }
@@ -929,7 +918,7 @@ class UserContent {
     public string $userid;
 
     public function returnModels($userid, $page) {
-        $creation_conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+        $creation_conn = Database::get(DB_NAME2);
 
         if ($creation_conn->connect_error) {
             return ['success' => false, 'error' => "Database connection failed"];
@@ -985,7 +974,7 @@ class UserContent {
     }
 
     public function returnLikedModels($userid, $page) {
-        $creation_conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+        $creation_conn = Database::get(DB_NAME2);
 
 		if ($creation_conn->connect_error) {
             return ['success' => false, 'error' => "Database connection failed"];
@@ -1058,8 +1047,8 @@ class UserContent {
     }
 
     public function returnComments($userid, $page) {
-        $conn_creations = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-        $conn_forum = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+        $conn_creations = Database::get(DB_NAME2);
+        $conn_forum = Database::get(DB_NAME3);
 
         $limit = 8;
         $offset = ($page - 1) * $limit;
@@ -1173,7 +1162,7 @@ class UserContent {
     }
 
     public function returnForums($userid, $page) {
-        $conn_forum = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+        $conn_forum = Database::get(DB_NAME3);
 
         $limit = 12;
         $offset = ($page - 1) * $limit;
@@ -1279,11 +1268,6 @@ if(isset($_GET['getUserComments'])) {
     }
 
     $page = $_GET['page'] ?? 0;
-    /*if(!isset($page) || $page === null || $page < 1) {
-        echo json_encode(['success' => false, 'error' => 'Invalid page number']);
-        exit;
-    }*/
-    
     $UserContent = new UserContent();
     $comments = $UserContent->returnComments($_GET['userid'], $page);
     $comments_arr = [];

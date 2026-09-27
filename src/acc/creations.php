@@ -3,14 +3,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
 
-if (!loggedin()) {
+if (!loggedin() || !isset($current_user)) {
     header('Location:login.php');
 }
 
-$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-if ($conn2->connect_error) {
-    exit($conn2->connect_error);
-}
+$conn2 = Database::get(DB_NAME2);
 
 if(isset($_GET['my_creations']) && isset($_GET['page'])) {
     $page = $_GET['page'] ?: 1;
@@ -156,8 +153,6 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
             $data = $result->fetch_assoc();
 
             if(trim($current_user->id) === trim($data['user']) || $current_user->admin === true) {
-                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-
                 $modelFile = basename($data['model']);
                 $screenshotFile = basename($data['screenshot']);
 
@@ -170,15 +165,15 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                 }
 
                 $sql2 = "DELETE FROM model WHERE id = ?";
-                $stmt2 = $conn->prepare($sql2);
+                $stmt2 = $conn2->prepare($sql2);
                 $stmt2->bind_param("i", $model_id);
 
                 if ($stmt2->execute()) {
-                    $stmtVotes = $conn->prepare("DELETE FROM votes WHERE creation = ?");
+                    $stmtVotes = $conn2->prepare("DELETE FROM votes WHERE creation = ?");
                     $stmtVotes->bind_param("i", $model_id);
                     $stmtVotes->execute();
 
-                    $stmtComments = $conn->prepare("DELETE FROM comments WHERE model = ?");
+                    $stmtComments = $conn2->prepare("DELETE FROM comments WHERE model = ?");
                     $stmtComments->bind_param("i", $model_id);
                     $stmtComments->execute();
 
@@ -436,26 +431,6 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
             </div>
         </template>
     </div><br />
-
-    <!--<template id="gr8-edit-template">
-        <div id="editingbox" class="editingbox w3-row w3-section">
-            <form method="post" action="" class="w3-col s12 w3-light-grey w3-card-2 w3-border w3-border-grey w3-padding-large w3-round">
-                <span onclick='document.getElementById("editingbox").style.display="none"' class="w3-btn w3-red w3-hover-white w3-padding w3-right">&times;</span>
-                <b>Edit creation</b><br />
-                <p>
-                    <label>Name:</label>
-                    <textarea name="title" id="title" class="w3-input w3-border" rows="1"></textarea>
-                </p>
-                <p>
-                    <label>Description:</label>
-                    <textarea name="about" id="about" class="w3-input w3-border" rows="2"></textarea>
-                </p>
-                <p>
-                    <button name="edit-confirm" id="edit-confirm" class="w3-btn w3-blue w3-hover-white w3-quarter w3-border w3-border-indigo">Update</button>
-                </p>
-            </form>
-        </div>
-    </template>-->
 
     <template id="gr8-edit-template">
         <div class="w3-modal editingbox" style="display:block;">

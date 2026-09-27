@@ -17,6 +17,7 @@ ini_set('display_errors', '1');
 
 // constants
 require_once 'constants.php';
+require_once 'mysql.php';
 require_once 'ipban.php';
 require_once 'what_browser.php';
 
@@ -130,15 +131,13 @@ $requests = count($_SESSION['requests']);
 
 if ($requests >= 50) {
     if ($requests >= 80) {
-        $db = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+        $db = Database::get(DB_NAME);
 
-        if (!$db->connect_error) {
-            $ipbano = new IpBans($db);
-            $ban = $ipbano->getBan();
+        $ipbano = new IpBans($db);
+        $ban = $ipbano->getBan();
+        if($ban) {
             $ipbano->displayBan($ban);
-        }
-
-        if (!$db->connect_error) {
+        } else {
             $ip = $_SERVER['REMOTE_ADDR'];
             $date = date("Y-m-d H:i:s");
             $until = date('Y-m-d H:i:s', strtotime('+1 hour'));
@@ -178,13 +177,12 @@ if (!isset($_SESSION['csrf']) || !isset($_SESSION['csrf_last_updated']) || $_SES
 
 define('csrf', $_SESSION['csrf']);
 
-$db = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-if ($db->connect_error) {
-    exit($db->connect_error);
-}
+$db = Database::get(DB_NAME);
 $ipbano = new IpBans($db);
 $ban = $ipbano->getBan();
-$ipbano->displayBan($ban);
+if($ban) {
+    $ipbano->displayBan($ban);
+}
 
 class Cookie {
     public static function controls() {
@@ -210,10 +208,6 @@ class Cookie {
                 $_SESSION['last_analytics'] = time();
                 return true;
             }
-
-            /*if($_SESSION['last_analytics'] && time() - $_SESSION['last_analytics'] < 3600) { //every hour
-                return false;
-            }*/
 
             return true;
         } else {

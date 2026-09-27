@@ -3,7 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
 if (loggedin()) {
     if (isset($_GET['status']) && ($_GET['status'] === 'logout' || $_GET['status'] === 'loggedout')) {
-        logout(true);
+        logout(false);
         exit;
     } else {
         header('Location: /index.php');

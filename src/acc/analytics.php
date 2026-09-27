@@ -21,10 +21,7 @@ if(!loggedin()) {
     ?>
 		<?php
             $cookie = Cookie::controls();
-            $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-            if ($conn2->connect_error) {
-                exit($conn2->connect_error);
-            }
+            $conn2 = Database::get(DB_NAME);
 
             if(!in_array('analytics', $cookie)) {
                 echo "<b>Analytics are disabled in your cookie settings.</b>";
@@ -109,7 +106,6 @@ if(!loggedin()) {
                 echo "</article><br />";
             }
             $result->free();
-            $conn2->close();
 		
 		?><br /><br />
 		
