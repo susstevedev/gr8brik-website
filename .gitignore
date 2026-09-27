@@ -4,10 +4,21 @@
 # --- credentials ---
 **/ajax/constants.php
 **/ajax/constants/
+**/google4cb09ae7ae2edb25.html
 .env
 
 # --- user generated content ---
 **/acc/users/
-cre/
 **/cre/
 **/com/old/
+
+# --- old files ---
+**/index_old.php
+**/header_new.php
+**/feed.php
+**/aprilfools.html
+**/chart.php
+**/rules.php
+**/list_old.php
+**/navbar_new.php
+**/oops.html
