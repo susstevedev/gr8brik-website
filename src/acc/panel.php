@@ -1,4 +1,6 @@
-<?php if(isset($current_user) && $current_user->verify_token !== null) { ?>
+<?php if(loggedin() && isset($current_user)) { ?>
+
+<?php if($current_user->verify_token !== null) { ?>
 	<div class="w3-card-2 w3-light-grey w3-padding w3-round-small w3-margin-top gr8-theme">
 		<i class="fa fa-lock" aria-hidden="true"></i>
 		<b>Verify your account to unlock all features</b>
@@ -65,3 +67,5 @@
         <?php } ?>
     </div>
 </div><br /><br />
+
+<?php } ?>

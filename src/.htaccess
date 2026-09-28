@@ -32,6 +32,8 @@ RewriteRule ^acc/creations/edit/([0-9]+)/?$ /acc/creations?edit=$1 [QSA,L]
 Redirect 301 /github https://github.com/susstevedev/gr8brik-new
 RewriteRule ^sitemap.xml /sitemap2.php [QSA,L]
 Redirect 301 /new_appeal.php /appeal.php
+# obviously you can remove this if your local copy of gr8brik doesn't have a rules topic yet
+Redirect 301 /rules /com/view.php?id=17
 Redirect 403 /important.php
 
 # RewriteRule ^index.php /oops.html [QSA,L]

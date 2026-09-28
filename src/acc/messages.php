@@ -5,16 +5,17 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 $bbcode = new BBCode;
 
-if (loggedin() || !isset($current_user)) {
-    $id = $current_user->id ?? 0;
-} else {
-    header('Location: login.php');
-    exit;
-}
-
 $conn = Database::get(DB_NAME);
 
+
 if (isset($_GET['group'])) {
+    if(!loggedin() || !isset($current_user)) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => "Please login to continue."]);
+        exit;
+    }
+
+    $uid = $current_user->id ?? 0;
     $sql = "SELECT
         mg.id AS group_id,
         mg.is_group,
@@ -41,7 +42,7 @@ if (isset($_GET['group'])) {
     ORDER BY mg.timestamp DESC";
 
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ii", $id, $id);
+    $stmt->bind_param("ii", $uid, $uid);
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -84,6 +85,7 @@ if (isset($_GET['group'])) {
 if (isset($_GET['message'])) {
     $message = isset($_GET['message']) ? (int)$_GET['message'] : null;
     $uid = $current_user->id ?? 0;
+    $uadmin = $current_user->admin ?? false;
 
     if (empty($message)) {
         echo json_encode(['success' => false, 'message' => 'Empty message ID']);
@@ -99,7 +101,11 @@ if (isset($_GET['message'])) {
     LEFT JOIN message_users adm
         ON adm.groupid = g.id
         AND adm.admin = 1
-    WHERE g.id = ? AND g.is_removed = 0";
+    WHERE g.id = ?";
+
+    if($uadmin !== true) {
+        $sql .= " AND g.is_removed = 0";
+    }
 
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $message);
@@ -198,6 +204,12 @@ if (isset($_GET['message'])) {
 
 if (isset($_POST['comment'])) {
     header('Content-type: application/json');
+    if(!loggedin() || !isset($current_user)) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => "Please login to continue."]);
+        exit;
+    }
+
     $comment = isset($_POST['commentbox']) ? htmlentities($_POST['commentbox']) : null;
     $id = $current_user->id ?? 0;
     $conn2 = Database::get(DB_NAME);
@@ -239,7 +251,7 @@ if (isset($_POST['comment'])) {
             $notifications->subscribe($id, 'direct_message', $groupid);
         }
 
-	    $notifications->notify_subscribers('direct_message', $groupid, $id);
+        $notifications->notify_subscribers('direct_message', $groupid, $id);
         $stmt2->close();
         echo json_encode(['success' => true, 'groupid' => $groupid]);
         exit;
@@ -248,6 +260,13 @@ if (isset($_POST['comment'])) {
 
 if (isset($_POST['group_create'])) {
     header('Content-type: application/json');
+    if(!loggedin() || !isset($current_user)) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => "Please login to continue."]);
+        exit;
+    }
+
+    $id = $current_user->id ?? 0;
     $comment = trim($_POST['commentbox'] ?? '');
 
     if ($comment === "") {
@@ -329,7 +348,7 @@ if (isset($_POST['group_create'])) {
     WHERE mu.userid IN ($check_placeholders)
     GROUP BY mu.groupid
     HAVING COUNT(DISTINCT mu.userid) = ?
-       AND COUNT(DISTINCT mu.userid) = (SELECT COUNT(*) FROM message_users mu2 WHERE mu2.groupid = mu.groupid)");
+    AND COUNT(DISTINCT mu.userid) = (SELECT COUNT(*) FROM message_users mu2 WHERE mu2.groupid = mu.groupid)");
     $check_stmt->bind_param($check_types, ...$check_params);
     $check_stmt->execute();
     $check_result = $check_stmt->get_result();
@@ -383,6 +402,13 @@ if (isset($_POST['group_create'])) {
 }
 
 if(isset($_POST['group_delete'])) {
+    if(!loggedin() || !isset($current_user)) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => "Please login to continue."]);
+        exit;
+    }
+
+    $id = $current_user->id ?? 0;
     $groupid = (int)$_POST['groupid'];
 
     $exists_sql = "SELECT id FROM message_group WHERE id = ? AND is_removed = 0";
@@ -409,11 +435,6 @@ if(isset($_POST['group_delete'])) {
         exit;
     }
 
-    /*$delete_sql = "DELETE t1, t2, t3
-        FROM message_group t1
-        LEFT JOIN message_users t2 ON t1.id = t2.groupid
-        LEFT JOIN direct_message t3 ON t1.id = t3.groupid
-        WHERE t1.id = ?";*/
     $delete_sql = "UPDATE message_group SET is_removed = 1 WHERE id = ?";
     $delete_stmt = $conn->prepare($delete_sql);
     $delete_stmt->bind_param("i", $groupid);
