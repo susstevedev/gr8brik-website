@@ -111,6 +111,7 @@ if (isset($_POST['deny'])) {
     <div class="w3-row">
         <?php
         $conn = Database::get(DB_NAME2);
+        $conn2 = Database::get(DB_NAME);
         $empty = "<center><b>No content reported. You're all caught up!</b><br />";
 
         $sql = "SELECT * FROM reports ORDER BY id DESC";
@@ -125,7 +126,7 @@ if (isset($_POST['deny'])) {
                 $reporter_username = $usero->username ?: '';
 
                 if ($reported_type === 'creation') {
-                    $stmt = $conn->prepare("SELECT name, user, date FROM model WHERE id = ? AND removed = 0");
+                    $stmt = $conn->prepare("SELECT name, user, date FROM model WHERE id = ?");
                     $stmt->bind_param("i", $reported_id);
                     $stmt->execute();
 
@@ -166,6 +167,23 @@ if (isset($_POST['deny'])) {
                         $reported_link = '/user/' . $reported_id;
                         $reported_user = $usero->username ?: '';
                         $reported_date = date("F j, Y, g:i a", strtotime($usero->age));
+                    } else {
+                        continue;
+                    }
+                } else if ($reported_type === 'direct_message') {
+                    $stmt = $conn2->prepare("SELECT * FROM direct_message WHERE id = ?");
+                    $stmt->bind_param("i", $reported_id);
+                    $stmt->execute();
+
+                    $c_result = $stmt->get_result();
+
+                    if ($c_result->num_rows !== 0) {
+                        while ($c_row = $c_result->fetch_assoc()) {
+                            $reported_name = $c_row['message'];
+                            $reported_link = '/acc/messages?m=' . $c_row['groupid'] . '#g' . $c_row['id'];
+                            $reported_user = User::getUser($c_row['userid'])->username ?: '';
+                            $reported_date = date("F j, Y, g:i a", $c_row['timestamp']);
+                        }
                     } else {
                         continue;
                     }

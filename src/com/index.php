@@ -21,7 +21,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
             <button id="search-button-2" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-round-small w3-border w3-border-indigo"><i class="fa fa-search" aria-hidden="true"></i></button>
 
             <?php
-			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+			    $conn = Database::get(DB_NAME3);
                 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
                 $limit = 8;
                 $offset = ($page - 1) * $limit;
@@ -92,7 +92,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
             </thead>
             <tbody>
             <?php
-			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+			    $conn = Database::get(DB_NAME3);
 			
 				$sql = "SELECT id, userid, title, content, timestamp, last_posted, last_page
                         FROM messages
@@ -132,12 +132,10 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                         echo "<tr><td><a href='/topic/" . $id . "?p=" . $last_page . "'><i class='fa fa-map-pin w3-padding-small w3-text-grey' aria-hidden='true' title='Pinned Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                         echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
                         echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($username) . "</a></td>";
-                        echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></td></tr>";
+                        echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($last_post_username) . "</a></td></tr>";
                     $username = null;
                     $last_post_username = null;
                 }
-
-			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
                 
 				$sql = "SELECT id, userid, title, content, timestamp, last_posted, last_active_time, last_page
                         FROM messages
@@ -150,8 +148,6 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted, $last_active, $last_page);
                 
 				while ($stmt->fetch()) {	
-                    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-
                     $user_row = User::getUser($post_user);
                     $username = $user_row->username;
                     
@@ -163,10 +159,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                     }
                     
                     if($last_page <= 0) {
-                          $last_page = 1;
+                        $last_page = 1;
                     }
-
-                    $conn2->close();
 
                     $shortTitle = substr($title, 0, 25);
                     if (strlen($title) > 25) {
@@ -186,7 +180,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                 }
 
                 define('DB_NAME4', 'if0_36019408_blog');
-			    $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME4);
+			    $conn = Database::get(DB_NAME4);
 			
 				$sql = "SELECT id, user, title, post, date FROM posts ORDER BY date DESC LIMIT $limit OFFSET $offset";
 				$stmt = $conn->prepare($sql);
@@ -194,32 +188,25 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 				$stmt->bind_result($id, $post_user, $title, $post, $date);
 				
 				while ($stmt->fetch()) {
-					$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+					$user_row = User::getUser($post_user);
+                    $username = $user_row->blog_user_id;
 
-                        $sql = "SELECT username FROM users WHERE id = ?";
-                        $stmt2 = $conn2->prepare($sql);
-                        $stmt2->bind_param("i", $post_user);
-                        $stmt2->execute();
-                        $stmt2->bind_result($username);
-                        $stmt2->fetch();
-                        $stmt2->close();
-                        $conn2->close();
+                    $shortTitle = substr($title, 0, 25);
+                    if (strlen($title) > 25) {
+                        $shortTitle .= "...";
+                    }
 
-                        $shortTitle = substr($title, 0, 25);
-                        if (strlen($title) > 25) {
-                            $shortTitle .= "...";
-                        }
+                    if(empty($title)) {
+                        $shortTitle = 'Untitled';
+                    }
 
-                        if(empty($title)) {
-                            $shortTitle = 'Untitled';
-                        }
+                    $date = date("Y-m-d H:i:s", $date);
 
-                        $date = date("Y-m-d H:i:s", $date);
-
-                        echo "<tr><td><a href='http://blog.gr8brik.rf.gd/t/" . $id . "' target='_blank'><i class='fa fa-pencil-square w3-padding-small w3-text-grey' aria-hidden='true' title='Blog Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
-                        echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
-                        echo "<td><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($username) . "</td></tr>";
-                        $username = null;
+                    echo "<tr><td><a href='http://blog.gr8brik.rf.gd/t/" . $id . "' target='_blank'><i class='fa fa-pencil-square w3-padding-small w3-text-grey' aria-hidden='true' title='Blog Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
+                    echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
+                    echo "<td><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($username) . "</td>";
+                    echo "<td><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . htmlspecialchars($username) . "</td></tr>";
+                    $username = null;
                 }
 
             ?>

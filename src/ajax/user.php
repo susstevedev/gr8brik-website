@@ -1107,16 +1107,18 @@ function delete_inactive_users($userid = null, $blacklist_email = false, $blackl
         bulk($conn, "DELETE FROM notifications WHERE user IN ($placeholders) OR profile IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
         bulk($conn, "DELETE FROM subscriptions WHERE userid IN ($placeholders)", $types, $user_ids);
 
-        //mod records
+        //legacy
         bulk($conn, "DELETE FROM bans WHERE user IN ($placeholders)", $types, $user_ids);
-        bulk($conn, "DELETE FROM appeals WHERE user IN ($placeholders)", $types, $user_ids);
         bulk($conn2, "DELETE FROM reported WHERE user IN ($placeholders)", $types, $user_ids);
+
+        //mod records
+        bulk($conn, "DELETE FROM appeals WHERE user IN ($placeholders)", $types, $user_ids);
         bulk($conn2, "DELETE FROM reports WHERE reporter_user_id IN ($placeholders)", $types, $user_ids);
         bulk($conn2, "DELETE FROM reports WHERE reportable_type = 'profile' AND reportable_id IN ($placeholders)", $types, $user_ids);
         bulk($conn, "DELETE FROM analytics WHERE my_user IN ($placeholders) OR their_user IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
 
         //dms
-        bulk($conn, "DELETE FROM direct_message WHERE userid IN ($placeholders)", $types, $user_ids);
+        bulk($conn, "UPDATE direct_message SET userid = 0 WHERE userid IN ($placeholders)", $types, $user_ids);
         bulk($conn, "DELETE FROM message_users WHERE userid IN ($placeholders)", $types, $user_ids);
 
         //the actual user

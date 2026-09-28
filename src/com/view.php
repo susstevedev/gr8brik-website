@@ -3,10 +3,10 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 
 if (loggedin()) {
-    $id = $current_user->id;
+    $id = $current_user->id ?? 0;
 }
 
-$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME3);
+$conn = Database::get(DB_NAME3);
 
 $post_id = htmlspecialchars($_GET['id']);
 
@@ -40,7 +40,7 @@ if (!empty($row['edited'])) {
     $edit_date = $row['timestamp'];
 }
 
-$conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+$conn2 = Database::get(DB_NAME);
 
 if (!$row['username']) { //check for anonymous posting
     $user = User::getUser($userid);
@@ -114,7 +114,6 @@ if (isset($_POST['comment_edit'])) {
     $edit_stmt->bind_param("ssi", $content, $date, $commentid);
 	$edit_result = $edit_stmt->execute();
     $edit_stmt->close();
-    $conn->close();
 
     if ($edit_result) {
 		echo json_encode(['success' => true]);
@@ -161,7 +160,6 @@ if (isset($_POST['comment_delete'])) {
     $delete_stmt->bind_param("i", $commentid);
     $delete_result = $delete_stmt->execute();
     $delete_stmt->close();
-    $conn->close();
 
     if ($delete_result) {
         echo json_encode(['success' => true]);
@@ -241,9 +239,8 @@ if (isset($_POST['comment'])) {
     $sql = "UPDATE messages SET last_active_time = ?, last_page = ?, last_posted = ? WHERE id = ?";
     $stmt3 = $conn->prepare($sql);
     $stmt3->bind_param("iiii", $time, $total_pages, $id, $post_id);
-    $conn3 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
 
-    $notifications = new Notifications($conn3);
+    $notifications = new Notifications($conn2);
     $notifications->subscribe($id, 'forum_reply', $post_id);
     $notifications->notify_subscribers('forum_reply', $post_id, $id);
 
@@ -298,7 +295,7 @@ if (isset($_POST['comment'])) {
     </div><br />
 
     <?php
-    $sql = "SELECT * FROM messages WHERE (parent = $post_id OR id = $post_id) AND deleted_at IS NULL LIMIT $limit OFFSET $offset";
+    $sql = "SELECT * FROM messages WHERE (parent = $post_id OR id = $post_id) AND deleted_at IS NULL ORDER BY timestamp ASC LIMIT $limit OFFSET $offset";
     $comResult = $conn->query($sql);
     $rows = [];
     $blocked = [];
@@ -340,11 +337,6 @@ if (isset($_POST['comment'])) {
             $c_date = $row['timestamp'] ?? time();
             $decoded_comment = htmlentities($c_comment, ENT_QUOTES, 'UTF-8');
             $c_edited = $row['edited'] ?? null;
-
-            $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-            if ($conn2->connect_error) {
-                exit($conn2->connect_error);
-            }
 
             $c_user_o = $users[$c_user] ?? User::getUser($c_user);
             $c_username = htmlspecialchars($c_user_o->username);

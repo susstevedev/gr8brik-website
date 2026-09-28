@@ -19,52 +19,29 @@ if (isset($_GET['group'])) {
         mg.id AS group_id,
         mg.is_group,
         mg.group_name,
-
-        (
-            SELECT u2.username
-            FROM message_users mu2
-            JOIN users u2 ON u2.id = mu2.userid
-            WHERE mu2.groupid = mg.id
-            AND mu2.userid != ?
-            LIMIT 1
-        ) AS username,
-
-        (
-            SELECT u2.picture
-            FROM message_users mu2
-            JOIN users u2 ON u2.id = mu2.userid
-            WHERE mu2.groupid = mg.id
-            AND mu2.userid != ?
-            LIMIT 1
-        ) AS picture,
-
-        (
-            SELECT u2.age
-            FROM message_users mu2
-            JOIN users u2 ON u2.id = mu2.userid
-            WHERE mu2.groupid = mg.id
-            AND mu2.userid != ?
-            LIMIT 1
-        ) AS age,
-
-        (
-            SELECT GROUP_CONCAT(u2.username SEPARATOR ', ')
-            FROM message_users mu2
-            JOIN users u2 ON u2.id = mu2.userid
-            WHERE mu2.groupid = mg.id
-            AND mu2.userid != ?
-        ) AS members
-
+        mg.timestamp,
+        GROUP_CONCAT(u.username SEPARATOR ', ') AS members,
+        GROUP_CONCAT(u.picture SEPARATOR ', ') AS member_pics
     FROM message_group mg
-
     JOIN message_users me
         ON me.groupid = mg.id
         AND me.userid = ?
-
+        AND mg.is_removed = 0
+    LEFT JOIN message_users mu
+        ON mu.groupid = mg.id
+        AND mu.userid != ?
+    JOIN users u
+        ON u.id = mu.userid
+        AND deactive IS NULL
+        AND suspended = 0
+    GROUP BY
+        mg.id,
+        mg.is_group,
+        mg.group_name
     ORDER BY mg.timestamp DESC";
 
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("iiiii", $id, $id, $id, $id, $id);
+    $stmt->bind_param("ii", $id, $id);
     $stmt->execute();
     $result = $stmt->get_result();
 
@@ -79,12 +56,16 @@ if (isset($_GET['group'])) {
         $group = null;
 
         if ($row['is_group'] == 1) {
-            $group['title'] = ($row['group_name'] ?? 'Group ') . '(' . $row['members'] . ')';
+            $group['title'] = $row['group_name'] ?? $row['members'];
         } else {
-            $group['title'] = isset($row['username']) ? $row['username'] : 'Deleted User';
-            $group['picture'] = isset($row['picture']) ? $row['picture'] : null;
-            $group['joined'] = isset($row['age']) ? 'Joined ' . time_ago($row['age']) : null;
+            $members = explode(', ', $row['members']);
+            $member_pics = explode(', ', $row['member_pics']);
+
+            $group['title'] = $members[0] ?? 'Deleted User';
+            $group['picture'] = isset($member_pics[0]) ? $member_pics[0] : null;
         }
+
+        $group['joined'] = isset($row['timestamp']) ? 'Last messaged ' . time_ago($row['timestamp']) : null;
 
         $data[] = [
             'success' => true,
@@ -100,111 +81,116 @@ if (isset($_GET['group'])) {
     exit;
 }
 
-if ((isset($_GET['message']))) {
+if (isset($_GET['message'])) {
     $message = isset($_GET['message']) ? (int)$_GET['message'] : null;
     $uid = $current_user->id ?? 0;
 
-    if(empty($message)) {
-        echo json_encode([
-            'success' => false,
-            'message' => 'Empty message ID'
-        ]);
+    if (empty($message)) {
+        echo json_encode(['success' => false, 'message' => 'Empty message ID']);
         exit;
     }
 
     $sql = "SELECT
-            g.id AS groupid,
-            g.group_name,
-            g.is_group,
-            me.admin AS group_admin,
-            dm.id AS message_id,
-            dm.message,
-            dm.timestamp,
-            u.id AS sender_id,
-            u.username AS sender_username,
-            u.deactive AS sender_inactive,
-            u.picture AS sender_picture,
-            u.age AS sender_age,
-        (
-            SELECT GROUP_CONCAT(u.username SEPARATOR ', ')
-            FROM message_users mu
-            JOIN users u ON u.id = mu.userid
-            WHERE mu.groupid = g.id
-            AND mu.userid != ?
-        ) AS members
-        FROM message_group g
-        JOIN message_users me
-            ON me.groupid = g.id
-           AND me.userid = ?
-        LEFT JOIN direct_message dm
-            ON dm.groupid = g.id
-        LEFT JOIN users u
-            ON u.id = dm.userid
-        WHERE g.id = ?
-        ORDER BY dm.timestamp DESC
-    ";
+        g.id AS groupid,
+        g.group_name,
+        g.is_group,
+        adm.userid AS sender_group_admin
+    FROM message_group g
+    LEFT JOIN message_users adm
+        ON adm.groupid = g.id
+        AND adm.admin = 1
+    WHERE g.id = ? AND g.is_removed = 0";
 
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("iii", $uid, $uid, $message);
+    $stmt->bind_param("i", $message);
     $stmt->execute();
-    $result = $stmt->get_result();
+    $group_res = $stmt->get_result();
 
-    $data = [];
-    $rows = [];
-
-    if($result->num_rows === 0) {
+    if ($group_res->num_rows === 0) {
         echo json_encode(['success' => false, 'message' => 'Group not found in database.']);
         exit;
     }
 
-    while ($row = $result->fetch_assoc()) {
-        $group = $row['groupid'] ?? null;
-        $groupname = $row['group_name'] ?? $row['members'];
-        $groupadmin = $row['group_admin'] ? true : false;
+    $group_row = $group_res->fetch_assoc();
+    $group = $group_row['groupid'];
+    $groupname = $group_row['group_name'];
+    $groupadmin = ((int)$group_row['sender_group_admin'] === (int)$uid);
 
-        if (!$row['message_id']) {
-            continue;
-        }
-        $rows[] = $row;
+    $sql = "SELECT GROUP_CONCAT(u.username SEPARATOR ', ') AS members
+    FROM message_users mu
+    JOIN users u
+        ON u.id = mu.userid
+        AND u.deactive IS NULL
+        AND u.suspended = 0
+    WHERE mu.groupid = ?
+    AND mu.userid != ?";
+
+    $member_stmt = $conn->prepare($sql);
+    $member_stmt->bind_param("ii", $message, $uid);
+    $member_stmt->execute();
+    $member_res = $member_stmt->get_result();
+    $members = $member_res->fetch_assoc()['members'] ?? null;
+
+    if (empty($groupname)) {
+        $groupname = $members;
     }
 
-    foreach($rows as $row) {
-        $message = null;
+    $sql = "SELECT
+        dm.id AS message_id,
+        dm.message,
+        dm.timestamp,
+        sender.id AS sender_id,
+        sender.username AS sender_username,
+        sender.deactive AS sender_inactive,
+        sender.picture AS sender_picture,
+        sender.age AS sender_age
+    FROM direct_message dm
+    LEFT JOIN users sender
+        ON sender.id = dm.userid
+        AND sender.deactive IS NULL
+        AND sender.suspended = 0
+    WHERE dm.groupid = ?
+    ORDER BY dm.timestamp DESC";
 
-        $message['id'] = $row['message_id'] ?? null;
-        $message['userid'] = $row['sender_id'] ?? null;
-        $message['username'] = $row['sender_username'] ?? 'Deleted User';
-        $message['post'] = $bbcode->toHTML($row['message'], true, true);
-        $message['timestamp'] = $row['timestamp'] ?? 0;
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $message);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $data = [];
 
-        //Simple logic to give messages different colors
-        if ((int)$uid !== (int)$message['userid']) {
+    while ($row = $result->fetch_assoc()) {
+        $post = $bbcode->toHTML($row['message'] ?? '', true, true);
+
+        if ((int)$uid !== (int)$row['sender_id']) {
             $p_color = "#90EE90";
         } else {
             $p_color = "#ADD8E6";
         }
 
-        if($row['sender_inactive'] === null) {
-            $message['url'] = '/@' . rawurlencode($message['username']);
+        $url = null;
+        $username = 'Deleted User';
+        if ($row['sender_id'] !== null && !$row['sender_inactive']) {
+            $username = $row['sender_username'];
+            $url = '/@' . rawurlencode($username);
         }
 
-        http_response_code(200);
         $data[] = [
-            'id' => $id,
-            'user' => htmlentities($message['username']),
-            'userID' => $message['userid'],
-            'url' => $message['url'] ?? null,
-            'message' => $message['post'],
+            'id' => $row['message_id'],
+            'userID' => $row['sender_id'],
+            'user' => htmlentities($username),
+            'url' => $url,
+            'message' => $post,
             'color' => $p_color,
-            'timestamp' => time_ago(date('Y-m-d H:i:s', $message['timestamp'])),
+            'timestamp' => time_ago(date('Y-m-d H:i:s', $row['timestamp'] ?? 0)),
         ];
     }
 
+    http_response_code(200);
     echo json_encode([
         'success' => true,
         'groupid' => $group,
         'name' => $groupname,
-        'admin' => $groupadmin ?? false,
+        'admin' => $groupadmin,
         'msgs' => $data
     ]);
     exit;
@@ -223,7 +209,7 @@ if (isset($_POST['comment'])) {
 
     $groupid = (int)$_POST['groupid'];
 
-    $sql = "SELECT id FROM message_group WHERE id = ?";
+    $sql = "SELECT id FROM message_group WHERE id = ? AND is_removed = 0";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $groupid);
     $stmt->execute();
@@ -335,12 +321,15 @@ if (isset($_POST['group_create'])) {
     $check_types = str_repeat('i', count($all_participant_ids)) . 'i';
     $check_params = array_merge($all_participant_ids, [count($all_participant_ids)]);
 
-    $check_stmt = $conn->prepare("SELECT groupid 
-        FROM message_users 
-        WHERE userid IN ($check_placeholders)
-        GROUP BY groupid
-        HAVING COUNT(DISTINCT userid) = ? 
-           AND COUNT(DISTINCT userid) = (SELECT COUNT(*) FROM message_users mu WHERE mu.groupid = message_users.groupid)");
+    $check_stmt = $conn->prepare("SELECT mu.groupid
+    FROM message_users mu
+    INNER JOIN message_group mg
+        ON mg.id = mu.groupid
+        AND mg.is_removed = 0
+    WHERE mu.userid IN ($check_placeholders)
+    GROUP BY mu.groupid
+    HAVING COUNT(DISTINCT mu.userid) = ?
+       AND COUNT(DISTINCT mu.userid) = (SELECT COUNT(*) FROM message_users mu2 WHERE mu2.groupid = mu.groupid)");
     $check_stmt->bind_param($check_types, ...$check_params);
     $check_stmt->execute();
     $check_result = $check_stmt->get_result();
@@ -396,7 +385,7 @@ if (isset($_POST['group_create'])) {
 if(isset($_POST['group_delete'])) {
     $groupid = (int)$_POST['groupid'];
 
-    $exists_sql = "SELECT id FROM message_group WHERE id = ?";
+    $exists_sql = "SELECT id FROM message_group WHERE id = ? AND is_removed = 0";
     $exists_stmt = $conn->prepare($exists_sql);
     $exists_stmt->bind_param("i", $groupid);
     $exists_stmt->execute();
@@ -420,11 +409,12 @@ if(isset($_POST['group_delete'])) {
         exit;
     }
 
-    $delete_sql = "DELETE t1, t2, t3
+    /*$delete_sql = "DELETE t1, t2, t3
         FROM message_group t1
         LEFT JOIN message_users t2 ON t1.id = t2.groupid
         LEFT JOIN direct_message t3 ON t1.id = t3.groupid
-        WHERE t1.id = ?";
+        WHERE t1.id = ?";*/
+    $delete_sql = "UPDATE message_group SET is_removed = 1 WHERE id = ?";
     $delete_stmt = $conn->prepare($delete_sql);
     $delete_stmt->bind_param("i", $groupid);
 
@@ -453,6 +443,31 @@ if(isset($_POST['group_delete'])) {
     ?>
 
     <div id="ajax-error" class="w3-red w3-padding w3-margin-bottom w3-round w3-border w3-border-pink"></div>
+
+    <div id="modal-report" class="w3-modal" style="z-index: 999999">
+        <div class="w3-modal-content gr8-theme w3-card-2 w3-light-grey w3-center">
+            <div class="w3-container">
+                <span onclick="$('#reportForm')[0].reset();$('#modal-report').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
+                <form id="reportForm">
+                    <h2>Why do you want to report this message?</h2>
+                    <b>You can only report content when it violates our <a href="/rules?src=creation" target="_blank"><i class="fa fa-external-link" aria-hidden="true"></i>rules</a>.</b><br />
+                    <input type="radio" name="reason" value="violent" class="w3-check"> <label>Violent or extreme content</label><br />
+                    <input type="radio" name="reason" value="misinformation" class="w3-check"> <label>Misinformation/disinformation</label><br />
+                    <input type="radio" name="reason" value="inappropriate" class="w3-check"> <label>Inappropriate content</label><br />
+                    <input type="radio" name="reason" value="harrasing-me" class="w3-check"> <label>Harassing me or others</label><br />
+                    <input type="radio" name="reason" value="spam" class="w3-check"> <label>Spam</label><br />
+                    <input type="radio" name="reason" value="underage" class="w3-check"> <label>User is under 13</label><br />
+                    <input type="radio" name="reason" value="copyright" class="w3-check"> <label>Copyrighted content</label><br />
+                    <input type="radio" name="reason" value="other" class="w3-check" id="otherReasonToggle"> <label>Something else</label><br /><br />
+
+                    <textarea class="w3-input w3-card-2 w3-hover-shadow w3-mobile w3-round" name="other" id="otherReason" placeholder="Explain more..." rows="4"></textarea><br />
+
+                    <span class="w3-btn w3-large w3-white w3-hover-blue w3-round-small" onclick="$('#reportForm')[0].reset();$('#modal-report').hide();">Close</span>
+                    <button type="submit" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">Report</button>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <div class="w3-row-padding">
         <div class="w3-third" id="groups" style="display:none">
@@ -495,6 +510,10 @@ if(isset($_POST['group_delete'])) {
                 <div style="color: #000;" class='container w3-padding-small w3-round w3-margin-bottom w3-margin-top w3-card-2'">
                     <p><a class="user" href=""></a> sent <span class="timestamp"></span></p>
                     <p class="message"></p>
+                    <div class="tooltip" id="report-message">
+                        <span class="w3-tag w3-blue tooltiptext">Report this message to moderators</span>
+                        <button data-testid="" name="flag-comment" class="report-message-button fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
+                    </div>
                 </div>
             </template>
         </div>

@@ -35,10 +35,9 @@ $(document).ready(function () {
                 window.mode();
                 elm.fadeIn('fast');
             },
-            error: (xhr, text, err) => {
-                console.error("error: " + text, err, xhr);
-                var response = JSON.parse(xhr.responseText);
-                $("#groups").append(response.error).fadeIn();
+            error: function(xhr, text, error) {
+                console.error(xhr.status, error);
+                ui_error(error);
             }
         });
     }
@@ -80,6 +79,8 @@ $(document).ready(function () {
                             $clone.find(".timestamp").text(r.timestamp);
                             $clone.find(".message").html(r.message);
                             $clone.css("background-color", (r.color ?? '#ffffff'));
+                            $clone.find(".report-message-button").attr('data-testid', r.id);
+                            $clone.attr('id', 'g' + r.id);
 
                             if(r.url) {
                                 $clone.find(".user").attr("href", r.url);
@@ -97,8 +98,9 @@ $(document).ready(function () {
                     ui_error(res.message);
                 }
             },
-            error: (xhr, text, err) => {
-                console.error("error: " + text, err, xhr);
+            error: function(xhr, text, error) {
+                console.error(xhr.status, error);
+                ui_error(error);
             }
         });
     }
@@ -136,10 +138,11 @@ $(document).ready(function () {
                     ui_error(response.error);
                 }
             },
-            error: (xhr, text, err) => {
+            error: function(xhr, text, error) {
                 commentBtnText.html('Send');
                 btn.prop("disabled", false);
-                console.error("error: " + text, err, xhr);
+                console.error(xhr.status, error);
+                ui_error(error);
             }
         });
     }
@@ -177,12 +180,11 @@ $(document).ready(function () {
                     ui_error(response.error);
                 }
             },
-            error: (jqXHR, textStatus, errorThrown) => {
+            error: function(xhr, text, error) {
                 commentBtnText.html(prevBtnText);
                 btn.prop("disabled", false);
-                console.error("error:", textStatus, errorThrown, jqXHR);
-                var response = JSON.parse(jqXHR.responseText);
-                ui_error(response.error);
+                console.error(xhr.status, error);
+                ui_error(error);
             }
         });
     }
@@ -194,39 +196,49 @@ $(document).ready(function () {
         btntext.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
         btn.prop("disabled", true);
 
-        $.ajax({
-            url: "messages.php",
-            method: "POST",
-            dataType: 'json',
-            data: {
-                group_delete: true,
-                groupid: id
-            },
-            success: function (response) {
-                if (response.success) {
-                    var url = new URL(window.location.href);
-                    var elm = $("#messages");
+        if(confirm('Are you sure you want to permenantly delete this group?')) {
+            $.ajax({
+                url: "messages.php",
+                method: "POST",
+                dataType: 'json',
+                data: {
+                    group_delete: true,
+                    groupid: id
+                },
+                success: function (response) {
+                    if (response.success) {
+                        var url = new URL(window.location.href);
+                        var elm = $("#messages");
 
-                    url.searchParams.set("m", response.groupid);
-                    window.history.pushState(null, '', url);
+                        url.searchParams.set("m", response.groupid);
+                        window.history.pushState(null, '', url);
 
-                    elm.hide();
-                    elm.children().not('template').remove();
-                } else {
+                        elm.hide();
+                        elm.children().not('template').remove();
+
+                        load_message(response.groupid);
+                        load_message_group();
+                    } else {
+                        btntext.html('Delete');
+                        btn.prop("disabled", false);
+                        load_message(id);
+                        load_message_group();
+                        ui_error(response.error);
+                    }
+                },
+                error: function(xhr, text, error) {
                     btntext.html('Delete');
                     btn.prop("disabled", false);
-                    ui_error(response.error);
+                    console.error(xhr.status, error);
+                    ui_error(error);
                 }
-            },
-            error: (jqXHR, textStatus, errorThrown) => {
-                btntext.html('Delete');
-                btn.prop("disabled", false);
-                console.error("error:", textStatus, errorThrown, jqXHR);
-
-                var response = JSON.parse(jqXHR.responseText);
-                ui_error(response.error);
-            }
-        });
+            });
+        } else {
+            btntext.html('Delete');
+            btn.prop("disabled", false);
+            load_message(id);
+            load_message_group();
+        }
     }
 
     window.ui_error = function(text) {
@@ -235,6 +247,54 @@ $(document).ready(function () {
         $err.delay(2500).slideToggle('fast');
         $('html, body').animate({scrollTop: 0}, 'slow');
     }
+
+    $(document).on("click", ".report-message-button", function (e) {
+        e.preventDefault();
+        var message_id = $(this).attr('data-testid');
+        $('#modal-report').show();
+
+        $("#reportForm").submit(function (e) {
+            e.preventDefault();
+
+            $.get("/ajax/config.php", {
+                get_csrf_token: true
+            }, function (d) {
+                let csrf_token = d.csrf_token;
+
+                let payload = {
+                    report_type: 'direct_message',
+                    csrf_token: csrf_token,
+                    reportv2: true,
+                    reportable_id: message_id,
+                    other: $("#reportForm #otherReason").val(),
+                    reason: $("#reportForm [name='reason']:checked").val(),
+                }
+
+                $.ajax({
+                    url: "/creation.php?id=null",
+                    type: "POST",
+                    data: payload,
+                    dataType: "json",
+                    success: function (response) {
+                        $("#modal-report").hide();
+
+                        if (response.success) {
+                            alert(response.success);
+                            $("#reportForm")[0].reset();
+                        } else {
+                            ui_error(response.error);
+                        }
+                    },
+                    error: function () {
+                        $("#modal-report").hide();
+                        ui_error("An error occurred. Please try again later.");
+                    }
+                });
+            }, "json").fail(function (xhr, text, err) {
+                ui_error(text);
+            });
+        });
+    });
 
     var url = new URL(window.location.href);
     var message = url.searchParams.get("m");

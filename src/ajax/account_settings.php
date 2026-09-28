@@ -247,6 +247,45 @@ class AccountSettings {
         }
     }
 
+    public function private_profile() {
+        global $current_user;
+
+        if(!loggedin()) {
+            header("HTTP/1.0 403 Forbidden");
+            return ['error' => 'Not authenticated', 'code' => '403'];
+        }
+
+        $id = $current_user->id;
+        $upd = null;
+
+        if($current_user->verify_token != NULL) {
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => "Please verify your account to continue this action."];
+        }
+
+        if((bool)$current_user->private_profile === false) {
+            $upd = 1;
+        } else if((bool)$current_user->private_profile === false) {
+            $upd = 0;
+        }
+
+        if($upd === null) {
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => "Something went wrong."];
+        }
+
+        $conn = Database::get(DB_NAME);
+        $stmt = $conn->prepare("UPDATE users SET private_profile = ? WHERE id = ? AND deactive IS NULL");
+
+        $stmt->bind_param("ii", $upd, $id);
+        if ($stmt->execute()) {
+            return ['success' => 'Your profile has been updated.'];
+        } else {
+            header("HTTP/1.0 500 Internal Server Error");
+            return ['error' => 'Error privating or unprivating profile.'];
+        }
+    }
+
     public function password_change($oldPassword, $newPassword, $confirmPassword) {
         global $current_user;
 
@@ -436,6 +475,12 @@ if(isset($_GET['bsky_change'])) {
 if(isset($_GET['about_change'])){
     $new = urldecode(htmlspecialchars($_GET['description'], ENT_NOQUOTES));
     $result = $account_settings->about_change($new);
+    echo json_encode($result);
+    exit;
+}
+
+if(isset($_GET['private_profile'])){
+    $result = $account_settings->private_profile();
     echo json_encode($result);
     exit;
 }
