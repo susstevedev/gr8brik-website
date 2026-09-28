@@ -512,7 +512,7 @@ if(isset($_POST['group_delete'])) {
                     <p class="message"></p>
                     <div class="tooltip" id="report-message">
                         <span class="w3-tag w3-blue tooltiptext">Report this message to moderators</span>
-                        <button data-testid="" name="flag-comment" class="report-message-button fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
+                        <button data-testid="" name="flag-comment" class="report-message-button fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round w3-border w3-border-pink"></button>
                     </div>
                 </div>
             </template>
