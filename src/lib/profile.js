@@ -25,7 +25,6 @@
                 }
 
                 $("#followedby-wrapper").html(`Followed by ${followedBy}`);
-                $("#followedby-wrapper").css({"display": "inline","font-size": "15px","text-shadow": "0px 0px 0px #fff"});
             },
             error: function (xhr, text, err) {
                 console.error(xhr.status + ' ' + err);
@@ -36,7 +35,6 @@
                 } else {
                     $("#followedby-wrapper").html('Internal server error');
                 }
-                $("#followedby-wrapper").css({"display": "inline","font-size": "15px","text-shadow": "0px 0px 0px #fff"});
             }
         });
 

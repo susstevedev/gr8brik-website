@@ -24,6 +24,8 @@ if (isset($_GET['followed_by'])) {
         exit;
     }
 
+    $conn = Database::get(DB_NAME);
+
     //selects user follow row(s), selects users actual account, fliters invalid accounts
     $query = "
         SELECT DISTINCT u.id, u.picture, u.username, u.email
@@ -207,7 +209,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     	$is_following = $stmt->get_result()->fetch_assoc()['following'];
     	$stmt->close();
 
-        if($current_user->admin == '1') {
+        if($current_user->admin) {
             $adm_email = isset($usero->email) ? htmlspecialchars($usero->email) : '';
         }
     }
@@ -262,18 +264,25 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         'bsky' => $bsky,
         'age' => isset($usero->age) ? htmlspecialchars($usero->age) : '',
         'picture' => htmlspecialchars($usero->picture_small ?? $usero->picture),
-        'model_count' => $model_count,
-        'followers' => $followers,
-        'following' => $following,
-        'forum_posts' => $user_post_count,
-        'views' => $views,
-        'likes' => $likes,
+        'stats' => [
+            'creation_count' => $model_count,
+            'followers' => $followers,
+            'following' => $following,
+            'forum_posts' => $user_post_count,
+            'views' => $views,
+            'likes' => $likes,
+        ],
         'is_following' => (bool)$is_following,
         'is_blocking' => (bool)$is_blocking,
         'is_private' => (bool)$is_private,
         'message' => $message,
-        'email' => $adm_email ?? null
     ];
+
+    if(loggedin()) {
+        if($current_user->admin) {
+            $data['email'] = $adm_email ?? null;
+        }
+    }
 
     return $data;
 }

@@ -12,7 +12,8 @@ if(isset($_GET['name'])) {
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
 $data = fetch_profile($_GET['id'] ?? urldecode($_GET['name']), $_SESSION['csrf'], $use_username);
-$userid = loggedin() ? $current_user->id : null;
+$userid = (loggedin() && isset($current_user)) ? $current_user->id : null;
+$user_admin = (loggedin() && isset($current_user) && $current_user->admin) ? true : false;
 
 if(isset($data) && !$data['success'] && !empty($data['message'])) {
     $error = $data['message'];
@@ -268,7 +269,7 @@ if(isset($_POST['unban-submit'])) {
                 <a href="/acc/login" id="button-follow" name="follow" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Login to follow user</a>
             <?php } ?>
 
-            <?php if(isset($error_code) && $error_code === 'account_banned' && loggedin() && $current_user->admin) {?>
+            <?php if(isset($error_code) && $error_code === 'account_banned' && loggedin() && $user_admin) {?>
                 <form id="unbanUser" action="" method="post"></form>
                 <input id="unban-submit" name="unban-submit" form="unbanUser" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-border w3-border-pink" type="submit" value="Unban user">
             <?php } ?>
@@ -288,51 +289,54 @@ if(isset($_POST['unban-submit'])) {
     </div><br /><br />
 
     <article id="user-card" class="gr8-theme w3-light-grey w3-card-2 w3-padding w3-round">
+        <!-- banners are on life support -->
         <?php if(file_exists("acc/users/banners/" . htmlspecialchars($_GET['id']) . "..jpg")) { ?>
-            <style>
-                [data-testid="user-profile-card-banner_image"] {
-                    background-image: url('/acc/users/banners/<?php echo htmlspecialchars($_GET['id']) ?>..jpg');
-                }
-            </style>
-
-            <div data-testid="user-profile-card-banner">
-                <span data-testid="user-profile-card-banner_image" id="banner"></span>
+            <div>
+                <span data-testid="user-profile-card-banner_image" id="banner"><img src="/acc/users/banners/<?php echo htmlspecialchars($_GET['id']) ?>..jpg" /></span>
             </div>
         <?php } ?>
-        
-        <span style="font-size: 30px; display: inline-block; vertical-align: top; max-width: 100%;">
-            <img id="picture" width="50px" height="50px" class="w3-round" src="<?php echo $data['picture'] ?>" />
 
-            <?php if(!empty($data['admin'])) { ?>
-                <span id="username" class="w3-text-red"><?php echo $data['username'] ?></span>
-            <?php } else { ?>
-                <span id="username"><?php echo $data['username'] ?></span>
-            <?php } ?>
+        <span class="w3-large">
+            <img id="picture" width="75px" height="75px" class="w3-round" src="<?php echo $data['picture'] ?>" />
+
+            <header>
+                <?php if($data['admin']) { ?>
+                    <span id="username" class="w3-padding-small w3-xlarge w3-text-red"><?php echo $data['username'] ?></span>
+                <?php } else { ?>
+                    <span id="username" class="w3-padding-small w3-xlarge"><?php echo $data['username'] ?></span>
+                <?php } ?>
+
+                <span id="stats-other">
+                    <b><?php echo number_format($data['stats']['forum_posts']) ?></b> forum posts -
+                    <b><?php echo number_format($data['stats']['views']) ?></b> views -
+                    <b><?php echo number_format($data['stats']['likes']) ?></b> likes
+                </span>
+            </header>
 
             <?php if($data['is_private']) { ?>
-                <i class='fa fa-lock w3-text-yellow' title="This profile has been privated. You can only view public contibutions if you follow them." aria-hidden='true'></i>
+                <i class='fa fa-lock w3-xlarge w3-text-yellow' title="This profile has been privated. You can only view public contibutions if you follow them." aria-hidden='true'></i>
             <?php } ?>
 
-            <span style="font-size:20px;">
-                <span><b id="model-count"><?php echo $data['model_count'] ?></b>&nbsp;creations</span>
-                <span><b id="follower-count"><?php echo $data['followers'] ?></b>&nbsp;followers</span>
-                <span><b id="following-count"><?php echo $data['following'] ?></b>&nbsp;following</span>
-                <span><b id="view-count"><?php echo $data['views'] ?></b>&nbsp;views</span>
-                <span><b id="like-count"><?php echo $data['likes'] ?></b>&nbsp;likes</span>
-            </span>
+            <span id="stats" class="w3-padding-small">
+                <b id="model-count"><?php echo number_format($data['stats']['creation_count']) ?></b> creations -
+                <b id="follower-count"><?php echo number_format($data['stats']['followers']) ?></b> followers -
+                <b id="following-count"><?php echo number_format($data['stats']['following']) ?></b> following
+            </span><br />
         </span>
 
         <div><p id="description"><?php echo $data['description'] ?></p></div>
 
-        <span id="joined-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">Became a member <?php echo time_ago($data['age']) ?></span>
+        <span id="joined-wrapper">
+            Became a member <?php echo time_ago($data['age']) ?>
+        </span>
         
         <?php if(!empty($data['twitter'])) { ?>
             <b>-</b>
-            <span id="twitter-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">
+            <span id="twitter-wrapper">
                 <a id="twitter-link" href="https://twitter.com/<?php echo $data['twitter'] ?>" target="_blank">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-twitter-x" viewBox="0 0 16 16">
-  						<path d="M12.6.75h2.454l-5.36 6.142L16 15.25h-4.937l-3.867-5.07-4.425 5.07H.316l5.733-6.57L0 .75h5.063l3.495 4.633L12.601.75Zm-.86 13.028h1.36L4.323 2.145H2.865z"/>
-					</svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-twitter" viewBox="0 0 16 16">
+                        <path d="M5.026 15c6.038 0 9.341-5.003 9.341-9.334q.002-.211-.006-.422A6.7 6.7 0 0 0 16 3.542a6.7 6.7 0 0 1-1.889.518 3.3 3.3 0 0 0 1.447-1.817 6.5 6.5 0 0 1-2.087.793A3.286 3.286 0 0 0 7.875 6.03a9.32 9.32 0 0 1-6.767-3.429 3.29 3.29 0 0 0 1.018 4.382A3.3 3.3 0 0 1 .64 6.575v.045a3.29 3.29 0 0 0 2.632 3.218 3.2 3.2 0 0 1-.865.115 3 3 0 0 1-.614-.057 3.28 3.28 0 0 0 3.067 2.277A6.6 6.6 0 0 1 .78 13.58a6 6 0 0 1-.78-.045A9.34 9.34 0 0 0 5.026 15"/>
+                    </svg>
                     <?php echo $data['twitter'] ?>
                 </a>
             </span>
@@ -340,7 +344,7 @@ if(isset($_POST['unban-submit'])) {
         
         <?php if(!empty($data['bsky'])) { ?>
             <b>-</b>
-            <span id="bsky-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff">
+            <span id="bsky-wrapper">
                 <a id="bsky-link" href="https://bsky.app/profile/<?php echo $data['bsky'] ?>" target="_blank">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-bluesky" viewBox="0 0 16 16">
   						<path d="M3.468 1.948C5.303 3.325 7.276 6.118 8 7.616c.725-1.498 2.698-4.29 4.532-5.668C13.855.955 16 .186 16 2.632c0 .489-.28 4.105-.444 4.692-.572 2.04-2.653 2.561-4.504 2.246 3.236.551 4.06 2.375 2.281 4.2-3.376 3.464-4.852-.87-5.23-1.98-.07-.204-.103-.3-.103-.218 0-.081-.033.014-.102.218-.379 1.11-1.855 5.444-5.231 1.98-1.778-1.825-.955-3.65 2.28-4.2-1.85.315-3.932-.205-4.503-2.246C.28 6.737 0 3.12 0 2.632 0 .186 2.145.955 3.468 1.948"/>
@@ -349,12 +353,12 @@ if(isset($_POST['unban-submit'])) {
                 </a>
             </span>
         <?php } ?>
-        
+
         <b>-</b>
-        <span id="followedby-wrapper" style="display: inline; font-size: 15px; text-shadow: 0px 0px 0px #fff"></span><br />
+        <span id="followedby-wrapper"></span><br />
 
         <?php if(loggedin()) { ?>
-            <?php if($current_user->id != trim($_GET['id'])) { ?>
+            <?php if($userid != trim($_GET['id'])) { ?>
             <span id="action-buttons">
                 <?php if($data['is_following'] === true) { ?>
                     <button onclick='document.getElementById("modal-unfollow").style.display="block"' name="unfollow" class="button-unfollow w3-btn w3-red w3-hover-opacity w3-round-small w3-border w3-border-pink" />
@@ -379,7 +383,7 @@ if(isset($_POST['unban-submit'])) {
                             Report
                         </button>
 
-                        <?php if($current_user->admin != false) { ?>
+                        <?php if($user_admin != false) { ?>
         					<button id="button-warn-user" onclick='document.getElementById("modal-warn").style.display="block"' name="warn" class="w3-bar-item w3-button" />
                                 Warn
                             </button>
@@ -394,7 +398,7 @@ if(isset($_POST['unban-submit'])) {
                 <form id="unblockUser" action="" method="post"></form>
             </span>
             <?php } else { ?>
-                <a href="/acc">Edit Profile</a>&nbsp;
+                <a href="/acc/index">Edit Profile</a>&nbsp;
             <?php } ?>
         <?php } ?>
 
@@ -406,7 +410,7 @@ if(isset($_POST['unban-submit'])) {
 				<span onclick="document.getElementById('modal-unfollow').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
 				    <form method='post' action=''>
 					<h2>Are you sure you want to unfollow this user?</h2>
-					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('unfollow').style.display='none'">No</span> 
+					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('modal-unfollow').style.display='none'">No</span> 
 					<input type="submit" value="Yes" name="unfollow" class="w3-btn w3-large w3-white w3-hover-red">
 				</form>
 			</div>
@@ -444,14 +448,14 @@ if(isset($_POST['unban-submit'])) {
 				<span onclick="document.getElementById('modal-block').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
 				    <form method='post' action=''>
 					<h2>Are you sure you want to block this user?</h2>
-					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('block').style.display='none'">No</span> 
+					<span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('modal-block').style.display='none'">No</span> 
 					<input type="submit" value="Yes" name="block" class="w3-btn w3-large w3-white w3-hover-red">
 				</form>
 			</div>
 		</div>
 	</div>
 
-    <?php if(loggedin() && $current_user->admin != false) { ?>
+    <?php if(loggedin() && $user_admin != false) { ?>
         <div id="modal-delete" class="w3-modal">
             <div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-center">
                 <div class="w3-container">
@@ -470,7 +474,7 @@ if(isset($_POST['unban-submit'])) {
 
                         <textarea name="reason" placeholder="Moderator note about this ban" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea><br />
 
-                        <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('delete').style.display='none'">No</span>
+                        <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('modal-delete').style.display='none'">No</span>
                         <input type="submit" value="Yes" name="delete" class="w3-btn w3-large w3-white w3-hover-red">
                     </form>
                 </div>
@@ -483,7 +487,7 @@ if(isset($_POST['unban-submit'])) {
                     <span onclick='document.getElementById("modal-warn").style.display="none"' class="w3-closebtn w3-red w3-hover-white w3-padding w3-display-topright">&times;</span><form method="post" action="">
                         <h2>Are you sure you want to warn this user?</h2>
                         <textarea name="reason" placeholder="Moderator note about this warning (required)" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea><br />
-                        <span name="close" class="w3-btn w3-large w3-white w3-hover-blue w3-round" onclick='document.getElementById("warn").style.display="none"'>No</span>
+                        <span name="close" class="w3-btn w3-large w3-white w3-hover-blue w3-round" onclick='document.getElementById("modal-warn").style.display="none"'>No</span>
                         <input type="submit" value="Yes" name="warn" class="w3-btn w3-large w3-white w3-hover-red w3-round">
                     </form>
                 </div>

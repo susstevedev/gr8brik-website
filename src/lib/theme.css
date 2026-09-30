@@ -131,6 +131,16 @@ body.mode-dark .creation-page-meta {
     width: 50%;
 }
 
+/* profile page css */
+#twitter-wrapper, #bsky-wrapper, #joined-wrapper, #stats-other, #followedby-wrapper {
+    display: inline;
+    font-size: 15px;
+
+    a {
+        text-decoration: none;
+    }
+}
+
 #gdpr-cookie-message {
     margin-left: 20%;
     margin-right: 20%;
