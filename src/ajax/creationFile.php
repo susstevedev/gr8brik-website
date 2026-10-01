@@ -39,7 +39,6 @@ if(isset($data)) {
         $cdata = json_decode(fetch_build($model_id, $_SESSION['csrf']), true);
 
         if ($cdata['message']) {
-            http_response_code(500);
             echo json_encode(["success" => false, "message" => $cdata['message']]);
             exit;
         } else {
@@ -81,8 +80,8 @@ if(isset($data)) {
                 }
             }
 
-            $res = ["success" => true, "message" => "JSON file found", "creation" => $raw_array];
-            echo json_encode($res);
+            $_SESSION['viewer_auth'] = uuid();
+            echo json_encode($raw_array);
             exit;
         }
     }

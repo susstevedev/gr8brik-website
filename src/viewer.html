@@ -40,6 +40,7 @@
             padding: 10px 20px;
             font-size: 20px;
             border-radius: 4px;
+            border: 1px #fafafa solid;
         }
 
         #watermark {
@@ -219,10 +220,6 @@
                 window.location.reload();
             }
 
-            const version_string = "Gr8brik Viewer 01-28-26";
-            const version_num = "012820261-1327";
-            window.modelIsLegacy = false;
-
             console.log(window.globalPlayerConfig);
 
             let debug = false;
@@ -232,10 +229,6 @@
 
             if (debug) {
                 console.log(JSON.stringify(window.globalPlayerConfig));
-            }
-
-            if (typeof window.globalPlayerConfig.player_redesign === "boolean" && debug) {
-                console.log('Player redesign flags coming soon');
             }
 
             const viewer = document.getElementById("viewer");
@@ -249,87 +242,87 @@
             const stat_name = document.getElementById("stats");
             const button_settings = document.getElementById("web-settings");
 
+            loading.innerHTML = "Loading creation...";
+
             if (!model_file) {
                 console.error("invalid creation file");
-                loading.innerText = "Creation not found";
+                loading.innerHTML = "Creation not found";
                 return;
             }
 
-            fetch(`/ajax/build?buildId=${model_file}&fetch=true`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Server returned the error code ${response.status}`);
-                    }
-                    return response.text();
-                })
-                .then(text => {
-                    try {
-                        window.creation_data = text;
-                        return JSON.parse(text);
-                    } catch (error) {
-                        throw new Error(response);
-                    }
-                })
-                .then(json => {
-                    if (json.legacy == 1) {
-                        window.location = `/legacy_viewer.html?model=${model_file}`;
-                    }
-                })
-                fetch(`/ajax/creationFile`, {
-                    "credentials": "include",
-                    "method": "POST",
-                    "body": JSON.stringify({ 'getViewerSess': true }),
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Server returned the error code ${response.status}`);
-                    }
-                    return response.text();
-                })
-                .then(viewer_sess => {
-                    try {
-                        window.viewer_sess = viewer_sess;
-                        return viewer_sess;
-                    } catch (error) {
-                        throw new Error(response);
-                    }
-                })
-                .then(viewer_sess => {
-                    fetch(`/ajax/creationFile`, {
-                        "credentials": "include",
-                        "method": "POST",
-                        "body": JSON.stringify({ 'iwantthejsonbruh': true, 'creID': model_file, 'viewer': viewer_sess }),
-                    })
+            async function load(model_file) {
+                try {
+                    await fetch(`/ajax/build?buildId=${model_file}&fetch=true`)
                     .then(response => {
-                        if (!response.ok || response.status !== 200) {
-                            throw new Error(response.statusText);
+                        if (!response.ok) {
+                            throw new Error(`Server returned the error ${response.statusText}`);
                         }
                         return response.text();
                     })
                     .then(text => {
                         try {
-                            const model_data = JSON.parse(text);
-                            load_model_data(model_data.creation);
+                            window.creation_data = text;
+                            return JSON.parse(text);
+                        } catch (error) {
+                            throw new Error(response);
+                        }
+                    })
+                    .then(json => {
+                        if (json.legacy == 1) {
+                            window.location = `/legacy_viewer.html?model=${model_file}`;
+                        }
+                        if(json.is_removed == 1) {
+                            throw new Error('Not allowed');
+                        }
+                    })
+
+                    loading.innerText = "Loading perms...";
+                    await fetch(`/ajax/creationFile`, {
+                        "credentials": "include",
+                        "method": "POST",
+                        "body": JSON.stringify({ 'getViewerSess': true }),
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Server returned the error code ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(viewer_sess => {
+                        try {
+                            window.viewer_sess = viewer_sess;
+                            return viewer_sess;
+                        } catch (error) {
+                            throw new Error(response);
+                        }
+                    })
+                    loading.innerText = "Loading creation file...";
+                    await fetch(`/ajax/creationFile`, {
+                        "credentials": "include",
+                        "method": "POST",
+                        "body": JSON.stringify({ 'iwantthejsonbruh': true, 'creID': model_file, 'viewer': viewer_sess }),
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then((json) => {
+                                return Promise.reject(json);
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(text => {
+                        try {
+                            load_model_data(text);
                         } catch (error) {
                             throw new Error(error);
                         }
                     })
-                    .catch(error => {
-                        console.error(error);
-                        loading.innerText = `An error occurred: ${error.message}`;
-                        document.getElementById("retry").style.display = "block";
-                    });
-                })
-                .catch(error => {
-                    console.error(error);
-                    loading.innerText = `An error occurred: ${error.message}`;
+                } catch (error) {
+                    loading.innerHTML = error.message;
                     document.getElementById("retry").style.display = "block";
-                })
-            .catch(error => {
-                console.error(error);
-                loading.innerText = `An error occurred: ${error.message}`;
-                document.getElementById("retry").style.display = "block";
-            });
+                }
+            }
+            load(model_file);
 
             function load_model_data(model_data) {
                 var scene = new THREE.Scene();
@@ -469,7 +462,6 @@
 
                 window.file_ver = model_data?.metadata?.file_version || '0.0';
                 var complete = false;
-                var partsIntersecting = [];
 
                 function loadParts(blocks, index = 0) {
                     if (index === blocks.length) {
@@ -563,12 +555,6 @@
                                     }
                                 });
                             }
-
-                            if (child.isMesh && child.userData.fileName) {
-                                let childBB = new THREE.Box3().setFromObject(child);
-                                childBB.cloneid = child.id;
-                                partsIntersecting.push(childBB);
-                            }
                         });
 
                         if (block?.matrixw) {
@@ -649,29 +635,6 @@
 
                 window.showViewer = showViewer;
 
-                window.intersectingCheck = function () {
-                    console.log(partsIntersecting);
-                    scene.traverse((obj) => {
-                        const others = partsIntersecting.filter(other => other !== obj)
-
-                        others.forEach(other => {
-                            if (obj.intersectsBox(other)) {
-                                let OGobj = scene.getObjectById(obj.cloneid);
-                                if (debug === true) {
-                                    console.log(OGobj + ' is inside another part');
-                                }
-
-                                OGobj.material.transparent = true;
-                                OGobj.material.opacity = 0.25;
-                                OGobj.material.needsUpdate = true;
-
-                                scene.updateMatrixWorld(true);
-                                OGobj.updateMatrixWorld(true);
-                            }
-                        });
-                    });
-                }
-
                 document.getElementById('web-settings').addEventListener('click', function () {
                     let settings = document.getElementById('web-settings-dropdown');
                     if (settings.style.display == 'none') {
@@ -724,7 +687,7 @@
             }
         });
     </script>
-    <div id="loading" class="box-load">Loading...</div>
+    <div id="loading" class="box-load">...</div>
     <button id="retry">Retry</button>
     <div id="stats" class="box"></div>
     <div id="username" class="box">By </div>
