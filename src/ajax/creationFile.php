@@ -2,7 +2,6 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/build.php';
 
-header('Content-Type: application/json');
 $raw_inp = file_get_contents('php://input');
 $data = json_decode($raw_inp, true);
 
@@ -14,6 +13,8 @@ if(isset($data)) {
     }
 
     if(isset($data['iwantthejsonbruh']) && isset($data['creID'])) {
+        header('Content-Type: application/json');
+
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(400);
             echo json_encode(["success" => false, "message" => "use POST please"]);
@@ -84,6 +85,16 @@ if(isset($data)) {
             echo json_encode($res);
             exit;
         }
+    }
+
+    if(isset($data['getViewerSess'])) {
+        header('Content-Type: text/plain');
+
+        if(!isset($_SESSION['viewer_auth'])) {
+            $_SESSION['viewer_auth'] = uuid();
+        }
+        echo $_SESSION['viewer_auth'];
+        exit;
     }
 }
 

@@ -265,42 +265,71 @@
                 .then(text => {
                     try {
                         window.creation_data = text;
-                        return JSON.parse(creation_data);
+                        return JSON.parse(text);
                     } catch (error) {
                         throw new Error(response);
                     }
                 })
-                .then(creation_data => {
-                    if (creation_data.legacy == 1) {
+                .then(json => {
+                    if (json.legacy == 1) {
                         window.location = `/legacy_viewer.html?model=${model_file}`;
                     }
-
-                    fetch(`${creation_data.model}`)
-                        .then(response => {
-                            if (!response.ok || response.status !== 200) {
-                                throw new Error(response.statusText);
-                            }
-                            return response.text();
-                        })
-                        .then(text => {
-                            try {
-                                const model_data = JSON.parse(text);
-                                load_model_data(model_data);
-                            } catch (error) {
-                                throw new Error(error);
-                            }
-                        })
-                        .catch(error => {
-                            console.error(error);
-                            loading.innerText = `An error occurred: ${error.message}`;
-                            document.getElementById("retry").style.display = "block";
-                        });
+                })
+                fetch(`/ajax/creationFile`, {
+                    "credentials": "include",
+                    "method": "POST",
+                    "body": JSON.stringify({ 'getViewerSess': true }),
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Server returned the error code ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(viewer_sess => {
+                    try {
+                        window.viewer_sess = viewer_sess;
+                        return viewer_sess;
+                    } catch (error) {
+                        throw new Error(response);
+                    }
+                })
+                .then(viewer_sess => {
+                    fetch(`/ajax/creationFile`, {
+                        "credentials": "include",
+                        "method": "POST",
+                        "body": JSON.stringify({ 'iwantthejsonbruh': true, 'creID': model_file, 'viewer': viewer_sess }),
+                    })
+                    .then(response => {
+                        if (!response.ok || response.status !== 200) {
+                            throw new Error(response.statusText);
+                        }
+                        return response.text();
+                    })
+                    .then(text => {
+                        try {
+                            const model_data = JSON.parse(text);
+                            load_model_data(model_data.creation);
+                        } catch (error) {
+                            throw new Error(error);
+                        }
+                    })
+                    .catch(error => {
+                        console.error(error);
+                        loading.innerText = `An error occurred: ${error.message}`;
+                        document.getElementById("retry").style.display = "block";
+                    });
                 })
                 .catch(error => {
                     console.error(error);
                     loading.innerText = `An error occurred: ${error.message}`;
                     document.getElementById("retry").style.display = "block";
-                });
+                })
+            .catch(error => {
+                console.error(error);
+                loading.innerText = `An error occurred: ${error.message}`;
+                document.getElementById("retry").style.display = "block";
+            });
 
             function load_model_data(model_data) {
                 var scene = new THREE.Scene();
@@ -444,7 +473,7 @@
 
                 function loadParts(blocks, index = 0) {
                     if (index === blocks.length) {
-                        showViewer();
+                        showViewer(JSON.parse(window.creation_data));
                         return;
                     }
 
@@ -595,8 +624,8 @@
                     }
                 }
 
-                function showViewer() {
-                    document.title = `${JSON.parse(window.creation_data).name} | gr8brik.rf.gd`;
+                function showViewer(_json) {
+                    document.title = `${_json.name} | gr8brik.rf.gd`;
 
                     loading.style.display = "none";
                     viewer.style.display = "block";
@@ -605,13 +634,13 @@
                     wmark.innerHTML = "<img src='/img/logo/simplev2.png' alt='Logo' title='Logo' /> gr8brik.rf.gd";
 
                     stat_name.style.display = "block";
-                    stat_name.innerHTML += `<a href="/build/${JSON.parse(window.creation_data).modelid}" target="_blank">${JSON.parse(window.creation_data).name}</a>`;
+                    stat_name.innerHTML += `<a href="/build/${_json.modelid}" target="_blank">${_json.name}</a>`;
 
                     stat_username.style.display = "block";
-                    stat_username.innerHTML += `<a href="/user/${JSON.parse(window.creation_data).userid}" target="_blank"><img src='${JSON.parse(window.creation_data).user_image}.webp' alt='User icon' title='User icon' />${JSON.parse(window.creation_data).username}</a>`;
+                    stat_username.innerHTML += `<a href="/user/${_json.userid}" target="_blank"><img src='${_json.user_image}.webp' alt='User icon' title='User icon' />${_json.username}</a>`;
 
                     stat_date.style.display = "block";
-                    stat_date.innerHTML += `${JSON.parse(window.creation_data).date}`;
+                    stat_date.innerHTML += `${_json.date}`;
 
                     button_settings.style.display = "block";
 
