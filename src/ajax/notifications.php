@@ -109,6 +109,27 @@ class Notifications
         return $users;
     }
 
+    /**
+     * do not use this accedently because it'll wipe all of the subscriptions from a creation/content/balls/whatever
+     */
+    public function remove_all_subscribers(string $category, int $contentId): void
+    {
+        $stmt = $this->db->prepare("SELECT 1 FROM subscriptions WHERE content = ? AND category = ?");
+        $stmt->bind_param("is", $contentId, $category);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $exists = $result->fetch_assoc();
+
+        if ($exists) {
+            $notif = $this->db->prepare("DELETE FROM subscriptions WHERE content = ? AND category = ?");
+            $notif->bind_param("is", $contentId, $category);
+            $notif->execute();
+
+            $notif->close();
+            $stmt->close();
+        }
+    }
+
     public function get_notifications(int $userId, int $page)
     {
         if ($this->db->connect_error) {

@@ -230,7 +230,7 @@ if (isset($_POST['save_build_v2'])) {
         exit;
     }
 
-    $desc = $_POST['desc'] ?: null;
+    $desc = $_POST['desc'] ?: '';
     $name = $_POST['name'] ?: "Untitled Creation";
     $modelJson = $_POST['creation'] ?: null;
     $visible = $_POST['visibility'] ?: null;
@@ -282,14 +282,13 @@ if (isset($_POST['save_build_v2'])) {
 
         $result = $stmt->get_result();
         $existing = $result->fetch_assoc();
-
         $stmt->close();
 
         if (!$existing) {
             $updating = false; //so users can save other peoples creations
+        } else {
+            $updating = true;
         }
-
-        $updating = true;
     }
 
     if ($updating) {
@@ -559,6 +558,7 @@ function fetch_build($model_id, $csrf) {
 
     $row = User::getUser($userid);
     $username = $row->username;
+    $user_image = $row->picture_small;
 
     if (!isset($name) || empty($name)) {
         $name = $username . "'s creation";
@@ -617,7 +617,7 @@ function fetch_build($model_id, $csrf) {
             $voted = false;
         }
 
-        $is_subbed = $notifications->is_subscriber('comment', $model_id, $id) || $notifications->is_subscriber('fav', $model_id, $id);
+        $is_subbed = $notifications->is_subscriber('comment', $model_id, $id) || $notifications->is_subscriber('creation_fav', $model_id, $id);
 		$is_subbed_comment = $notifications->is_subscriber('comment', $model_id, $id);
 		$is_subbed_fav = $notifications->is_subscriber('creation_fav', $model_id, $id);
     } else {
@@ -656,6 +656,8 @@ function fetch_build($model_id, $csrf) {
     $data = [
         'success' => true,
         'userid' => $userid,
+        'username' => $username,
+        'user_image' => $user_image,
         'modelid' => $model_id,
         'model' => $row2['model'],
         'description' => $decoded_description,
@@ -674,7 +676,6 @@ function fetch_build($model_id, $csrf) {
 		'is_subbed_fav' => $is_subbed_fav ?? false,
         'likes' => $votes,
         'comments' => $row2['replies'],
-        'username' => $username,
         'followers' => $followers,
         'conversation_subbed' => $notifications->get_subscribers('comment', $model_id),
         'model_admin' => $row->admin,

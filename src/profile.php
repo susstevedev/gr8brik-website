@@ -299,19 +299,11 @@ if(isset($_POST['unban-submit'])) {
         <span class="w3-large">
             <img id="picture" width="75px" height="75px" class="w3-round" src="<?php echo $data['picture'] ?>" />
 
-            <header>
-                <?php if($data['admin']) { ?>
-                    <span id="username" class="w3-padding-small w3-xlarge w3-text-red"><?php echo $data['username'] ?></span>
-                <?php } else { ?>
-                    <span id="username" class="w3-padding-small w3-xlarge"><?php echo $data['username'] ?></span>
-                <?php } ?>
-
-                <span id="stats-other">
-                    <b><?php echo number_format($data['stats']['forum_posts']) ?></b> forum posts -
-                    <b><?php echo number_format($data['stats']['views']) ?></b> views -
-                    <b><?php echo number_format($data['stats']['likes']) ?></b> likes
-                </span>
-            </header>
+            <?php if($data['admin']) { ?>
+                <span id="username" class="w3-padding-small w3-xlarge w3-text-red"><?php echo $data['username'] ?></span>
+            <?php } else { ?>
+                <span id="username" class="w3-padding-small w3-xlarge"><?php echo $data['username'] ?></span>
+            <?php } ?>
 
             <?php if($data['is_private']) { ?>
                 <i class='fa fa-lock w3-xlarge w3-text-yellow' title="This profile has been privated. You can only view public contibutions if you follow them." aria-hidden='true'></i>
@@ -325,6 +317,12 @@ if(isset($_POST['unban-submit'])) {
         </span>
 
         <div><p id="description"><?php echo $data['description'] ?></p></div>
+
+        <span id="stats-other">
+            <b><?php echo number_format($data['stats']['forum_posts']) ?></b> forum posts -
+            <b><?php echo number_format($data['stats']['views']) ?></b> views -
+            <b><?php echo number_format($data['stats']['likes']) ?></b> likes
+        </span><br />
 
         <span id="joined-wrapper">
             Became a member <?php echo time_ago($data['age']) ?>

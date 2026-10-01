@@ -3,11 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/build.php';
 
-$conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-
-if ($conn->connect_error) {
-    exit($conn->connect_error);
-}
+$conn = Database::get(DB_NAME2);
 
 $model_id = $conn->real_escape_string($_GET['id']);
 $data = json_decode(fetch_build($model_id, $_SESSION['csrf']), true);

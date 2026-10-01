@@ -104,8 +104,13 @@
             background-color: #87ceeb;
             padding: 6px 16px;
             text-align: center;
-            border: none;
+            border: 1px #ddd solid;
+            border-radius: 4px;
             cursor: pointer;
+        }
+
+        button:hover {
+            opacity: 0.8;
         }
 
         #retry {
@@ -136,6 +141,7 @@
             top: 0px;
             right: 0px;
             border-radius: 3px;
+            display: none;
         }
 
         #web-settings:hover {
@@ -241,6 +247,7 @@
             const stat_date = document.getElementById("date-v2");
             const stat_username = document.getElementById("username");
             const stat_name = document.getElementById("stats");
+            const button_settings = document.getElementById("web-settings");
 
             if (!model_file) {
                 console.error("invalid creation file");
@@ -248,11 +255,10 @@
                 return;
             }
 
-            fetch(`/ajax/build?buildId=${model_file}&fetch=1`)
+            fetch(`/ajax/build?buildId=${model_file}&fetch=true`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`Server returned the error code ${response.status}`);
-                        console.error(response);
                     }
                     return response.text();
                 })
@@ -261,7 +267,7 @@
                         window.creation_data = text;
                         return JSON.parse(creation_data);
                     } catch (error) {
-                        console.error(response);
+                        throw new Error(response);
                     }
                 })
                 .then(creation_data => {
@@ -271,8 +277,8 @@
 
                     fetch(`${creation_data.model}`)
                         .then(response => {
-                            if (!response.ok) {
-                                console.error(response);
+                            if (!response.ok || response.status !== 200) {
+                                throw new Error(response.statusText);
                             }
                             return response.text();
                         })
@@ -281,12 +287,15 @@
                                 const model_data = JSON.parse(text);
                                 load_model_data(model_data);
                             } catch (error) {
-                                alert(error);
-                                console.error(error);
+                                throw new Error(error);
                             }
                         })
+                        .catch(error => {
+                            console.error(error);
+                            loading.innerText = `An error occurred: ${error.message}`;
+                            document.getElementById("retry").style.display = "block";
+                        });
                 })
-
                 .catch(error => {
                     console.error(error);
                     loading.innerText = `An error occurred: ${error.message}`;
@@ -599,10 +608,12 @@
                     stat_name.innerHTML += `<a href="/build/${JSON.parse(window.creation_data).modelid}" target="_blank">${JSON.parse(window.creation_data).name}</a>`;
 
                     stat_username.style.display = "block";
-                    stat_username.innerHTML += `<a href="/user/${JSON.parse(window.creation_data).userid}" target="_blank"><img src='/acc/users/pfps/${JSON.parse(window.creation_data).userid}.webp' alt='User icon' title='User icon' />${JSON.parse(window.creation_data).username}</a>`;
+                    stat_username.innerHTML += `<a href="/user/${JSON.parse(window.creation_data).userid}" target="_blank"><img src='${JSON.parse(window.creation_data).user_image}.webp' alt='User icon' title='User icon' />${JSON.parse(window.creation_data).username}</a>`;
 
                     stat_date.style.display = "block";
                     stat_date.innerHTML += `${JSON.parse(window.creation_data).date}`;
+
+                    button_settings.style.display = "block";
 
                     animate();
                 }

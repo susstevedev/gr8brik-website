@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
 
 if (!loggedin() || !isset($current_user)) {
@@ -8,6 +9,7 @@ if (!loggedin() || !isset($current_user)) {
 }
 
 $conn2 = Database::get(DB_NAME2);
+$conn = Database::get(DB_NAME);
 
 if(isset($_GET['my_creations']) && isset($_GET['page'])) {
     $page = $_GET['page'] ?: 1;
@@ -176,6 +178,10 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                     $stmtComments = $conn2->prepare("DELETE FROM comments WHERE model = ?");
                     $stmtComments->bind_param("i", $model_id);
                     $stmtComments->execute();
+
+                    $notifications = new Notifications($conn);
+                    $notifications->remove_all_subscribers('comment', $model_id);
+                    $notifications->remove_all_subscribers('creation_fav', $model_id);
 
                     echo json_encode(['success' => 'Creation deleted']);
                 } else {
