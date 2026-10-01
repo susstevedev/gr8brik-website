@@ -36,6 +36,9 @@ Redirect 301 /new_appeal.php /appeal.php
 Redirect 301 /rules /com/view.php?id=17
 Redirect 403 /important.php
 
+#block direct access to the creation files without new api
+RedirectMatch 403 ^/cre/.*.json$
+
 # RewriteRule ^index.php /oops.html [QSA,L]
 # RewriteCond %{HTTP:Cookie} admin=yes [NC]
 # RewriteRule .* - [L]

@@ -6,6 +6,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
 
 if (!loggedin() || !isset($current_user)) {
     header('Location:login.php');
+    exit;
 }
 
 $conn2 = Database::get(DB_NAME2);
