@@ -279,10 +279,10 @@ class AccountSettings {
 
         $stmt->bind_param("ii", $upd, $id);
         if ($stmt->execute()) {
-            return ['success' => 'Your profile has been updated.'];
+            return ['success' => 'Your page has been updated.'];
         } else {
             header("HTTP/1.0 500 Internal Server Error");
-            return ['error' => 'Error privating or unprivating profile.'];
+            return ['error' => 'Error privating or unprivating page.'];
         }
     }
 
@@ -479,7 +479,7 @@ if(isset($_GET['about_change'])){
     exit;
 }
 
-if(isset($_GET['private_profile'])){
+if(isset($_POST['private_profile'])){
     $result = $account_settings->private_profile();
     echo json_encode($result);
     exit;
@@ -665,22 +665,35 @@ if (isset($_POST['logout'])) {
 }
 
 if (isset($_POST['deactive_account'])) {
-    if (!loggedin()) {
-        exit('User not authenticated!');
+    if (!loggedin() || !isset($current_user)) {
+        exit('Not logged in.');
     }
 
-    $profile_id = (int)$current_user->id;
-    $today = date("Y-m-d H:i:s");
+    $_pwd = $_POST['password'];
+    $userid = $current_user->id;
 
-    $stmt = $conn->prepare("UPDATE users SET deactive = ? WHERE id = ?");
-    $stmt->bind_param("si", $today, $profile_id);
+    $stmt = $conn->prepare("SELECT password FROM users WHERE id = ? AND deactive IS NULL");
+    $stmt->bind_param("i", $userid);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $hash = $res->fetch_assoc()['password'] ?? null;
 
-    if ($stmt->execute()) {
-        logout();
-        header('Location: /index.php');
-        exit;
+    if ($hash && password_verify($_pwd, $hash)) {
+        $profile_id = (int)$current_user->id;
+        $today = date("Y-m-d H:i:s");
+
+        $stmt = $conn->prepare("UPDATE users SET deactive = ? WHERE id = ?");
+        $stmt->bind_param("si", $today, $profile_id);
+
+        if ($stmt->execute()) {
+            logout();
+            header('Location: /index.php');
+            exit;
+        } else {
+            exit($stmt->error);
+        }
     } else {
-        exit($stmt->error);
+        exit('Bad password.');
     }
 }
 ?>

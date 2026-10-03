@@ -32,7 +32,7 @@
 
 <h2>4. Account Termination and Deletion</h2>
 <ul>
-    <li>User-Initiated Deletion: You may request the permanent deletion of your account at any time through your account settings panel. Upon confirming deletion, you explicitly acknowledge that access to your private profile, direct messages, and other configurations will be permanently purged and cannot be recovered.</li>
+    <li>User-Initiated Deletion: You may request the permanent deletion of your account at any time through your account settings panel. Upon confirming deletion, you explicitly acknowledge that access to your private profile, direct messages, and other configurations will be permanently purged after 14 days, and cannot be recovered.</li>
     <li>Public Content Retention: To preserve the integrity and readability of public spaces, any public contributions you have made, including but not limited to creations, comments, forum posts, or direct messages will be permanently anonymized and reassigned to a system guest profile (ID 0). You grant Gr8brik a perpetual, irrevocable, royalty-free license to continue displaying this anonymized text and asset layout.</li>
     <li>Platform-Initiated Termination: Gr8brik reserves the right, in its sole discretion and without prior notice or liability, to suspend, deactivate, or permanently delete any account found violating these Terms of Service, community guidelines, or engaging in suspected fraudulent behavior.</li>
 </ul>

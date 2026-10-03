@@ -28,6 +28,7 @@ if (isset($_GET['reactive'])) {
 
 if (!loggedin() || !isset($current_user)) {
     header('Location:login.php');
+    exit;
 }
 
 if (isset($_POST['banner'])) {
@@ -357,7 +358,7 @@ if (isset($_POST['banner'])) {
                         if (res && res.success && res.image) {
                             $('#pictureForm #fileToUpload').css('background-image', 'url(' + res.image + ')');
                         } else if (res && res.error) {
-                            alert(res.error);
+                            DOMerror(res.error);
                         } else {
                             DOMerror('An error occured while uploading the image');
                         }
@@ -384,7 +385,7 @@ if (isset($_POST['banner'])) {
                             $('#pictureForm #fileToUpload').css('background-image', 'url(' + res.image + ')');
                             $('#pictureForm #remove_picture').remove();
                         } else if (res && res.error) {
-                            alert(res.error);
+                            DOMerror(res.error);
                         } else {
                             DOMerror('An error occured while removing the image');
                         }
@@ -392,6 +393,28 @@ if (isset($_POST['banner'])) {
                     error: function(xhr, text, error) {
                         var response = JSON.parse(xhr.responseText);
                         DOMerror(response.error || "An error occured while removing the image");
+                    }
+                });
+            });
+
+            $('#update_private_page').on('click', function(event) {
+                event.preventDefault();
+
+                $.ajax({
+                    url: "../ajax/account_settings",
+                    dataType: 'json',
+                    data: { private_profile: true },
+                    type: 'POST',
+                    success: function(res) {
+                        if (res && res.success) {
+                            DOMsuccess(res.success);
+                        } else if (res) {
+                            DOMerror(res.error || 'Error privating or unprivating page.');
+                        }
+                    },
+                    error: function(xhr, text, error) {
+                        var response = JSON.parse(xhr.responseText);
+                        DOMerror(response.error || 'Error privating or unprivating page.');
                     }
                 });
             });
@@ -445,7 +468,7 @@ if (isset($_POST['banner'])) {
             <p>We recommend your banner be 1200x400</p>
             <p><input type="file" name="fileToupload" id="fileToupload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-banner"></p>
             <?php
-            if (strpos($current_user->banner, '/acc/users/banners/') !== false && file_exists($_SERVER['DOCUMENT_ROOT'] . $current_user->banner)) {
+            if ($current_user->banner && strpos($current_user->banner, '/acc/users/banners/') !== false && file_exists($_SERVER['DOCUMENT_ROOT'] . $current_user->banner)) {
                 echo '<input type="checkbox" class="w3-check" id="deleteBanner" name="deleteBanner" value="1">';
                 echo '<label for="deleteBanner">Remove banner</label>';
             }
@@ -462,7 +485,7 @@ if (isset($_POST['banner'])) {
                 <p><input type="file" name="fileToUpload" id="fileToUpload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
                 <input type="submit" value="Upload picture" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-col m4">
                 <?php
-                if (strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($_SERVER['DOCUMENT_ROOT'] . $current_user->picture)) {
+                if ($current_user->picture && strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($_SERVER['DOCUMENT_ROOT'] . $current_user->picture)) {
                     echo '<span class="w3-col m1">&nbsp;</span>';
                     echo '<input type="submit" value="Remove picture" id="remove_picture" name="remove_picture" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink w3-col m4">';
                 }
@@ -503,9 +526,9 @@ if (isset($_POST['banner'])) {
     </div><br /><hr />
 
     <h2>Account</h2>
-    <form id="github-link">
+    <form id="github-link" action="/ajax/auth.php" method="GET">
         <b><legend>Github oauth</legend></b>
-        <p>Link your github account as a method to access your account.</p>
+        <p>Link (or unlink) your github account as a method to access your account.</p>
         <input type="hidden" name="authtype" value="github" />
         <?php if(empty($current_user->github_id)) { ?>
             <button type="submit" name="github_link" class="w3-btn w3-round w3-padding-small w3-white w3-hover-light-grey w3-border w3-border-grey">
@@ -518,6 +541,12 @@ if (isset($_POST['banner'])) {
                 Unlink github
             </button>
         <?php } ?>
+    </form><br />
+
+    <form id="private-page">
+        <b><legend>Private page</legend></b>
+        <p>Private or unprivate your page. Will prevent people that don't follow you from viewing your page.</p>
+        <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="update_private_page">Private page</button>
     </form><br />
 
     <form id="password">

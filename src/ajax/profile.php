@@ -170,6 +170,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     $is_blocking = false;
     $is_following = false;
     $is_me = false;
+    $is_admin = false;
     $is_private = $usero->private_profile;
 
     if(loggedin()) {
@@ -201,10 +202,11 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
 
         if($current_user->admin) {
             $adm_email = isset($usero->email) ? htmlspecialchars($usero->email) : '';
+            $is_admin = true;
         }
     }
 
-    if(!$is_me && !$is_following && $is_private) {
+    if(!$is_me && !$is_admin && !$is_following && $is_private) {
         http_response_code(403);
 
         return [
@@ -279,10 +281,8 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         'message' => $message,
     ];
 
-    if(loggedin()) {
-        if($current_user->admin) {
-            $data['email'] = $adm_email ?? null;
-        }
+    if($is_admin) {
+        $data['email'] = $adm_email ?? null;
     }
 
     return $data;

@@ -41,6 +41,7 @@
 
 Please be aware of the following conditions upon account deletion:
 <ul>
+    <li>Your account can be recovered until 14 days after you initiate the process.</li>
     <li>Analytics are deleted around once every month.</li>
     <li>Your username will be permanently blacklisted to prevent impersonation and platform abuse.</li>
     <li>Publicly available community contributions, including forum threads, comment layouts, and creations, will be permanently reassigned to a system-controlled guest profile (ID 0). The text content of these posts will remain visible to preserve the context of public discussions.</li>
