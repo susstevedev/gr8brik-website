@@ -112,7 +112,7 @@ class AccountSettings {
         $changed = time();
 
         $stmt = $conn->prepare("UPDATE users SET username = ?, changed = ? WHERE id = ? AND deactive IS NULL");
-        $stmt->bind_param("sss", $new, $changed, $id);
+        $stmt->bind_param("sis", $new, $changed, $id);
         if ($stmt->execute()) {
             return ['success' => 'Username updated'];
         }
@@ -141,7 +141,7 @@ class AccountSettings {
 
         $conn = Database::get(DB_NAME);
 
-        $stmt_2 = $conn->prepare("UPDATE users SET twitter = ? WHERE id = ? AND deactive IS NULL");
+        $stmt_2 = $conn->prepare("UPDATE user_profiles SET twitter = ? WHERE userid = ?");
         $stmt_2->bind_param("ss", $new, $id);
         if ($stmt_2->execute()) {
             return ['success' => 'Your profile has been updated with the new Twitter account.', 'code' => '200', 'version' => 'NEW'];
@@ -170,7 +170,7 @@ class AccountSettings {
 
         $new = strtolower(trim($new));
 
-        $stmt = $conn->prepare("SELECT 1 FROM users WHERE bsky = ? AND deactive IS NULL");
+        $stmt = $conn->prepare("SELECT 1 FROM user_profiles WHERE bsky = ?");
         $stmt->bind_param("s", $new);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -206,7 +206,7 @@ class AccountSettings {
             }
         }
 
-        $stmt_2 = $conn->prepare("UPDATE users SET bsky = ? WHERE id = ? AND deactive IS NULL");
+        $stmt_2 = $conn->prepare("UPDATE user_profiles SET bsky = ? WHERE userid = ?");
         $stmt_2->bind_param("ss", $new, $id);
         if ($stmt_2->execute()) {
             return ['success' => 'Your profile has been updated with the new Bluesky account.', 'code' => '200', 'version' => 'NEW'];
@@ -236,7 +236,7 @@ class AccountSettings {
         }
 
         $conn = Database::get(DB_NAME);
-        $stmt_2 = $conn->prepare("UPDATE users SET description = ? WHERE id = ? AND deactive IS NULL");
+        $stmt_2 = $conn->prepare("UPDATE user_profiles SET description = ? WHERE userid = ?");
 
         $stmt_2->bind_param("si", $new, $id);
         if ($stmt_2->execute()) {
@@ -275,7 +275,7 @@ class AccountSettings {
         }
 
         $conn = Database::get(DB_NAME);
-        $stmt = $conn->prepare("UPDATE users SET private_profile = ? WHERE id = ? AND deactive IS NULL");
+        $stmt = $conn->prepare("UPDATE user_profiles SET private_profile = ? WHERE userid = ?");
 
         $stmt->bind_param("ii", $upd, $id);
         if ($stmt->execute()) {
@@ -606,7 +606,7 @@ if (isset($_POST['picture'])) {
         if ($image_webp && $tiny_image_webp) {
             $conn = Database::get(DB_NAME);
 
-            $stmt = $conn->prepare("UPDATE users SET picture = ?, picture_small = ? WHERE id = ? AND deactive IS NULL");
+            $stmt = $conn->prepare("UPDATE user_profiles SET picture = ?, picture_small = ? WHERE userid = ?");
             $stmt->bind_param("sss", $db_pfp, $db_pfp_tiny, $id);
             if ($stmt->execute()) {
                 http_response_code(200);
@@ -648,7 +648,7 @@ if (isset($_POST['remove_picture'])) {
         unlink($old_pfp_small);
     }
 
-    $stmt = $conn->prepare("UPDATE users SET picture = NULL, picture_small = NULL WHERE id = ? AND deactive IS NULL");
+    $stmt = $conn->prepare("UPDATE user_profiles SET picture = NULL, picture_small = NULL WHERE userid = ?");
     $stmt->bind_param("s", $id);
 
     if ($stmt->execute()) {
@@ -672,7 +672,7 @@ if (isset($_POST['deactive_account'])) {
     $profile_id = (int)$current_user->id;
     $today = date("Y-m-d H:i:s");
 
-    $stmt = $conn->prepare("UPDATE users SET blog_user_id = NULL, deactive = ? WHERE id = ?");
+    $stmt = $conn->prepare("UPDATE users SET deactive = ? WHERE id = ?");
     $stmt->bind_param("si", $today, $profile_id);
 
     if ($stmt->execute()) {

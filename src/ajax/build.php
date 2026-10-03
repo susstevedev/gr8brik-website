@@ -557,7 +557,7 @@ function fetch_build($model_id, $csrf) {
     $name = $bbcode->toHTML($row2['name'] ?? 'Untited creation', true, true);
 
     $row = User::getUser($userid);
-    $user_name = $row->username ?? 'Deleted User';
+    $user_name = $row->username ?? '';
     $user_image = $row->picture_small ?? null;
 
     if (!isset($name) || empty($name)) {
@@ -842,7 +842,7 @@ function fetch_comments($model_id, $csrf) {
             'userid' => $c_user,
             'user_removed' => $c_user_removed,
             'user_admin' => $userRow->admin ?? 0,
-            'username' => $userRow->username ?? "Deleted User",
+            'username' => $userRow->username ?? '',
             'is_op' => $is_op,
             'is_hidden' => $row['hidden'],
             'parent' => $row['parent'],

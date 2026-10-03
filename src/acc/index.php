@@ -434,8 +434,8 @@ if (isset($_POST['banner'])) {
         }
     </style>
 
-    <h4 id="ajax-success" class="success w3-light-grey w3-card-2 w3-padding w3-round"></h4>
-    <h4 id="ajax-error" class="error w3-red w3-card-2 w3-padding w3-round"></h4>
+    <div id="ajax-success" class="success w3-light-grey w3-padding w3-margin-bottom w3-round w3-border w3-border-grey"></div>
+    <div id="ajax-error" class="error w3-red w3-padding w3-margin-bottom w3-round w3-border w3-border-pink"></div>
     <h1>Account settings</h1><hr />
 
     <h2>Profile</h2>

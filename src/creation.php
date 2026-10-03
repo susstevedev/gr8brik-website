@@ -3,6 +3,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/build.php';
 
+if (isset($_POST['reportv2'])) {
+    require_once __DIR__ . '/ajax/report.php';
+    exit;
+}
+
 $conn = Database::get(DB_NAME2);
 
 $model_id = $conn->real_escape_string($_GET['id']);
@@ -14,76 +19,6 @@ if ($data['message']) {
     if($data['is_removed']) {
         $message = 'This creation has been <b>removed</b> by an admin. This means that it\'s not visible to regular users.';
     }
-}
-
-if (isset($_POST['reportv2'])) {
-    header('Content-Type: application/json');
-
-    if ($_SESSION['csrf'] === $_POST['csrf_token']) {
-        if (loggedin()) {
-            $id = $current_user->id;
-            $reportable_id = (int)$_POST['reportable_id'];
-
-            $type = isset($_POST['report_type']) ? trim($_POST['report_type']) : null;
-            $desc = isset($_POST['other']) ? trim($_POST['other']) : null;
-            $reason = isset($_POST['reason']) ? trim($_POST['reason']) : null;
-
-            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-            if ($conn->connect_error) {
-                echo json_encode(['error' => 'Database connection failed.']);
-                exit;
-            }
-
-            if (!isset($type) || empty($type)) {
-                echo json_encode(['error' => 'No report type provided']);
-                exit;
-            }
-
-            if (!isset($reason) || empty($reason)) {
-                echo json_encode(['error' => 'No reason provided']);
-                exit;
-            }
-
-            $stmt_check = $conn->prepare("SELECT * FROM reports WHERE reporter_user_id = ? AND reportable_id = ? AND reportable_type = ?");
-            $stmt_check->bind_param("iis", $id, $reportable_id, $type);
-            $stmt_check->execute();
-            $result = $stmt_check->get_result();
-
-            if($result->num_rows !== 0) {
-                echo json_encode(['error' => 'You have already reported this content.']);
-                exit;
-            }
-
-            if ($reason === 'other' && empty($desc)) {
-                echo json_encode(['error' => 'Please fill in the description box to explain your report.']);
-                exit;
-            }
-
-            if ($desc !== null) {
-                if(strlen($desc) > 500) {
-                    echo json_encode(['error' => 'Description shall be under 500 characters.']);
-                    exit;
-                }
-            }
-
-            $stmt = $conn->prepare("INSERT INTO reports (reportable_id, reportable_type, reason, description, reporter_user_id) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("isssi", $reportable_id, $type, $reason, $desc, $id);
-
-            if ($stmt->execute()) {
-                echo json_encode(['success' => 'Content reported! Thanks for making our platform a safe space for everyone!']);
-            } else {
-                echo json_encode(['error' => 'Oops! We couldn\'t report the submitted content at this moment. Please try again later.']);
-            }
-
-            $stmt->close();
-            $conn->close();
-        } else {
-            echo json_encode(['error' => 'Oops! Please login to report content.']);
-        }
-    } else {
-        echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
-    }
-    exit;
 }
 
 if (isset($_POST['delete_model'])) {
@@ -263,14 +198,14 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
         <div class="message w3-card-2 w3-padding w3-round-small w3-light-grey"><?php echo $message ?></div><br />
     <?php } ?>
 
-    <?php if ($loggedin === true) { ?>
+    <?php if (loggedin()) { ?>
         <form id="downvote" action="/ajax/build" method="post"><input type="hidden" value="<?php echo $model_id ?>" name="model_id"></form>
         <form id="upvote" action="/ajax/build" method="post"><input type="hidden" value="<?php echo $model_id ?>" name="model_id"></form>
     <?php } ?>
 
     <main id="wrapper">
-        <div id="ajax-error" class="w3-col m9 w3-bottom w3-card-2 w3-padding w3-round-small w3-red"></div>
-        <div id="ajax-success" class="w3-col m9 w3-bottom w3-card-2 w3-padding w3-round-small w3-light-grey"></div>
+        <div id="ajax-error" class="w3-col m9 w3-bottom w3-red w3-card-2 w3-padding w3-margin-bottom w3-round w3-border w3-border-pink"></div>
+        <div id="ajax-success" class="w3-col m9 w3-bottom w3-light-grey w3-card-2 w3-padding w3-margin-bottom w3-round w3-border w3-border-grey"></div>
 
         <figure class="model-screenshot">
             <iframe id="model-embed" src="/viewer.html?model=<?php echo urlencode($_GET['id']) ?>" class="w3-border w3-card-2"></iframe>
@@ -394,9 +329,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
         </figure>
 
         <div class="w3-container w3-margin">
-            <?php if ($data['message']) { ?>
-                <p><div class="gr8-theme w3-light-grey w3-round w3-padding"><?php echo $data['message'] ?></div></p>
-            <?php } elseif (loggedin()) { ?>
+            <?php if (loggedin() && isset($current_user) && $current_user->verify_token === null) { ?>
                 <div id="comment-view-toggle" class="w3-col s12 w3-margin-bottom w3-bar">
                     <button class="edit w3-bar-item w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Edit</button>
                     <button class="preview w3-bar-item w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Preview</button>
@@ -442,36 +375,14 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                     </div>
                 </div>
 
-                <!--<div id="comment-preview-form" class="w3-row w3-section">
-                    <div class="w3-col w3-hide-small" id="comment-profile-picture">
-                        <img class="w3-bar-item w3-round w3-card-2 w3-grey" width="50px" height="50px" src="<?php echo $current_user->picture ?>">
-                    </div>
-
-                    <div class="w3-col w3-hide-small">
-                        <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
-                    </div>
-
-                    <article class="gr8-theme w3-col w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
-                        <header class="w3-padding-bottom">
-                            <b>
-                                <a href="/@<?php echo urlencode($current_user->username) ?>" class="<?php echo $current_user->admin ? 'w3-text-red w3-hover-text-yellow' : ''; ?>"><?php echo $current_user->username ?></a>
-                            </b>
-
-                            <span class="w3-mobile w3-right">
-                                <time class="date" title="0 seconds ago" datetime="0 seconds ago">0 seconds ago</time>
-                                - <span class="votes">0 favorites</span>
-                            </span>
-                        </header>
-
-                        <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;">
-                            My comments text
-                        </span>
-                    </article>
-                </div>-->
-
                 <form id="attach-upload" method="post" action="">
                     <input type="file" name="imagefile" id="imagefile">
                 </form>
+            <?php } else if(isset($current_user) && $current_user->verify_token !== null) { ?>
+                <div class="gr8-theme w3-card-2 w3-light-grey w3-border w3-padding" style="width:65%">
+                    <b>Verify your account to comment</b>
+                    <p>An email was sent to your inbox. If you did not receive an email, contact us.</p>
+                </div><br />
             <?php } else { ?>
                 <div>
                     <a href="/acc/login" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo"><i class="fa fa-paper-plane-o" aria-hidden="true"></i> Login to post comments</a>

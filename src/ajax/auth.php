@@ -300,27 +300,14 @@ class AccountManager
             return ['success' => false, 'error' => "Email address is not avaliable"];
         }
 
-        $sql = "INSERT INTO users (blog_user_id, username, password, email, age, picture, verify_token) VALUES ('$token_raw', '$username', '$password', '$email', CURRENT_TIMESTAMP(), '$picture', '$token_raw') LIMIT 1";
-        if (mysqli_query($conn, $sql)) {
-            $userid = mysqli_insert_id($conn);
-            $time = time();
-
-            // Create session token
-            $sql = "INSERT INTO sessions (id, login_from, user, timestamp, remember) VALUES ('$token_hashed', '$login_from', '$userid', '$time', '1') LIMIT 1";
-            if (mysqli_query($conn, $sql)) {
-                $_SESSION['userid'] = $userid;
-                $_SESSION['tokenid'] = $token_hashed;
-
-				self::send_verify_email($token_raw, $email, $username);
-                return ['success' => true];
-            }
+        $insert = self::insert_user($conn, $token_raw, $username, $password, $email, $token_raw, null, null, null, null, null, null);
+        if (isset($insert['id'])) {
+            self::send_verify_email($token_raw, $email, $username);
+            return $this->login_final($conn, $insert, 1);
         } else {
             http_response_code(500);
-            return ['success' => false, 'error' => "Failed to register account."];
+            return ['success' => false, 'error' => $insert['error'] ?? "Failed to register account."];
         }
-
-        http_response_code(500);
-        return ['success' => false, 'error' => 'An unknown error occured. Please try again later.'];
     }
 
     public function github_auth($data)
@@ -393,7 +380,7 @@ class AccountManager
         }
 
         $token_raw = bin2hex(random_bytes(32));
-        $sql = "INSERT INTO users (blog_user_id, username, password, email, age, verify_token, picture, description, twitter, github_id) VALUES (?, ?, NULL, ?, CURRENT_TIMESTAMP(), ?, ?, ?, ?, ?)";
+        /*$sql = "INSERT INTO users (blog_user_id, username, password, email, age, verify_token, picture, description, twitter, github_id) VALUES (?, ?, NULL, ?, CURRENT_TIMESTAMP(), ?, ?, ?, ?, ?)";
 
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("ssssssss", $token_raw, $username, $email, $token_raw, $avatar, $bio, $twitter, $github_id);
@@ -405,6 +392,12 @@ class AccountManager
 
             self::send_verify_email($token_raw, $email, $username);
             return $this->login_final($conn, $row, 1);
+        }*/
+
+        $insert = self::insert_user($conn, $token_raw, $username, null, $email, $token_raw, $avatar, null, $github_id, $bio, $twitter, null);
+        if (isset($insert['id'])) {
+            self::send_verify_email($token_raw, $email, $username);
+            return $this->login_final($conn, $insert, 1);
         }
     }
 
@@ -476,18 +469,42 @@ class AccountManager
         }
 
         $token_raw = bin2hex(random_bytes(32));
-        $sql = "INSERT INTO users (blog_user_id, username, password, email, age, verify_token, picture, google_id) VALUES (?, ?, NULL, ?, CURRENT_TIMESTAMP(), ?, ?, ?)";
+        /*$sql = "INSERT INTO users (blog_user_id, username, password, email, age, verify_token, picture, google_id) VALUES (?, ?, NULL, ?, CURRENT_TIMESTAMP(), ?, ?, ?)";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssssss", $token_raw, $username, $email, $token_raw, $avatar, $google_id);
+        $stmt->bind_param("ssssss", $token_raw, $username, $email, $token_raw, $avatar, $google_id);*/
 
-        if ($stmt->execute()) {
+        $insert = self::insert_user($conn, $token_raw, $username, null, $email, $token_raw, $avatar, $google_id, null, null, null, null);
+        if (isset($insert['id'])) {
+            self::send_verify_email($token_raw, $email, $username);
+            return $this->login_final($conn, $insert, 1);
+        }
+    }
+
+    public function insert_user(mixed $conn, ?string $blog_id, ?string $username, ?string $pwd, ?string $email, ?string $verifyToken, ?string $avatar, ?string $google, ?string $github, ?string $bio, ?string $twitter, ?string $display) {
+        try {
+            $conn->begin_transaction();
+
+            $sql1 = "INSERT INTO users (blog_user_id, username, password, email, age, verify_token, github_id, google_id) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(), ?, ?, ?)";
+            $stmt1 = $conn->prepare($sql1);
+            $stmt1->bind_param("sssssss", $blog_id, $username, $pwd, $email, $verifyToken, $github, $google);
+            $stmt1->execute();
             $new_userid = $conn->insert_id;
+            $stmt1->close();
+
+            $sql2 = "INSERT INTO user_profiles (userid, picture, twitter, private_profile, description, display_name) VALUES (?, ?, ?, 1, ?, ?)";
+            $stmt2 = $conn->prepare($sql2);
+            $stmt2->bind_param("issss", $new_userid, $avatar, $twitter, $bio, $display);
+            $stmt2->execute();
+            $stmt2->close();
+
+            $conn->commit();
 
             $result = $conn->query("SELECT id, username, email, password, deactive, suspended FROM users WHERE id = {$new_userid} LIMIT 1");
             $row = $result->fetch_assoc();
-
-            self::send_verify_email($token_raw, $email, $username);
-            return $this->login_final($conn, $row, 1);
+            return $row;
+        } catch (\Throwable $th) {
+            $conn->rollback();
+            return ['error' => $th->getMessage()];
         }
     }
 

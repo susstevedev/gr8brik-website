@@ -46,35 +46,31 @@ if (isset($_GET['group'])) {
     $stmt->execute();
     $result = $stmt->get_result();
 
-    if ($result->num_rows === 0) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'No messages to display. Try sending one!']);
-        exit;
-    }
-
     $data = [];
-    while ($row = $result->fetch_assoc()) {
-        $group = null;
+    if ($result->num_rows !== 0) {
+        while ($row = $result->fetch_assoc()) {
+            $group = null;
 
-        if ($row['is_group'] == 1) {
-            $group['title'] = $row['group_name'] ?? $row['members'];
-        } else {
-            $members = explode(', ', $row['members']);
-            $member_pics = explode(', ', $row['member_pics']);
+            if ($row['is_group'] == 1) {
+                $group['title'] = $row['group_name'] ?? $row['members'];
+            } else {
+                $members = explode(', ', $row['members']);
+                $member_pics = explode(', ', $row['member_pics']);
 
-            $group['title'] = $members[0] ?? 'Deleted User';
-            $group['picture'] = isset($member_pics[0]) ? $member_pics[0] : null;
+                $group['title'] = $members[0] ?? 'Deleted User';
+                $group['picture'] = isset($member_pics[0]) ? $member_pics[0] : null;
+            }
+
+            $group['joined'] = isset($row['timestamp']) ? 'Last messaged ' . time_ago($row['timestamp']) : null;
+
+            $data[] = [
+                'success' => true,
+                'id' => $row['group_id'],
+                'title' => htmlentities($group['title'], ENT_NOQUOTES),
+                'pictureurl' => $group['picture'] ?? null,
+                'joined' => $group['joined'] ?? null,
+            ];
         }
-
-        $group['joined'] = isset($row['timestamp']) ? 'Last messaged ' . time_ago($row['timestamp']) : null;
-
-        $data[] = [
-            'success' => true,
-            'id' => $row['group_id'],
-            'title' => htmlentities($group['title'], ENT_NOQUOTES),
-            'pictureurl' => $group['picture'] ?? null,
-            'joined' => $group['joined'] ?? null,
-        ];
     }
 
     header("Content-Type: application/json");

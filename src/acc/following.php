@@ -75,7 +75,7 @@ if(!loggedin() || !isset($current_user)) {
             $clean_age = htmlspecialchars($row2['age'] ?? '', ENT_QUOTES, 'UTF-8');
             $url_username = strtolower(urlencode($username));
 
-            echo "<article data-gr8brik-item='follow-" . htmlspecialchars($row2['blog_user_id'] ?? '') . "' id='user-" . $profileid . "-name-" . $url_username . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
+            echo "<article id='user-" . $profileid . "-name-" . $url_username . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
             echo "<a href='../user/" . $profileid . "'>" . $clean_username . '</a><br />';
             
             if (!empty($clean_description)) {
@@ -109,7 +109,7 @@ if(!loggedin() || !isset($current_user)) {
             $clean_age = htmlspecialchars($row4['age'] ?? '', ENT_QUOTES, 'UTF-8');
             $url_username = strtolower(urlencode($username));
 
-            echo "<article data-gr8brik-item='follow-" . htmlspecialchars($row4['blog_user_id'] ?? '') . "' id='user-" . $userid . "-name-" . $url_username . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
+            echo "<article id='user-" . $userid . "-name-" . $url_username . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
             echo "<a href='../user/" . $userid . "'>" . $clean_username . '</a><br />';
             if (!empty($clean_description)) {
                 echo "<span>" . $clean_description . '</span><br />';
@@ -138,7 +138,7 @@ if(!loggedin() || !isset($current_user)) {
             $clean_age = htmlspecialchars($row5['age'] ?? '', ENT_QUOTES, 'UTF-8');
             $url_username = strtolower(urlencode($username));
 
-            echo "<article data-gr8brik-item='block-" . htmlspecialchars($row5['blog_user_id'] ?? '') . "' id='user-" . $userid . "-name-" . $url_username . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
+            echo "<article id='user-" . $userid . "-name-" . $url_username . "' class='gr8-theme w3-card-2 w3-light-grey w3-padding w3-large'>";
             echo "<a href='../user/" . $userid . "'>" . $clean_username . '</a><br />';
             if (!empty($clean_description)) {
                 echo "<span>" . $clean_description . '</span><br />';

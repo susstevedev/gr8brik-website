@@ -1,14 +1,14 @@
 <?php if(loggedin() && isset($current_user)) { ?>
 
 <?php if($current_user->verify_token !== null) { ?>
-	<div class="w3-card-2 w3-light-grey w3-padding w3-round-small w3-margin-top gr8-theme">
+	<div class="w3-card-2 w3-light-grey w3-padding w3-border w3-margin-top gr8-theme">
 		<i class="fa fa-lock" aria-hidden="true"></i>
 		<b>Verify your account to unlock all features</b>
-		<p>An email was sent to <?php echo $current_user->email ?>. If you did not receive an email, <a href="mailto:<?php echo DB_MAIL ?>">contact us</a>.</p>
+		<p>An email was sent to <b><?php echo $current_user->email ?></b>. If you did not receive an email, <a href="mailto:<?php echo DB_MAIL ?>">contact us</a>.</p>
 	</div><br />
 <?php } ?>
 
-<div class="gr8-theme w3-container w3-card-2 w3-light-grey w3-padding w3-round w3-center">
+<div class="gr8-theme w3-container w3-card-2 w3-light-grey w3-padding w3-border w3-center">
     <?php if($current_user->alert > 0) { ?>
 			<h2 class="w3-text-red"><?php echo number_format($current_user->alert) ?> notifications</h2>
 	<?php } ?>

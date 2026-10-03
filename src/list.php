@@ -10,7 +10,7 @@ if (isset($_GET['feature_v3'])) {
     $stmt = $conn2->prepare("SELECT * FROM model WHERE feature = 1 ORDER BY date DESC LIMIT 6");
     $stmt->execute();
     $result2 = $stmt->get_result();
-    $build_count = $result2->num_rows;
+    $build_count = 0;
     $creations = [];
 
     while ($row2 = $result2->fetch_assoc()) {
@@ -20,21 +20,21 @@ if (isset($_GET['feature_v3'])) {
         }
 
         $userid = $row2['user'];
-
         $usero = User::getUser($userid);
-        $userid = $usero->id;
 
-        if (!User::isDeleted($userid)) {
-            $truncated_username = substr($usero->username ?: 'Untited User', 0, 15);
-            if (strlen($usero->username) >= 15) {
+        if ($usero) {
+            $username = $usero->username ?: '';
+            $truncated_username = substr($username, 0, 15);
+            if (strlen($username) >= 15) {
                 $truncated_username .= "...";
             }
 
+            $build_count++;
             $creations[] = [
                 'model_id' => $row2['id'],
                 'user' => $userid,
                 'username' => $truncated_username,
-                'pfp' => $usero->picture,
+                'pfp' => $usero->picture ?? null,
                 'title' => $truncated_name,
                 'views' => $row2['views'],
                 'likes' => $row2['likes'],

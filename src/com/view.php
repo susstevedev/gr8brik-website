@@ -44,10 +44,8 @@ $conn2 = Database::get(DB_NAME);
 
 if (!$row['username']) { //check for anonymous posting
     $user = User::getUser($userid);
-    $isAdmin = $user->admin === '1' ? "w3-text-red" : "";
-    $username = $user->username;
+    $username = $user->username ?? null;
 } else {
-    $isAdmin = false;
     $username = $row['username'];
 }
 
@@ -339,9 +337,9 @@ if (isset($_POST['comment'])) {
             $c_edited = $row['edited'] ?? null;
 
             $c_user_o = $users[$c_user] ?? User::getUser($c_user);
-            $c_username = htmlspecialchars($c_user_o->username);
-            $isAdmin = $c_user_o->admin === 1 ? "w3-text-red" : "";
-            $pfp = $c_user_o->picture;
+            $c_username = htmlspecialchars($c_user_o->username ?? 'Deleted');
+            $isAdmin = $c_user_o->admin ?? false;
+            $pfp = $c_user_o->picture ?? null;
 
             $c_user_exists = !User::isDeleted($c_user);
             $c_user_blocked = $blocked[$c_user]['they_blocked'] ?? false;
@@ -368,7 +366,7 @@ if (isset($_POST['comment'])) {
                     <?php if ($c_user_exists) { ?>
                         <a href="../user/<?php echo $c_user ?>">
                     <?php } ?>
-                        <span class="<?php echo $isAdmin ?>" style="text-overflow: ellipsis;">
+                        <span class="<?php echo $isAdmin ? "w3-text-red" : "" ?>" style="text-overflow: ellipsis;">
                             <?php echo $c_username ?>
                         </span>
                     <?php if ($c_user_exists) { ?>

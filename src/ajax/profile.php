@@ -28,7 +28,7 @@ if (isset($_GET['followed_by'])) {
 
     //selects user follow row(s), selects users actual account, fliters invalid accounts
     $query = "
-        SELECT DISTINCT u.id, u.picture, u.username, u.email
+        SELECT DISTINCT u.id, u.picture, u.username
         FROM follow f1
         INNER JOIN follow f2 ON f1.userid = f2.profileid
         INNER JOIN users u ON f1.userid = u.id
@@ -137,7 +137,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         $usero = User::getUser($profile_id);
     }
 
-    if (!isset($usero) || User::isDeleted($profile_id)) {
+    if (!isset($usero) || $usero->deactive) {
         http_response_code(404);
         return [
             "success" => false,
@@ -154,7 +154,6 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
 
         $arr = [
             "success" => false,
-            "picture" => $usero->picture_small,
             "code" => 'account_banned',
             "title" => 'Account suspended',
             "message" => 'This account has been suspended ' . $until . '.<br />When an account is suspended, the owner can\'t sign in or interact with content. However, they can appeal the ban.',
@@ -170,20 +169,8 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     $bsky = $usero->bsky ?? null;
     $is_blocking = false;
     $is_following = false;
-    $is_me = User::isMe($userid);
-    $is_private = User::isPrivate($profile_id);
-
-    if(!$is_me && !$is_following && $is_private) {
-        http_response_code(403);
-
-        return [
-            "success" => false,
-            "picture" => $usero->picture_small,
-            "code" => 'profile_private',
-            "title" => 'Profile private',
-            "message" => 'The owner of this account has privated their profile.<br />When an account is private, other users can\'t view the profile unless they are following said user, or said user is following them.',
-        ];
-    }
+    $is_me = false;
+    $is_private = $usero->private_profile;
 
     if(loggedin()) {
         $blocks = User::isBlocking($profile_id);
@@ -193,7 +180,6 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
                 header("HTTP/1.0 403 Forbidden");
                 return [
                     "success" => false,
-                    "picture" => $usero->picture_small,
                     "code" => 'user_blocking',
                     "title" => 'User blocked you',
                     "message" => htmlspecialchars($blocks['message']),
@@ -209,9 +195,24 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     	$is_following = $stmt->get_result()->fetch_assoc()['following'];
     	$stmt->close();
 
+        if((int)$userid === (int)$profile_id) {
+            $is_me = true;
+        }
+
         if($current_user->admin) {
             $adm_email = isset($usero->email) ? htmlspecialchars($usero->email) : '';
         }
+    }
+
+    if(!$is_me && !$is_following && $is_private) {
+        http_response_code(403);
+
+        return [
+            "success" => false,
+            "code" => 'profile_private',
+            "title" => 'Profile private',
+            "message" => 'The owner of this account has privated their profile.<br />When an account is private, other users can\'t view the profile unless they are following said user, or said user is following them.',
+        ];
     }
 
     $conn2 = Database::get(DB_NAME2);
@@ -257,7 +258,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
     $data = [
         'success' => true,
         'userid' => $profile_id,
-        'username' => htmlspecialchars($usero->username),
+        'username' => htmlspecialchars($usero->username ?? ''),
         'admin' => (string)$usero->admin,
         'description' => isset($usero->description) ? $bbcode->toHTML($usero->description) : '', 
         'twitter' => isset($usero->twitter) ? htmlspecialchars($usero->twitter) : '',

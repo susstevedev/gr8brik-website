@@ -94,7 +94,7 @@ class Notifications
             $recipientId = (int)$row['userid'];
             $userObj = User::getUser($recipientId);
 
-            if(User::isDeleted($recipientId) || User::isPrivate($recipientId)) {
+            if(!$userObj || User::isPrivate($recipientId)) {
                 continue;
             }
 

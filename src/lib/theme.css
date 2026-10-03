@@ -337,7 +337,7 @@ img.emoji {
     display: none;
 }
 
-@media only screen and (max-width: 768px) {
+@media only screen and (max-width: 600px) {
     .main-text {
         min-width: 100%;
         max-width: 100%;

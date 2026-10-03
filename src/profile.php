@@ -256,10 +256,10 @@ if(isset($_POST['unban-submit'])) {
     <?php include 'navbar.php' ?>
 
     <?php if(isset($error) && isset($error_title)) { ?>
-        <div class="message-wrapper w3-light-grey w3-card-2 w3-padding w3-round w3-center">
-            <div class="message-img"><img src="<?php echo $error_picture ?? '/img/logo/simplev2.png' ?>" class="w3-border w3-border-grey w3-round" width="50px" height="50px" /></div>
+        <div class="message-wrapper gr8-theme w3-light-grey w3-card-2 w3-padding w3-round-small w3-center">
             <div class="message-title"><h4><?php echo $error_title ?></h4></div>
             <div class="message"><p><?php echo $error ?></p></div>
+
             <?php if(isset($error_code) && $error_code === 'profile_private' && loggedin()) {?>
                 <form id="followUser" action="" method="post"></form>
                 <input id="button-follow" name="follow" form="followUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" type="submit" value="Follow user">
