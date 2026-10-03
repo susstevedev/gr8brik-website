@@ -70,28 +70,23 @@ class SessHandler implements SessionHandlerInterface {
         return '';
     }
 
-    public function write($id, $data):bool {
+    public function write($id, $data): bool {
         $id = hash('sha256', $id);
         $ip = $_SERVER['REMOTE_ADDR'];
         $useragent = UA; //UA is defined in what_browser.php
         $userid = $this->userId;
         $timestamp = time();
+
         $stmt = $this->db->query("
-            INSERT INTO php_sessions (id, data, timestamp, ip, ua, userid, active) 
+            REPLACE INTO php_sessions (id, data, timestamp, ip, ua, userid, active) 
             VALUES ('$id', '$data', '$timestamp', '$ip', '$useragent', '$userid', 1)
-            ON DUPLICATE KEY UPDATE
-                data = IF(active = 1, VALUES(data), data),
-                timestamp = IF(active = 1, VALUES(timestamp), timestamp),
-                ip = IF(active = 1, VALUES(ip), ip),
-                ua = IF(active = 1, VALUES(ua), ua),
-                userid = IF(active = 1, VALUES(userid), userid)
         ");
         return $stmt;
     }
 
     public function destroy($id):bool {
         $id = hash('sha256', $id);
-        $stmt = $this->db->query("DELETE FROM php_sessions WHERE id = '$id' AND active = 1");
+        $stmt = $this->db->query("DELETE FROM php_sessions WHERE id = '$id'");
         return $stmt;
     }
 
@@ -123,14 +118,14 @@ if (!isset($_SESSION['requests'])) {
 }
 
 $_SESSION['requests'] = array_filter($_SESSION['requests'] ?? [], function ($timestamp) {
-    return $timestamp > time() - 80;
+    return $timestamp > time() - 100;
 });
 
 $_SESSION['requests'][] = time();
 $requests = count($_SESSION['requests']);
 
 if ($requests >= 50) {
-    if ($requests >= 80) {
+    if ($requests >= 100) {
         $db = Database::get(DB_NAME);
 
         $ipbano = new IpBans($db);
@@ -152,7 +147,7 @@ if ($requests >= 50) {
     }
 
     $oldest = min($_SESSION['requests']);
-    $remaining = max(1, 80 - (time() - $oldest)); 
+    $remaining = max(1, 100 - (time() - $oldest)); 
     $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
     $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
     $json = (stripos($contentType, 'application/json') !== false) || (stripos($accept, 'application/json') !== false);

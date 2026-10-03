@@ -557,11 +557,11 @@ function fetch_build($model_id, $csrf) {
     $name = $bbcode->toHTML($row2['name'] ?? 'Untited creation', true, true);
 
     $row = User::getUser($userid);
-    $username = $row->username;
-    $user_image = $row->picture_small;
+    $user_name = $row->username ?? 'Deleted User';
+    $user_image = $row->picture_small ?? null;
 
     if (!isset($name) || empty($name)) {
-        $name = $username . "'s creation";
+        $name = $user_name . "'s creation";
     }
 
     $did_track = false;
@@ -605,7 +605,7 @@ function fetch_build($model_id, $csrf) {
         if ($result4->num_rows > 0) {
             http_response_code(403);
             return json_encode([
-                "message" => htmlspecialchars($row->username) . " has blocked you.",
+                "message" => htmlspecialchars($user_name) . " has blocked you.",
                 "error" => 'ACC_BLOCKING'
             ]);
         }
@@ -656,7 +656,7 @@ function fetch_build($model_id, $csrf) {
     $data = [
         'success' => true,
         'userid' => $userid,
-        'username' => $username,
+        'username' => $user_name,
         'user_image' => $user_image,
         'modelid' => $model_id,
         'model' => $row2['model'],
@@ -678,7 +678,7 @@ function fetch_build($model_id, $csrf) {
         'comments' => $row2['replies'],
         'followers' => $followers,
         'conversation_subbed' => $notifications->get_subscribers('comment', $model_id),
-        'model_admin' => $row->admin,
+        'model_admin' => $row->admin ?? false,
         'message' => $message ?? null
     ];
     return json_encode($data);
@@ -772,7 +772,7 @@ function fetch_comments($model_id, $csrf) {
         }
 
         foreach ($users as $c_user) {
-            $c_user_id = (int)$c_user->id ?? 0;
+            $c_user_id = (int)$c_user->id ?? null;
 
             if(((bool)$c_user->private_profile && !User::isFollowing($c_user_id) && !User::isMe($c_user_id))) {
                 $privated[$c_user_id] = true;
@@ -802,16 +802,18 @@ function fetch_comments($model_id, $csrf) {
             $c_user_removed = true;
         }
 
-        if(User::isDeleted($c_user)) {
+        if(!$userRow) {
             $c_user_removed = true;
             $message = "The account that had posted this reply has been deleted.";
             $comment = null;
+            $userRow = null;
         }
 
         if($c_user_privated) {
             $c_user_removed = true;
             $message = "The account that had posted this reply is private.";
             $comment = null;
+            $userRow = null;
         }
 
         if((int)$row['edited_at'] !== 0) {
@@ -839,12 +841,12 @@ function fetch_comments($model_id, $csrf) {
             'id' => $comment_id,
             'userid' => $c_user,
             'user_removed' => $c_user_removed,
-            'user_admin' => $userRow->admin || 0,
-            'username' => $userRow->username,
+            'user_admin' => $userRow->admin ?? 0,
+            'username' => $userRow->username ?? "Deleted User",
             'is_op' => $is_op,
             'is_hidden' => $row['hidden'],
             'parent' => $row['parent'],
-            'picture' => $userRow->picture,
+            'picture' => $userRow->picture_small ?? null,
             'comment' => $comment,
             'comment_og' => $comment_og,
             'date' => $date,
@@ -1009,9 +1011,9 @@ if(isset($_POST['comment'])) {
             'comment' => [
                 'id' => $last_id,
                 'text' => $bbcode->toHTML($comment, true, true),
-                'username' => $current_user->username,
-                'userid' => $current_user->id,
-                'admin' => $current_user->admin,
+                'username' => $current_user->username ?? null,
+                'userid' => $current_user->id ?? null,
+                'admin' => $current_user->admin ?? false,
                 'op' => $is_op,
                 'parent' => $parent,
                 'picture' => $current_user->picture,

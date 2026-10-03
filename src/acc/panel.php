@@ -10,7 +10,7 @@
 
 <div class="gr8-theme w3-container w3-card-2 w3-light-grey w3-padding w3-round w3-center">
     <?php if($current_user->alert > 0) { ?>
-			<h2 class="w3-text-red"><?php echo $current_user->alert ?> notifications</h2>
+			<h2 class="w3-text-red"><?php echo number_format($current_user->alert) ?> notifications</h2>
 	<?php } ?>
 	<span><h4>Hello, </h4><span class="usertext"><h2><?php echo $current_user->username ?></h2></span></span>
 
@@ -28,10 +28,10 @@
             <i class="fa fa-bell-o" aria-hidden="true"></i>
       		Notifications 
         	<?php if($current_user->alert > 0) { 
-    			echo "<span style='color:red;'>" . $current_user->alert  . "</span>";
+    			echo "<span style='color:red;'>" . number_format($current_user->alert)  . "</span>";
 			} ?>
         </a>&nbsp;
-        
+
         <a href="/acc/creations" class="gr8-panelbtn gr8-panelbtn-mycreations w3-btn w3-hover-opacity w3-large w3-white w3-mobile w3-border w3-padding w3-round-small">
             <i class="fa fa-th" aria-hidden="true"></i>
             Creations

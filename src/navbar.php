@@ -17,8 +17,9 @@
 
                 <span class='w3-red w3-tag w3-round'>
                     <?php
-                        if (!empty($current_user->alert) && $current_user->alert != 0) { 
-                            echo (int)$current_user->alert;
+                        if (!empty($current_user->alert) && $current_user->alert != 0) {
+                            require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
+                            echo Numbers::format($current_user->alert);
                         }
                     ?>
                 </span>
@@ -34,7 +35,7 @@
                 </a>
 
                 <a href='/acc/notifications' class='w3-bar-item w3-button'>
-                    <span><i class='fa fa-bell-o w3-padding-small' aria-hidden='true'></i>Notifications <span class='w3-red w3-tag w3-round'><?php echo (int)$current_user->alert ?></span></span>
+                    <span><i class='fa fa-bell-o w3-padding-small' aria-hidden='true'></i>Notifications <span class='w3-red w3-tag w3-round'><?php echo number_format($current_user->alert); ?></span></span>
                 </a>
                 
                 <a href='/acc/creations' class='w3-bar-item w3-button'>
@@ -81,6 +82,11 @@
 
 <div class="w3-main gr8-main"><br />
 	<span id="popup-wrapper-global"></span>
+
+    <div class="w3-card-2 w3-light-grey w3-padding w3-round-small w3-margin-top gr8-theme">
+		<b>Creation downloads</b>
+		<p>We're removing direct downloading of Creations, due to how we're restructuring the Creation system internally. You will still be able to view and edit creations from Gr8Brik itself; and export creations from the Modeler.</p>
+	</div><br />
 
     <div id="modal-set-logout" class="w3-modal">
         <div class="w3-modal-content gr8-theme w3-card-2 w3-center w3-light-grey w3-animate-bottom">

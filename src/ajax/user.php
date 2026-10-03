@@ -29,14 +29,19 @@ function login() {
         return logout(false);
     }
 
-    $id = $session_res->fetch_assoc()['user'];
+    $id = $session_res->fetch_assoc()['user'] ?? null;
+    $user = User::getUser($id);
+
+    if(!$user) {
+        $session_stmt->close();
+        return logout(false);
+    }
+
+    $user->id = $id;
     $_SESSION['tokenid'] = $token_raw;
     $_SESSION['userid'] = $id;
 
     $session_stmt->close();
-
-    $user = User::getUser($id);
-    $user->id = $id;
     return $user;
 }
 
@@ -47,21 +52,18 @@ function login() {
 $current_user = login();
 
 if (loggedin()) {
+    $lock_file = __DIR__ . '/.cleanup_lock';
+
     if (rand(1, 20) <= 1) {
         regenerate_session();
         delete_old_sessions();
-        Cookie::del_old_analytics($conn, 15, 3600);
-
-        $lock_file = __DIR__ . '/.cleanup_lock';
-        $t = time();
+        Cookie::del_old_analytics($conn, 3, 3600);
         clearstatcache(true, $lock_file);
+    }
 
-        if (!file_exists($lock_file) || ($t - filemtime($lock_file) > 3600)) {
-            delete_inactive_users();
-            @touch($lock_file);
-        }
-
-        unset($t);
+    if (!file_exists($lock_file) || (time() - filemtime($lock_file) > 3600)) {
+        delete_inactive_users();
+        @touch($lock_file);
     }
 }
 
@@ -88,6 +90,8 @@ class User {
     public ?bool $suspended;
     public ?bool $private_profile;
     public ?string $deactive;
+    public ?int $changed;
+    public ?string $ip;
 
     private const FIELDS = [
         'id',
@@ -109,6 +113,8 @@ class User {
         'private_profile',
         'suspended',
         'deactive',
+        'changed',
+        'ip'
     ];
 
     /**
@@ -121,15 +127,13 @@ class User {
             $this->$field = $data[$field] ?? null;
         }
 
-        $this->username ??= '[deleted]';
-        $this->deactive ??= true;
-        $this->private_profile ??= true;
         $this->picture ??= $this->email ? $this->userGravatar($this->email, 200) : '/img/no_image.png';
-        $this->picture_small ??= $this->picture ?? ($this->email ? $this->userGravatar($this->email, 50) : '/img/no_image.png');
+        $this->picture_small ??= $this->picture;
     }
 
     /**
      * Checks if a users account doesn't exist or is marked for later deletion
+     * @deprecated, please check if $usero->deactive is not null instead
      */
     public static function isDeleted(?int $id): bool {
         $conn = Database::get(DB_NAME);
@@ -245,6 +249,7 @@ class User {
 
     /**
      * Checks if your userID is the same as another
+     * @deprecated, just check if $current_user->id is the same as the id, it doesn't take a genius to do that
      */
     public static function isMe(?int $id): bool {
         global $current_user;
@@ -420,13 +425,52 @@ class User {
     public static function getUser(?int $id = 0) {
         $conn = Database::get(DB_NAME);
 
-        $user_stmt = $conn->prepare("SELECT * FROM users WHERE id = ? AND deactive IS NULL");
+        $user_stmt = $conn->prepare(
+        "SELECT
+        u.id, u.blog_user_id, u.username, u.github_id, u.google_id, u.email, u.password, u.verify_token, u.alert, u.admin, u.deactive, u.suspended, u.age, u.changed, u.ip,
+        p.picture, p.picture_small, p.banner, p.twitter, p.bsky, p.private_profile, p.description, p.display_name
+        FROM users u
+        LEFT JOIN user_profiles p
+            ON u.id = p.userid
+        WHERE u.id = ? AND u.deactive IS NULL;
+        ");
         $user_stmt->bind_param("i", $id);
         $user_stmt->execute();
         $user_res = $user_stmt->get_result();
-        $user_row = $user_res->fetch_assoc();
 
-        return new User($user_row);
+        if($user_res->num_rows !== 0) {
+            $user_row = $user_res->fetch_assoc() ?? [];
+            return new User($user_row);
+        } else {
+            return null;
+        }
+    }
+    
+    /**
+     * Like getUser, but with a name instead of an ID
+     */
+    public static function getUserByName(?string $username) {
+        $conn = Database::get(DB_NAME);
+
+        $user_stmt = $conn->prepare(
+        "SELECT
+        u.id, u.blog_user_id, u.username, u.github_id, u.google_id, u.email, u.password, u.verify_token, u.alert, u.admin, u.deactive, u.suspended, u.age, u.changed, u.ip,
+        p.picture, p.picture_small, p.banner, p.twitter, p.bsky, p.private_profile, p.description, p.display_name
+        FROM users u
+        LEFT JOIN user_profiles p
+            ON u.id = p.userid
+        WHERE u.username = ? AND u.deactive IS NULL;
+        ");
+        $user_stmt->bind_param("s", $username);
+        $user_stmt->execute();
+        $user_res = $user_stmt->get_result();
+
+        if($user_res->num_rows !== 0) {
+            $user_row = $user_res->fetch_assoc() ?? [];
+            return new User($user_row);
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -462,36 +506,6 @@ class User {
 
         $stmt->close();
         return $users;
-    }
-
-    /**
-     * Like getUser, but with a name instead of an ID
-     */
-    public static function getUserByName(?string $username) {
-        $conn = Database::get(DB_NAME);
-
-        $user_stmt = $conn->prepare("SELECT * FROM users WHERE username = ? AND deactive IS NULL");
-        $user_stmt->bind_param("s", $username);
-        $user_stmt->execute();
-        $user_res = $user_stmt->get_result();
-        $user_row = $user_res->fetch_assoc();
-
-        return new User($user_row);
-    }
-
-    /**
-     * Like getUser, but with an email address instead of an ID
-     */
-    public static function getUserByEmail(?string $email) {
-        $conn = Database::get(DB_NAME);
-
-        $user_stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND deactive IS NULL");
-        $user_stmt->bind_param("s", $email);
-        $user_stmt->execute();
-        $user_res = $user_stmt->get_result();
-        $user_row = $user_res->fetch_assoc();
-
-        return new User($user_row);
     }
 
     /**
@@ -630,53 +644,55 @@ function seen_warn_status() {
    	return false;
 }
 
-if(isset($_GET['get_warn_status']) && basename($_SERVER['PHP_SELF']) === "user.php") {
-    header("Content-type: application/json");
-    echo json_encode(get_warn_status());
-	exit;
-}
-
-if(isset($_GET['seen_warn_status']) && basename($_SERVER['PHP_SELF']) === "user.php") {
-    header("Content-type: application/json");
-    echo json_encode(seen_warn_status());
-	exit;
-}
-
-if (isset($_GET['ajax']) && basename($_SERVER['PHP_SELF']) === "user.php") {
-    header('Content-type: application/json');
-
-    if(!loggedin()) {
-        echo json_encode(['error' => 'User is not authenticated']);
+if(basename($_SERVER['PHP_SELF']) === "user.php") {
+    if(isset($_GET['get_warn_status'])) {
+        header("Content-type: application/json");
+        echo json_encode(get_warn_status());
         exit;
     }
-    $id = $current_user->id;
 
-    $followers_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE profileid = ? LIMIT 1");
-    $followers_stmt->bind_param("i", $id);
-    $followers_stmt->execute();
-    $res = $followers_stmt->get_result();
-    $followers_count = $res->fetch_assoc()['count'] ?? 0;
+    if(isset($_GET['seen_warn_status'])) {
+        header("Content-type: application/json");
+        echo json_encode(seen_warn_status());
+        exit;
+    }
 
-    $following_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE userid = ? LIMIT 1");
-    $following_stmt->bind_param("i", $id);
-    $following_stmt->execute();
-    $res = $following_stmt->get_result();
-    $following_count = $res->fetch_assoc()['count'] ?? 0;
+    if (isset($_GET['ajax'])) {
+        header('Content-type: application/json');
 
-    $logindata = json_encode([
-        'success' => true,
-        'id' => $current_user->id,
-        'pfp' => $current_user->picture,
-        'user' => $current_user->username,
-        'alert' => $current_user->alert,
-        'is_verified' => empty($current_user->verify_token) ? true : false,
-        'stats' => [
-            'followers' => $followers_count ?? 0,
-            'following' => $following_count ?? 0,
-        ]
-    ]);
-    echo $logindata;
-    exit;
+        if(!loggedin()) {
+            echo json_encode(['error' => 'User is not authenticated']);
+            exit;
+        }
+        $id = $current_user->id;
+
+        $followers_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE profileid = ? LIMIT 1");
+        $followers_stmt->bind_param("i", $id);
+        $followers_stmt->execute();
+        $res = $followers_stmt->get_result();
+        $followers_count = $res->fetch_assoc()['count'] ?? 0;
+
+        $following_stmt = $conn->prepare("SELECT COUNT(*) as count FROM follow WHERE userid = ? LIMIT 1");
+        $following_stmt->bind_param("i", $id);
+        $following_stmt->execute();
+        $res = $following_stmt->get_result();
+        $following_count = $res->fetch_assoc()['count'] ?? 0;
+
+        $logindata = json_encode([
+            'success' => true,
+            'id' => $current_user->id,
+            'pfp' => $current_user->picture_small,
+            'user' => $current_user->username,
+            'alert' => $current_user->alert,
+            'is_verified' => empty($current_user->verify_token) ? true : false,
+            'stats' => [
+                'followers' => $followers_count ?? 0,
+                'following' => $following_count ?? 0,
+            ]
+        ]);
+        echo $logindata;
+        exit;
+    }
 }
 
 function logout(?bool $redirect = false) {
@@ -697,7 +713,6 @@ function logout(?bool $redirect = false) {
 
     if (session_status() === PHP_SESSION_ACTIVE) {
         $_SESSION = [];
-        session_destroy();
     }
 
     if (isset($_COOKIE['token'])) {
@@ -1159,7 +1174,7 @@ function loggedin() {
     if (isset($_SESSION['userid']) && isset($_SESSION['tokenid'])) {
         return true;
     }
-    
+
     //If session died but they have a browser cookie, they might be loggable-in
     if (isset($_COOKIE['token'])) {
         return true;
