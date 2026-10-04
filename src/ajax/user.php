@@ -1,6 +1,5 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/config.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
 $conn = Database::get(DB_NAME);
 $loggedin = loggedin();
 

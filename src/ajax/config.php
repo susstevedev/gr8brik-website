@@ -18,6 +18,7 @@ ini_set('display_errors', '1');
 // constants
 require_once 'constants.php';
 require_once 'mysql.php';
+require_once 'errors.php';
 require_once 'ipban.php';
 require_once 'what_browser.php';
 

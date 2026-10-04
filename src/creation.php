@@ -190,12 +190,12 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     <?php include 'navbar.php' ?>
 
     <?php if (isset($error)) { ?>
-        <div class="message w3-card-2 w3-padding w3-round-small w3-red"><?php echo $error ?></div><br />
+        <div class="message w3-red w3-padding w3-round w3-border w3-border-pink"><?php echo $error ?></div><br />
         <?php exit; ?>
     <?php } ?>
 
     <?php if (isset($message)) { ?>
-        <div class="message w3-card-2 w3-padding w3-round-small w3-light-grey"><?php echo $message ?></div><br />
+        <div class="message w3-padding w3-round w3-border w3-border-grey w3-light-grey"><?php echo $message ?></div><br />
     <?php } ?>
 
     <?php if (loggedin()) { ?>

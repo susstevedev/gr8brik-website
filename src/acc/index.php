@@ -399,6 +399,7 @@ if (isset($_POST['banner'])) {
 
             $('#update_private_page').on('click', function(event) {
                 event.preventDefault();
+                var btn = $(this);
 
                 $.ajax({
                     url: "../ajax/account_settings",
@@ -406,15 +407,17 @@ if (isset($_POST['banner'])) {
                     data: { private_profile: true },
                     type: 'POST',
                     success: function(res) {
-                        if (res && res.success) {
-                            DOMsuccess(res.success);
-                        } else if (res) {
-                            DOMerror(res.error || 'Error privating or unprivating page.');
+                        if (res && res.success && res.message) {
+                            DOMsuccess(res.message);
+
+                            if(res.text) {
+                                btn.text(res.text);
+                            }
                         }
                     },
                     error: function(xhr, text, error) {
                         var response = JSON.parse(xhr.responseText);
-                        DOMerror(response.error || 'Error privating or unprivating page.');
+                        DOMerror(response.message || 'Error privating or unprivating page.');
                     }
                 });
             });
@@ -546,7 +549,10 @@ if (isset($_POST['banner'])) {
     <form id="private-page">
         <b><legend>Private page</legend></b>
         <p>Private or unprivate your page. Will prevent people that don't follow you from viewing your page.</p>
-        <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="update_private_page">Private page</button>
+
+        <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="update_private_page">
+            <?php echo $current_user->private_profile ? 'Unprivate' : 'Private' ?> Page
+        </button>
     </form><br />
 
     <form id="password">

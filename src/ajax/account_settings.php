@@ -250,39 +250,50 @@ class AccountSettings {
     public function private_profile() {
         global $current_user;
 
+        $STRINGS = [
+            'ING' => [
+                0 => 'Privating',
+                1 => 'Unprivating',
+            ],
+            'NOR' => [
+                0 => 'Private',
+                1 => 'Unprivate',
+            ],
+            'ED' => [
+                0 => 'Privated',
+                1 => 'Unprivated',
+            ],
+            'ERRORS' => [
+                0 => 'An error has occured',
+                1 => 'Not logged in',
+                2 => 'Please verify your account to continue this action.'
+            ]
+        ];
+
         if(!loggedin()) {
-            header("HTTP/1.0 403 Forbidden");
-            return ['error' => 'Not authenticated', 'code' => '403'];
+            http_response_code(401);
+            return ['success' => false, 'message' => $STRINGS['ERRORS'][1]];
         }
 
         $id = $current_user->id;
-        $upd = null;
 
         if($current_user->verify_token != NULL) {
-            header("HTTP/1.0 500 Internal Server Error");
-            return ['error' => "Please verify your account to continue this action."];
+            http_response_code(401);
+            return ['success' => false, 'message' => $STRINGS['ERRORS'][2]];
         }
 
-        if((bool)$current_user->private_profile === false) {
-            $upd = 1;
-        } else if((bool)$current_user->private_profile === false) {
-            $upd = 0;
-        }
-
-        if($upd === null) {
-            header("HTTP/1.0 500 Internal Server Error");
-            return ['error' => "Something went wrong."];
-        }
+        $upd = $current_user->private_profile ? 0 : 1;
+        $anti = $current_user->private_profile ? 1 : 0;
 
         $conn = Database::get(DB_NAME);
         $stmt = $conn->prepare("UPDATE user_profiles SET private_profile = ? WHERE userid = ?");
 
         $stmt->bind_param("ii", $upd, $id);
         if ($stmt->execute()) {
-            return ['success' => 'Your page has been updated.'];
+            return ['success' => true, 'message' => "Your page has been {$STRINGS['ED'][$anti]}", 'text' => "{$STRINGS['NOR'][$upd]} Page"];
         } else {
-            header("HTTP/1.0 500 Internal Server Error");
-            return ['error' => 'Error privating or unprivating page.'];
+            http_response_code(500);
+            return ['success' => false, 'message' => "Error {$STRINGS['ING'][$upd]} page."];
         }
     }
 
