@@ -371,8 +371,9 @@ function fetch_build($model_id, $csrf) {
         return json_encode(["message" => ErrorRegistry::get('creation', 'not_found')]);
     }
 
+    $id = loggedin() ? ($current_user->id ?? 0) : 0;
     $is_admin = (isset($current_user->admin) && $current_user->admin === true);
-    $is_owner = (loggedin() && trim($current_user->id) === trim($row2['user']));
+    $is_owner = (loggedin() && isset($current_user) && trim($current_user->id) === trim($row2['user']));
 
     if (!$is_admin) {
         if ($row2['removed'] === 1) {
@@ -408,7 +409,8 @@ function fetch_build($model_id, $csrf) {
 
     $did_track = false;
     if(loggedin()) {
-        if(Cookie::analytics_creation($conn2, $userid, $current_user->id, $name)) {
+        $cookie = new Cookie($id);
+        if($cookie->analytics_creation($conn2, $userid, $name)) {
             $did_track = true;
         }
     }
@@ -422,8 +424,6 @@ function fetch_build($model_id, $csrf) {
     $notifications = new Notifications($conn2);
 
     if(loggedin()) {
-        $id = $current_user->id;
-
         $sql = "SELECT * FROM user_blocks WHERE userid = ? AND profileid = ? LIMIT 1";
         $stmt = $conn2->prepare($sql);
         $stmt->bind_param("ii", $userid, $id);

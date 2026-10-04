@@ -168,7 +168,7 @@ class ImgBB {
      * Returns an attachment from it's md5 hash
      */
     public function get_by_hash(string $md5) {
-        $stmt = $this->db->prepare("SELECT * FROM attachments WHERE md5 = ? LIMIT 1");
+        $stmt = $this->db->prepare("SELECT * FROM attachments WHERE md5 = ? AND md5 IS NOT NULL LIMIT 1");
         $stmt->bind_param("s", $md5);
         $stmt->execute();
 
@@ -200,34 +200,37 @@ class ImgBB {
             $usero = User::getUser($userid);
             $username = $usero->username ?? null;
             $delete_url = null;
+            $url = $row['url'] ?? null;
 
-            if($usero->id === 0 || $usero->deactive !== null || $usero->private_profile !== false) {
-                $username = null;
-            }
+            $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
-            if(loggedin()) {
-                if(trim($me) === trim($userid)) {
-                    $delete_url = $row['delete_url'] ?? null;
+            if (!curl_errno($ch) && curl_getinfo($ch, CURLINFO_HTTP_CODE) == 200) {
+                if(loggedin()) {
+                    if(trim($me) === trim($userid)) {
+                        $delete_url = $row['delete_url'] ?? null;
+                    }
                 }
-            }
 
-            return [
-                'success' => true,
-                'message' => 'Image found',
-                'id' => $row['id'] ?? null,
-                'image' => [
-                    'user' => $username,
-                    'mime' => $row['mime'] ?? null,
-                    'url' => $row['url'] ?? null,
-                    'bbcode' => $row['bbcode'] ?? null,
-                    'remove' => $delete_url,
-                    'timestamp' => $row['timestamp'] ?? null,
-                    'removed' => (bool)$row['is_deleted'] ?? false,
-                ]
-            ];
-        } else {
-            return ['success' => false, 'message' => 'Image does not exist'];
+                return [
+                    'success' => true,
+                    'message' => 'Image found',
+                    'id' => $row['id'] ?? null,
+                    'image' => [
+                        'user' => $username,
+                        'mime' => $row['mime'] ?? null,
+                        'url' => $url,
+                        'bbcode' => $row['bbcode'] ?? null,
+                        'remove' => $delete_url,
+                        'timestamp' => $row['timestamp'] ?? null,
+                        'removed' => (bool)$row['is_deleted'] ?? false,
+                    ]
+                ];
+            }
+            curl_close($ch);
         }
+        return ['success' => false, 'message' => 'Image does not exist'];
     }
 }
 ?>

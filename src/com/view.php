@@ -1,6 +1,9 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . "/com/bbcode.php";
+require_once $_SERVER['DOCUMENT_ROOT'] . "/ajax/time.php";
+$bbcode = new BBCode;
 
 if (loggedin()) {
     $id = $current_user->id ?? 0;
@@ -168,7 +171,7 @@ if (isset($_POST['comment_delete'])) {
 if (isset($_POST['comment'])) {
     header('Content-Type: application/json');
 
-    $comment = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
+    $comment = isset($_POST['commentbox']) ? $bbcode->Screennameify($_POST['commentbox']) : null;
     if ($conn->connect_error) {
         echo json_encode(['success' => false, 'message' => 'Database connection has failed']);
 		exit;
@@ -208,7 +211,7 @@ if (isset($_POST['comment'])) {
         $stmt2 = $conn->prepare($sql);
         $stmt2->bind_param("siss", $username, $post_id, $comment, $date);
     } else {
-        if (!$loggedin) {
+        if (!loggedin()) {
             echo json_encode(['success' => false, 'message' => 'You are not logged in.']);
 		    exit;
         }
@@ -260,9 +263,6 @@ if (isset($_POST['comment'])) {
 <body class="w3-light-blue w3-container">
     <?php
     include $_SERVER['DOCUMENT_ROOT'] . '/navbar.php';
-    require_once $_SERVER['DOCUMENT_ROOT'] . "/com/bbcode.php";
-    require_once $_SERVER['DOCUMENT_ROOT'] . "/ajax/time.php";
-    $bbcode = new BBCode;
 
     $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
     $page = $page < 1 ? 1 : (int)$page;

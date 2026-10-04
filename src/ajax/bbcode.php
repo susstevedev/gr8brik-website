@@ -73,7 +73,12 @@ class BBCode
       $username = '[deleted]';
       $picture = '/img/no_image.png';
 
-      $matchResult = $this->db->query("SELECT id, username, picture FROM users WHERE (id = '$str' OR username = '$str') AND deactive IS NULL AND private_profile != 1");
+      $matchResult = $this->db->query(
+        "SELECT u.id, u.username, p.picture
+        FROM users u
+        LEFT JOIN user_profiles p ON u.id = p.userid
+        WHERE (u.id = '$str' OR u.username = '$str') AND u.deactive IS NULL AND u.suspended = 0"
+        );
 
       if ($matchResult && $matchRow = $matchResult->fetch_assoc()) {
         $username = htmlspecialchars($matchRow['username'] ?? '[deleted]');
@@ -352,7 +357,7 @@ class BBCode
     if (!empty($matches[1])) {
       $usernames = array_unique($matches[1]);
       $placeholders = implode(',', array_fill(0, count($usernames), '?'));
-      $stmt = $this->db->prepare("SELECT id, username FROM users WHERE username IN ($placeholders) AND deactive IS NULL AND private_profile != 1");
+      $stmt = $this->db->prepare("SELECT id, username FROM users WHERE username IN ($placeholders)");
       $stmt->execute($usernames);
       $result = $stmt->get_result();
 

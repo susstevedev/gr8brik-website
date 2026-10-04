@@ -491,9 +491,9 @@ class AccountManager
             $new_userid = $conn->insert_id;
             $stmt1->close();
 
-            $sql2 = "INSERT INTO user_profiles (userid, picture, twitter, private_profile, description, display_name) VALUES (?, ?, ?, 1, ?, ?)";
+            $sql2 = "INSERT INTO user_profiles (userid, picture, twitter, private_profile, description) VALUES (?, ?, ?, 1, ?)";
             $stmt2 = $conn->prepare($sql2);
-            $stmt2->bind_param("issss", $new_userid, $avatar, $twitter, $bio, $display);
+            $stmt2->bind_param("isss", $new_userid, $avatar, $twitter, $bio);
             $stmt2->execute();
             $stmt2->close();
 

@@ -181,6 +181,25 @@ if($ban) {
 }
 
 class Cookie {
+    public ?int $userId = null;
+
+    public function __construct(int $userid) {
+        if(!loggedin() || !$userid) {
+            return false;
+        }
+
+        $user = User::getUser($userid);
+        if(!$user) {
+            return false;
+        }
+
+        if(!self::allow_analytics()) {
+            return false;
+        }
+
+        $this->userId = $user->id;
+    }
+
     public static function controls() {
         if (isset($_COOKIE['cookieControlPrefs'])) {
             $saved_prefs = json_decode(stripslashes($_COOKIE['cookieControlPrefs']), true);
@@ -197,6 +216,10 @@ class Cookie {
     }
 
     public static function allow_analytics() {
+        if(!loggedin()) {
+            return false;
+        }
+
         $cookie = Cookie::controls();
 
         if(in_array('analytics', $cookie)) {
@@ -211,7 +234,7 @@ class Cookie {
         }
     }
 
-    public static function analytics_user(mixed $db, int $id, int $me, ?string $content = 'No string hast been provided! Sorcery!') {
+    public function analytics_user(mixed $db, int $id, ?string $content = 'No string hast been provided! Sorcery!') {
         if(!loggedin()) {
             return false;
         }
@@ -219,6 +242,11 @@ class Cookie {
         if(!Cookie::allow_analytics()) {
             return false;
         }
+
+        if(!$this->userId) {
+            return false;
+        }
+        $me = $this->userId ?? 0;
 
         $stmt = $db->prepare("INSERT INTO analytics (my_user, their_user, content_string, type) VALUES (?, ?, ?, 'user')");
         $stmt->bind_param("iis", $me, $id, $content);
@@ -226,7 +254,7 @@ class Cookie {
         return $db->insert_id ?? true;
     }
 
-    public static function analytics_creation(mixed $db, int $id, int $me, ?string $content = 'No string hast been provided! Sorcery!') {
+    public function analytics_creation(mixed $db, int $id, ?string $content = 'No string hast been provided! Sorcery!') {
         if(!loggedin()) {
             return false;
         }
@@ -234,6 +262,11 @@ class Cookie {
         if(!Cookie::allow_analytics()) {
             return false;
         }
+
+        if(!$this->userId) {
+            return false;
+        }
+        $me = $this->userId ?? 0;
 
         $stmt = $db->prepare("INSERT INTO analytics (my_user, their_user, content_string, type) VALUES (?, ?, ?, 'creation')");
         $stmt->bind_param("iis", $me, $id, $content);
@@ -241,7 +274,7 @@ class Cookie {
         return $db->insert_id ?? true;
     }
 
-    public static function analytics_forum(mixed $db, int $id, int $me, ?string $content = 'No string hast been provided! Sorcery!') {
+    public function analytics_forum(mixed $db, int $id, ?string $content = 'No string hast been provided! Sorcery!') {
         if(!loggedin()) {
             return false;
         }
@@ -249,6 +282,11 @@ class Cookie {
         if(!Cookie::allow_analytics()) {
             return false;
         }
+
+        if(!$this->userId) {
+            return false;
+        }
+        $me = $this->userId ?? 0;
 
         $stmt = $db->prepare("INSERT INTO analytics (my_user, their_user, content_string, type) VALUES (?, ?, ?, 'forum')");
         $stmt->bind_param("iis", $me, $id, $content);

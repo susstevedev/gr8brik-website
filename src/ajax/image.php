@@ -19,7 +19,7 @@ if(isset($_POST['upload']) && isset($_FILES['imagefile'])) {
 }
 
 if(isset($_GET['imgbb_image']) && isset($_GET['id'])) {
-    $id = $_GET['id'];
+    $id = (int)$_GET['id'];
     $res = $ImgBBO->get($id);
 
     if(isset($res['success'])) {
@@ -34,17 +34,14 @@ if(isset($_GET['imgbb_image']) && isset($_GET['id'])) {
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             header("Content-Type: $contentType");
             echo $data;
-        } else {
-            http_response_code(404);
-            header("Content-Type: image/png");
-            echo @file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/img/notavaliable.png');
         }
 
         curl_close($ch);
-    } else {
-        http_response_code(404);
-        echo @file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/img/notavaliable.png');
     }
+
+    http_response_code(404);
+    header("Content-Type: image/png");
+    echo @file_get_contents($_SERVER['DOCUMENT_ROOT'] . '/img/notavaliable.png');
     exit;
 }
 
