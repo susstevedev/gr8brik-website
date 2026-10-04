@@ -15,45 +15,62 @@ if (isset($_GET['followed_by'])) {
         exit;
     }
 
-    $profile_id = $_GET['followed_by'];
+    $profile_id = isset($_GET['userid']) ? $_GET['userid'] : (int)$_GET['followed_by'];
     $current_user_id = $current_user->id ?? 0;
+    $followed_by = [];
+    $rows = [];
 
-    if(User::isDeleted($profile_id) || (User::isPrivate($profile_id) && !User::isFollowing($profile_id))) {
+    if(!User::getUser($profile_id) && (User::isPrivate($profile_id) && !User::isFollowing($profile_id))) {
         http_response_code(404);
         echo json_encode(['error' => 'invalid account id', 'success' => false]);
         exit;
     }
 
-    $conn = Database::get(DB_NAME);
+    if(isset($_SESSION['fb'][$profile_id])) {
+        $rows = $_SESSION['fb'][$profile_id];
+    } else {
+        $conn = Database::get(DB_NAME);
 
-    //selects user follow row(s), selects users actual account, fliters invalid accounts
-    $query = "
-        SELECT DISTINCT u.id, u.picture, u.username
-        FROM follow f1
-        INNER JOIN follow f2 ON f1.userid = f2.profileid
-        INNER JOIN users u ON f1.userid = u.id
-        WHERE f1.profileid = ? 
-          AND f2.userid = ?
-          AND u.deactive IS NULL
-          AND u.suspended = 0
-        ORDER BY u.id DESC
-    ";
+        //selects user follow row(s), selects users actual account, fliters invalid accounts
+        $query = "
+            SELECT DISTINCT u.id, u.username, p.picture
+            FROM follow f1
+            INNER JOIN follow f2 ON f1.userid = f2.profileid
+            INNER JOIN users u ON f1.userid = u.id
+            LEFT JOIN user_profiles p ON f1.userid = p.userid
+            WHERE f1.profileid = ? 
+            AND f2.userid = ?
+            AND u.deactive IS NULL
+            AND u.suspended = 0
+            ORDER BY u.id DESC
+        ";
 
-    $stmt = $conn->prepare($query);
-    $stmt->bind_param("ss", $profile_id, $current_user_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("ii", $profile_id, $current_user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
-    $followed_by = [];
-    while ($row = $result->fetch_assoc()) {
+        $followed_by = [];
+        $rows = $result->fetch_assoc();
+    }
+
+    foreach($rows as $row) {
+        if(!$rows || (!$row['id'] && isset($_SESSION['fb'][$profile_id]))) {
+            http_response_code(301);
+            unset($_SESSION['fb']);
+            exit;
+        }
+
         $followed_by[] = [
-            'url'      => '/user/' . urlencode($row['id']) . '?from=' . urlencode($profile_id),
+            'url'      => '/@' . urlencode($row['username']),
             'userid'   => $row['id'], 
-            'pfp'      => $row['picture'],
+            'pfp'      => $row['picture'] ?? '/img/no_image.png',
             'username' => htmlspecialchars($row['username'])
         ];
     }
+
     $stmt->close();
+    $_SESSION['fb'][$profile_id][] = $rows;
 
     http_response_code(200);
     echo json_encode($followed_by);
@@ -267,6 +284,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         'bsky' => $bsky,
         'age' => isset($usero->age) ? htmlspecialchars($usero->age) : '',
         'picture' => htmlspecialchars($usero->picture_small ?? $usero->picture),
+        'banner' => isset($usero->banner) ? htmlspecialchars($usero->banner) : null,
         'stats' => [
             'creation_count' => $model_count,
             'followers' => $followers,
@@ -371,7 +389,8 @@ class UserInteractions {
             $result = $stmt_follow->execute();
 
             $notification = new Notifications($this->conn);
-            $notification->notify_subscribers('profile', $profile_id, $this->userid);
+            $notification->subscribe($this->userid, 'follow', $profile_id);
+            $notification->notify_subscribers('follow', $profile_id, $this->userid);
 
             if ($result) {
                 $stmt_follow->close();
@@ -440,6 +459,9 @@ class UserInteractions {
             $stmt_follow = $this->conn->prepare($sql_follow);
             $stmt_follow->bind_param("ii", $this->userid, $profile_id);
             $result = $stmt_follow->execute();
+
+            $notification = new Notifications($this->conn);
+            $notification->remove_subscriber('follow', $profile_id, $this->userid);
 
             if ($result) {
                 $stmt_follow->close();
@@ -954,7 +976,7 @@ class UserContent {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
-        $stmt = $creation_conn->prepare("SELECT * FROM model WHERE user = ? AND visibility = 'public' AND removed = 0 ORDER BY date DESC LIMIT $limit OFFSET $offset");
+        $stmt = $creation_conn->prepare("SELECT id, name, user, date, screenshot, views, likes, replies FROM model WHERE user = ? AND visibility = 'public' AND removed = 0 ORDER BY date DESC LIMIT $limit OFFSET $offset");
         $stmt->bind_param("i", $userid);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -1025,7 +1047,7 @@ class UserContent {
                 $liked[] = $row['creation'];
             }
 
-            $stmt2 = $creation_conn->prepare("SELECT * FROM model WHERE id IN (" . implode(',', $liked) . ") AND visibility = 'public' AND removed = 0 ORDER BY date DESC");
+            $stmt2 = $creation_conn->prepare("SELECT id, name, user, date, screenshot, views, likes, replies FROM model WHERE id IN (" . implode(',', $liked) . ") AND visibility = 'public' AND removed = 0 ORDER BY date DESC");
             $stmt2->execute();
             $result2 = $stmt2->get_result();
 
@@ -1096,7 +1118,7 @@ class UserContent {
 
         // comments and replies
         $profileid = $userid; // whatever
-        $profile_stmt = $conn_creations->prepare("SELECT * FROM comments WHERE hidden = 0 AND user = ? ORDER BY id DESC LIMIT $limit OFFSET $offset;");
+        $profile_stmt = $conn_creations->prepare("SELECT id, user, comment, model, date FROM comments WHERE hidden = 0 AND user = ? ORDER BY id DESC LIMIT $limit OFFSET $offset;");
         $profile_stmt->bind_param("s", $profileid);
         $profile_stmt->execute();
         $result = $profile_stmt->get_result();
@@ -1128,14 +1150,14 @@ class UserContent {
             $creation_replies[] = $comment2;
         }
 
-        $sql = "SELECT * FROM messages WHERE userid = $profileid AND deleted_at IS NULL AND parent != 0 ORDER BY timestamp DESC LIMIT $limit OFFSET $offset;";
+        $sql = "SELECT id, userid, deleted_at, content, parent, timestamp FROM messages WHERE userid = $profileid AND deleted_at IS NULL AND parent != 0 ORDER BY timestamp DESC LIMIT $limit OFFSET $offset;";
         $result = $conn_forum->query($sql);
 
         while ($reply = $result->fetch_assoc()) {
             $parent = $reply['parent'];
             $reply2 = [];
 
-            $stmt = $conn_forum->prepare("SELECT title FROM messages WHERE id = ?");
+            $stmt = $conn_forum->prepare("SELECT title FROM messages WHERE id = ? AND deleted_at IS NULL");
             $stmt->bind_param("i", $parent);
             $stmt->execute();
 
@@ -1146,7 +1168,7 @@ class UserContent {
             } else {
                 $parent_name = "a forum topic";
             }
-            
+
             $reply2['type'] = 'forum';
             $reply2['id'] = $reply['id'];
             $reply2['username'] = $user->username ?? null;

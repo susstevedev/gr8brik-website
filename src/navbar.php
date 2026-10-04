@@ -17,9 +17,10 @@
 
                 <span class='w3-red w3-tag w3-round'>
                     <?php
-                        if (!empty($current_user->alert) && $current_user->alert != 0) {
+                        $alert = User::get_alert($current_user->id);
+                        if ($alert > 0) {
                             require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
-                            echo Numbers::format($current_user->alert);
+                            echo Numbers::format($alert);
                         }
                     ?>
                 </span>
@@ -35,7 +36,7 @@
                 </a>
 
                 <a href='/acc/notifications' class='w3-bar-item w3-button'>
-                    <span><i class='fa fa-bell-o w3-padding-small' aria-hidden='true'></i>Notifications <span class='w3-red w3-tag w3-round'><?php echo number_format($current_user->alert); ?></span></span>
+                    <span><i class='fa fa-bell-o w3-padding-small' aria-hidden='true'></i>Notifications <span class='w3-red w3-tag w3-round'><?php echo $alert > 0 ? number_format($alert) : null; ?></span></span>
                 </a>
                 
                 <a href='/acc/creations' class='w3-bar-item w3-button'>

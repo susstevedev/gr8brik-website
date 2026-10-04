@@ -95,7 +95,7 @@ class AccountSettings {
     public function username_change($new) {
         if(!loggedin()) {
             header("HTTP/1.0 403 Forbidden");
-            return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
+            return ['error' => 'Not authenticated, please sign in using traditional means'];
         }
 
         global $conn;
@@ -121,7 +121,7 @@ class AccountSettings {
     public function twitter_change($new) {
         if(!loggedin()) {
             header("HTTP/1.0 403 Forbidden");
-            return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
+            return ['error' => 'Not authenticated, please sign in using traditional means'];
         }
 
         global $current_user;
@@ -144,14 +144,14 @@ class AccountSettings {
         $stmt_2 = $conn->prepare("UPDATE user_profiles SET twitter = ? WHERE userid = ?");
         $stmt_2->bind_param("ss", $new, $id);
         if ($stmt_2->execute()) {
-            return ['success' => 'Your profile has been updated with the new Twitter account.', 'code' => '200', 'version' => 'NEW'];
+            return ['success' => 'Your profile has been updated with the new Twitter account.'];
         }
     }
 
     public function bsky_change($new) {
         if(!loggedin()) {
             header("HTTP/1.0 403 Forbidden");
-            return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
+            return ['error' => 'Not authenticated, please sign in using traditional means'];
         }
 
         global $current_user;
@@ -209,7 +209,7 @@ class AccountSettings {
         $stmt_2 = $conn->prepare("UPDATE user_profiles SET bsky = ? WHERE userid = ?");
         $stmt_2->bind_param("ss", $new, $id);
         if ($stmt_2->execute()) {
-            return ['success' => 'Your profile has been updated with the new Bluesky account.', 'code' => '200', 'version' => 'NEW'];
+            return ['success' => 'Your profile has been updated with the new Bluesky account.'];
         }
     }
 
@@ -218,7 +218,7 @@ class AccountSettings {
 
         if(!loggedin()) {
             header("HTTP/1.0 403 Forbidden");
-            return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
+            return ['error' => 'Not authenticated, please sign in using traditional means'];
         }
 
         $id = $current_user->id;
@@ -639,35 +639,112 @@ if (isset($_POST['picture'])) {
 if (isset($_POST['remove_picture'])) {
     $conn = Database::get(DB_NAME);
 
-    if(!loggedin()) {
+    if(loggedin() && isset($current_user)) {
+        $id = $current_user->id;
+        $old_pfp = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture;
+        $old_pfp_small = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture_small;
+
+        if (strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($old_pfp)) {
+            unlink($old_pfp);
+        } else {
+            http_response_code(400);
+            exit(json_encode(['success' => false, 'error' => 'You do not have an uploaded profile image.']));
+        }
+
+        if (strpos($current_user->picture_small, '/acc/users/pfps/') !== false && file_exists($old_pfp_small)) {
+            unlink($old_pfp_small);
+        }
+
+        $stmt = $conn->prepare("UPDATE user_profiles SET picture = NULL, picture_small = NULL WHERE userid = ?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            http_response_code(200);
+            exit(json_encode(['success' => true, 'message' => 'Profile picture removed.', 'image' => $current_user->picture ?? null]));
+        } else {
+            http_response_code(500);
+            exit(json_encode(['success' => false, 'error' => 'Error removing profile picture. Please try again later.']));
+        }
+    } else {
         http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'login first']);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'unauthed')]);
+        exit;
+    }
+}
+
+if (isset($_POST['banner'])) {
+    $id = $current_user->id ?? 0;
+    $uploadOkay = 1;
+
+    if(!loggedin() || !isset($current_user)) {
+        http_response_code(500);
+        echo json_encode([ 'success' => false, 'error' => ErrorRegistry::get('auth', 'unauthed') ]);
         exit;
     }
 
-    $old_pfp = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture;
-    $old_pfp_small = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture_small;
-
-    if (strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($old_pfp)) {
-        unlink($old_pfp);
-    } else {
-        http_response_code(400);
-        exit(json_encode(['success' => false, 'error' => 'You do not have an uploaded profile image.']));
+    if ($current_user->verify_token !== NULL) {
+        http_response_code(401);
+        echo json_encode([ 'success' => false, 'error' => ErrorRegistry::get('auth', 'unverified') ]);
+        exit;
     }
 
-    if (strpos($current_user->picture_small, '/acc/users/pfps/') !== false && file_exists($old_pfp_small)) {
-        unlink($old_pfp_small);
-    }
+    if (isset($_POST['deleteBanner'])) {
+        $old_banner = $_SERVER['DOCUMENT_ROOT'] . $current_user->banner;
 
-    $stmt = $conn->prepare("UPDATE user_profiles SET picture = NULL, picture_small = NULL WHERE userid = ?");
-    $stmt->bind_param("s", $id);
+        if (strpos($current_user->banner, '/acc/users/banners/') !== false && file_exists($old_banner)) {
+            unlink($old_banner);
+        } else {
+            http_response_code(400);
+            exit(json_encode(['success' => false, 'error' => 'You do not have an uploaded banner image.']));
+        }
 
-    if ($stmt->execute()) {
-        http_response_code(200);
-        exit(json_encode(['success' => true, 'message' => 'Profile picture removed.', 'image' => $current_user->picture ?? null]));
+        $stmt = $conn->prepare("UPDATE user_profiles SET banner = NULL WHERE userid = ?");
+        $stmt->bind_param("i", $id);
+
+        if ($stmt->execute()) {
+            http_response_code(200);
+            exit(json_encode(['success' => true, 'message' => 'Profile banner removed.', 'image' => $current_user->banner ?? '/img/no_image.png']));
+        } else {
+            http_response_code(500);
+            exit(json_encode(['success' => false, 'error' => 'Error removing profile banner. Please try again later.']));
+        }
     } else {
-        http_response_code(500);
-        exit(json_encode(['success' => false, 'error' => 'Error removing profile picture. Please try again later.']));
+        if (empty($_FILES['fileToUpload']['tmp_name'])) {
+            $uploadOkay = 0;
+        }
+
+        if ($uploadOkay === 1) {
+            if ($_FILES["fileToUpload"]["size"] > 5242880) {
+                $uploadOkay = 0;
+            }
+
+            if ($uploadOkay === 1) {
+                $data = file_get_contents($_FILES["fileToUpload"]["tmp_name"]);
+                $image = imagecreatefromstring($data);
+                if (!$image) {
+                    $uploadOkay = 0;
+                }
+            }
+        }
+
+        if ($uploadOkay === 0) {
+            http_response_code(500);
+            echo json_encode([ 'success' => false, 'error' => ErrorRegistry::get('account_settings', 'banner_upload_fail') ]);
+            exit;
+        } else {
+            $dir = "../acc/users/banners/";
+            $upload = $dir . $id . '..jpg';
+
+            if (imagewebp($image, $upload, 50)) {
+                http_response_code(401);
+                echo json_encode([ 'success' => true ]);
+                exit;
+            } else {
+                http_response_code(500);
+                echo json_encode([ 'success' => false, 'error' => ErrorRegistry::get('account_settings', 'banner_upload_fail') ]);
+                exit;
+            }
+        }
     }
 }
 

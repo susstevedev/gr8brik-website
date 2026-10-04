@@ -286,13 +286,13 @@ if(isset($_POST['unban-submit'])) {
         <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('poststab')">Posts</a>
         <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('commentstab')">Comments</a>
         <a class='w3-button w3-light-grey w3-col m2 w3-hover-blue w3-border w3-border-grey w3-padding-small w3-card-2' onclick="openTab('likestab')">Favorites</a>
-    </div><br /><br />
+    </div>
 
-    <article id="user-card" class="gr8-theme w3-light-grey w3-card-2 w3-padding w3-round">
+    <article id="user-card" class="gr8-theme w3-margin-top w3-light-grey w3-card-2 w3-padding w3-round">
         <!-- banners are on life support -->
-        <?php if(file_exists("acc/users/banners/" . htmlspecialchars($_GET['id']) . "..jpg")) { ?>
-            <div>
-                <span data-testid="user-profile-card-banner_image" id="banner"><img src="/acc/users/banners/<?php echo htmlspecialchars($_GET['id']) ?>..jpg" /></span>
+        <?php if(isset($data['banner']) && !empty($data['banner'])) { ?>
+            <div id="banner-wrapper">
+                <img id="banner" src="<?php echo $data['banner'] ?>" />
             </div>
         <?php } ?>
 

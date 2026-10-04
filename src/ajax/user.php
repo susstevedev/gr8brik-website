@@ -421,16 +421,18 @@ class User {
     public static function getUser(?int $id = 0) {
         $conn = Database::get(DB_NAME);
 
-        $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, alert, admin, deactive, suspended, age, changed, ip FROM users WHERE id = ? AND deactive IS NULL");
+        $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE id = ? AND deactive IS NULL");
         $u_stmt->bind_param("i", $id);
         $u_stmt->execute();
         $user = $u_stmt->get_result()->fetch_assoc() ?? [];
+        $u_stmt->close();
 
         if($user) {
             $p_stmt = $conn->prepare("SELECT picture, picture_small, banner, twitter, bsky, private_profile, description, display_name FROM user_profiles WHERE userid = ?");
             $p_stmt->bind_param("i", $id);
             $p_stmt->execute();
             $profile = $p_stmt->get_result()->fetch_assoc() ?? [];
+            $p_stmt->close();
 
             return new User(array_merge($user, $profile));
         }
@@ -444,17 +446,19 @@ class User {
     public static function getUserByName(?string $username) {
         $conn = Database::get(DB_NAME);
 
-        $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, alert, admin, deactive, suspended, age, changed, ip FROM users WHERE username = ? AND deactive IS NULL");
+        $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE username = ? AND deactive IS NULL");
         $u_stmt->bind_param("s", $username);
         $u_stmt->execute();
         $user = $u_stmt->get_result()->fetch_assoc() ?? [];
         $userid = $user['id'];
+        $u_stmt->close();
 
         if($user) {
             $p_stmt = $conn->prepare("SELECT picture, picture_small, banner, twitter, bsky, private_profile, description, display_name FROM user_profiles WHERE userid = ?");
             $p_stmt->bind_param("i", $userid);
             $p_stmt->execute();
             $profile = $p_stmt->get_result()->fetch_assoc() ?? [];
+            $p_stmt->close();
 
             return new User(array_merge($user, $profile));
         }
@@ -479,7 +483,7 @@ class User {
         $users = [];
         $users = [];
 
-        $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, alert, admin, deactive, suspended, age, changed, ip FROM users WHERE id IN ($placeholders) AND deactive IS NULL");
+        $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE id IN ($placeholders) AND deactive IS NULL");
         $types = str_repeat('i', count($ids));
         $u_stmt->bind_param($types, ...$ids);
         $u_stmt->execute();
@@ -524,6 +528,26 @@ class User {
         $params = ['s' => $size,'d' => 'identicon','r' => 'pg'];
 
         return "https://www.gravatar.com/avatar/" . $hash . "?" . http_build_query($params);
+    }
+
+    public static function get_alert(?int $userId) {
+        $conn = Database::get(DB_NAME);
+
+        if(!isset($userId)) {
+            return 0;
+        }
+
+        $stmt = $conn->prepare("SELECT COUNT(*) as alert FROM notifications WHERE user = ? AND is_read = 0 AND category2 IS NOT NULL");
+        $stmt->bind_param("i", $userId);
+
+        if($stmt->execute()) {
+            $alert = $stmt->get_result()->fetch_assoc()['alert'] ?? 0;
+            $stmt->close();
+
+            return $alert;
+        }
+
+        return 0;
     }
 
     /**
@@ -687,7 +711,7 @@ if(basename($_SERVER['PHP_SELF']) === "user.php") {
             'id' => $current_user->id,
             'pfp' => $current_user->picture_small,
             'user' => $current_user->username,
-            'alert' => $current_user->alert,
+            'alert' => User::get_alert($id),
             'is_verified' => empty($current_user->verify_token) ? true : false,
             'stats' => [
                 'followers' => $followers_count ?? 0,

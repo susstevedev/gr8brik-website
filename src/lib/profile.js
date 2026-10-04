@@ -3,7 +3,7 @@
         $.ajax({
             url: "/ajax/profile",
             method: "GET",
-            data: { followed_by: userid },
+            data: { followed_by: true, userid: userid },
             success: function (response) {
                 let followedBy = "";
                 if (response.length > 0) {

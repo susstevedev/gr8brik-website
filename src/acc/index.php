@@ -30,57 +30,6 @@ if (!loggedin() || !isset($current_user)) {
     header('Location:login.php');
     exit;
 }
-
-if (isset($_POST['banner'])) {
-    $id = $current_user->id ?? 0;
-    $uploadOkay = 1;
-
-    if ($current_user->verify_token !== NULL) {
-        echo "<center>Please verify your account to continue this action.</center>";
-        exit;
-    }
-
-    if (isset($_POST['deleteBanner'])) {
-        $bannerPath = "users/banners/" . $id . "..jpg";
-        if (file_exists($bannerPath)) {
-            unlink($bannerPath);
-        }
-        header("Location: index.php?deletedBanner=true");
-        exit;
-    } else {
-        if (empty($_FILES['fileToUpload']['tmp_name'])) {
-            $uploadOkay = 0;
-        }
-
-        if ($uploadOkay === 1) {
-            if ($_FILES["fileToUpload"]["size"] > 5242880) {
-                $uploadOkay = 0;
-            }
-
-            if ($uploadOkay === 1) {
-                $data = file_get_contents($_FILES["fileToUpload"]["tmp_name"]);
-                $image = imagecreatefromstring($data);
-                if (!$image) {
-                    $uploadOkay = 0;
-                }
-            }
-        }
-
-        if ($uploadOkay === 0) {
-            echo '<center>Sorry, there was an error uploading your file.</center>';
-        } else {
-            $dir = "../acc/users/banners/";
-            $upload = $dir . $id . '..jpg';
-
-            if (imagewebp($image, $upload, 50)) {
-                echo "<center>Banner updated successfully.</center>";
-                header("refresh:3; url=index.php");
-            } else {
-                echo '<center>Sorry, there was an error saving your banner.</center>';
-            }
-        }
-    }
-}
 ?>
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">

@@ -11,6 +11,9 @@ class ErrorRegistry {
             'unauthed' => 'Please login to continue this action.',
             'bad_csrf' => 'Your cross-site-request-forgery token seems to be invalid.',
         ],
+        'account_settings' => [
+            'banner_upload_fail' => "Sorry, there was an error uploading your file.",
+        ],
         'db' => [
             'conn_fail' => 'Connection failed.',
             'query_fail' => 'Query execution failed.',

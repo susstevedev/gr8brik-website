@@ -56,13 +56,19 @@ class Notifications
         $row = $result->fetch_assoc();
 
         if ($row) {
-            $notif = $this->db->prepare("DELETE FROM subscriptions WHERE content = ? AND category = ? AND userid = ?");
-            $notif->bind_param("isi", $contentId, $category, $recipientId);
-            $notif->execute();
+            $sub = $this->db->prepare("DELETE FROM subscriptions WHERE content = ? AND category = ? AND userid = ?");
+            $sub->bind_param("isi", $contentId, $category, $recipientId);
 
-            $notif->close();
-            $stmt->close();
+            if($sub->execute()) {
+                $notif = $this->db->prepare("DELETE FROM notifications WHERE content = ? AND category2 = ? AND user = ?");
+                $notif->bind_param("isi", $contentId, $category, $recipientId);
+                $notif->execute();
+
+                $notif->close();
+            }
+            $sub->close();
         }
+        $stmt->close();
     }
 
     public function is_subscriber(string $category, int $contentId, int $recipientId): bool
@@ -141,7 +147,7 @@ class Notifications
         }
 
         $usero = User::getUser($userId);
-        if (User::isDeleted($userId)) {
+        if (!$usero) {
             return;
         }
 
@@ -152,7 +158,7 @@ class Notifications
         $limit = 8;
         $offset = ($page - 1) * $limit;
 
-        $sql = "SELECT * FROM notifications WHERE user = ? ORDER BY timestamp DESC";
+        $sql = "SELECT * FROM notifications WHERE user = ? AND category2 IS NOT NULL ORDER BY timestamp DESC";
         $notif_count = $usero->alert ?? 0;
 
         $stmt = $this->db->prepare($sql);
@@ -162,25 +168,39 @@ class Notifications
 
         $grouped_notifications = [];
 
-        if ($result->num_rows !== 0 && $notif_count > 0) {
-            $alertsql = "UPDATE users SET alert = 0 WHERE id = ?";
-            $alertstmt = $this->db->prepare($alertsql);
-            $alertstmt->bind_param("i", $userId);
-            if ($alertstmt->execute()) {
+        if ($result->num_rows !== 0) {
+            if($notif_count > 0) {
+                $alertsql = "UPDATE users SET alert = 0 WHERE id = ?";
+                $alertstmt = $this->db->prepare($alertsql);
+                $alertstmt->bind_param("i", $userId);
+
+                if (!$alertstmt->execute()) {
+                    exit($alertstmt->error);
+                }
                 $alertstmt->close();
+            }
+
+            $readstmt = $this->db->prepare("UPDATE notifications SET is_read = 1 WHERE user = ? AND is_read = 0 AND category2 IS NOT NULL");
+            $readstmt->bind_param("i", $userId);
+            if ($readstmt->execute()) {
+                $readstmt->close();
             } else {
-                echo $alertstmt->error;
-                exit;
+                exit($readstmt->error);
             }
         }
 
         while ($row = $result->fetch_assoc()) {
             $profile = $row['profile'] ?? 0;
             $content = $row['content'] ?? 0;
-            $category = $row['category2'];
+            $category = $row['category2'] ?? 'follow';
+            $is_read = $row['is_read'] ?? 0;
             $timestamp = is_numeric($row['timestamp']) ? (int)$row['timestamp'] : time();
 
             $user_data_o = User::getUser($profile);
+            if(!$user_data_o) {
+                continue;
+            }
+
             $username = htmlspecialchars($user_data_o->username) ?: '[unknown]';
             $userid = $user_data_o->id ?: 0;
 
@@ -196,8 +216,9 @@ class Notifications
                     'category' => $category,
                     'content' => $content,
                     'timestamp' => $timestamp,
+                    'is_read' => $is_read,
                     'users' => [],
-                    'fallback_pic' => $user_data_o->picture ?: '/img/no_image.png'
+                    'fallback_pic' => $user_data_o->picture_small ?: '/img/no_image.png'
                 ];
             }
 
@@ -233,12 +254,13 @@ class Notifications
             $category = $group['category'];
             $content = $group['content'];
             $users = $group['users'];
+            $is_read = $group['is_read'];
             $user_count = count($users);
 
             if ($user_count === 1) {
                 $user_string = "<a href='/user/" . $users[0]['id'] . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a>";
             } elseif ($user_count === 2) {
-                $user_string = "<a href='/user/" . $users[0]['id'] . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a> and <a href='/user/" . $users[1]['id'] . "'>" . $users[1]['name'] . "</a>";
+                $user_string = "<a href='/user/" . $users[0]['id'] . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a> and <a href='/user/" . $users[1]['id'] . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[1]['name'] . "</a>";
             } else {
                 $user_string = "<a href='/user/" . $users[0]['id'] . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a> and " . ($user_count - 1) . " others";
             }
@@ -254,18 +276,18 @@ class Notifications
                     }
 
                     $post = '';
-                    $img = $group['fallback_pic'];
+                    $img = $group['fallback_pic'] ?? '/img/no_image.png';
                     break;
                 case 'comment':
                     $stmt2 = $this->db->prepare("SELECT screenshot, name FROM `" . DB_NAME2 . "`.`model` WHERE id = ?");
                     $stmt2->bind_param("i", $content);
                     $stmt2->execute();
                     $res2 = $stmt2->get_result();
-                    
+
                     if ($row2 = $res2->fetch_assoc()) {
-                        $img = $row2['screenshot'];
+                        $img = $row2['screenshot'] ?? '/img/no_image.png';
                         $url = "/build/" . urlencode($content);
-                        $title = !empty($row2['name']) ? $row2['name'] : "[unknown]";
+                        $title = !empty($row2['name']) ? $row2['name'] : "Creation";
                         $post = 'commented on by';
                     }
 
@@ -286,9 +308,9 @@ class Notifications
                         $res3 = $stmt3->get_result();
 
                         if ($row3 = $res3->fetch_assoc()) {
-                            $img = $row3['screenshot'];
-                            $name = !empty($row3['name']) ? $row3['name'] : "[unknown]";
-                            $title = "Comment on " . $name;
+                            $img = $row3['screenshot'] ?? '/img/no_image.png';
+                            $name = !empty($row3['name']) ? $row3['name'] : "Creation";
+                            $title = "Reply to comment on" . $name;
                         }
 
                         $url = "/build/" . urlencode($row2['model']) . '#comment' . $content;
@@ -306,15 +328,15 @@ class Notifications
                     if ($row2 = $res2->fetch_assoc()) {
                         $img = '../img/com.jpg';
                         $url = "/topic/" . urlencode($content);
-                        $title = !empty($row2['title']) ? $row2['title'] : "[unknown]";
+                        $title = !empty($row2['title']) ? $row2['title'] : "Forum Post";
                         $post = "replied to by";
                     }
 
                     $stmt2->close();
                     break;
                 case 'direct_message':
-                    $stmt2 = $this->db->prepare("SELECT userid, profileid FROM `" . DB_NAME . "`.`message_group` WHERE id = ?");
-                    $stmt2->bind_param("i", $content);
+                    $stmt2 = $this->db->prepare("SELECT * FROM `" . DB_NAME . "`.`message_users` WHERE groupid = ? AND userid != ?");
+                    $stmt2->bind_param("ii", $content, $id);
                     $stmt2->execute();
                     $res2 = $stmt2->get_result();
 
@@ -347,9 +369,9 @@ class Notifications
                     $res2 = $stmt2->get_result();
 
                     if ($row2 = $res2->fetch_assoc()) {
-                        $img = $row2['screenshot'];
+                        $img = $row2['screenshot'] ?? '/img/no_image.png';
                         $url = "/build/" . urlencode($content);
-                        $title = !empty($row2['name']) ? $row2['name'] : "[unknown]";
+                        $title = !empty($row2['name']) ? $row2['name'] : "Creation";
                         $post = $title . " was removed by";
                     }
 
@@ -362,9 +384,9 @@ class Notifications
                     $res2 = $stmt2->get_result();
 
                     if ($row2 = $res2->fetch_assoc()) {
-                        $img = $row2['screenshot'];
+                        $img = $row2['screenshot'] ?? '/img/no_image.png';
                         $url = "/build/" . urlencode($content);
-                        $title = !empty($row2['name']) ? $row2['name'] : "[unknown]";
+                        $title = !empty($row2['name']) ? $row2['name'] : "Creation";
                         $post = "Favorited by";
                     }
 
@@ -373,17 +395,17 @@ class Notifications
                 default:
                     $img = '/img/no_image.png';
                     $url = '';
-                    $title = '[unknown]';
-                    $post = 'Users:';
+                    $title = 'Notification';
+                    $post = '';
                 endswitch;
 
             $time = time_ago(date("Y-m-d H:i:s", $group['timestamp']));
         ?>
 
-        <article id="<?php echo $group_name ?>" class='w3-card-4 w3-hover-shadow gr8-theme w3-padding w3-round w3-large'>
+        <article id="<?php echo $group_name ?>" class='w3-card-2 w3-hover-shadow <?php echo $is_read ? 'gr8-theme' : 'w3-yellow' ?> w3-padding w3-round-small w3-border w3-border-grey w3-large'>
             <div class="w3-row">
                 <div class="w3-col s2 m3">
-                    <img src="<?php echo htmlspecialchars($img); ?>" class="w3-round" style='background: #ddd; height: 150px;' alt='Image' title='Image'>
+                    <img src="<?php echo htmlspecialchars($img); ?>" class="w3-round-large w3-padding-small w3-grey" style='height: 150px;' alt='Image' title='Image'>
                 </div>
 
                 <div class="w3-col s6 m7">

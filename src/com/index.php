@@ -93,50 +93,48 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
             <tbody>
             <?php
 			    $conn = Database::get(DB_NAME3);
-			
+
 				$sql = "SELECT id, userid, title, content, timestamp, last_posted, last_page
                         FROM messages
                         WHERE status = 'pinned' OR status = 'pinnedLocked'
                         ORDER BY timestamp DESC LIMIT $limit OFFSET $offset;";
 				$stmt = $conn->prepare($sql);
 				$stmt->execute();
-				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted, $last_page);
-				
-				while ($stmt->fetch()) {
-					    $conn2 = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-                        $user_row = User::getUser($post_user);
-                        $username = $user_row->username ?? null;
-                  
-                        if($last_posted != 0) {
-                          $last_post_username = User::getUser($last_posted)->username ?? null;
-                        } else {
-                          $last_posted = $post_user;
-                          $last_post_username = $username;
-                        }
-                    
-                    	if($last_page <= 0) {
-                          $last_page = 1;
-                        }
+                $result = $stmt->get_result();
 
-                        $conn2->close();
+                while ($row = $result->fetch_assoc()) {
+                    $user_row = User::getUser($row['userid']);
+                    $username = $user_row->username ?? null;
 
-                        $shortTitle = substr($title, 0, 25);
-                        if (strlen($title) > 25) {
-                            $shortTitle .= "...";
-                        }
+                    if($row['last_posted'] != 0) {
+                        $last_posted = $row['last_posted'];
+                        $last_post_username = User::getUser($row['last_posted'])->username ?? null;
+                    } else {
+                        $last_posted = $row['userid'];
+                        $last_post_username = $username;
+                    }
 
-                        if(empty($title)) {
-                            $shortTitle = 'Untitled';
-                        }
+                    if($row['last_page'] <= 0) {
+                        $row['last_page'] = 1;
+                    }
 
-                        echo "<tr><td><a href='/topic/" . $id . "?p=" . $last_page . "'><i class='fa fa-map-pin w3-padding-small w3-text-grey' aria-hidden='true' title='Pinned Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
-                        echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
-                        echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</a></td>";
-                        echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $last_post_username . "</a></td></tr>";
+                    $shortTitle = substr($row['title'], 0, 25);
+                    if (strlen($row['title']) > 25) {
+                        $shortTitle .= "...";
+                    }
+
+                    if(empty($shortTitle)) {
+                        $shortTitle = 'Untitled';
+                    }
+
+                    echo "<tr><td><a href='/topic/" . $row['id'] . "?p=" . $row['last_page'] . "'><i class='fa fa-map-pin w3-padding-small w3-text-grey' aria-hidden='true' title='Pinned Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
+                    echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $row['timestamp'] . "</td>";
+                    echo "<td><a href='/user/" . $row['userid'] . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</a></td>";
+                    echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $last_post_username . "</a></td></tr>";
                     $username = null;
                     $last_post_username = null;
                 }
-                
+
 				$sql = "SELECT id, userid, title, content, timestamp, last_posted, last_active_time, last_page
                         FROM messages
                         WHERE (status = 'general' OR status = 'locked') AND (parent IS NULL OR parent = 0)
@@ -145,64 +143,63 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                 
 				$stmt = $conn->prepare($sql);
 				$stmt->execute();
-				$stmt->bind_result($id, $post_user, $title, $post, $date, $last_posted, $last_active, $last_page);
-                
-				while ($stmt->fetch()) {	
-                    $user_row = User::getUser($post_user);
+                $result = $stmt->get_result();
+
+                while ($row = $result->fetch_assoc()) {
+                    $user_row = User::getUser($row['userid']);
                     $username = $user_row->username ?? null;
                     
-                    if($last_posted != 0) {
+                    if($row['last_posted'] != 0) {
+                        $last_posted = $row['last_posted'];
                         $last_post_username = User::getUser($last_posted)->username ?? null;
                     } else {
-                      $last_posted = $post_user;
+                      $last_posted = $row['userid'];
                       $last_post_username = $username;
                     }
-                    
-                    if($last_page <= 0) {
-                        $last_page = 1;
+
+                    if($row['last_page'] <= 0) {
+                        $row['last_page'] = 1;
                     }
 
-                    $shortTitle = substr($title, 0, 25);
-                    if (strlen($title) > 25) {
+                    $shortTitle = substr($row['title'], 0, 25);
+                    if (strlen($row['title']) > 25) {
                         $shortTitle .= "...";
                     }
 
-                    if(empty($title)) {
+                    if(empty($shortTitle)) {
                         $shortTitle = 'Untitled';
                     }
 
-                    echo "<tr><td><a href='/topic/" . $id . "?p=" . $last_page . "'><i class='fa fa-users w3-padding-small w3-text-grey' aria-hidden='true' title='General Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
-                    echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
-                    echo "<td><a href='/user/" . $post_user . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</a></td>";
+                    echo "<tr><td><a href='/topic/" . $row['id'] . "?p=" . $row['last_page'] . "'><i class='fa fa-users w3-padding-small w3-text-grey' aria-hidden='true' title='General Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
+                    echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $row['timestamp'] . "</td>";
+                    echo "<td><a href='/user/" . $row['userid'] . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</a></td>";
                     echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $last_post_username . "</a></tr>";
                     $username = null;
                     $last_post_username = null;
                 }
 
-                define('DB_NAME4', 'if0_36019408_blog');
 			    $conn = Database::get(DB_NAME4);
-			
 				$sql = "SELECT id, user, title, post, date FROM posts ORDER BY date DESC LIMIT $limit OFFSET $offset";
 				$stmt = $conn->prepare($sql);
 				$stmt->execute();
-				$stmt->bind_result($id, $post_user, $title, $post, $date);
-				
-				while ($stmt->fetch()) {
-					$user_row = User::getUser($post_user);
+				$result = $stmt->get_result();
+
+                while ($row = $result->fetch_assoc()) {
+					$user_row = User::getUser($row['user']);
                     $username = $user_row->username ?? null;
 
-                    $shortTitle = substr($title, 0, 25);
-                    if (strlen($title) > 25) {
+                    $shortTitle = substr($row['title'], 0, 25);
+                    if (strlen($row['title']) > 25) {
                         $shortTitle .= "...";
                     }
 
-                    if(empty($title)) {
+                    if(empty($shortTitle)) {
                         $shortTitle = 'Untitled';
                     }
 
-                    $date = date("Y-m-d H:i:s", $date);
+                    $date = date("Y-m-d H:i:s", $row['date']);
 
-                    echo "<tr><td><a href='http://blog.gr8brik.rf.gd/t/" . $id . "' target='_blank'><i class='fa fa-pencil-square w3-padding-small w3-text-grey' aria-hidden='true' title='Blog Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
+                    echo "<tr><td><a href='http://blog.gr8brik.rf.gd/t/" . $row['id'] . "' target='_blank'><i class='fa fa-pencil-square w3-padding-small w3-text-grey' aria-hidden='true' title='Blog Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                     echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
                     echo "<td><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</td>";
                     echo "<td><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</td></tr>";
