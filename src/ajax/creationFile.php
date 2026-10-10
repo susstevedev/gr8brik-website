@@ -21,7 +21,6 @@ if(isset($data)) {
             exit;
         }
 
-        $is_viewer = isset($data['viewer']) ? true : false;
         $can_edit = false;
 
         if(!isset($_SESSION['viewer_auth'])) {
@@ -31,14 +30,14 @@ if(isset($data)) {
             exit;
         }
 
-        if($is_viewer && $data['viewer'] === $_SESSION['viewer_auth']) {
+        if(isset($data['viewer']) && $data['viewer'] === $_SESSION['viewer_auth']) {
             $can_edit = true;
         }
 
         $model_id = $data['creID'];
         $cdata = json_decode(fetch_build($model_id, $_SESSION['csrf']), true);
 
-        if ($cdata['message']) {
+        if (isset($cdata['message'])) {
             echo json_encode(["success" => false, "message" => $cdata['message']]);
             exit;
         } else {

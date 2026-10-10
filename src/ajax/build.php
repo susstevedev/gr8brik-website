@@ -1,9 +1,14 @@
 <?php
+
+use Michelf\MarkdownExtra;
+
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
+
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/Michelf/MarkdownExtra.inc.php';
 $bbcode = new BBCode;
 
 $conn = Database::get(DB_NAME2);
@@ -49,21 +54,6 @@ if(isset($_GET['storage'])) {
     exit;
 }
 
-$CREATION_SAVE_STRINGS = [
-	'NO_LOGIN' => "Please login to save creations.",
-	'REQUEST_EMPTY' => "Request is empty.",
-	'CREATION_FORMAT_INVALID' => "Invalid creation format.",
-	'CREATION_INVALID' => 'Failed to look for creation.',
-	'INVALID_VISIBILITY' => "Visibility must be one of: public, unlisted, private.",
-	'STORAGE_INVALID' => "Failed to check storage usage.",
-	'STORAGE_MAX' => "Storage limit of " . Numbers::filesize(MODEL_STORAGE_LIMIT) . " was reached.",
-	'CREATION_SAVE_FAIL' => "Failed to save creation.",
-	'CREATION_UPDATE_FAIL' => "Failed to update creation.",
-	'THUMBNAIL_INVALID' => "Thumbnail is not a valid image.",
-	'THUMBNAIL_BAD_ENCODING' => "Thumbnail must be encoded in Webp or PNG.",
-	'THUMBNAIL_SAVE_FAIL' => "Failed to save thumbnail.",
-];
-
 if (isset($_POST['save_build_v2'])) {
     header('Content-Type: application/json');
 
@@ -83,6 +73,7 @@ if (isset($_POST['save_build_v2'])) {
 
     $desc = $_POST['desc'] ?: '';
     $name = $_POST['name'] ?: "Untitled Creation";
+    $name_trim = preg_replace('/[^A-Za-z0-9]/', '_', $name);
     $modelJson = $_POST['creation'] ?: null;
     $visible = $_POST['visibility'] ?: null;
     $can_edit = $_POST['can_edit'] ?: 0;
@@ -156,15 +147,22 @@ if (isset($_POST['save_build_v2'])) {
             $db_screenshot = null;
         }
     } else {
-        $file_id = bin2hex(random_bytes(16));
-
-        $file_name = "../cre/" . $file_id . ".json";
-        $db_file_name = "/cre/" . $file_id . ".json";
-
-        $screenshot_path = "../cre/" . $file_id . ".webp";
-        $db_screenshot = "/cre/" . $file_id . ".webp";
-
+        $file_id = $name_trim . '_' . bin2hex(random_bytes(16));
         $old_file_size = 0;
+        $db_files_path = '/cre/';
+
+        $db_file_name = $db_files_path . $file_id . ".gr8";
+        $file_name = '../' . $db_file_name;
+        $db_screenshot = $db_files_path . $file_id . ".webp";
+        $screenshot_path = '../' . $db_screenshot;
+
+        if (!is_dir('../' . $db_files_path)) {
+            if(!mkdir('../' . $db_files_path)) {
+                http_response_code(500);
+                echo json_encode(['error' => ErrorRegistry::get('creation', 'save_fail')]);
+                exit;
+            }
+        }
     }
 
     $new_file_size = strlen($modelJson);
@@ -327,10 +325,12 @@ if (isset($_POST['save_build_v2'])) {
             'url_modeler' => $url_modeler,
             'visibility' => $visible,
             'can_edit' => $can_edit,
+            'rawfile' => $db_file_name, //should be blacklisted but i don't see why not to send this to the client 
         ],
         'user' => [
             'id' => $current_user->id,
             'name' => $current_user->username,
+            'url' => '/@' . urlencode($current_user->username),
         ],
     ]);
     exit;
@@ -340,24 +340,14 @@ function fetch_build($model_id, $csrf) {
     global $current_user;
     global $conn;
     global $conn2;
-
-    require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
-    $bbcode = new BBCode();
+    global $bbcode;
 
     if (empty($csrf) || $csrf != $_SESSION['csrf']) {
-        return json_encode(["message" => 'No CSRF token provided, or it is invalid!',]);
-    }
-
-    if ($conn->connect_error) {
-        exit($conn->connect_error);
-    }
-
-    if ($conn2->connect_error) {
-        exit($conn2->connect_error);
+        return json_encode(["success" => false, "message" => 'No CSRF token provided, or it is invalid!',]);
     }
 
     if (!is_numeric($model_id)){
-        return json_encode(["message" => ErrorRegistry::get('creation', 'bad_id')]);
+        return json_encode(["success" => false, "message" => ErrorRegistry::get('creation', 'bad_id')]);
     }
 
     $stmt = $conn->prepare("SELECT * FROM model WHERE id = ?");
@@ -368,22 +358,29 @@ function fetch_build($model_id, $csrf) {
 
     if (!$row2) {
         http_response_code(404);
-        return json_encode(["message" => ErrorRegistry::get('creation', 'not_found')]);
+        return json_encode(["success" => false, "message" => ErrorRegistry::get('creation', 'not_found')]);
     }
 
     $id = loggedin() ? ($current_user->id ?? 0) : 0;
     $is_admin = (isset($current_user->admin) && $current_user->admin === true);
     $is_owner = (loggedin() && isset($current_user) && trim($current_user->id) === trim($row2['user']));
+    $soft_message = '';
 
-    if (!$is_admin) {
-        if ($row2['removed'] === 1) {
+    if ($row2['removed'] === 1) {
+        if(!$is_admin) {
             http_response_code(404);
-            return json_encode(["message" => ErrorRegistry::get('creation', 'not_found')]);
+            return json_encode(["success" => false, "message" => ErrorRegistry::get('creation', 'not_found')]);
+        } else {
+            $soft_message .= "This creation has been [b]removed[/b] by an admin. This means that it\'s not visible to regular users.";
         }
+    }
 
-        if ($row2['visibility'] === 'private' && !$is_owner) {
+    if ($row2['visibility'] === 'private') {
+        if (!$is_admin && !$is_owner) {
             http_response_code(404);
-            return json_encode(["message" => ErrorRegistry::get('creation', 'not_found')]);
+            return json_encode(["success" => false, "message" => ErrorRegistry::get('creation', 'not_found')]);
+        } else {
+            $soft_message .= "This creation is private, meaning only the owner and site administratiors can view it.";
         }
     }
 
@@ -396,15 +393,29 @@ function fetch_build($model_id, $csrf) {
     $userid = $row2['user'];
     $views = $row2['views'];
     $votes = $row2['likes'];
+    $description_raw = $row2['description'];
     $decoded_description = $bbcode->toHTML($row2['description'], true, true);
-    $name = $bbcode->toHTML($row2['name'] ?? 'Untited creation', true, true);
+    $description_markdown = MarkdownExtra::defaultTransform(htmlentities($row2['description']));
+    $name = htmlentities($row2['name'] ?? 'Untited creation');
 
     $row = User::getUser($userid);
-    $user_name = $row->username ?? '';
-    $user_image = $row->picture_small ?? null;
+    $user_exists = true;
 
-    if (!isset($name) || empty($name)) {
-        $name = $user_name . "'s creation";
+    if(!$row) {
+        $user_exists = false;
+    } else if($row->suspended !== false) {
+        $user_exists = false;
+    } else if($row->deactive !== null) {
+        $user_exists = false;
+    }
+
+    if($user_exists) {
+        $user_name = $row->username ?? '';
+        $user_image = $row->picture_small;
+
+        if (!isset($name) || empty($name)) {
+            $name = $user_name . "'s creation";
+        }
     }
 
     $did_track = false;
@@ -432,8 +443,12 @@ function fetch_build($model_id, $csrf) {
         $stmt->close();
 
         if ($result4->num_rows > 0) {
-            http_response_code(403);
-            return json_encode(["message" => ErrorRegistry::get('creation', 'user_blocked')]);
+            if(!$is_admin) {
+                http_response_code(403);
+                return json_encode(["success" => false, "message" => ErrorRegistry::get('creation', 'user_blocked')]);
+            } else {
+                $soft_message .= "\n" . ErrorRegistry::get('creation', 'user_blocked');
+            }
         }
 
         $find_votes = $conn->query("SELECT id FROM votes WHERE user = '$id' AND creation = '$model_id' LIMIT 1");
@@ -478,15 +493,23 @@ function fetch_build($model_id, $csrf) {
     }
     $Tag_stmt->close();
 
+    $soft_message = isset($soft_message) ? $bbcode->toHTML($soft_message, true, true) : null;
     http_response_code(200);
     $data = [
         'success' => true,
-        'userid' => $userid,
-        'username' => $user_name,
-        'user_image' => $user_image,
+        'user' => [
+            'exists' => $user_exists,
+            'id' => $userid ?? 0,
+            'name' => $user_name ?? 'Deleted User, bitch',
+            'image' => $user_image ?? '/img/no_image.png',
+            'admin' => $row->admin ?? false,
+            'followers' => $followers ?? 0,
+        ],
         'modelid' => $model_id,
         'model' => $row2['model'],
         'description' => $decoded_description,
+        'description_raw' => $description_raw,
+        'description_markdown' => $description_markdown,
         'tags' => $model_tags,
         'name' => $name,
         'date' => date("F j, Y, g:i a", strtotime($row2['date'])),
@@ -502,10 +525,7 @@ function fetch_build($model_id, $csrf) {
 		'is_subbed_fav' => $is_subbed_fav ?? false,
         'likes' => $votes,
         'comments' => $row2['replies'],
-        'followers' => $followers,
-        'conversation_subbed' => $notifications->get_subscribers('comment', $model_id),
-        'model_admin' => $row->admin ?? false,
-        'message' => $message ?? null
+        'soft_message' => $soft_message,
     ];
     return json_encode($data);
 }
@@ -613,14 +633,19 @@ function fetch_comments($model_id, $csrf) {
 	foreach($rows as $row) {
         $comment_id = $row['id'];
         $comment_votes = Numbers::format($row['votes']);
+
         $is_op = $row['is_op'];
         $c_user = (int)$row['user'];
-        $c_user_removed = false;
-        $comment = $bbcode->toHTML($row['comment'], true, true);
+
         $comment_og = $row['comment'];
+        $comment = $bbcode->toHTML($comment_og, true, true);
+        $comment_md = MarkdownExtra::defaultTransform($comment_og);
+
         $userRow = $users[$c_user] ?? User::getUser($c_user);
         $date = time_ago(date('Y-m-d H:i:s', is_numeric($row['date']) ? $row['date'] : 0));
         $edited_at = null;
+
+        $c_user_removed = false;
         $c_user_privated = $privated[$c_user] ?? false;
         $c_user_banned = $suspended[$c_user] ?? false;
 
@@ -672,8 +697,9 @@ function fetch_comments($model_id, $csrf) {
             'is_op' => $is_op,
             'is_hidden' => $row['hidden'],
             'parent' => $row['parent'],
-            'picture' => $userRow->picture_small ?? null,
+            'picture' => $userRow->picture_small ?? '/img/no_image.png',
             'comment' => $comment,
+            'comment_md' => !empty($comment) ? $comment_md : null,
             'comment_og' => $comment_og,
             'date' => $date,
             'edited_at' => $edited_at,
@@ -686,6 +712,16 @@ function fetch_comments($model_id, $csrf) {
 
     $comResult->free();
     return json_encode($comments); 
+}
+
+function comment_subscribers($model_id) {
+    global $conn2;
+    $notifications = new Notifications($conn2);
+
+    $subbed = $notifications->get_subscribers('comment', $model_id);
+    $data = ['subbed' => $subbed];
+
+    return $data;
 }
 
 if(isset($_GET['comments'])) {
@@ -836,7 +872,7 @@ if(isset($_POST['comment'])) {
             'success' => 'Comment sent.',
             'comment' => [
                 'id' => $last_id,
-                'text' => $bbcode->toHTML($comment, true, true),
+                'text' => MarkdownExtra::defaultTransform($comment),
                 'username' => $current_user->username ?? null,
                 'userid' => $current_user->id ?? null,
                 'admin' => $current_user->admin ?? false,
@@ -880,7 +916,7 @@ if (isset($_POST['edit_comment'])) {
                         $stmt2->bind_param("ssi", $comment_text, $date, $comment_id);
 
                         if ($stmt2->execute()) {
-                            echo json_encode(['success' => 'Comment edited', 'comment' => ['text' => $bbcode->toHTML($comment_text, true, true), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
+                            echo json_encode(['success' => 'Comment edited', 'comment' => ['text' => MarkdownExtra::defaultTransform($comment_text), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
                         } else {
                             echo json_encode(['error' => 'Error editing comment']);
                         }
@@ -910,7 +946,7 @@ if (isset($_POST['comment_preview']) && isset($_POST['commentbox'])) {
             $comment_text = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
             $date = time();
 
-            echo json_encode(['success' => true, 'comment' => ['text' => $bbcode->toHTML($comment_text, true, true), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
+            echo json_encode(['success' => true, 'comment' => ['text' => MarkdownExtra::defaultTransform($comment_text), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Not logged in']);
         }

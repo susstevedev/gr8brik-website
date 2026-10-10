@@ -623,7 +623,7 @@
                     stat_name.innerHTML += `<a href="/build/${_json.modelid}" target="_blank">${_json.name}</a>`;
 
                     stat_username.style.display = "block";
-                    stat_username.innerHTML += `<a href="/user/${_json.userid}" target="_blank"><img src='${_json.user_image}.webp' alt='User icon' title='User icon' />${_json.username}</a>`;
+                    stat_username.innerHTML += `<a href="/user/${_json.user.id}" target="_blank"><img src='${_json.user.image}.webp' alt='User icon' title='User icon' />${_json.user.name}</a>`;
 
                     stat_date.style.display = "block";
                     stat_date.innerHTML += `${_json.date}`;
@@ -654,7 +654,7 @@
                         }
                     });
 
-                    window.globalPlayerConfig.model._lines.ldraw = show ? "true" : "false";
+                    window.globalPlayerConfig.model._lines.ldraw = show ? "true" : "false"; //why not bool bruh
                 });
 
                 window.addEventListener('resize', onWinResize, true);

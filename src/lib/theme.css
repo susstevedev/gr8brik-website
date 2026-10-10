@@ -294,12 +294,21 @@ body.mode-dark .creation-page-meta {
     width: 50px;
 }
 
-#data-comment-wrapper .comment #comment-text img {
+#data-comment-wrapper .comment .comment-body img {
     max-width: 100%;
 }
 
-#data-comment-wrapper .comment #comment-text article {
+#data-comment-wrapper .comment .comment-body article {
     min-height: 75px;
+}
+
+#data-comment-wrapper .comment .comment-body article .text {
+    word-wrap: break-word;
+    white-space: normal;
+
+    p, strong, b, i, em, a, h1, h2, h3, h4, h5, h6 {
+        margin: 10px 0;
+    }
 }
 
 .reply-form-box {

@@ -13,11 +13,22 @@ $conn = Database::get(DB_NAME2);
 $model_id = $conn->real_escape_string($_GET['id']);
 $data = json_decode(fetch_build($model_id, $_SESSION['csrf']), true);
 
-if ($data['message']) {
+$message = null;
+$error = null;
+$is_admin = false;
+$loggedin = false;
+
+if(loggedin() && isset($current_user)) {
+    $is_admin = $current_user->admin ? true : false;
+    $loggedin = true;
+    $id = $current_user->id ?? 0;
+}
+
+if (isset($data['message'])) {
     $error = $data['message'];
 } else {
-    if($data['is_removed']) {
-        $message = 'This creation has been <b>removed</b> by an admin. This means that it\'s not visible to regular users.';
+    if(isset($data['soft_message'])) {
+        $message = $data['soft_message'];
     }
 }
 
@@ -26,7 +37,7 @@ if (isset($_POST['delete_model'])) {
     $model_id = (int)$_POST['model_id'];
 
     if ($_SESSION['csrf'] === $_POST['csrf_token']) {
-        if (loggedin() && $current_user->admin === true) {
+        if ($loggedin && $is_admin) {
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 
             $sql = "SELECT id, removed FROM model WHERE id = ?";
@@ -67,9 +78,8 @@ if (isset($_POST['delete_comment'])) {
     $comment_id = (int)$_POST['id'];
 
     if ($_SESSION['csrf'] === $_POST['csrf_token']) {
-        if (loggedin()) {
+        if ($loggedin) {
             $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
-            $id = $current_user->id;
 
             $sql = "SELECT id, hidden, user, model FROM comments WHERE id = ?";
             $stmt = $conn->prepare($sql);
@@ -78,7 +88,7 @@ if (isset($_POST['delete_comment'])) {
             $result = $stmt->get_result();
 
             if ($row = $result->fetch_assoc()) {
-                if(trim($row['user']) === trim($current_user->id) || $current_user->admin) {
+                if(trim($row['user']) === trim($id) || $is_admin) {
                     $sql2 = "UPDATE comments SET hidden = 1 WHERE id = ?";
 					$type = 'delete';
                     $model_id = $row['model'];
@@ -92,7 +102,7 @@ if (isset($_POST['delete_comment'])) {
                     $stmt2->bind_param("i", $comment_id);
 
                     if ($stmt2->execute()) {
-                        echo json_encode(['success' => 'Comment updated', 'type' => $type, 'admin' => $current_user->admin ? true : false]);
+                        echo json_encode(['success' => 'Comment updated', 'type' => $type, 'admin' => $is_admin]);
                     } else {
                         echo json_encode(['error' => 'Error deleting comment']);
                     }
@@ -117,7 +127,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 <html lang="en">
 
 <head>
-    <title><?php echo $data['name'] ?? "This user's creation"?> by <?php echo $data['username'] ?? null ?></title>
+    <title><?php echo $data['name'] ?? "This user's creation"?> by <?php echo $data['user']['name'] ?? null ?></title>
     <?php include 'header.php' ?>
 
     <script type="text/javascript">
@@ -198,7 +208,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
         <div class="message w3-padding w3-round w3-border w3-border-grey w3-light-grey"><?php echo $message ?></div><br />
     <?php } ?>
 
-    <?php if (loggedin()) { ?>
+    <?php if ($loggedin) { ?>
         <form id="downvote" action="/ajax/build" method="post"><input type="hidden" value="<?php echo $model_id ?>" name="model_id"></form>
         <form id="upvote" action="/ajax/build" method="post"><input type="hidden" value="<?php echo $model_id ?>" name="model_id"></form>
     <?php } ?>
@@ -214,12 +224,14 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <header>
                     <h3 class="creation-page-title" id="name"><?php echo $data['name'] ?></h3>
 
-                    <p class="creation-page-meta">By 
-                        <b class="meta-author">
-                            <?php if(!User::isDeleted($data['userid'])) { ?><a id="user-link" class="<?php echo $data['model_admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>" href="/@<?php echo urlencode($data['username'])?>"><?php } ?><i class="fa fa-at" aria-hidden="true"></i><?php echo $data['username'] ?><?php if(!User::isDeleted($data['userid'])) { ?></a><?php } ?>
-                        </b>
-                        • <span id="user-link-followers"><?php echo $data['followers'] ?> followers</span>
-                    </p>
+                    <?php if($data['user']['exists']) { ?>
+                        <p class="creation-page-meta">By 
+                            <b class="meta-author">
+                                <a id="user-link" class="<?php echo $data['user']['admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>" href="/@<?php echo urlencode($data['user']['name'])?>"><i class="fa fa-at" aria-hidden="true"></i><?php echo $data['user']['name'] ?></a>
+                            </b>
+                            • <span id="user-link-followers"><?php echo $data['user']['followers'] ?> followers</span>
+                        </p>
+                    <?php } ?>
 
                     <p class="creation-page-meta" id="stats">
                         <span title="<?php echo $data['date'] ?>">Published <?php echo time_ago($data['date']) ?></span> • <span><?php echo $data['views'] ?> views</span>
@@ -227,8 +239,8 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 </header>
                 <hr />
 
-                <?php if (!empty($data['description'])) { ?>
-                    <h4><span id="description" class="w3-large"><?php echo $data['description'] ?></span><br /></h4>
+                <?php if (!empty($data['description_markdown'])) { ?>
+                    <h4><span id="description" class="w3-large"><?php echo $data['description_markdown'] ?></span><br /></h4>
                     <hr />
                 <?php } ?>
 
@@ -258,26 +270,26 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 								<button onclick="dropdown('dropdown-download')" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo"><i class="fa fa-download" aria-hidden="true"></i> Download</button>
 							</div>
 							<div id="dropdown-download" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
-								<a id="data-gr8-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['model'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['username']) ?>.<?php echo substr(strrchr($data['model'], '.'), 1) ?>">Creation file</a>
-								<a id="data-webp-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['username']) ?>.<?php echo substr(strrchr($data['screenshot'], '.'), 1) ?>">Thumbnail file</a>
+								<a id="data-gr8-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['model'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['user']['name']) ?>.<?php echo substr(strrchr($data['model'], '.'), 1) ?>">Creation file</a>
+								<a id="data-webp-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['user']['name']) ?>.<?php echo substr(strrchr($data['screenshot'], '.'), 1) ?>">Thumbnail file</a>
 							</div>
 						</div>
 					<?php } ?>
 
-                    <?php if (loggedin()) { ?>
+                    <?php if ($loggedin) { ?>
                         <?php if ($data['voted'] === true) { ?>
                             <div class="tooltip" id="data-unlike-creation">
                                 <span class="w3-tag w3-blue tooltiptext">Unfavorite this creation</span>
-                                &nbsp;<button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink"><span class="fa fa-star"></span>
+                                <button class="unlike-creation w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink"><span class="fa fa-star"></span>
                                     <span class="text">Unfavorite (<?php echo $data['likes'] ?>)</span>
-                                </button>&nbsp;
+                                </button>
                             </div>
                         <?php } else { ?>
                             <div class="tooltip" id="data-like-creation">
                                 <span class="w3-tag w3-blue tooltiptext">Favorite this creation to support it and the creator</span>
-                                &nbsp;<button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-padding-small w3-border w3-border-orange"><span class="fa fa-star-o"></span>
+                                <button class="like-creation w3-btn w3-yellow w3-hover-opacity w3-padding-small w3-border w3-border-orange"><span class="fa fa-star-o"></span>
                                     <span class="text">Favorite (<?php echo $data['likes'] ?>)</span>
-                                </button>&nbsp;
+                                </button>
                             </div>
                         <?php } ?>
 
@@ -294,12 +306,12 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 							</div>
 						</div>
 
-                        <?php if ($current_user->admin === true) { ?>
+                        <?php if ($is_admin) { ?>
                             <div class="tooltip" id="data-delete-model">
                                 <span class="w3-tag w3-blue tooltiptext"><?php echo $data['is_removed'] ? 'Restore' : 'Delete'; ?> this creation as an admin</span>
                                 <button onclick='document.getElementById("delete-model").style.display="block"' name="delete" class="w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink" />
                                 <i class="fa fa-trash" aria-hidden="true"></i> <?php echo $data['is_removed'] ? 'Restore' : 'Delete'; ?>
-                                </button>&nbsp;
+                                </button>
                             </div>
                         <?php } ?>
 
@@ -329,7 +341,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
         </figure>
 
         <div class="w3-container w3-margin">
-            <?php if (loggedin() && isset($current_user) && $current_user->verify_token === null) { ?>
+            <?php if ($loggedin && isset($current_user) && $current_user->verify_token === null) { ?>
                 <div id="comment-view-toggle" class="w3-col s12 w3-margin-bottom w3-bar">
                     <button class="edit w3-bar-item w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Edit</button>
                     <button class="preview w3-bar-item w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Preview</button>
@@ -392,20 +404,22 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     </main>
 
     <div id="data-comment-wrapper">
-        <h4><span class="fa fa-comments-o" aria-hidden="true"></span> <span id="comment-count"><?php echo $data['comments'] ?></span> comments</h4><hr />
+        <h4><span class="fa fa-comments-o" aria-hidden="true"></span> <span id="comment-count"><?php echo number_format($data['comments']) ?></span> comments</h4><hr />
+        <p>Involved in this conversation</p>
 
-            <div id="user-conversation-wrapper">
-                <?php
-                    foreach($data['conversation_subbed'] as $subbed) {
-                        ?>
-                        <span class="tooltip avatar">
-                            <span class="w3-blue tooltiptext"><?php echo $subbed['username'] ?></span>
-                            <a href="/user/<?php echo $subbed['id'] ?>"><img src="<?php echo $subbed['picture'] ?>" class="w3-circle w3-grey" width="50px" height="50px" alt="User Avatar" /></a>
-                        </span>
-                        <?php
-                    }
-                ?>
-            </div>
+        <div id="user-conversation-wrapper">
+            <?php
+                $convo_subbed = comment_subscribers($model_id);
+                foreach($convo_subbed['subbed'] as $subbed) {
+                    ?>
+                    <span class="tooltip avatar">
+                        <span class="w3-blue tooltiptext"><?php echo $subbed['username'] ?></span>
+                        <a href="/@<?php echo urlencode(strtolower($subbed['username'])) ?>"><img src="<?php echo $subbed['picture'] ?>" class="w3-round w3-grey" width="25px" height="25px" alt="User Avatar" /></a>
+                    </span>
+                    <?php
+                }
+            ?>
+        </div>
 
         <?php
         $comment_data = json_decode(fetch_comments($model_id, $_SESSION['csrf']), true);
@@ -430,7 +444,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
             }
 
             function comment_tree(array $grouped_comments, $parent_id = null, $depth = 0) {
-                global $current_user;
+                global $current_user, $loggedin;
 
                 if (!isset($grouped_comments[$parent_id])) {
                     return;
@@ -487,20 +501,19 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                     <p class="comment-error w3-text-grey"><i class="fa fa-info-circle" aria-hidden="true"></i> <i>This comment has been removed</i></p>
                                 <?php } ?>
 
-                                <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;">
-                                    <?php echo $comment['comment'] ?? '<i>This comment has been removed</i>' ?>
+                                <span class="text">
+                                    <?php echo $comment['comment_md'] ?? '<i>This comment has been removed</i>' ?>
                                 </span>
 
-                                <?php if (loggedin() && trim($current_user->id) === trim($comment['userid'])) { ?>
+                                <?php if ($loggedin && trim($current_user->id) === trim($comment['userid'])) { ?>
                                     <form class="edit w3-hide">
                                         <textarea class="edit-textarea"><?php echo $comment['comment_og'] ?></textarea><br />
                                         <button class="save-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Save</button>
                                         <button class="cancel-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
                                     </form>
                                 <?php } ?>
-                                <br />
 
-                                <?php if(loggedin()) { ?>
+                                <?php if($loggedin) { ?>
                                     <?php if ($comment['voted'] === false) { ?>
                                         <div class="tooltip">
                                             <span class="w3-blue tooltiptext">Favorite Comment</span>
@@ -603,13 +616,13 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </span>
                         </header>
 
-                        <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;"></span>
+                        <span class="text"></span>
 
                         <form class="edit w3-hide">
                             <textarea class="edit-textarea"></textarea><br />
                             <button class="save-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Save</button>
                             <button class="cancel-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
-                        </form><br />
+                        </form>
 
                         <div class="tooltip">
                             <span class="w3-blue tooltiptext">Favorite Comment</span>

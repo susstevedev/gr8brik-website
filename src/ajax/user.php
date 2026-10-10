@@ -181,7 +181,7 @@ class User {
             return false;
         }
 
-        $stmt = $conn->prepare("SELECT private_profile FROM users WHERE id = ?");
+        $stmt = $conn->prepare("SELECT private_profile FROM user_profiles WHERE userid = ?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
 

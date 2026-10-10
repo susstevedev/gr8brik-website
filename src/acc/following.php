@@ -52,11 +52,8 @@ if(!loggedin() || !isset($current_user)) {
 
     <?php
         $conn2 = Database::get(DB_NAME);
-        if ($conn2->connect_error) {
-            exit($conn2->connect_error);
-        }
 
-        $id = $current_user->id;
+        $id = $current_user->id ?? 0;
         $sql = "SELECT DISTINCT u.* FROM follow f JOIN users u ON f.profileid = u.id WHERE f.userid = ? AND u.deactive IS NULL ORDER BY f.id DESC";
 
         $stmt = $conn2->prepare($sql);
@@ -83,7 +80,7 @@ if(!loggedin() || !isset($current_user)) {
             }
             echo "<span>Member since " . $clean_age . '</span>';
             
-            echo "<form id='unfollow-" . $profileid . "' method='post' action='profile.php?id=" . $profileid . "'></form>";
+            echo "<form id='unfollow-" . $profileid . "' method='post' action='/user/" . $profileid . "'></form>";
             echo "<input form='unfollow-" . $profileid . "' type='submit' value='Unfollow' name='unfollow' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>";
             echo "</article><br />";
         }
@@ -144,8 +141,8 @@ if(!loggedin() || !isset($current_user)) {
                 echo "<span>" . $clean_description . '</span><br />';
             }
             echo "<span>Member since " . $clean_age . '</span>';
-            
-            echo "<form id='unblock-" . $userid . "' method='post' action='profile.php?id=" . $userid . "'></form>";
+
+            echo "<form id='unblock-" . $userid . "' method='post' action='/user/" . $userid . "'></form>";
             echo "<input form='unblock-" . $userid . "' type='submit' value='Unblock' name='unblock' class='w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink'>";
             echo "</article><br />";
         }
