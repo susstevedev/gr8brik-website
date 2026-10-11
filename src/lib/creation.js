@@ -424,13 +424,28 @@
 
         $("#comment-form").on("focusin focusout", function(event) {
             var form_inside = $(event.relatedTarget).closest("#comment-form").length > 0;
+            var comment_box = $("#comment-form [name='comment-box']");
 
             if (event.type === 'focusin') {
-                $("#comment-form [name='comment-box']").stop().animate({ height: "80px" }, 'fast');
+                comment_box.stop().animate({ height: "80px" }, 'fast');
                 $("#comment-form .comment-button").stop().show();
             } else if (event.type === 'focusout' && !form_inside) {
-                $("#comment-form [name='comment-box']").stop().animate({ height: "60px" }, 'fast'); 
+                comment_box.stop().animate({ height: "60px" }, 'fast'); 
                 $("#comment-form .comment-button").stop().hide();
+            }
+
+            if($.trim(comment_box.val()).length === 0) {
+                $("#comment-view-toggle button.preview").addClass('w3-disabled');
+            } else {
+                $("#comment-view-toggle button.preview").removeClass('w3-disabled');
+            }
+        });
+
+        $("#comment-form [name='comment-box']").on("input", function(event) {
+            if($.trim($(this).val()).length === 0) {
+                $("#comment-view-toggle button.preview").addClass('w3-disabled');
+            } else {
+                $("#comment-view-toggle button.preview").removeClass('w3-disabled');
             }
         });
 
@@ -456,20 +471,15 @@
         $(document).on("click", "#comment-view-toggle button", function (event) {
             event.preventDefault();
             var btn = $(this);
-            var comment_box = $("#comment-form [name='comment-box']").val() || $("#comment-form [name='comment-box']").attr('placeholder');
+            var comment_box = $("#comment-form [name='comment-box']").val();
             var preview_selector = $('#comment-form .comment-preview .text');
             var preview_date_selector = $('#comment-form .comment-preview .w3-right .date');
 
             if(btn.hasClass('edit')) {
                 $('#comment-form #post').show();
                 $('#comment-form .comment-preview').hide();
-            } else if(btn.hasClass('preview')) {
+            } else if(btn.hasClass('preview') && !btn.hasClass('w3-disabled') && $.trim(comment_box).length !== 0) {
                 $('#comment-form #post').hide();
-
-                if($.trim(comment_box).length === 0) {
-                    $('#comment-form .comment-preview').show();
-                    return;
-                }
 
                 if($.trim(comment_box) === $.trim(atob(preview_selector.attr('data-preview-text')))) {
                     $('#comment-form .comment-preview').show();

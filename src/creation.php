@@ -263,7 +263,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <?php } ?>
 
                 <div class="w3-right">
-					<?php if ($data['can_edit']) { ?>
+					<?php /* if ($data['can_edit']) { ?>
 						<div class="w3-dropdown-click" style="z-index: 999;">
 							<div class="tooltip">
 								<span class="w3-tag w3-blue tooltiptext">Download this model's screenshot and json file</span>
@@ -274,7 +274,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 								<a id="data-webp-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['user']['name']) ?>.<?php echo substr(strrchr($data['screenshot'], '.'), 1) ?>">Thumbnail file</a>
 							</div>
 						</div>
-					<?php } ?>
+					<?php } */ ?>
 
                     <?php if ($loggedin) { ?>
                         <?php if ($data['voted'] === true) { ?>
@@ -357,7 +357,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                     </div>
 
                     <div id="post" class="w3-rest w3-hover-shadow w3-border w3-border-blue">
-                        <textarea name="comment-box" id="comment-box" class="w3-input w3-col s12" placeholder="Add a comment... (@username mentions someone, BBcode supported)"></textarea>
+                        <textarea name="comment-box" id="comment-box" class="w3-input w3-col s12" placeholder="Add a comment... (@username mentions someone, Markdown supported)"></textarea>
                     </div>
 
                     <article class="comment-preview w3-rest gr8-theme w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
@@ -371,9 +371,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </span>
                         </header>
 
-                        <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;" data-preview-text="">
-                            My comments text
-                        </span>
+                        <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;" data-preview-text=""></span>
                     </article>
 
                     <div class="w3-col s12 w3-margin-top">
@@ -390,7 +388,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <form id="attach-upload" method="post" action="">
                     <input type="file" name="imagefile" id="imagefile">
                 </form>
-            <?php } else if(isset($current_user) && $current_user->verify_token !== null) { ?>
+            <?php } else if($loggedin && isset($current_user) && $current_user->verify_token !== null) { ?>
                 <div class="gr8-theme w3-card-2 w3-light-grey w3-border w3-padding" style="width:65%">
                     <b>Verify your account to comment</b>
                     <p>An email was sent to your inbox. If you did not receive an email, contact us.</p>
@@ -502,7 +500,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 <?php } ?>
 
                                 <span class="text">
-                                    <?php echo $comment['comment_md'] ?? '<i>This comment has been removed</i>' ?>
+                                    <?php echo $comment['comment_md'] ?? '<p><i>This comment has been removed</i></p>' ?>
                                 </span>
 
                                 <?php if ($loggedin && trim($current_user->id) === trim($comment['userid'])) { ?>

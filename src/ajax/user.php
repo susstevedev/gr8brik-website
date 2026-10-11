@@ -94,7 +94,6 @@ class User {
     public ?bool $private_profile;
     public ?string $deactive;
     public ?int $changed;
-    public ?string $ip;
 
     private const FIELDS = [
         'id',

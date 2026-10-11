@@ -1,6 +1,6 @@
 <?php
 
-use Michelf\MarkdownExtra;
+//use Michelf\MarkdownExtra;
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
@@ -8,7 +8,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/Michelf/MarkdownExtra.inc.php';
+//require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/Michelf/MarkdownExtra.inc.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
 $bbcode = new BBCode;
 
 $conn = Database::get(DB_NAME2);
@@ -395,7 +396,8 @@ function fetch_build($model_id, $csrf) {
     $votes = $row2['likes'];
     $description_raw = $row2['description'];
     $decoded_description = $bbcode->toHTML($row2['description'], true, true);
-    $description_markdown = MarkdownExtra::defaultTransform(htmlentities($row2['description']));
+    //$description_markdown = MarkdownExtra::defaultTransform(htmlentities($row2['description']));
+    $description_markdown = Slimdown::render(htmlspecialchars($row2['description']));
     $name = htmlentities($row2['name'] ?? 'Untited creation');
 
     $row = User::getUser($userid);
@@ -500,7 +502,7 @@ function fetch_build($model_id, $csrf) {
         'user' => [
             'exists' => $user_exists,
             'id' => $userid ?? 0,
-            'name' => $user_name ?? 'Deleted User, bitch',
+            'name' => $user_name ?? 'Deleted User',
             'image' => $user_image ?? '/img/no_image.png',
             'admin' => $row->admin ?? false,
             'followers' => $followers ?? 0,
@@ -553,9 +555,9 @@ function fetch_comments($model_id, $csrf) {
     }
 
     $model_id = (int)$model_id;
-    $id = loggedin() ? (int)$current_user->id : 0;
+    $id = loggedin() ? ((int)$current_user->id ?? 0) : false;
 
-    if($current_user->admin !== true) {
+    if($id && $current_user->admin !== true) {
 	    $sql = "SELECT * FROM comments WHERE model = $model_id AND hidden = 0 ORDER BY id ASC";
     } else {
         $sql = "SELECT * FROM comments WHERE model = $model_id ORDER BY id ASC";
@@ -620,7 +622,7 @@ function fetch_comments($model_id, $csrf) {
         foreach ($users as $c_user) {
             $c_user_id = (int)$c_user->id ?? null;
 
-            if(((bool)$c_user->private_profile && !User::isFollowing($c_user_id) && !User::isMe($c_user_id))) {
+            if(((bool)$c_user->private_profile && !User::isFollowing($c_user_id) && $c_user_id !== $id)) {
                 $privated[$c_user_id] = true;
             }
 
@@ -634,55 +636,60 @@ function fetch_comments($model_id, $csrf) {
         $comment_id = $row['id'];
         $comment_votes = Numbers::format($row['votes']);
 
-        $is_op = $row['is_op'];
-        $c_user = (int)$row['user'];
+        $comment_og = htmlspecialchars($row['comment']);
+        $comment = $bbcode->toHTML($comment_og, false, true);
+        //$comment_md = MarkdownExtra::defaultTransform($comment_og);
+        $comment_md = Slimdown::render($comment_og);
 
-        $comment_og = $row['comment'];
-        $comment = $bbcode->toHTML($comment_og, true, true);
-        $comment_md = MarkdownExtra::defaultTransform($comment_og);
+        $userRow = $users[(int)$row['user']] ?? User::getUser((int)$row['user']);
 
-        $userRow = $users[$c_user] ?? User::getUser($c_user);
         $date = time_ago(date('Y-m-d H:i:s', is_numeric($row['date']) ? $row['date'] : 0));
         $edited_at = null;
 
-        $c_user_removed = false;
-        $c_user_privated = $privated[$c_user] ?? false;
-        $c_user_banned = $suspended[$c_user] ?? false;
+        //c_user_blablabla got annoying
+        $c_user_data = [
+            'id' => (int)$row['user'] ?? 0,
+            'name' => $userRow->username ?? 'Deleted User',
+            'admin' => $userRow->admin ?? false,
+            'is_op' => $row['is_op'] ?? 0,
+            'picture' => $userRow->picture_small ?? '/img/no_image.png',
+            'banned' => $suspended[(int)$row['user']] ?? false,
+            'removed' => !$userRow ? true : false,
+            'private' => $privated[(int)$row['user']] ?? false,
+        ];
 
-        if($c_user_banned) {
-            $c_user_removed = true;
+        if($c_user_data['banned']) {
+            $message = "The account that had posted this reply has been suspended for violating the Guidelines.";
+            $c_user_data['removed'] = true;
+            $c_user_data['picture'] = '/img/no_image.png';
         }
 
         if(!$userRow) {
-            $c_user_removed = true;
+            $c_user_data['removed'] = true;
+            $c_user_data['picture'] = '/img/no_image.png';
             $message = "The account that had posted this reply has been deleted.";
-            $comment = null;
-            $userRow = null;
         }
 
-        if($c_user_privated) {
-            $c_user_removed = true;
-            $message = "The account that had posted this reply is private.";
-            $comment = null;
-            $userRow = null;
+        if($c_user_data['private']) {
+            continue;
         }
 
         if((int)$row['edited_at'] !== 0) {
             $edited_at = time_ago(date('Y-m-d H:i:s', is_numeric($row['edited_at']) ? $row['edited_at'] : 0));
         }
 
-        $youBlocked = $blocked[$c_user]['you_blocked'] ?? false;
-        $theyBlocked = $blocked[$c_user]['they_blocked'] ?? false;
+        $youBlocked = $blocked[$c_user_data['id']]['you_blocked'] ?? false;
+        $theyBlocked = $blocked[$c_user_data['id']]['they_blocked'] ?? false;
         if(loggedin()) {
             if ($youBlocked && $theyBlocked) {
-                $c_user_removed = true;
-                $message = "You blocked @" . $userRow->username . ", and they blocked you. Their comments and profile will not be visible.";
+                $c_user_data['removed'] = true;
+                $message = "You blocked @" . $c_user_data['username'] . ", and they blocked you. Their comments and profile will not be visible.";
                 $comment = null;
             } elseif ($youBlocked) {
-                $message = "You blocked @" . $userRow->username . ". Your comments and profile will not be visible to them.";
+                $message = "You blocked @" . $c_user_data['username'] . ". Your comments and profile will not be visible to them.";
             } elseif ($theyBlocked) {
-                $c_user_removed = true;
-                $message = "You're blocked from @" . $userRow->username . ". Their comments and profile will not be visible.";
+                $c_user_data['removed'] = true;
+                $message = "You're blocked from @" . $c_user_data['username'] . ". Their comments and profile will not be visible.";
                 $comment = null;
             }
         }
@@ -690,14 +697,14 @@ function fetch_comments($model_id, $csrf) {
         $comments[] = [
             'message' => $message ?? null,
             'id' => $comment_id,
-            'userid' => $c_user,
-            'user_removed' => $c_user_removed,
-            'user_admin' => $userRow->admin ?? 0,
-            'username' => $userRow->username ?? '',
-            'is_op' => $is_op,
+            'userid' => $c_user_data['id'],
+            'user_removed' => $c_user_data['removed'],
+            'user_admin' => $c_user_data['admin'],
+            'username' => $c_user_data['name'],
+            'is_op' => $c_user_data['is_op'],
             'is_hidden' => $row['hidden'],
             'parent' => $row['parent'],
-            'picture' => $userRow->picture_small ?? '/img/no_image.png',
+            'picture' => $c_user_data['picture'],
             'comment' => $comment,
             'comment_md' => !empty($comment) ? $comment_md : null,
             'comment_og' => $comment_og,
@@ -872,7 +879,8 @@ if(isset($_POST['comment'])) {
             'success' => 'Comment sent.',
             'comment' => [
                 'id' => $last_id,
-                'text' => MarkdownExtra::defaultTransform($comment),
+                //'text' => MarkdownExtra::defaultTransform($comment),
+                'text' => Slimdown::render(htmlspecialchars($comment)),
                 'username' => $current_user->username ?? null,
                 'userid' => $current_user->id ?? null,
                 'admin' => $current_user->admin ?? false,
@@ -916,7 +924,7 @@ if (isset($_POST['edit_comment'])) {
                         $stmt2->bind_param("ssi", $comment_text, $date, $comment_id);
 
                         if ($stmt2->execute()) {
-                            echo json_encode(['success' => 'Comment edited', 'comment' => ['text' => MarkdownExtra::defaultTransform($comment_text), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
+                            echo json_encode(['success' => 'Comment edited', 'comment' => ['text' => Slimdown::render($comment_text), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
                         } else {
                             echo json_encode(['error' => 'Error editing comment']);
                         }
@@ -946,7 +954,7 @@ if (isset($_POST['comment_preview']) && isset($_POST['commentbox'])) {
             $comment_text = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
             $date = time();
 
-            echo json_encode(['success' => true, 'comment' => ['text' => MarkdownExtra::defaultTransform($comment_text), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
+            echo json_encode(['success' => true, 'comment' => ['text' => Slimdown::render($comment_text), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Not logged in']);
         }

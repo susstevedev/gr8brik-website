@@ -62,7 +62,7 @@ if (isset($_GET['feature_v3'])) {
 
 <body class="w3-container">
     <?php
-        include 'com/bbcode.php';
+        include 'ajax/bbcode.php';
         include 'navbar.php';
         $bbcode = new BBCode;
     ?>
@@ -95,46 +95,44 @@ if (isset($_GET['feature_v3'])) {
             <button form="list-search-cre" class="w3-btn w3-hover-none w3-mobile" id="search-button-2">
                 <i class="fa fa-search" aria-hidden="true"></i>
             </button>
-            <input name="q" class="w3-padding" type="text" value="<?php if (isset($_GET['q'])) {
-                                                                        echo htmlspecialchars($_GET['q']);
-                                                                    } ?>" id="search-input-2" placeholder="Search for..." style="border:none; outline:none;">
+            <input name="q" class="w3-padding" type="text" value="<?php echo isset($_GET['q']) ? htmlspecialchars($_GET['q']) : null ?>" id="search-input-2" placeholder="Search for..." style="border:none; outline:none;">
         </form>
 
         <form id="list-tags-cre" name="list-tags-cre" class="w3-white" method="get" action="" style="display: inline-flex; align-items: center; border: 1px solid #ccc;">
             <button form="list-tags-cre" class="w3-btn w3-hover-none w3-mobile">
                 <i class="fa fa-search" aria-hidden="true"></i>
             </button>
-            <input name="t" class="w3-padding" type="text" value="<?php if (isset($_GET['t'])) {
-                                                                        echo htmlspecialchars($_GET['t']);
-                                                                    } ?>" placeholder="Tags (seperated by comma)" style="border:none; outline:none;">
+            <input name="t" class="w3-padding" type="text" value="<?php echo isset($_GET['t']) ? htmlspecialchars($_GET['t']) : null ?>" placeholder="Tags (seperated by comma)" style="border:none; outline:none;">
         </form>
 
         <form id="sorting" name="sorting" method="get" style="display: inline-flex; align-items: center; gap: 8px;">
             <label for="sort"><span>Sort by&nbsp;</span></label>
             <select class="w3-select w3-light-grey w3-border w3-border-grey" name="sort" id="sort" style="width: auto; padding: 4px 8px;">
                 <option disabled>Select...</option>
+
                 <?php
                 $selected_sort = isset($_GET['sort']) ? $_GET['sort'] : 'follow';
 
                 $options = [
-                    'follow'  => 'Following',
+                    'follow' => 'Following',
                     'feature' => 'Featured',
-                    'all'     => 'All',
-                    'views'   => 'Most viewed',
-                    'size'    => 'File size',
-                    'likes'   => 'Most liked',
-                    'az'      => 'Alphabetical A-Z',
-                    'za'      => 'Alphabetical Z-A',
-                    'oldest'  => 'Oldest',
-                    'newest'  => 'Newest'
+                    'all' => 'All',
+                    'views' => 'Most viewed',
+                    'size' => 'File size',
+                    'likes' => 'Most liked',
+                    'az' => 'Alphabetical A-Z',
+                    'za' => 'Alphabetical Z-A',
+                    'oldest' => 'Oldest',
+                    'newest' => 'Newest'
                 ];
 
                 foreach ($options as $value => $label) {
-                    $selected = ($selected_sort === $value) ? 'selected' : '';
+                    $selected = ($selected_sort === $value) ? 'selected' : null;
                     echo "<option value='{$value}' {$selected}>{$label}</option>";
                 }
                 ?>
             </select>
+
             <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" type="submit">
                 <i class="fa fa-filter" aria-hidden="true"></i>
                 <span>Apply</span>
@@ -149,7 +147,7 @@ if (isset($_GET['feature_v3'])) {
         if (loggedin() && isset($current_user)) {
             $id = $current_user->id ?? 0;
 
-            $stmt = $conn->prepare('SELECT * FROM follow WHERE userid = ?');
+            $stmt = $conn->prepare('SELECT profileid FROM follow WHERE userid = ? LIMIT 300');
             $stmt->bind_param('i', $id);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -220,17 +218,17 @@ if (isset($_GET['feature_v3'])) {
             }
         }
 
-        if (isset($_GET['sort']) && $_GET['sort']) {
+        if (isset($_GET['sort'])) {
             $sort_options = [
                 'feature' => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" AND feature = 1 ORDER BY date DESC', 'label' => 'Featured creations'],
-                'views'   => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY views DESC', 'label' => 'Most viewed'],
-                'size'    => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY size DESC', 'label' => 'Biggest in size'],
-                'likes'   => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY likes DESC', 'label' => 'Most liked'],
-                'az'      => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY name ASC', 'label' => 'Alphabetical A-Z'],
-                'za'      => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY name DESC', 'label' => 'Alphabetical Z-A'],
-                'oldest'  => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY date ASC', 'label' => 'Oldest creations'],
-                'newest'  => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY date DESC', 'label' => 'Newest creations'],
-                'all'     => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY id DESC', 'label' => 'All creations']
+                'views' => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY views DESC', 'label' => 'Most viewed'],
+                'size' => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY size DESC', 'label' => 'Biggest in size'],
+                'likes' => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY likes DESC', 'label' => 'Most liked'],
+                'az' => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY name ASC', 'label' => 'Alphabetical A-Z'],
+                'za' => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY name DESC', 'label' => 'Alphabetical Z-A'],
+                'oldest' => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY date ASC', 'label' => 'Oldest creations'],
+                'newest' => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY date DESC', 'label' => 'Newest creations'],
+                'all' => ['sql' => 'SELECT * FROM model WHERE removed = 0 AND visibility = "public" ORDER BY id DESC', 'label' => 'All creations']
             ];
 
             if (array_key_exists($_GET['sort'], $sort_options)) {
@@ -248,21 +246,32 @@ if (isset($_GET['feature_v3'])) {
 
         if (isset($result2) && $result2 !== null && $result2->num_rows > 0) {
         ?>
-            <div class="w3-col s12">
-                <h4><i class="fa fa-info-circle w3-padding-small" aria-hidden="true"></i><?php echo $result2->num_rows; ?> creations found</h4>
-            </div>
+            <?php if($is_search) { ?>
+                <div class="w3-col s12">
+                    <h4><i class="fa fa-info-circle w3-padding-small" aria-hidden="true"></i><?php echo $result2->num_rows; ?> creations found</h4>
+                </div>
+            <?php } ?>
 
             <?php
             while ($row = $result2->fetch_assoc()) {
-                $model_id = $row['id'];
-                $userid = $row['user'];
-                $user = User::getUser($userid);
+                $rows[] = $row;
+            }
 
-                if (empty($row['name'])) {
-                    $row['name'] = $user->username . "'s creation";
-                }
+            if(!empty($rows)) {
+                $userIds = array_column($rows, 'user');
+                $users = User::getUsers($userIds);
 
-                $truncatedName = (mb_strlen($row['name']) > 30) ? mb_substr($row['name'], 0, 30) . '...' : $row['name'];
+                foreach($rows as $row) {
+                    $model_id = $row['id'];
+                    $userid = $row['user'];
+                    //$user = User::getUser($userid);
+                    $user = $users[$userid] ?? null;
+
+                    if (empty($row['name'])) {
+                        $row['name'] = ($user->username ?? '') . "'s creation";
+                    }
+
+                    $truncatedName = (mb_strlen($row['name']) > 30) ? mb_substr($row['name'], 0, 30) . '...' : $row['name'];
             ?>
 
                 <!-- new ui because old one got boring -->
@@ -274,10 +283,10 @@ if (isset($_GET['feature_v3'])) {
                         </a>
                         <div class="creation-meta">
                             <span class="meta-author">
-                                <?php if (!User::isDeleted($userid)) { ?>
+                                <?php if ($user) { ?>
                                     By <a href="/@<?php echo rawurlencode($user->username); ?>"><b><?php echo $user->username; ?></b></a>
                                 <?php } else { ?>
-                                    By <i><?php echo $user->username; ?></i>
+                                    By <i>Deleted User</i>
                                 <?php } ?>
                                 on <?php echo date("d M Y", strtotime($row['date'])); ?>
                             </span>
@@ -291,6 +300,7 @@ if (isset($_GET['feature_v3'])) {
                     </div>
                 </div>
         <?php
+                }
             }
         } else {
             echo '<div class="w3-col s12 w3-center w3-padding-large"><b>¯\_(ツ)_/¯ No creations found. Sorry!</b></div>';

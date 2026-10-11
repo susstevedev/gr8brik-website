@@ -28,7 +28,7 @@ class Notifications
 
         $result = $stmt->get_result();
         $notif = $this->db->prepare("INSERT INTO notifications (user, profile, timestamp, content, category2) VALUES (?, ?, ?, ?, ?)");
-        $alert = $this->db->prepare("UPDATE users SET alert = alert + 1 WHERE id = ?");
+        $alert = $this->db->prepare("UPDATE users SET alert = alert + 1 WHERE id = ? AND deactive IS NULL"); //legacy ass code
 
         $time = time();
 
@@ -101,6 +101,10 @@ class Notifications
             $userObj = User::getUser($recipientId);
 
             if(!$userObj || User::isPrivate($recipientId)) {
+                continue;
+            }
+
+            if($userObj->suspended) {
                 continue;
             }
 
