@@ -168,7 +168,7 @@
 				});
 			});
 
-			$(document).on("click", ".gr8-comment-attachment", function (event) {
+			/*$(document).on("click", ".gr8-comment-attachment", function (event) {
 				event.preventDefault();
 
 				var item = $(this);
@@ -219,6 +219,6 @@
 						alert("An error occured while viewing the image details");
 					}
 				});
-			});
+			});*/
 	});
 })();

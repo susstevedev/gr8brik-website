@@ -559,10 +559,10 @@
                     btntext.html(prevbtntext);
                     btn.prop("disabled", false);
 
-                    if (res && res.success && res.image && res.insert) {
+                    if (res && res.success && res.image && res.image.markdown) {
                         showSuccess(res.message);
 
-                        comment_box.val(comment_box.val() + ($.trim(comment_box.val()).length === 0 ? "" : "\n") + res.insert);
+                        comment_box.val(comment_box.val() + ($.trim(comment_box.val()).length === 0 ? "" : "\n") + res.image.markdown);
                     } else if (res && res.message && !res.success) {
                         showError(res.message);
                     } else {

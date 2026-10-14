@@ -372,7 +372,7 @@ function fetch_build($model_id, $csrf) {
             http_response_code(404);
             return json_encode(["success" => false, "message" => ErrorRegistry::get('creation', 'not_found')]);
         } else {
-            $soft_message .= "This creation has been [b]removed[/b] by an admin. This means that it\'s not visible to regular users.";
+            $soft_message .= "This creation has been **removed** by an admin. This means that it\'s not visible to regular users.";
         }
     }
 
@@ -381,7 +381,7 @@ function fetch_build($model_id, $csrf) {
             http_response_code(404);
             return json_encode(["success" => false, "message" => ErrorRegistry::get('creation', 'not_found')]);
         } else {
-            $soft_message .= "This creation is private, meaning only the owner and site administratiors can view it.";
+            $soft_message .= "This creation is **private**, meaning only the owner and site administratiors can view it.";
         }
     }
 
@@ -396,7 +396,6 @@ function fetch_build($model_id, $csrf) {
     $votes = $row2['likes'];
     $description_raw = $row2['description'];
     $decoded_description = $bbcode->toHTML($row2['description'], true, true);
-    //$description_markdown = MarkdownExtra::defaultTransform(htmlentities($row2['description']));
     $description_markdown = Slimdown::render(htmlspecialchars($row2['description']));
     $name = htmlentities($row2['name'] ?? 'Untited creation');
 
@@ -495,7 +494,7 @@ function fetch_build($model_id, $csrf) {
     }
     $Tag_stmt->close();
 
-    $soft_message = isset($soft_message) ? $bbcode->toHTML($soft_message, true, true) : null;
+    $soft_message = isset($soft_message) ? Slimdown::render($soft_message) : null;
     http_response_code(200);
     $data = [
         'success' => true,

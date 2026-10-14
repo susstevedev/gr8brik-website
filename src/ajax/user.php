@@ -283,7 +283,7 @@ class User {
         $type = null;
         $userid = $current_user->id ?? 0; //clarification: this is your user id profileid is their userid
 
-        $stmt = $conn->prepare("SELECT userid, profileid FROM user_blocks WHERE (userid = ? AND profileid = ?) OR (userid = ? AND profileid = ?) LIMIT 1");
+        $stmt = $conn->prepare("SELECT userid, profileid, reason FROM user_blocks WHERE (userid = ? AND profileid = ?) OR (userid = ? AND profileid = ?)");
     	$stmt->bind_param("iiii", $userid, $profileid, $profileid, $userid);
     	$stmt->execute();
         $block_result = $stmt->get_result();
@@ -296,6 +296,7 @@ class User {
                     $you = true;
                 } elseif ($row['userid'] === $profileid && $row['profileid'] === $userid) {
                     $them = true;
+                    $reason = $row['reason'] ?? null;
                 }
             }
 
@@ -312,7 +313,7 @@ class User {
                 return false;
             }
 
-            return array('message' => $message, 'type' => $type);
+            return array('message' => $message, 'type' => $type, 'reason' => $reason);
         }
 
         return false;

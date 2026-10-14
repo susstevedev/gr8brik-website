@@ -62,9 +62,9 @@ if (isset($_GET['followed_by'])) {
         }
 
         $followed_by[] = [
-            'url'      => '/@' . urlencode($row['username']),
-            'userid'   => $row['id'], 
-            'pfp'      => $row['picture'] ?? '/img/no_image.png',
+            'url' => '/@' . urlencode($row['username']),
+            'userid' => $row['id'], 
+            'pfp' => $row['picture'] ?? '/img/no_image.png',
             'username' => htmlspecialchars($row['username'])
         ];
     }
@@ -75,59 +75,6 @@ if (isset($_GET['followed_by'])) {
     http_response_code(200);
     echo json_encode($followed_by);
     exit;
-}
-
-function user_blocks(int $profileid, mixed $db) {
-    global $current_user;
-
-    if(!loggedin()) {
-        return;
-    }
-
-    $you = false;
-    $them = false;
-    $type = null;
-    $message = false;
-    $message_arr = [];
-    $userid = $current_user->id ?? 0; //clarification: this is your user id profileid is their userid
-
-    $block_result = $db->query("SELECT * FROM user_blocks WHERE (userid = '$userid' AND profileid = '$profileid') OR (userid = '$profileid' AND profileid = '$userid')");
-
-    if ($block_result && $block_result->num_rows > 0) {
-        $block_usero = User::getUser($profileid);
-
-        if(!$block_usero) {
-            return;
-        }
-
-        $username = $block_usero->username ?? '[user]';
-
-        while ($row = $block_result->fetch_assoc()) {
-            if ($row['userid'] == $userid && $row['profileid'] == $profileid) {
-                $you = true;
-            } elseif ($row['userid'] == $profileid && $row['profileid'] == $userid) {
-                $them = true;
-            }
-        }
-
-        if ($you && $them) {
-            $message = "You blocked " . $username . ", and they blocked you.";
-            $type = 'both';
-        } elseif ($you) {
-            $message = "You blocked " . $username;
-            $type = 'you';
-        } elseif ($them) {
-            $message = "You're blocked from " . $username;
-            $type = 'them';
-        }
-
-        $message_arr = array(
-            'message' => $message,
-            'type' => $type,
-        );
-
-        return $message_arr;
-    }
 }
 
 function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
@@ -158,6 +105,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
         http_response_code(404);
         return [
             "success" => false,
+            "userid" => $profile_id,
             "code" => 'not_found',
             "title" => '404 Not Found',
             "message" => 'This profile wasn\'t found. Maybe you typed the username wrong?',
@@ -171,6 +119,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
 
         $arr = [
             "success" => false,
+            "userid" => $profile_id,
             "code" => 'account_banned',
             "title" => 'Account suspended',
             "message" => 'This account has been suspended ' . $until . '.<br />When an account is suspended, the owner can\'t sign in or interact with content. However, they can appeal the ban.',
@@ -195,12 +144,20 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
 
         if($blocks && is_array($blocks)) {
             if($blocks['type'] !== 'you') {
-                header("HTTP/1.0 403 Forbidden");
+                $reason = $blocks['message'];
+
+                if(!empty($blocks['reason'])) {
+                    $reason .= '\n The reason for the block:';
+                    $reason .= '\n' . $blocks['reason'];
+                }
+
+                http_response_code(403);
                 return [
                     "success" => false,
+                    "userid" => $profile_id,
                     "code" => 'user_blocking',
                     "title" => 'User blocked you',
-                    "message" => htmlspecialchars($blocks['message']),
+                    "message" => $reason,
                 ];
             } else {
                 $is_blocking = true;
@@ -228,6 +185,7 @@ function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
 
         return [
             "success" => false,
+            "userid" => $profile_id,
             "code" => 'profile_private',
             "title" => 'Profile private',
             "message" => 'The owner of this account has privated their profile.<br />When an account is private, other users can\'t view the profile unless they are following said user, or said user is following them.',
@@ -880,25 +838,17 @@ class UserAdmin {
             ];
         }
 
-        if(User::isDeleted($profile_id)) {
-            $error = "No user found";
-            return [
-                'success' => false,
-                'message' => $error,
-                'title' => $error_title
-            ];
-        }
-
-        if((int)$this->userid === $profile_id) {
-            $error = "You cannot unremove yourself";
-            return [
-                'success' => false,
-                'message' => $error,
-                'title' => $error_title
-            ];
-        }
-
         $email = hash('sha256', strtolower(trim($email)));
+        $usero = User::getUser($profile_id);
+
+        if(!$usero) {
+            $error = "User account does not exist";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
 
         $sql_follow = "SELECT id FROM blacklist WHERE (value = ? AND type = 'userid') OR (value = ? AND type = 'email') LIMIT 1";
         $stmt_follow = $this->conn->prepare($sql_follow);
@@ -906,7 +856,7 @@ class UserAdmin {
         $stmt_follow->execute();
         $result = $stmt_follow->get_result();
 
-        if($result->num_rows <= 0) {
+        if($result->num_rows <= 0 || !$usero->suspended) {
             $error = "User account is not blacklisted";
             return [
                 'success' => false,

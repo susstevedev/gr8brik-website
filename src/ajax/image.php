@@ -26,14 +26,16 @@ if(isset($_GET['imgbb_image']) && isset($_GET['id'])) {
         $url = $res['image']['url'] ?? null;
         $ch = curl_init($url);
 
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         $data = curl_exec($ch);
 
-        if (!curl_errno($ch) && curl_getinfo($ch, CURLINFO_HTTP_CODE) == 200) {
+        if (!curl_errno($ch)) {
             $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
             header("Content-Type: $contentType");
             echo $data;
+            exit;
         }
 
         curl_close($ch);

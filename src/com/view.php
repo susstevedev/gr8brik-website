@@ -2,6 +2,7 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . "/com/bbcode.php";
+require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . "/ajax/time.php";
 $bbcode = new BBCode;
 
@@ -146,7 +147,7 @@ if (isset($_POST['comment_delete'])) {
 		exit;
     }
 
-    if (!loggedin()) {
+    if (!loggedin() || !isset($current_user)) {
 		echo json_encode(['success' => false, 'message' => 'You are not logged in.']);
 		exit;
     }
@@ -171,7 +172,7 @@ if (isset($_POST['comment_delete'])) {
 if (isset($_POST['comment'])) {
     header('Content-Type: application/json');
 
-    $comment = isset($_POST['commentbox']) ? $bbcode->Screennameify($_POST['commentbox']) : null;
+    $comment = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
     if ($conn->connect_error) {
         echo json_encode(['success' => false, 'message' => 'Database connection has failed']);
 		exit;
@@ -330,19 +331,25 @@ if (isset($_POST['comment'])) {
         }
 
         foreach($rows as $row) {
-            $c_user = $row['userid'] ?? null;
             $c_comment = $row['content'] ?? '[empty]';
             $c_date = $row['timestamp'] ?? time();
-            $decoded_comment = htmlentities($c_comment, ENT_QUOTES, 'UTF-8');
+            $decoded_comment = htmlspecialchars($c_comment);
             $c_edited = $row['edited'] ?? null;
 
-            $c_user_o = $users[$c_user] ?? User::getUser($c_user);
+            $c_user = $row['userid'] ?? null;
             $c_username = htmlspecialchars($c_user_o->username ?? 'Deleted');
-            $isAdmin = $c_user_o->admin ?? false;
-            $pfp = $c_user_o->picture ?? null;
-
-            $c_user_exists = !User::isDeleted($c_user);
+            $c_user_o = $users[$c_user] ?? User::getUser($c_user);
             $c_user_blocked = $blocked[$c_user]['they_blocked'] ?? false;
+
+            $c_user_exists = true;
+            if(!$c_user_o || $c_user_o->suspended) {
+                $c_user_exists = false;
+                $isAdmin = false;
+                $pfp = '/img/no_image.png';
+            } else {
+                $isAdmin = $c_user_o->admin ?? false;
+                $pfp = $c_user_o->picture ?? null;
+            }
 
 			if ($c_user_exists) {
 				$user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user' AND deleted_at IS NULL");
@@ -382,7 +389,7 @@ if (isset($_POST['comment'])) {
 					<?php } ?>
                 </div>
                 <div class="gr8-theme w3-display-container w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-col m9 l9">
-                    <pre class="comment-text"><?php echo $bbcode->toHTML($bbcode->Smilify($decoded_comment), false, true) ?></pre><br />
+                    <pre class="comment-text"><?php echo Slimdown::render($decoded_comment) ?></pre><br />
 					<form class="edit w3-hide">
 						<textarea class="edit-textarea"><?php echo $decoded_comment ?></textarea><br />
 						<button class="save-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Save</button>
@@ -390,7 +397,7 @@ if (isset($_POST['comment'])) {
 					</form>
 					<span class="w3-display-bottomleft">
 						<?php
-						if (loggedin()) {
+						if (loggedin() && isset($current_user)) {
 							if ($row['parent'] === $post_id && ($current_user->admin || trim($current_user->id) === trim($c_user))) {
 								?>
 								<div class="delete gr8-theme w3-hide w3-light-grey w3-round-small w3-padding-small w3-margin-bottom">
@@ -454,7 +461,7 @@ if (isset($_POST['comment'])) {
     if ($category === "pinnedLocked" || $category === "locked") {
         echo "<b id='commentboxcontainer'>This conversation is locked. New replies cannot be posted.</b><br />";
     } else if ($category === "nolist") {
-        if (loggedin()) {
+        if (loggedin() && isset($current_user)) {
             $forum_anonymous_username = $current_user->username;
         } else {
             $forum_anonymous_username = $_SESSION['forum_anonymous_username'];

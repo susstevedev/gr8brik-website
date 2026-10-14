@@ -27,7 +27,7 @@ if(loggedin() && isset($current_user)) {
 if (isset($data['message'])) {
     $error = $data['message'];
 } else {
-    if(isset($data['soft_message'])) {
+    if(isset($data['soft_message']) && !empty($data['soft_message'])) {
         $message = $data['soft_message'];
     }
 }
@@ -240,7 +240,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <hr />
 
                 <?php if (!empty($data['description_markdown'])) { ?>
-                    <h4><span id="description" class="w3-large"><?php echo $data['description_markdown'] ?></span><br /></h4>
+                    <h4><span id="description" class="w3-large"><?php echo $data['description_markdown'] ?></span></h4>
                     <hr />
                 <?php } ?>
 

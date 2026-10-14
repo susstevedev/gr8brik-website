@@ -11,20 +11,6 @@ class ImgBB {
         $this->db = $db;
     }
 
-    //todo use this later
-    //was going to use for attachment ids but i dont really see the use
-    private function uuid(): string {
-        $data = random_bytes(16);
-
-        // set version to 4 (0100)
-        $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
-        // set variant to rfc 4122 (10xx)
-        $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
-
-        // format into the 8-4-4-4-12 format
-        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
-    }
-
     /**
      * Uploads image to ImgBB server using cURL and inserts into attachments database
      * If exists, will pull from database
@@ -49,90 +35,98 @@ class ImgBB {
             return ['success' => false, 'message' => 'Image not valid'];
         }
 
-        $servername = $image['tmp_name'];
         $filename = $image['name'];
         $mimetype = $image['type'];
         $hash = md5_file($image["tmp_name"]);
-        $exists = false;
+        $success = false;
 
         $res_exists = self::get_by_hash($hash);
         if ($res_exists) {
-            if(isset($res_exists['success']) && isset($res_exists['image'])) {
-                $exists = true;
-            }
-        }
+            if(isset($res_exists['success']) && $res_exists['success']) {
+                $success = (bool)$res_exists['success'] ? true : false;
+                $error = $res_exists['message'] ?? '[unknown error]';
+                $removed = (bool)$res_exists['image']['removed'] ? true : false;
 
-        if(!$exists) {
-            $url = "https://api.imgbb.com/1/upload?key=" . urlencode($this->apikey);
-            $payload = ['image' => new CURLFile($servername, $mimetype, $filename)];
+                if($success && !$removed) {
+                    $final = [
+                        'uuid' => $res_exists['id'],
+                        'message' => "Same image already found, using that one",
+                        'url' => $res_exists['image']['url'] ?? null,
+                        'filename' => $res_exists['name'] ?? null,
+                        'mime' => $res_exists['image']['mime'] ?? null,
+                        'user' => $res_exists['image']['userid'] ?? null,
+                        'bbcode' => $res_exists['image']['bbcode'] ?? null,
+                        'markdown' => $res_exists['image']['markdown'] ?? null,
+                        'delete_url' => $res_exists['image']['remove'] ?? null,
+                    ];
+                } else if($removed) {
+                    $success = false;
+                    $error = "This image is blacklisted from being uploaded.";
+                } else {
+                    $success = false;
+                    $error = "Couldn't upload this image right now.";
+                }
+            } else {
+                $url = "https://api.imgbb.com/1/upload?key=" . urlencode($this->apikey);
+                $payload = ['image' => new CURLFile($image['tmp_name'], $mimetype, $filename)];
 
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            $response = curl_exec($ch);
-            
-            if (curl_errno($ch)) {
+                $ch = curl_init($url);
+                curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                $response = curl_exec($ch);
+                
+                if (curl_errno($ch)) {
+                    $error = curl_errno($ch);
+                    curl_close($ch);
+                    return ['success' => false, 'message' => 'curl failed', 'oh' => ['curl' => $error, 'res' => $response]];
+                }
                 curl_close($ch);
-                return ['success' => false, 'message' => 'curl failed'];
-            }
-            curl_close($ch);
 
-            $res = json_decode($response, true);
-            $success = (bool)$res['success'] ? true : false;
-            $error = $res['error']['message'] ?? '[unknown error]';
+                $res = json_decode($response, true);
+                $success = (bool)$res['success'] ? true : false;
+                $error = $res['error']['message'] ?? '[unknown error]';
 
-            if ($success) {
-                $message = "Image uploaded";
-                $url = $res['data']['url'] ?? $res['data']['display_url'];
-                $mime = $res['data']['image']['mime'] ?? null;
-                $user = $current_user->id ?? null;
-                $username = $current_user->username ?? null;
-                $bbcode = '[img]' . $url . '[/img]';
-                $delete_url = $res['data']['delete_url'] ?? $res['data']['url_viewer'];
+                if ($success) {
+                    $url = $res['data']['url'] ?? $res['data']['display_url'];
+                    $final = [
+                        'message' => "Image uploaded",
+                        'url' => $url,
+                        'filename' => $res['data']['image']['filename'],
+                        'mime' => $res['data']['image']['mime'] ?? null,
+                        'user' => $current_user->id ?? null,
+                        'bbcode' => '[img]' . $url . '[/img]',
+                        'markdown' => '![' . htmlspecialchars($res['data']['image']['filename']) . '](' . $url . ')',
+                        'delete_url' => $res['data']['delete_url'] ?? $res['data']['url_viewer'],
+                    ];
 
-                $stmt = $this->db->prepare("INSERT INTO attachments (userid, url, bbcode, md5, mime, delete_url) VALUES (?, ?, ?, ?, ?, ?)");
-                $stmt->bind_param("isssss", $user, $url, $bbcode, $hash, $mime, $delete_url);
+                    $stmt = $this->db->prepare("INSERT INTO attachments (userid, url, md5, mime, delete_url, name) VALUES (?, ?, ?, ?, ?, ?)");
+                    $stmt->bind_param("isssss", $final['user'], $final['url'], $hash, $final['mime'], $final['delete_url'], $final['filename']);
 
-                if($stmt->execute()) {
-                    $stmt->close();
-                    $uuid = $this->db->insert_id;
+                    if($stmt->execute()) {
+                        $stmt->close();
+                        $final['uuid'] = $this->db->insert_id;
+                    }
                 }
             }
-        } else {
-            $res = self::get_by_hash($hash);
-            $success = (bool)$res['success'] ? true : false;
-            $error = $res['message'] ?? '[unknown error]';
-            $removed = (bool)$res['image']['removed'] ? true : false;
-
-            if($success && !$removed) {
-                $uuid = $res['id'];
-                $message = "Same image already found, using that one";
-                $url = $res['image']['url'] ?? null;
-                $mime = $res['image']['mime'] ?? null;
-                $user = $res['image']['user'] ?? null;
-                $username = $current_user->username ?? null;
-                $bbcode = '[img]' . $url . '[/img]';
-                $delete_url = $res['image']['remove'];
-            } else {
-                $success = false;
-                $error = "This image is blacklisted from being uploaded.";
-            }
         }
 
-        if (isset($success) && $success === true) {
+        if (isset($final) && $success === true) {
             return [
                 'success' => true,
-                'message' => $message ?? null,
-                'id' => $uuid,
-                'insert' => '[attachment]' . $uuid . '[/attachment]',
+                'message' => $final['message'] ?? null,
+                'id' => $final['uuid'],
+                'name' => $final['filename'],
+                //'insert' => '[attachment]' . $uuid . '[/attachment]',
+                'insert' =>  '![' . htmlspecialchars($final['filename']) . '](/ajax/image?imgbb_image=true&id=' . $final['uuid'] . ')',
                 'image' => [
-                    'user' => $username,
-                    'mime' => $mime,
-                    'url' => $url,
-                    'bbcode' => $bbcode,
-                    'remove' => $delete_url
+                    'user' => User::getUser($final['user'])->username ?? null,
+                    'mime' => $final['mime'],
+                    'url' => $final['url'],
+                    'bbcode' => $final['bbcode'],
+                    'markdown' => $final['markdown'],
+                    'remove' => $final['delete_url']
                 ]
             ];
         } else {
@@ -168,12 +162,16 @@ class ImgBB {
      * Returns an attachment from it's md5 hash
      */
     public function get_by_hash(string $md5) {
-        $stmt = $this->db->prepare("SELECT * FROM attachments WHERE md5 = ? AND md5 IS NOT NULL LIMIT 1");
+        if(empty($md5)) {
+            return ['success' => false, 'message' => 'Hash is null'];
+        }
+
+        $stmt = $this->db->prepare("SELECT * FROM attachments WHERE md5 = ? LIMIT 1");
         $stmt->bind_param("s", $md5);
         $stmt->execute();
 
         $result = $stmt->get_result();
-        if($result->num_rows <= 0) {
+        if($result->num_rows === 0) {
             return ['success' => false, 'message' => 'Image does not exist'];
         }
 
@@ -201,12 +199,16 @@ class ImgBB {
             $username = $usero->username ?? null;
             $delete_url = null;
             $url = $row['url'] ?? null;
+            $filename = htmlspecialchars($row['name']) ?? null;
+            $markdown = '![' . $filename . '](' . $url . ')';
+            $bbcode = '[img]' . $url . '[/img]';
 
             $ch = curl_init($url);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
-            if (!curl_errno($ch) && curl_getinfo($ch, CURLINFO_HTTP_CODE) == 200) {
+            if (!curl_errno($ch)) {
                 if(loggedin()) {
                     if(trim($me) === trim($userid)) {
                         $delete_url = $row['delete_url'] ?? null;
@@ -217,11 +219,14 @@ class ImgBB {
                     'success' => true,
                     'message' => 'Image found',
                     'id' => $row['id'] ?? null,
+                    'name' => $filename ?? null,
                     'image' => [
                         'user' => $username,
+                        'userid' => $userid,
                         'mime' => $row['mime'] ?? null,
                         'url' => $url,
-                        'bbcode' => $row['bbcode'] ?? null,
+                        'bbcode' => $bbcode,
+                        'markdown' => $markdown,
                         'remove' => $delete_url,
                         'timestamp' => $row['timestamp'] ?? null,
                         'removed' => (bool)$row['is_deleted'] ?? false,
