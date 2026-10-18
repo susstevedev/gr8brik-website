@@ -1,4 +1,5 @@
 <?php
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
 
 if(isset($_GET['name'])) {
@@ -6,12 +7,11 @@ if(isset($_GET['name'])) {
 } else if(isset($_GET['id'])) {
     $use_username = false;
 } else {
+    http_response_code(400);
     exit;
 }
 
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-
-$data = fetch_profile($_GET['id'] ?? urldecode($_GET['name']), $_SESSION['csrf'], $use_username);
+$data = UserProfile::get($_GET['id'] ?? urldecode($_GET['name']), $_SESSION['csrf'], $use_username);
 $userid = (loggedin() && isset($current_user)) ? $current_user->id : null;
 $user_admin = (loggedin() && isset($current_user) && $current_user->admin) ? true : false;
 
@@ -110,92 +110,6 @@ if(isset($_POST['warn'])) {
         header('refresh:3');
     }
 }
-
-/*if(isset($_POST['delete'])) {
-    $error_title = 'Removing user';
-
-    if(!loggedin()) {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "Please login to remove this user";
-    }
-
-    if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-        exit('Invalid user ID!');
-    }
-
-    if(User::isDeleted((int)$_GET['id'])) {
-        exit('No user found');
-    }
-
-    $ignore = isset($_POST['ignore']) ? $_POST['ignore'] : 0;
-    $use_email = isset($_POST['use_email']) ? $_POST['use_email'] : 0;
-
-    if (!empty($_POST['until']) && !$ignore) {
-        $date = new DateTime($_POST['until']);
-
-        if ($date) {
-            $until = $date->format('Y-m-d H:i:s');
-        } else {
-            header("HTTP/1.0 500 Internal Server Error");
-            $error = "Invalid ban date";
-            header('refresh:3');
-        }
-    } else {
-        $until = null;
-    }
-
-    $profile_id = (int)$_GET['id'];
-    $reason = isset($_POST['reason']) ? trim($_POST['reason']) : 'banned by admin request';
-    $rand = bin2hex(random_bytes(32));
-
-    if($use_email) {
-        $identifier = hash('sha256', strtolower(trim($data['email'])));
-        $type = 'email';
-    } else {
-        $identifier = $profile_id;
-        $type = 'userid';
-    }
-
-    if($current_user->admin != false) {
-        $sql_block = "INSERT IGNORE INTO blacklist (value, type, reason, ignore_at) VALUES (?, ?, ?, ?)";
-        $sql_delete = "UPDATE php_sessions SET active = 0 WHERE userid = ?";
-        $sql_delete_2 = "UPDATE sessions SET timestamp = 0 WHERE user = ?";
-
-        $stmt_block = $conn->prepare($sql_block);
-        $stmt_block->bind_param("ssss", $identifier, $type, $reason, $until);
-        $result2 = $stmt_block->execute();
-        $stmt_block->close();
-
-        if(!$result2) {
-            header("HTTP/1.0 500 Internal Server Error");
-            $error = "Couldn't ban this user at this time";
-            header('refresh:3');
-        } else {
-            $stmt_delete = $conn->prepare($sql_delete);
-            $stmt_delete->bind_param("i", $profile_id);
-            $result3 = $stmt_delete->execute();
-            $stmt_delete->close();
-
-            $stmt_delete = $conn->prepare($sql_delete_2);
-            $stmt_delete->bind_param("i", $profile_id);
-            $result4 = $stmt_delete->execute();
-            $stmt_delete->close();
-
-            if(!$result3 || !$result4) {
-                header("HTTP/1.0 500 Internal Server Error");
-                $error = "Couldn't log this user out when banning the account";
-                header('refresh:3');
-            } else {
-                header('refresh:1');
-                exit;
-            }
-        }
-    } else {
-        header("HTTP/1.0 500 Internal Server Error");
-        $error = "User is not an administrator!";
-        header('refresh:3');
-    }
-}*/
 
 if(isset($_POST['delete'])) {
     $profile_id = (int)$_GET['id'];

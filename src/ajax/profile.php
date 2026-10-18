@@ -3,6 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 $bbcode = new BBCode;
 
@@ -26,242 +27,288 @@ if (isset($_GET['followed_by'])) {
         exit;
     }
 
-    if(isset($_SESSION['fb'][$profile_id])) {
-        $rows = $_SESSION['fb'][$profile_id];
-    } else {
-        $conn = Database::get(DB_NAME);
+    $conn = Database::get(DB_NAME);
 
-        //selects user follow row(s), selects users actual account, fliters invalid accounts
-        $query = "
-            SELECT DISTINCT u.id, u.username, p.picture
-            FROM follow f1
-            INNER JOIN follow f2 ON f1.userid = f2.profileid
-            INNER JOIN users u ON f1.userid = u.id
-            LEFT JOIN user_profiles p ON f1.userid = p.userid
-            WHERE f1.profileid = ? 
-            AND f2.userid = ?
-            AND u.deactive IS NULL
-            AND u.suspended = 0
-            ORDER BY u.id DESC
-        ";
+    //selects user follow row(s), selects users actual account, fliters invalid accounts
+    $query = "
+        SELECT DISTINCT u.id, u.username, p.picture
+        FROM follow f1
+        INNER JOIN follow f2 ON f1.userid = f2.profileid
+        INNER JOIN users u ON f1.userid = u.id
+        LEFT JOIN user_profiles p ON f1.userid = p.userid
+        WHERE f1.profileid = ? 
+        AND f2.userid = ?
+        AND u.deactive IS NULL
+        AND u.suspended = 0
+        ORDER BY u.id DESC
+    ";
 
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("ii", $profile_id, $current_user_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("ii", $profile_id, $current_user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-        $followed_by = [];
-        $rows = $result->fetch_assoc();
-    }
+    $followed_by = [];
+    $rows = $result->fetch_assoc();
 
     foreach($rows as $row) {
-        if(!$rows || (!$row['id'] && isset($_SESSION['fb'][$profile_id]))) {
+        if(!$rows || (isset($_SESSION['fb'][$profile_id]))) {
             http_response_code(301);
             unset($_SESSION['fb']);
             exit;
         }
 
+        if(!isset($row['id'])) continue;
+
         $followed_by[] = [
-            'url' => '/@' . urlencode($row['username']),
+            'url' => '/@' . urlencode($row['username'] ?? ''),
             'userid' => $row['id'], 
             'pfp' => $row['picture'] ?? '/img/no_image.png',
-            'username' => htmlspecialchars($row['username'])
+            'username' => htmlspecialchars($row['username'] ?? '')
         ];
     }
 
     $stmt->close();
-    $_SESSION['fb'][$profile_id][] = $rows;
 
     http_response_code(200);
     echo json_encode($followed_by);
     exit;
 }
 
-function fetch_profile(mixed $profile_id, mixed $csrf, bool $use_name = true) {
-    global $current_user;
-    $userid = $current_user->id ?? null;
-    $bbcode = new BBCode();
+class UserProfile {
+    /**
+     * Raw user table row
+    */
+    private static function raw_user(mixed $identifier, $usename = true) {
+        $conn = Database::get(DB_NAME);
 
-    if (empty($csrf) || $csrf != $_SESSION['csrf']) {
-        return [
-            "success" => false,
-            "code" => 'csrf_missing',
-            "title" => 'Something something tech-related',
-            "message" => 'No CSRF (cross-site-request-forgery) token provided, or it is invalid!',
-        ];
-    }
-
-    $conn = Database::get(DB_NAME);
-
-    if($use_name === true) {
-        $usero = User::getUserByName($profile_id);
-        $profile_id = $usero->id;
-    } else {
-        $profile_id = $profile_id;
-        $usero = User::getUser($profile_id);
-    }
-
-    if (!isset($usero) || $usero->deactive) {
-        http_response_code(404);
-        return [
-            "success" => false,
-            "userid" => $profile_id,
-            "code" => 'not_found',
-            "title" => '404 Not Found',
-            "message" => 'This profile wasn\'t found. Maybe you typed the username wrong?',
-        ];
-    }
-
-    if ((bool)$usero->suspended === true) {
-        http_response_code(403);
-        $banrow = User::isBannedByID($profile_id);
-        $until = isset($banrow['ignore_at']) ? ('until ' . date("d M Y", strtotime($banrow['ignore_at']))) : 'indefinitely';
-
-        $arr = [
-            "success" => false,
-            "userid" => $profile_id,
-            "code" => 'account_banned',
-            "title" => 'Account suspended',
-            "message" => 'This account has been suspended ' . $until . '.<br />When an account is suspended, the owner can\'t sign in or interact with content. However, they can appeal the ban.',
-        ];
-
-        if(loggedin() && $current_user->admin) {
-            $arr['email'] = $usero->email;
+        switch ($usename) {
+            case true:
+                $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE username = ?");
+                $u_stmt->bind_param("s", $identifier);
+                break;
+            case false:
+                $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE id = ?");
+                $u_stmt->bind_param("i", $identifier);
+                break;
         }
 
-        return $arr;
+        $u_stmt->execute();
+        $user = $u_stmt->get_result()->fetch_assoc() ?? [];
+
+        if($user) {
+            $userid = $user['id'] ?? null;
+            $u_stmt->close();
+
+            $p_stmt = $conn->prepare("SELECT picture, picture_small, banner, twitter, bsky, private_profile, description FROM user_profiles WHERE userid = ?");
+            $p_stmt->bind_param("i", $userid);
+            $p_stmt->execute();
+            $profile = $p_stmt->get_result()->fetch_assoc() ?? [];
+            $p_stmt->close();
+
+            return array(
+                'id' => $userid,
+                'user' => $user,
+                'profile' => $profile
+            );
+        }
+
+        return null;
     }
 
-    $bsky = $usero->bsky ?? null;
-    $is_blocking = false;
-    $is_following = false;
-    $is_me = false;
-    $is_admin = false;
-    $is_private = $usero->private_profile;
+    /**
+     * Returns public user profile
+    */
+    public static function get(mixed $identifier, mixed $csrf, bool $use_name = true) {
+        global $current_user;
+        $userid = $current_user->id ?? null;
 
-    if(loggedin()) {
-        $blocks = User::isBlocking($profile_id);
+        if (empty($csrf) || $csrf != $_SESSION['csrf']) {
+            return [
+                "success" => false,
+                "code" => 'csrf_missing',
+                "title" => 'Something tech-related',
+                "message" => 'No CSRF (cross-site-request-forgery) token provided, or it is invalid!',
+            ];
+        }
 
-        if($blocks && is_array($blocks)) {
-            if($blocks['type'] !== 'you') {
-                $reason = $blocks['message'];
+        $conn = Database::get(DB_NAME);
+        $user_arr = self::raw_user($identifier, $use_name);
+        $profile_id = $user_arr['user']['id'];
 
-                if(!empty($blocks['reason'])) {
-                    $reason .= '\n The reason for the block:';
-                    $reason .= '\n' . $blocks['reason'];
-                }
+        if (!isset($user_arr) || !$user_arr) {
+            http_response_code(404);
+            return [
+                "success" => false,
+                "userid" => $profile_id,
+                "code" => 'not_found',
+                "title" => '404 Not Found',
+                "message" => 'This profile wasn\'t found. Maybe you typed the username wrong?',
+            ];
+        }
 
-                http_response_code(403);
-                return [
+        if ($user_arr['user']['suspended'] || $user_arr['user']['deactive']) {
+            http_response_code(403);
+            $banrow = User::isBannedByID($profile_id);
+
+            if($banrow) {
+                $until = isset($banrow['ignore_at']) ? ('until ' . date("d M Y", strtotime($banrow['ignore_at']))) : 'indefinitely';
+
+                $arr = [
                     "success" => false,
                     "userid" => $profile_id,
-                    "code" => 'user_blocking',
-                    "title" => 'User blocked you',
-                    "message" => $reason,
+                    "code" => 'account_banned',
+                    "title" => 'Account suspended',
+                    "message" => 'This account has been suspended ' . $until . '.<br />When an account is suspended, the owner can\'t sign in or interact with content. However, they can appeal the ban.',
                 ];
             } else {
-                $is_blocking = true;
+                $arr = [
+                    "success" => false,
+                    "userid" => $profile_id,
+                    "code" => 'not_found',
+                    "title" => 'Something went wrong',
+                    "message" => 'Please try again later',
+                ];
+            }
+
+            if(loggedin() && $current_user->admin) {
+                $arr['email'] = $user_arr['user']['email'];
+            }
+
+            return $arr;
+        }
+
+        $bsky = $user_arr['profile']['bsky'] ?? null;
+        $is_blocking = false;
+        $is_following = false;
+        $is_me = false;
+        $is_admin = false;
+        $is_private = $user_arr['profile']['private_profile'] ?? false;
+
+        if(loggedin()) {
+            $blocks = User::isBlocking($profile_id);
+
+            if($blocks && is_array($blocks)) {
+                if($blocks['type'] !== 'you') {
+                    $reason = $blocks['message'];
+
+                    if(!empty($blocks['reason'])) {
+                        $reason .= '\n The reason for the block:';
+                        $reason .= '\n' . $blocks['reason'];
+                    }
+
+                    http_response_code(403);
+                    return [
+                        "success" => false,
+                        "userid" => $profile_id,
+                        "code" => 'user_blocking',
+                        "title" => 'User blocked you',
+                        "message" => $reason,
+                    ];
+                } else {
+                    $is_blocking = true;
+                }
+            }
+
+            $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ? AND profileid = ?");
+            $stmt->bind_param("ii", $userid, $profile_id);
+            $stmt->execute();
+            $is_following = $stmt->get_result()->fetch_assoc()['following'];
+            $stmt->close();
+
+            if((int)$userid === (int)$profile_id) {
+                $is_me = true;
+            }
+
+            if($current_user->admin) {
+                $adm_email = isset($user_arr['user']['email']) ? htmlspecialchars($user_arr['user']['email']) : '';
+                $is_admin = true;
             }
         }
 
-        $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ? AND profileid = ?");
-    	$stmt->bind_param("ii", $userid, $profile_id);
-    	$stmt->execute();
-    	$is_following = $stmt->get_result()->fetch_assoc()['following'];
-    	$stmt->close();
+        if(!$is_me && !$is_admin && !$is_following && $is_private) {
+            http_response_code(403);
 
-        if((int)$userid === (int)$profile_id) {
-            $is_me = true;
+            return [
+                "success" => false,
+                "userid" => $profile_id,
+                "code" => 'profile_private',
+                "title" => 'Profile private',
+                "message" => 'The owner of this account has privated their profile.<br />When an account is private, other users can\'t view the profile unless they are following said user, or said user is following them.',
+            ];
         }
 
-        if($current_user->admin) {
-            $adm_email = isset($usero->email) ? htmlspecialchars($usero->email) : '';
-            $is_admin = true;
-        }
-    }
+        $conn2 = Database::get(DB_NAME2);
+        $conn3 = Database::get(DB_NAME3);
 
-    if(!$is_me && !$is_admin && !$is_following && $is_private) {
-        http_response_code(403);
+        $stmt = $conn2->prepare("SELECT COUNT(*) as all_models FROM model WHERE user = ?");
+        $stmt->bind_param("s", $profile_id);
+        $stmt->execute();
+        $model_count = $stmt->get_result()->fetch_assoc()['all_models'] ?? 0;
+        $stmt->close();
 
-        return [
-            "success" => false,
-            "userid" => $profile_id,
-            "code" => 'profile_private',
-            "title" => 'Profile private',
-            "message" => 'The owner of this account has privated their profile.<br />When an account is private, other users can\'t view the profile unless they are following said user, or said user is following them.',
+        $stmt = $conn2->prepare("SELECT SUM(views) as total_views FROM model WHERE user = ?");
+        $stmt->bind_param("s", $profile_id);
+        $stmt->execute();
+        $views = $stmt->get_result()->fetch_assoc()['total_views'] ?? 0;
+        $stmt->close();
+
+        $stmt = $conn2->prepare("SELECT SUM(likes) as total_likes FROM model WHERE user = ?");
+        $stmt->bind_param("s", $profile_id);
+        $stmt->execute();
+        $likes = $stmt->get_result()->fetch_assoc()['total_likes'] ?? 0;
+        $stmt->close();
+
+        $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
+        $stmt->bind_param("s", $profile_id);
+        $stmt->execute();
+        $followers = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
+        $stmt->close();
+
+        $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ?");
+        $stmt->bind_param("s", $profile_id);
+        $stmt->execute();
+        $following = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
+        $stmt->close();
+
+        $stmt = $conn3->prepare("SELECT COUNT(*) as reply_count FROM messages WHERE userid = ? AND deleted_at IS NULL");
+        $stmt->bind_param("i", $profile_id);
+        $stmt->execute();
+        $user_post_count = $stmt->get_result()->fetch_assoc()['reply_count'] ?? 0;
+        $stmt->close();
+
+        $message = null;
+        $data = [
+            'success' => true,
+            'userid' => $profile_id,
+            'username' => htmlspecialchars($user_arr['user']['username'] ?? ''),
+            'admin' => (string)$user_arr['user']['admin'],
+            'description' => isset($user_arr['profile']['description']) ? Slimdown::render($user_arr['profile']['description']) : '', 
+            'twitter' => isset($user_arr['profile']['twitter']) ? htmlspecialchars($user_arr['profile']['twitter']) : '',
+            'bsky' => $bsky,
+            'age' => isset($user_arr['user']['age']) ? htmlspecialchars($user_arr['user']['age']) : '',
+            'picture' => htmlspecialchars($user_arr['profile']['picture_small'] ?? $user_arr['profile']['picture']),
+            'banner' => isset($user_arr['profile']['banner']) ? htmlspecialchars($user_arr['profile']['banner']) : null,
+            'stats' => [
+                'creation_count' => $model_count,
+                'followers' => $followers,
+                'following' => $following,
+                'forum_posts' => $user_post_count,
+                'views' => $views,
+                'likes' => $likes,
+            ],
+            'is_following' => (bool)$is_following,
+            'is_blocking' => (bool)$is_blocking,
+            'is_private' => (bool)$is_private,
+            'message' => $message,
         ];
+
+        if($is_admin) {
+            $data['email'] = $adm_email ?? null;
+        }
+
+        return $data;
     }
-
-    $conn2 = Database::get(DB_NAME2);
-    $conn3 = Database::get(DB_NAME3);
-
-    $stmt = $conn2->prepare("SELECT COUNT(*) as all_models FROM model WHERE user = ?");
-    $stmt->bind_param("s", $profile_id);
-    $stmt->execute();
-    $model_count = $stmt->get_result()->fetch_assoc()['all_models'] ?? 0;
-    $stmt->close();
-
-    $stmt = $conn2->prepare("SELECT SUM(views) as total_views FROM model WHERE user = ?");
-    $stmt->bind_param("s", $profile_id);
-    $stmt->execute();
-    $views = $stmt->get_result()->fetch_assoc()['total_views'] ?? 0;
-    $stmt->close();
-
-    $stmt = $conn2->prepare("SELECT SUM(likes) as total_likes FROM model WHERE user = ?");
-    $stmt->bind_param("s", $profile_id);
-    $stmt->execute();
-    $likes = $stmt->get_result()->fetch_assoc()['total_likes'] ?? 0;
-    $stmt->close();
-
-    $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
-    $stmt->bind_param("s", $profile_id);
-    $stmt->execute();
-    $followers = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
-    $stmt->close();
-
-    $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ?");
-    $stmt->bind_param("s", $profile_id);
-    $stmt->execute();
-    $following = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
-    $stmt->close();
-
-    $stmt = $conn3->prepare("SELECT COUNT(*) as reply_count FROM messages WHERE userid = ? AND deleted_at IS NULL");
-    $stmt->bind_param("i", $profile_id);
-    $stmt->execute();
-    $user_post_count = $stmt->get_result()->fetch_assoc()['reply_count'] ?? 0;
-    $stmt->close();
-
-    $message = null;
-    $data = [
-        'success' => true,
-        'userid' => $profile_id,
-        'username' => htmlspecialchars($usero->username ?? ''),
-        'admin' => (string)$usero->admin,
-        'description' => isset($usero->description) ? $bbcode->toHTML($usero->description) : '', 
-        'twitter' => isset($usero->twitter) ? htmlspecialchars($usero->twitter) : '',
-        'bsky' => $bsky,
-        'age' => isset($usero->age) ? htmlspecialchars($usero->age) : '',
-        'picture' => htmlspecialchars($usero->picture_small ?? $usero->picture),
-        'banner' => isset($usero->banner) ? htmlspecialchars($usero->banner) : null,
-        'stats' => [
-            'creation_count' => $model_count,
-            'followers' => $followers,
-            'following' => $following,
-            'forum_posts' => $user_post_count,
-            'views' => $views,
-            'likes' => $likes,
-        ],
-        'is_following' => (bool)$is_following,
-        'is_blocking' => (bool)$is_blocking,
-        'is_private' => (bool)$is_private,
-        'message' => $message,
-    ];
-
-    if($is_admin) {
-        $data['email'] = $adm_email ?? null;
-    }
-
-    return $data;
 }
 
 //replacement for the old one
@@ -271,7 +318,7 @@ if(isset($_GET['profile']) && (isset($_GET['actorId']) || isset($_GET['actorName
     $profile = $_GET['actorId'] ?? $_GET['actorName'] ?? null;
     $use_name = isset($_GET['actorName']) ? true : false;
 
-    $data = fetch_profile($profile, $_SESSION['csrf'], $use_name);
+    $data = UserProfile::get($profile, $_SESSION['csrf'], $use_name);
     echo json_encode($data);
     exit;
 }
@@ -951,7 +998,6 @@ class UserContent {
             $creations[] = $creation;
         }
         $stmt->close();
-        $creation_conn->close();
         return ['success' => true, 'creations' => $creations];
     }
 
@@ -1137,9 +1183,6 @@ class UserContent {
             'forum_replies' => $forum_replies,
         ]);
 
-        $conn_forum->close();
-        $conn_creations->close();
-
         return $arr;
     }
 
@@ -1191,7 +1234,6 @@ class UserContent {
             $posts[] = $p2;
         }
 
-        $conn_forum->close();
         return ['success' => true, 'posts' => $posts];
     }
 }
