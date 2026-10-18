@@ -536,14 +536,9 @@ class AccountManager
                 'error' => false,
                 'extras' => $reason,
                 'links' => [
-                    0 => [
-                        'btn' => 'Okay',
-                        'goto' => false,
-                    ],
-                    1 => [
-                        'btn' => 'Appeal',
-                        'goto' => '/appeal.php',
-                    ],
+                    'btn_cancel' => 'Okay',
+                    'btn' => 'Appeal',
+                    'goto' => '/appeal.php',
                 ],
             ];
         }
@@ -562,14 +557,9 @@ class AccountManager
                     'error' => false,
                     'extras' => false,
                     'links' => [
-                        0 => [
-                            'btn' => 'Cancel',
-                            'goto' => false,
-                        ],
-                        1 => [
-                            'btn' => 'Reactivate',
-                            'goto' => "/acc/index?reactive=1&token=" . $token_hashed,
-                        ],
+                        'btn_cancel' => 'Cancel',
+                        'btn' => 'Reactivate',
+                        'goto' => "/acc/index?reactive=true&token=" . $token_hashed,
                     ],
                 ];
             } else {

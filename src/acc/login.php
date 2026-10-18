@@ -78,18 +78,9 @@ if (loggedin()) {
                             }
 
                             if(response.links) {
-                                response.links.forEach(elm => {
-                                    let $btnclone = $($clone.find('.popup-goto').html());
-                                    if(elm.goto) {
-                                        $btnclone.find('a').attr("href", elm.goto);
-                                    } else {
-                                        $btnclone.find('a').addClass('popup-close');
-                                    }
-
-                                    $btnclone.find('a').text(elm.btn);
-                                    $btnclone.find('a').removeClass('w3-hide');
-                                    $clone.find('.popup-buttons').append($btnclone);
-                                });
+                                $clone.find('.popup-buttons .cancel-btn').text(response.links.btn_cancel);
+                                $clone.find('.popup-buttons .main-btn').text(response.links.btn);
+                                $clone.find('.popup-buttons .main-btn').attr('href', response.links.goto);
                             }
                             $popup.append($clone);
                             $popup.find("#popup").show();
@@ -122,10 +113,9 @@ if (loggedin()) {
                     <p id="popup-text"></p>
                     <p class="w3-hide w3-round w3-padding w3-border w3-border-grey" id="popup-extra"></p>
                     <div class="popup-buttons">
-                        <span class="popup-goto w3-hide">
-                            <span class="w3-padding-small">
-                                <a class="w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo"></a>
-                            </span>
+                        <span class="w3-padding-small">
+                            <a href="#" class="cancel-btn w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo"></a>
+                            <a href="#" class="main-btn w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo"></a>
                         </span>
                     </div>
                 </div>
