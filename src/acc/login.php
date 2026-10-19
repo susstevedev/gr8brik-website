@@ -43,61 +43,61 @@ if (loggedin()) {
                     success: function(response) {
                         $("#loginBtn").html(prevBtnText);
                 		$("#loginBtn").prop("disabled", false);
-                        
+
                         if(response.success === true) {
-                            if(location.search == "?desktop=true") {
-                                window.location.reload();
+                            if(response.href) {
+                                window.location.href = response.href;
                             } else {
-                                window.location.href = "/";
+                                window.location.reload();
                             }
                         } else {
-                            $("#error").show()
-                            $("#error-text").text(response.error);
-                            $("#error").delay(5000).fadeOut(2500, function() {
-                        		$("#error-text").text('');
-                        	});
+                            do_errors(response);
                         }
                     },
 
-                    error: function(jqXHR, textStatus, errorThrown) {
+                    error: function(xhr, text, err) {
                         $("#loginBtn").html(prevBtnText);
                 		$("#loginBtn").prop("disabled", false);
 
-                        var response = JSON.parse(jqXHR.responseText);
-                        console.error('Server status code: ' + textStatus + ' ' + jqXHR.status + ' ' + errorThrown);
-                        
-                        if(response.popup) {
-                            let $popup = $('#popup-template-contain');
-                            let $clone = $($('#popup-template').html());
+                        var response = JSON.parse(xhr.responseText);
+                        console.error(text + ' ' + xhr.status + ' ' + err);
 
-                            $clone.find("#popup-title").text(response.title);
-                            $clone.find("#popup-text").text(response.popup);
-
-                            if(response.extras) {
-                                $clone.find("#popup-extra").removeClass('w3-hide').text(response.extras);
-                            }
-
-                            if(response.links) {
-                                $clone.find('.popup-buttons .cancel-btn').text(response.links.btn_cancel);
-                                $clone.find('.popup-buttons .main-btn').text(response.links.btn);
-                                $clone.find('.popup-buttons .main-btn').attr('href', response.links.goto);
-                            }
-                            $popup.append($clone);
-                            $popup.find("#popup").show();
-
-                            $(".popup-close").click(function(event) {
-                                $("#popup").remove();
-                            });
-                        } else {
-                            $("#error").show()
-                            $("#error-text").text(response.error);
-                            $("#error").delay(5000).fadeOut(2500, function() {
-                                $("#error-text").text('');
-                            });
-                        }
+                        do_errors(response);
                     }
                 });
             });
+
+            function do_errors(response) {
+                if(response.popup) {
+                    let $popup = $('#popup-template-contain');
+                    let $clone = $($('#popup-template').html());
+
+                    $clone.find("#popup-title").text(response.title);
+                    $clone.find("#popup-text").text(response.popup);
+
+                    if(response.extras) {
+                        $clone.find("#popup-extra").removeClass('w3-hide').text(response.extras);
+                    }
+
+                    if(response.links) {
+                        $clone.find('.popup-buttons .cancel-btn').text(response.links.btn_cancel);
+                        $clone.find('.popup-buttons .main-btn').text(response.links.btn);
+                        $clone.find('.popup-buttons .main-btn').attr('href', response.links.goto);
+                    }
+                    $popup.append($clone);
+                    $popup.find("#popup").show();
+
+                    $(".popup-close").click(function(event) {
+                        $("#popup").remove();
+                    });
+                } else {
+                    $("#error").show()
+                    $("#error-text").text(response.error);
+                    $("#error").delay(5000).fadeOut(2500, function() {
+                        $("#error-text").text('');
+                    });
+                }
+            }
         });
     </script>
 
@@ -114,7 +114,7 @@ if (loggedin()) {
                     <p class="w3-hide w3-round w3-padding w3-border w3-border-grey" id="popup-extra"></p>
                     <div class="popup-buttons">
                         <span class="w3-padding-small">
-                            <a href="#" class="cancel-btn w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo"></a>
+                            <a href="#" class="popup-close cancel-btn w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo"></a>
                             <a href="#" class="main-btn w3-btn w3-blue w3-hover-opacity w3-round w3-padding w3-border w3-border-indigo"></a>
                         </span>
                     </div>

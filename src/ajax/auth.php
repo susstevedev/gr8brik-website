@@ -232,8 +232,6 @@ class AccountManager
         $username = mysqli_real_escape_string($conn, htmlspecialchars((urldecode($username))));
         $email = mysqli_real_escape_string($conn, trim($email ?? ''));
         $token_raw = bin2hex(random_bytes(32));
-		$token_hashed = hash('sha256', $token_raw);
-        $login_from = $_SERVER['REMOTE_ADDR'];
 
         if (empty($password) || empty($email) || empty($username)) {
             http_response_code(400);
@@ -259,8 +257,6 @@ class AccountManager
             http_response_code(400);
             return ['success' => false, 'error' => $username_available['reason']];
         }
-
-        $picture = "/img/no_image.png";
 
         if (strlen($password) < 8) {
             http_response_code(400);
@@ -380,19 +376,6 @@ class AccountManager
         }
 
         $token_raw = bin2hex(random_bytes(32));
-        /*$sql = "INSERT INTO users (blog_user_id, username, password, email, age, verify_token, picture, description, twitter, github_id) VALUES (?, ?, NULL, ?, CURRENT_TIMESTAMP(), ?, ?, ?, ?, ?)";
-
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssssssss", $token_raw, $username, $email, $token_raw, $avatar, $bio, $twitter, $github_id);
-
-        if ($stmt->execute()) {
-            $new_userid = $conn->insert_id;
-            $result = $conn->query("SELECT id, username, email, password, deactive, suspended FROM users WHERE id = {$new_userid} LIMIT 1");
-            $row = $result->fetch_assoc();
-
-            self::send_verify_email($token_raw, $email, $username);
-            return $this->login_final($conn, $row, 1);
-        }*/
 
         $insert = self::insert_user($conn, $token_raw, $username, null, $email, $token_raw, $avatar, null, $github_id, $bio, $twitter, null);
         if (isset($insert['id'])) {
@@ -469,9 +452,6 @@ class AccountManager
         }
 
         $token_raw = bin2hex(random_bytes(32));
-        /*$sql = "INSERT INTO users (blog_user_id, username, password, email, age, verify_token, picture, google_id) VALUES (?, ?, NULL, ?, CURRENT_TIMESTAMP(), ?, ?, ?)";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssssss", $token_raw, $username, $email, $token_raw, $avatar, $google_id);*/
 
         $insert = self::insert_user($conn, $token_raw, $username, null, $email, $token_raw, $avatar, $google_id, null, null, null, null);
         if (isset($insert['id'])) {
@@ -543,10 +523,9 @@ class AccountManager
             ];
         }
 
-        if (!empty($row['deactive'])) {
-            $sql = "INSERT INTO sessions (id, user, timestamp) VALUES (?, ?, ?) LIMIT 1";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("sii", $token_hashed, $userid, $time);
+        if (!empty($row['deactive']) || (bool)$row['suspended'] === true) {
+            $stmt = $conn->prepare("INSERT INTO sessions (id, login_from, user_agent, user, timestamp, remember) VALUES (?, ?, ?, ?, ?, 0)");
+            $stmt->bind_param("sssii", $token_hashed, $login_from, $user_agent, $userid, $time);
 
             if ($stmt->execute()) {
                 http_response_code(500);
@@ -559,7 +538,7 @@ class AccountManager
                     'links' => [
                         'btn_cancel' => 'Cancel',
                         'btn' => 'Reactivate',
-                        'goto' => "/acc/index?reactive=true&token=" . $token_hashed,
+                        'goto' => "/acc/index.php?reactive=true&token=" . $token_raw,
                     ],
                 ];
             } else {
@@ -568,19 +547,7 @@ class AccountManager
             }
         }
 
-        if ((bool)$row['suspended'] === true) {
-            $sql = "UPDATE users SET suspended = 0 WHERE id = ? AND deactive IS NULL AND suspended != 0";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("i", $userid);
-
-            if (!$stmt->execute()) {
-                http_response_code(500);
-                return ['success' => false, 'error' => "Couldn\'t restore your account at this time. Please try again later or contact us."];
-            }
-        }
-
-        $sessionSql = "INSERT INTO sessions (id, login_from, user_agent, user, timestamp, remember) VALUES (?, ?, ?, ?, ?, ?)";
-        $sessionStmt = $conn->prepare($sessionSql);
+        $sessionStmt = $conn->prepare("INSERT INTO sessions (id, login_from, user_agent, user, timestamp, remember) VALUES (?, ?, ?, ?, ?, ?)");
         $sessionStmt->bind_param("sssiii", $token_hashed, $login_from, $user_agent, $userid, $time, $remember);
 
         if ($sessionStmt->execute()) {
@@ -602,7 +569,8 @@ class AccountManager
                     'path' => '/'
                 ]);
             }
-            return ['success' => true];
+
+            return ['success' => true, 'sid' => $token_raw, 'href' => '/acc/creations'];
         }
     }
 

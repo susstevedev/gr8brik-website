@@ -2,28 +2,50 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/account_settings.php';
 
-if (isset($_GET['reactive'])) {
-    $new_token = $conn->real_escape_string($_GET['token']);
+if (isset($_GET['reactive']) && isset($_GET['token'])) {
+    $sessionid_raw = $_GET['token'];
+    $sessionid = hash('sha256', $sessionid_raw);
     $conn = Database::get(DB_NAME);
 
-    $stmt = $conn->prepare("SELECT * FROM sessions WHERE id = ? LIMIT 1");
-    $stmt->bind_param("s", $new_token);
-    $stmt->execute();
-    $new_tokendata = $stmt->get_result();
-    $new_tokenrow = $new_tokendata->fetch_assoc();
-    $user = (int)$new_tokenrow['user'];
+    if(isset($sessionid) && $sessionid) {
+        $stmt = $conn->prepare("SELECT user FROM sessions WHERE id = ? LIMIT 1");
+        $stmt->bind_param("s", $sessionid);
+        $stmt->execute();
 
-    $stmt2 = $conn->prepare("UPDATE users SET deactive = NULL WHERE id = ? LIMIT 1");
-    $stmt2->bind_param("i", $user);
-    if ($stmt2->execute()) {
-        $stmt3 = $conn->prepare("DELETE FROM sessions WHERE id = ? LIMIT 1");
-        $stmt3->bind_param("s", $new_token);
-        $stmt3->execute();
+        $res = $stmt->get_result();
+        $id = (int)$res->fetch_assoc()['user'];
 
-        echo "<h2>Account has been reactivated, please login after this.</h2>";
-        header('Location:login.php');
-        exit;
+        if(isset($id) && $id) {
+            $stmt_select = $conn->prepare("SELECT id FROM users WHERE id = ? AND (deactive IS NOT NULL OR suspended != 0) LIMIT 1");
+            $stmt_select->bind_param("i", $id);
+            $stmt_select->execute();
+
+            $res = $stmt_select->get_result();
+            $id = (int)$res->fetch_assoc()['id'];
+
+            if(isset($id) && $id) {
+                $banned = User::isBannedByID($id);
+
+                if(!$banned) {
+                    $stmt_set = $conn->prepare("UPDATE users SET deactive = NULL, suspended = 0 WHERE id = ? LIMIT 1");
+                    $stmt_set->bind_param("i", $id);
+
+                    if ($stmt_set->execute()) {
+                        session_regenerate_id(true);
+                        $_SESSION['userid'] = $id;
+                        $_SESSION['tokenid'] = $sessionid_raw;
+
+                        echo json_encode(['success' => true]);
+                        header('Location:login.php');
+                        exit;
+                    }
+                }
+            }
+        }
     }
+
+    echo json_encode(['success' => false, 'error' => 'Couldn\'t restore your account. Please try again later.']);
+    exit;
 }
 
 if (!loggedin() || !isset($current_user)) {
