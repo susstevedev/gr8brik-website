@@ -403,28 +403,32 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 
     <div id="data-comment-wrapper">
         <h4><span class="fa fa-comments-o" aria-hidden="true"></span> <span id="comment-count"><?php echo number_format($data['comments']) ?></span> comments</h4><hr />
-        <p>Involved in this conversation</p>
+		
+		<?php
+			$convo_subbed = comment_subscribers($model_id);
+			if(!empty($convo_subbed) && !empty($convo_subbed['subbed'])) {
+		?>
+			<p>Involved in this conversation</p>
 
-        <div id="user-conversation-wrapper">
-            <?php
-                $convo_subbed = comment_subscribers($model_id);
-                foreach($convo_subbed['subbed'] as $subbed) {
-                    ?>
-                    <span class="tooltip avatar">
-                        <span class="w3-blue tooltiptext"><?php echo $subbed['username'] ?></span>
-                        <a href="/@<?php echo urlencode(strtolower($subbed['username'])) ?>"><img src="<?php echo $subbed['picture'] ?>" class="w3-round w3-grey" width="25px" height="25px" alt="User Avatar" /></a>
-                    </span>
-                    <?php
-                }
-            ?>
-        </div>
+			<div id="user-conversation-wrapper">
+				<?php
+					foreach($convo_subbed['subbed'] as $subbed) {
+						?>
+						<span class="tooltip avatar">
+							<span class="w3-blue tooltiptext"><?php echo $subbed['username'] ?></span>
+							<a href="/@<?php echo urlencode(strtolower($subbed['username'])) ?>"><img src="<?php echo $subbed['picture'] ?>" class="w3-round w3-grey" width="25px" height="25px" alt="User Avatar" /></a>
+						</span>
+						<?php
+					}
+				?>
+			</div>
 
         <?php
+			}
+		
         $comment_data = json_decode(fetch_comments($model_id, $_SESSION['csrf']), true);
 
         if ($comment_data && is_array($comment_data)) {
-            $grouped_comments = [];
-
             if(isset($_GET['depth']) && isset($_GET['parent'])) {
                 ?>
                     You are viewing the replies of a comment.<br />
@@ -432,23 +436,20 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <?php
             }
 
-            foreach ($comment_data as $comment) {
-                if (!is_array($comment)) {
-                    continue;
-                }
-
-                $parent_id = $comment['parent'];
-                $grouped_comments[$parent_id][] = $comment;
-            }
-
-            function comment_tree(array $grouped_comments, $parent_id = null, $depth = 0) {
+            function comment_tree(array $grouped_comments, $parent_id, $depth = 0) {
                 global $current_user, $loggedin;
 
-                if (!isset($grouped_comments[$parent_id])) {
+                /*if (!isset($grouped_comments[$parent_id])) {
                     return;
                 }
 
-                foreach ($grouped_comments[$parent_id] as $comment) {
+				if(empty($grouped_comments[$parent_id]['children'])) {
+					return;
+				}
+
+				$grouped_replies = $grouped_comments[$parent_id]['children'];*/
+
+                foreach ($grouped_comments as $comment) {
                     $indentation = $depth * 25;
                     ?>
                     <div id="comment<?php echo $comment['id'] ?>" data-testid="<?php echo $comment['id'] ?>" data-level="<?php echo $depth ?>" data-parent="<?php echo $comment['parent'] ?>" class="comment w3-row w3-section" style="margin-left: <?php echo $indentation; ?>px;">
@@ -467,7 +468,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         ?>
 
                         <div class="w3-col comment-profile-picture">
-                            <img class="w3-bar-item w3-round w3-card-2 w3-grey" loading="lazy" width="50" height="50" src="<?php echo $comment['picture'] ? $comment['picture'] : '/img/no_image.png' ?>">
+							<img class="w3-bar-item w3-round w3-card-2 w3-grey" loading="lazy" width="50" height="50" src="<?php echo $comment['user']['picture'] ?? '/img/no_image.png' ?>">
                         </div>
 
                         <div data-testid="gr8-comment-divider" class="comment-divider w3-hide-small w3-col">
@@ -478,17 +479,17 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             <article class="<?php echo $comment['votes'] >= 100 ? 'w3-orange' : 'gr8-theme w3-light-grey' ?> w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
                                 <header class="w3-padding-bottom">
                                     <b>
-                                        <?php if (!$comment['user_removed']) { ?>
-                                            <a href="/@<?php echo urlencode($comment['username']) ?>" class="<?php echo $comment['user_admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>">
+                                        <?php if (!$comment['user']['removed']) { ?>
+                                            <a href="/@<?php echo urlencode($comment['user']['name']) ?>" class="<?php echo $comment['user']['admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>">
                                         <?php } ?>
-                                        <?php echo $comment['username'] ?>
-                                        <?php if (!$comment['user_removed']) { ?>
+                                        <?php echo $comment['user']['name'] ?>
+                                        <?php if (!$comment['user']['removed']) { ?>
                                             </a>
                                         <?php } ?>
                                     </b>
 
                                     <span class="w3-mobile w3-right">
-                                        <?php echo ($comment['is_op'] ?? false) ? '<b class="is-op" title="Original Poster">OP</b> - ' : '' ?>
+                                        <?php echo ($comment['user']['is_op'] ?? false) ? '<b class="is-op" title="Original Poster">OP</b> - ' : '' ?>
                                         <time class="date" title="<?php echo $comment['date'] ?>" datetime="<?php echo $comment['date'] ?>"><?php echo $comment['date'] ?></time>
                                         <time class="edited-at" title="<?php echo $comment['edited_at'] ?>" datetime="<?php echo $comment['edited_at'] ?>"><?php echo !empty($comment['edited_at']) ? '(edited)' : null ?></time> -
                                         <span class="votes"><span class="count"><?php echo $comment['votes'] ?></span> favorites</span>
@@ -503,7 +504,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                     <?php echo $comment['comment_md'] ?? '<p><i>This comment has been removed</i></p>' ?>
                                 </span>
 
-                                <?php if ($loggedin && trim($current_user->id) === trim($comment['userid'])) { ?>
+                                <?php if ($loggedin && $comment['actions']['edit']) { ?>
                                     <form class="edit w3-hide">
                                         <textarea class="edit-textarea"><?php echo $comment['comment_og'] ?></textarea><br />
                                         <button class="save-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Save</button>
@@ -515,7 +516,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                     <?php if ($comment['voted'] === false) { ?>
                                         <div class="tooltip">
                                             <span class="w3-blue tooltiptext">Favorite Comment</span>
-                                            <button <?php echo $comment['user_removed'] ? 'disabled' : null ?> data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
+                                            <button <?php echo $comment['user']['removed'] ? 'disabled' : null ?> data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
                                         </div>
                                     <?php } elseif ($comment['voted'] === true) { ?>
                                         <div class="tooltip">
@@ -538,28 +539,30 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                             ?>
                                         </span>
 
-                                        <div class="tooltip">
-                                            <span class="w3-blue tooltiptext">Reply to this comment</span>
-                                            <button <?php echo $comment['user_removed'] ? 'disabled' : null ?> data-id="<?php echo $comment['id'] ?>" class="reply-btn fa fa-reply w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small"></button>
-                                        </div>
+										<?php if($comment['actions']['reply']) { ?>
+											<div class="tooltip">
+												<span class="w3-blue tooltiptext">Reply to this comment</span>
+												<button <?php echo $comment['user']['removed'] ? 'disabled' : null ?> data-id="<?php echo $comment['id'] ?>" class="reply-btn fa fa-reply w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small"></button>
+											</div>
+										<?php } ?>
 
-                                        <?php if (trim($current_user->id) === trim($comment['userid'])) { ?>
+                                        <?php if($comment['actions']['edit']) { ?>
                                             <div class="tooltip">
                                                 <span class="w3-blue tooltiptext">Edit this comment</span>
                                                 <button data-id="<?php echo $comment['id'] ?>" class="edit-btn fa fa-pencil w3-btn w3-blue w3-hover-opacity w3-round w3-padding-small"></button>
                                             </div>
                                         <?php } ?>
 
-                                        <?php if (trim($current_user->id) !== trim($comment['userid']) && !$current_user->admin) { ?>
+                                        <?php if($comment['actions']['report']) { ?>
                                             <div class="tooltip" id="data-report-comment">
                                                 <span class="w3-blue tooltiptext">Report this comment to moderators</span>
                                                 <button data-id="<?php echo $comment['id'] ?>" id="report-comment-button" name="flag-comment" class="fa fa-flag w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
                                             </div>
                                         <?php } ?>
 
-                                        <?php if (trim($current_user->id) === trim($comment['userid']) || $current_user->admin) { ?>
+                                        <?php if($comment['actions']['remove']) { ?>
                                             <div class="tooltip" id="data-delete-comment">
-                                                <span class="w3-blue tooltiptext"><?php echo ($comment['is_hidden'] ?? false) ? 'Restore' : 'Delete'; ?> this comment</span>
+                                                <span class="w3-blue tooltiptext"><?php echo ($comment['is_hidden'] ?? false) ? 'Restore' : 'Remove'; ?> this comment</span>
                                                 <button data-id="<?php echo $comment['id'] ?>" id="delete-comment-button" name="delete-comment" class="fa fa-trash w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
                                             </div>
                                         <?php } ?>
@@ -569,14 +572,25 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         </div>
                     </div>
                     <?php
-                    comment_tree($grouped_comments, $comment['id'], $depth + 1);
+					if(!empty($comment['children'])) {
+						comment_tree($comment['children'], $comment['id'], $depth + 1);
+					}
                 }
             }
 
             if(isset($_GET['depth']) && isset($_GET['parent'])) {
-                comment_tree($grouped_comments, $_GET['parent'], 0);
+				$parent = (int)$_GET['parent'];
+				if(isset($comment_data[$parent])) {
+					if(!empty($comment_data[$parent]['children'])) {
+						comment_tree($comment_data[$parent]['children'], $parent, 0);
+					} else {
+						echo '<br /><b>Comment doesn\'t have any replies</b>';
+					}
+				} else {
+					echo '<br /><b>Comment not found</b>';
+				}
             } else {
-                comment_tree($grouped_comments, 0, 0);
+                comment_tree($comment_data, 0, 0);
             }
         }
         ?>
@@ -584,7 +598,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
         <template id="reply-box">
             <div id="reply-form-container-" class="w3-margin reply-form-box">
                 <div class="w3-right w3-block">
-                    <textarea name="reply-box" id="reply-box-" class="reply-box w3-input w3-border w3-border-blue w3-hover-shadow" placeholder="Add a reply... (@userid mentions someone, BBcode supported)" rows="2"></textarea>
+                    <textarea name="reply-box" id="reply-box-" class="reply-box w3-input w3-border w3-border-blue w3-hover-shadow" placeholder="Add a reply... (@userid mentions someone, Markdown supported)" rows="2"></textarea>
                     <button data-parent="" class="post-reply w3-right w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
                         <span class="comment-btn-text"><i class="fa fa-reply" aria-hidden="true"></i> Post reply</span>
                     </button>

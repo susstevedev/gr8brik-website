@@ -44,6 +44,8 @@ class ErrorRegistry {
             'reply_not_found' => 'The comment that you are trying to reply to does not exist.',
             'too_long' => 'Comment must be less than 500 characters.',
             'too_short' => 'Comment must contain text.',
+			'owner_banned' => 'The account that had posted this reply has been suspended for violating the Guidelines.',
+			'owner_not_found' => 'The account that had posted this reply has been deleted.',
         ],
     ];
 

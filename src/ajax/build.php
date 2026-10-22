@@ -536,6 +536,7 @@ if(isset($_GET['fetch'])) {
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
         header("Refresh:0");
+		exit;
     }
 
     $model_id = htmlspecialchars((int)$_GET['buildId']);
@@ -544,6 +545,7 @@ if(isset($_GET['fetch'])) {
 }
 
 function fetch_comments($model_id, $csrf) {
+	require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
     global $conn;
     global $conn2;
     global $current_user;
@@ -555,6 +557,8 @@ function fetch_comments($model_id, $csrf) {
 
     $model_id = (int)$model_id;
     $id = loggedin() ? ((int)$current_user->id ?? 0) : false;
+	$is_admin = loggedin() ? ((bool)$current_user->admin ?? false) : false;
+	$notifications = new Notifications($conn2);
 
     if($id && $current_user->admin !== true) {
 	    $sql = "SELECT * FROM comments WHERE model = $model_id AND hidden = 0 ORDER BY id ASC";
@@ -570,26 +574,24 @@ function fetch_comments($model_id, $csrf) {
     $comResult = $conn->query($sql);
     $rows = [];
     $comments = [];
+	$tree = [];
     $fav_ids = [];
+
     $blocked = [];
     $privated = [];
     $suspended = [];
+	$admin = [];
 
     while ($row = $comResult->fetch_assoc()) {
-        $rows[] = $row;
+        $rows[$row['id']] = $row;
     }
-
-    $userIds = array_column($rows, 'user');
-    $users = User::getUsers($userIds);
-    $notifications = new Notifications($conn2);
 
     if (!empty($rows)) {
         $userIds = array_column($rows, 'user');
-        $users = User::getUsers($userIds);
+        $users = UserProfile::multi_raw_users($userIds);
 
         if(loggedin()) {
             $commentIds = array_map('intval', array_column($rows, 'id'));
-            $userId = (int)$current_user->id;
             $ids = implode(',', $commentIds);
             $res = $conn->query("SELECT comment_id FROM comment_votes WHERE user_id = $id AND comment_id IN ($ids)");
 
@@ -600,73 +602,107 @@ function fetch_comments($model_id, $csrf) {
             $result = $conn2->query("
                 SELECT userid, profileid
                 FROM user_blocks
-                WHERE userid = $userId
-                OR profileid = $userId
+                WHERE userid = $id
+                OR profileid = $id
             ");
 
             while ($row = $result->fetch_assoc()) {
                 $userid = (int)$row['userid'];
                 $profileid = (int)$row['profileid'];
 
-                if ($userid === $userId) {
+                if ($userid === $id) {
                     $blocked[$profileid]['you_blocked'] = true;
                 }
 
-                if ($profileid === $userId) {
+                if ($profileid === $id) {
                     $blocked[$userid]['they_blocked'] = true;
                 }
             }
         }
 
         foreach ($users as $c_user) {
-            $c_user_id = (int)$c_user->id ?? null;
+            $c_user_id = (int)$c_user['id'] ?? 0;
 
-            if(((bool)$c_user->private_profile && !User::isFollowing($c_user_id) && $c_user_id !== $id)) {
-                $privated[$c_user_id] = true;
-            }
+			if(!empty($c_user['profile'])) {
+				if(((bool)$c_user['profile']['private_profile'] && !User::isFollowing($c_user_id) && $c_user_id !== $id)) {
+					$privated[$c_user_id] = true;
+				}
+			}
 
-            if(((bool)$c_user->suspended)) {
-                $suspended[$c_user_id] = true;
-            }
+			if(!empty($c_user['user'])) {
+				if(((bool)$c_user['user']['suspended'])) {
+					$suspended[$c_user_id] = true;
+				}
+
+				if(((bool)$c_user['user']['admin'])) {
+					$admin[$c_user_id] = true;
+				}
+			}
         }
     }
 
 	foreach($rows as $row) {
+		$actions = [
+			'reply' => false,
+			'fav' => false,
+			'edit' => false,
+			'remove' => false,
+			'report' => false,
+		];
+
         $comment_id = $row['id'];
         $comment_votes = Numbers::format($row['votes']);
 
         $comment_og = htmlspecialchars($row['comment']);
-        $comment = $bbcode->toHTML($comment_og, false, true);
-        //$comment_md = MarkdownExtra::defaultTransform($comment_og);
         $comment_md = Slimdown::render($comment_og);
 
-        $userRow = $users[(int)$row['user']] ?? User::getUser((int)$row['user']);
+		if(loggedin()) {
+			$actions = [
+				'reply' => true,
+				'fav' => true,
+				'edit' => (trim($id) === trim($c_user_id)) ? true : false,
+				'remove' => (trim($id) === trim($c_user_id) || $is_admin) ? true : false,
+				'report' => (trim($id) === trim($c_user_id) && !$is_admin) ? true : false,
+			];
+		}
+
+		$c_user_id = (int)$row['user'] ?? 0;
+        $userRow = $users[$c_user_id] ?? [];
 
         $date = time_ago(date('Y-m-d H:i:s', is_numeric($row['date']) ? $row['date'] : 0));
         $edited_at = null;
 
         //c_user_blablabla got annoying
         $c_user_data = [
-            'id' => (int)$row['user'] ?? 0,
-            'name' => $userRow->username ?? 'Deleted User',
-            'admin' => $userRow->admin ?? false,
+            'id' => $c_user_id ?? 0,
+            'name' => $userRow['user']['username'] ?? 'Deleted User',
+            'admin' => $admin[$c_user_id] ?? false,
             'is_op' => $row['is_op'] ?? 0,
-            'picture' => $userRow->picture_small ?? '/img/no_image.png',
-            'banned' => $suspended[(int)$row['user']] ?? false,
-            'removed' => !$userRow ? true : false,
-            'private' => $privated[(int)$row['user']] ?? false,
+            'picture' => $userRow['profile']['picture_small'] ?? UserProfile::gravatar($userRow['user']['email'], 45),
+            'banned' => $suspended[$c_user_id] ?? false,
+            'removed' => !$userRow['user'] ? true : false,
+            'private' => $privated[$c_user_id] ?? false,
+			'you_blocked' => $blocked[$c_user_id]['you_blocked'] ?? false,
+			'they_blocked' => $blocked[$c_user_id]['they_blocked'] ?? false,
         ];
 
         if($c_user_data['banned']) {
-            $message = "The account that had posted this reply has been suspended for violating the Guidelines.";
+			// Dude. The guy that wrote that comment is fucked up bruah
+            $message = ErrorRegistry::get('comment', 'owner_banned');
             $c_user_data['removed'] = true;
-            $c_user_data['picture'] = '/img/no_image.png';
+            $c_user_data['picture'] = null;
+
+			$actions['reply'] = false;
+			$actions['fav'] = false;
         }
 
-        if(!$userRow) {
+        if(!$userRow['user']) {
+			$message = ErrorRegistry::get('comment', 'owner_not_found');
             $c_user_data['removed'] = true;
-            $c_user_data['picture'] = '/img/no_image.png';
-            $message = "The account that had posted this reply has been deleted.";
+            $c_user_data['picture'] = null;
+
+			$actions['reply'] = false;
+			$actions['fav'] = false;
         }
 
         if($c_user_data['private']) {
@@ -677,47 +713,65 @@ function fetch_comments($model_id, $csrf) {
             $edited_at = time_ago(date('Y-m-d H:i:s', is_numeric($row['edited_at']) ? $row['edited_at'] : 0));
         }
 
-        $youBlocked = $blocked[$c_user_data['id']]['you_blocked'] ?? false;
-        $theyBlocked = $blocked[$c_user_data['id']]['they_blocked'] ?? false;
         if(loggedin()) {
-            if ($youBlocked && $theyBlocked) {
+            if ($c_user_data['you_blocked'] && $c_user_data['they_blocked']) {
                 $c_user_data['removed'] = true;
+				$c_user_data['picture'] = null;
                 $message = "You blocked @" . $c_user_data['username'] . ", and they blocked you. Their comments and profile will not be visible.";
-                $comment = null;
-            } elseif ($youBlocked) {
+
+				$actions['reply'] = false;
+				$actions['fav'] = false;
+            } elseif ($c_user_data['you_blocked']) {
                 $message = "You blocked @" . $c_user_data['username'] . ". Your comments and profile will not be visible to them.";
-            } elseif ($theyBlocked) {
+            } elseif ($c_user_data['they_blocked']) {
                 $c_user_data['removed'] = true;
+				$c_user_data['picture'] = null;
                 $message = "You're blocked from @" . $c_user_data['username'] . ". Their comments and profile will not be visible.";
-                $comment = null;
+
+				$actions['reply'] = false;
+				$actions['fav'] = false;
             }
         }
 
-        $comments[] = [
+        $comments[$comment_id] = [
             'message' => $message ?? null,
             'id' => $comment_id,
-            'userid' => $c_user_data['id'],
-            'user_removed' => $c_user_data['removed'],
-            'user_admin' => $c_user_data['admin'],
-            'username' => $c_user_data['name'],
-            'is_op' => $c_user_data['is_op'],
+			'user' => [
+				'id' => $c_user_id,
+				'removed' => $c_user_data['removed'],
+				'admin' => $c_user_data['admin'],
+				'name' => $c_user_data['name'],
+				'is_op' => $c_user_data['is_op'],
+				'picture' => $c_user_data['picture'],
+			],
             'is_hidden' => $row['hidden'],
             'parent' => $row['parent'],
-            'picture' => $c_user_data['picture'],
-            'comment' => $comment,
-            'comment_md' => !empty($comment) ? $comment_md : null,
+			'children' => [],
+            'comment_md' => !$c_user_data['they_blocked'] ? $comment_md : null,
             'comment_og' => $comment_og,
             'date' => $date,
             'edited_at' => $edited_at,
             'votes' => $comment_votes,
             'voted' => isset($fav_ids[$comment_id]),
             'conversation_subbed' => $notifications->get_subscribers('comment_reply', $comment_id),
+			'actions' => $actions,
         ];
         $message = null;
     }
 
+	//ampersands are needed; DO NOT REMOVE THEM!
+	foreach ($rows as $row) {
+		if (!$row['parent'] || !isset($comments[$row['parent']])) {
+			if(isset($comments[$row['id']])) {
+				$tree[$row['id']] = &$comments[$row['id']];
+			}
+		} elseif (isset($comments[$row['parent']])) {
+			$comments[$row['parent']]['children'][$row['id']] = &$comments[$row['id']];
+		}
+	}
+
     $comResult->free();
-    return json_encode($comments); 
+    return json_encode($tree); 
 }
 
 function comment_subscribers($model_id) {

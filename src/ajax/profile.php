@@ -116,6 +116,66 @@ class UserProfile {
         return null;
     }
 
+	/**
+		* Array of raw user table(s)
+	*/
+	public static function multi_raw_users(array $ids): array {
+        $conn = Database::get(DB_NAME);
+
+        $ids = array_unique(array_map('intval', $ids));
+        $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+
+		$final = [];
+        $profiles = [];
+        $users = [];
+
+        $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE id IN ($placeholders)");
+        $types = str_repeat('i', count($ids));
+        $u_stmt->bind_param($types, ...$ids);
+        $u_stmt->execute();
+        $u_res = $u_stmt->get_result();
+
+        while ($r = $u_res->fetch_assoc()) {
+            $users[$r['id']] = $r;
+        }
+
+        $p_stmt = $conn->prepare("SELECT userid, picture, picture_small, banner, twitter, bsky, private_profile, description FROM user_profiles WHERE userid IN ($placeholders)");
+        $types = str_repeat('i', count($ids));
+        $p_stmt->bind_param($types, ...$ids);
+        $p_stmt->execute();
+        $p_res = $p_stmt->get_result();
+
+        while ($r = $p_res->fetch_assoc()) {
+            $profiles[$r['userid']] = $r;
+        }
+
+        foreach ($ids as $id) {
+            $final[$id] = [
+                'id' => $id,
+                'user' => $users[$id] ?? [],
+                'profile' => $profiles[$id] ?? []
+            ];
+        }
+
+        $u_stmt->close();
+        $p_stmt->close();
+        return $final;
+    }
+
+	/**
+     * Constucts a Gravatar image URL from an email
+     */
+    public static function gravatar(?string $email, ?int $size = 50) {
+        if(empty($email)) {
+            return null;
+        }
+
+        $hash = hash('sha256', strtolower(trim($email)));
+        $params = ['s' => $size,'d' => 'identicon','r' => 'pg'];
+
+        return "https://www.gravatar.com/avatar/" . $hash . "?" . http_build_query($params);
+    }
+
     /**
      * Returns public user profile
     */
