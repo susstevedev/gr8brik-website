@@ -436,18 +436,24 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <?php
             }
 
+			function comment_find_by_id(array $comments, int $parent_id) {
+				foreach ($comments as $comment) {
+					if ($comment['id'] == $parent_id) {
+						return $comment;
+					}
+
+					if (!empty($comment['children'])) {
+						$found = comment_find_by_id($comment['children'], $parent_id);
+						if ($found !== null) {
+							return $found;
+						}
+					}
+				}
+				return null;
+			}
+
             function comment_tree(array $grouped_comments, $parent_id, $depth = 0) {
                 global $current_user, $loggedin;
-
-                /*if (!isset($grouped_comments[$parent_id])) {
-                    return;
-                }
-
-				if(empty($grouped_comments[$parent_id]['children'])) {
-					return;
-				}
-
-				$grouped_replies = $grouped_comments[$parent_id]['children'];*/
 
                 foreach ($grouped_comments as $comment) {
                     $indentation = $depth * 25;
@@ -516,12 +522,12 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                     <?php if ($comment['voted'] === false) { ?>
                                         <div class="tooltip">
                                             <span class="w3-blue tooltiptext">Favorite Comment</span>
-                                            <button <?php echo $comment['user']['removed'] ? 'disabled' : null ?> data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
+                                            <button <?php echo !$comment['actions']['fav'] ? 'disabled' : null ?> data-id="<?php echo $comment['id'] ?>" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>
                                         </div>
                                     <?php } elseif ($comment['voted'] === true) { ?>
                                         <div class="tooltip">
                                             <span class="w3-blue tooltiptext">Unfavorite Comment</span>
-                                            <button data-id="<?php echo $comment['id'] ?>" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>
+                                            <button <?php echo !$comment['actions']['fav'] ? 'disabled' : null ?> data-id="<?php echo $comment['id'] ?>" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>
                                         </div>
                                     <?php } ?>
 
@@ -571,6 +577,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </article>
                         </div>
                     </div>
+
                     <?php
 					if(!empty($comment['children'])) {
 						comment_tree($comment['children'], $comment['id'], $depth + 1);
@@ -578,27 +585,25 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 }
             }
 
-            if(isset($_GET['depth']) && isset($_GET['parent'])) {
+			if (isset($_GET['depth']) && isset($_GET['parent'])) {
 				$parent = (int)$_GET['parent'];
-				if(isset($comment_data[$parent])) {
-					if(!empty($comment_data[$parent]['children'])) {
-						comment_tree($comment_data[$parent]['children'], $parent, 0);
-					} else {
-						echo '<br /><b>Comment doesn\'t have any replies</b>';
+				$comment = comment_find_by_id($comment_data, $parent);
+
+				if ($comment !== null) {
+					if (!empty($comment['children'])) {
+						comment_tree($comment['children'], $parent, 0);
 					}
-				} else {
-					echo '<br /><b>Comment not found</b>';
 				}
-            } else {
-                comment_tree($comment_data, 0, 0);
-            }
+			} else {
+				comment_tree($comment_data, 0, 0);
+			}
         }
         ?>
 
         <template id="reply-box">
             <div id="reply-form-container-" class="w3-margin reply-form-box">
                 <div class="w3-right w3-block">
-                    <textarea name="reply-box" id="reply-box-" class="reply-box w3-input w3-border w3-border-blue w3-hover-shadow" placeholder="Add a reply... (@userid mentions someone, Markdown supported)" rows="2"></textarea>
+                    <textarea name="reply-box" id="reply-box-" class="reply-box w3-input w3-border w3-border-blue w3-hover-shadow" placeholder="Add a reply... (@username mentions someone, Markdown supported)" rows="2"></textarea>
                     <button data-parent="" class="post-reply w3-right w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
                         <span class="comment-btn-text"><i class="fa fa-reply" aria-hidden="true"></i> Post reply</span>
                     </button>

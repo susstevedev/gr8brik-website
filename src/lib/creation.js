@@ -320,6 +320,8 @@
                 }
             });
         });
+		
+		//todo: make this similar to the creation favoriate one, where it's one event listener
 
         $(document).on("click", ".upvote-btn", function () {
             event.preventDefault();
@@ -332,7 +334,8 @@
                 method: "POST",
                 dataType: 'json',
                 data: {
-                    upvote_comment: true,
+                    comment_favs: true,
+					fav: true,
                     comment_id: comment_id
                 },
                 success: function (response) {
@@ -362,7 +365,8 @@
                 method: "POST",
                 dataType: 'json',
                 data: {
-                    downvote_comment: true,
+                    comment_favs: true,
+					unfav: true,
                     comment_id: comment_id
                 },
                 success: function (response) {

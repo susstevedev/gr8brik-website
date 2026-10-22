@@ -38,14 +38,20 @@ class ErrorRegistry {
         ],
         'comment' => [
             'generic' => 'Could not send comment. Please try again later.',
+			'bad_id' => 'Id must be an integer',
             'unauthed' => 'Please login to comment.',
             'unverified' => 'Please verify your account to comment.',
-            'not_found' => 'Comment not found in database.',
+            'not_found' => 'Comment does not exist in the database.',
             'reply_not_found' => 'The comment that you are trying to reply to does not exist.',
             'too_long' => 'Comment must be less than 500 characters.',
             'too_short' => 'Comment must contain text.',
 			'owner_banned' => 'The account that had posted this reply has been suspended for violating the Guidelines.',
 			'owner_not_found' => 'The account that had posted this reply has been deleted.',
+			'comment_not_faved' => 'You have not favorited this comment',
+			'comment_fav_not_allowed' => 'You cannot favorite this comment',
+			'comment_faved' => 'You have already favorited this comment',
+			'comment_unfav_fail' => 'Failed to unfavorite',
+			'comment_fav_fail' => 'Failed to favorite this comment',
         ],
     ];
 

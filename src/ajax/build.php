@@ -656,18 +656,18 @@ function fetch_comments($model_id, $csrf) {
         $comment_og = htmlspecialchars($row['comment']);
         $comment_md = Slimdown::render($comment_og);
 
+		$c_user_id = (int)$row['user'] ?? 0;
+        $userRow = $users[$c_user_id] ?? [];
+
 		if(loggedin()) {
 			$actions = [
 				'reply' => true,
 				'fav' => true,
-				'edit' => (trim($id) === trim($c_user_id)) ? true : false,
+				'edit' => trim($id) === trim($c_user_id) ? true : false,
 				'remove' => (trim($id) === trim($c_user_id) || $is_admin) ? true : false,
 				'report' => (trim($id) === trim($c_user_id) && !$is_admin) ? true : false,
 			];
 		}
-
-		$c_user_id = (int)$row['user'] ?? 0;
-        $userRow = $users[$c_user_id] ?? [];
 
         $date = time_ago(date('Y-m-d H:i:s', is_numeric($row['date']) ? $row['date'] : 0));
         $edited_at = null;
@@ -675,10 +675,10 @@ function fetch_comments($model_id, $csrf) {
         //c_user_blablabla got annoying
         $c_user_data = [
             'id' => $c_user_id ?? 0,
-            'name' => $userRow['user']['username'] ?? 'Deleted User',
+            'name' => $userRow['user']['username'] ?? '[deleted]',
             'admin' => $admin[$c_user_id] ?? false,
             'is_op' => $row['is_op'] ?? 0,
-            'picture' => $userRow['profile']['picture_small'] ?? UserProfile::gravatar($userRow['user']['email'], 45),
+            'picture' => $userRow['profile']['picture_small'] ?? '/img/no_image.png',
             'banned' => $suspended[$c_user_id] ?? false,
             'removed' => !$userRow['user'] ? true : false,
             'private' => $privated[$c_user_id] ?? false,
@@ -686,9 +686,8 @@ function fetch_comments($model_id, $csrf) {
 			'they_blocked' => $blocked[$c_user_id]['they_blocked'] ?? false,
         ];
 
-        if($c_user_data['banned']) {
-			// Dude. The guy that wrote that comment is fucked up bruah
-            $message = ErrorRegistry::get('comment', 'owner_banned');
+        if(!$userRow['user'] || (bool)$userRow['user']['deactive']) {
+			$message = ErrorRegistry::get('comment', 'owner_not_found');
             $c_user_data['removed'] = true;
             $c_user_data['picture'] = null;
 
@@ -696,8 +695,9 @@ function fetch_comments($model_id, $csrf) {
 			$actions['fav'] = false;
         }
 
-        if(!$userRow['user']) {
-			$message = ErrorRegistry::get('comment', 'owner_not_found');
+		if($c_user_data['banned']) {
+			// Dude. The guy that wrote that comment is fucked up bruah
+            $message = ErrorRegistry::get('comment', 'owner_banned');
             $c_user_data['removed'] = true;
             $c_user_data['picture'] = null;
 
@@ -1233,132 +1233,138 @@ if (loggedin() && isset($current_user)) {
         exit;
     }
 
-    if (isset($_POST['upvote_comment'])) {
-        header('Content-Type: application/json');
+	if(isset($_POST['comment_favs'])) {
+		header('Content-Type: application/json');
 
-        if (!isset($_POST['comment_id']) || !is_numeric($_POST['comment_id'])) {
-            echo json_encode(['error' => 'Invalid comment id provided']);
-            exit;
-        }
-        
-        $username = htmlspecialchars($current_user->username);
-        $comment_id = (int)$_POST['comment_id'];
+		if (!isset($_POST['comment_id']) || !is_numeric($_POST['comment_id'])) {
+			echo json_encode(['error' => ErrorRegistry::get('comment', 'bad_id')]);
+			exit;
+		}
 
-        $stmt = $conn->prepare("SELECT id, user FROM comments WHERE id = ? LIMIT 1");
-        $stmt->bind_param("i", $comment_id);
-        $stmt->execute();
-        $stmt->bind_result($comment_id, $comment_user);
-        $stmt->fetch();
-        $stmt->close();
+		$comment_id = (int)$_POST['comment_id'];
+		$count = 0;
 
-        if (!$comment_id) {
-            echo json_encode(['error' => 'Comment does not exist in the database']);
-            exit;
-        }
+		$stmt = $conn->prepare("SELECT id, user FROM comments WHERE id = ? AND hidden = 0 LIMIT 1");
+		$stmt->bind_param("i", $comment_id);
+		$stmt->execute();
+		$stmt->bind_result($comment_id, $comment_user);
+		$stmt->fetch();
+		$stmt->close();
 
-        $stmt = $conn->prepare("SELECT COUNT(*) FROM comment_votes WHERE comment_id = ? AND user_id = ?");
-        $stmt->bind_param("ii", $comment_id, $id);
-        $stmt->execute();
-        $stmt->bind_result($count);
-        $stmt->fetch();
-        $stmt->close();
+		if (!$comment_id) {
+			echo json_encode(['error' => ErrorRegistry::get('comment', 'not_found')]);
+			exit;
+		}
 
-        if ($count > 0) {
-            echo json_encode(['error' => 'You have already favorited this comment']);
-            exit;
-        }
-        
-        if($current_user->verify_token != NULL) {
-            http_response_code(401);
-            echo json_encode(['error' => "Please verify your account to continue this action."]);
-            exit;
-        }
+		if (isset($_POST['fav'])) {
+			$alr_stmt = $conn->prepare("SELECT COUNT(*) as vote_count FROM comment_votes WHERE comment_id = ? AND user_id = ?");
+			$alr_stmt->bind_param("ii", $comment_id, $id);
 
-        $youBlocked = false;
-        $theyBlocked = false;
-        $blockResult = $conn2->query("SELECT * FROM user_blocks WHERE (userid = '$comment_user' AND profileid = '$id') OR (userid = '$id' AND profileid = '$comment_user')");
-        if ($blockResult && $blockResult->num_rows > 0) {
-            while ($row_block = $blockResult->fetch_assoc()) {
-                if ($row_block['userid'] == $id && $row_block['profileid'] == $comment_user) {
-                    $youBlocked = true;
-                } elseif ($row_block['userid'] == $comment_user && $row_block['profileid'] == $id) {
-                    $theyBlocked = true;
-                }
-            }
-        }
+			if($alr_stmt->execute()) {
+				$alr_res = $alr_stmt->get_result();
+				$count = $alr_res->fetch_assoc()['vote_count'] ?? 0;
+				$alr_stmt->close();
+			}
 
-        if ($theyBlocked) {
-            echo json_encode(['error' => 'You cannot favorite this comment']);
-            exit;
-        }
+			if ($count > 0) {
+				echo json_encode(['error' => ErrorRegistry::get('comment', 'comment_faved')]);
+				exit;
+			}
 
-        $stmt = $conn->prepare("INSERT INTO comment_votes (comment_id, user_id) VALUES (?, ?)");
-        $stmt->bind_param("ii", $comment_id, $id);
+			if($current_user->verify_token != NULL) {
+				http_response_code(401);
+				echo json_encode(['error' => ErrorRegistry::get('auth', 'unverified')]);
+				exit;
+			}
 
-        $stmt_upd = $conn->prepare("UPDATE comments SET votes = votes + 1 WHERE id = ?");
-        $stmt_upd->bind_param("i", $comment_id);
-    
-        if ($stmt->execute() && $stmt_upd->execute()) {
-            $stmt_count = $conn->prepare("SELECT votes FROM comments WHERE id = ?");
-            $stmt_count->bind_param("i", $comment_id);
-            $stmt_count->execute();
-            $stmt_count->bind_result($count);
-            $stmt_count->fetch();
-            $stmt_count->close();
+			$youBlocked = false;
+			$theyBlocked = false;
+			$blockResult = $conn2->query("SELECT * FROM user_blocks WHERE (userid = '$comment_user' AND profileid = '$id') OR (userid = '$id' AND profileid = '$comment_user')");
+			if ($blockResult && $blockResult->num_rows > 0) {
+				while ($row_block = $blockResult->fetch_assoc()) {
+					if ($row_block['userid'] == $id && $row_block['profileid'] == $comment_user) {
+						$youBlocked = true;
+					} elseif ($row_block['userid'] == $comment_user && $row_block['profileid'] == $id) {
+						$theyBlocked = true;
+					}
+				}
+			}
 
-            echo json_encode([
-                'success' => true,
-                'message' => 'Comment favorited',
-                'count' => Numbers::format($count),
-            ]);
-        } else {
-            echo json_encode(['success' => false, 'error' => 'Failed to favorite comment']);
-        }
-        $stmt->close();
-    }
+			if ($theyBlocked) {
+				echo json_encode(['error' => ErrorRegistry::get('comment', 'comment_fav_not_allowed')]);
+				exit;
+			}
 
-    if (isset($_POST['downvote_comment'])) {
-        header('Content-Type: application/json');
+			$stmt = $conn->prepare("INSERT INTO comment_votes (comment_id, user_id) VALUES (?, ?)");
+			$stmt->bind_param("ii", $comment_id, $id);
 
-        if (!isset($_POST['comment_id']) || !is_numeric($_POST['comment_id'])) {
-            echo json_encode(['error' => 'Invalid comment id provided']);
-            exit;
-        }
+			$stmt_upd = $conn->prepare("UPDATE comments SET votes = votes + 1 WHERE id = ?");
+			$stmt_upd->bind_param("i", $comment_id);
 
-        $comment_id = (int) $_POST['comment_id'];
+			if ($stmt->execute() && $stmt_upd->execute()) {
+				$stmt_count = $conn->prepare("SELECT votes FROM comments WHERE id = ?");
+				$stmt_count->bind_param("i", $comment_id);
+				if($stmt_count->execute()) {
+					$count_res = $stmt_count->get_result();
+					$count = $count_res->fetch_assoc()['votes'] ?? 0;
+					$stmt_count->close();
+				} else {
+					echo json_encode(['success' => false, 'error' => ErrorRegistry::get('db', 'query_fail')]);
+					exit;
+				}
 
-        $stmt = $conn->prepare("SELECT COUNT(*) as vote_count FROM comment_votes WHERE comment_id = ? AND user_id = ?");
-        $stmt->bind_param("ii", $comment_id, $id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $row = $result->fetch_assoc();
-        $vote_count = (int)$row['vote_count']; 
-        $stmt->close();
+				echo json_encode(['success' => true, 'message' => 'Comment favorited', 'count' => Numbers::format($count ?? 0)]);
+			} else {
+				echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'comment_fav_fail')]);
+			}
+			$stmt->close();
+			exit;
+		}
 
-        if ($vote_count === 0) {
-            echo json_encode(['error' => 'You have not favorited this comment']);
-            exit;
-        }
+		if (isset($_POST['unfav'])) {
+			$alr_stmt = $conn->prepare("SELECT COUNT(*) as vote_count FROM comment_votes WHERE comment_id = ? AND user_id = ?");
+			$alr_stmt->bind_param("ii", $comment_id, $id);
 
-        $stmt = $conn->prepare("DELETE FROM comment_votes WHERE comment_id = ? AND user_id = ?");
-        $stmt->bind_param("ii", $comment_id, $id);
+			if($alr_stmt->execute()) {
+				$alr_res = $alr_stmt->get_result();
+				$count = $alr_res->fetch_assoc()['vote_count'] ?? 0;
+				$alr_stmt->close();
+			}
 
-        $stmt_upd = $conn->prepare("UPDATE comments SET votes = votes - 1 WHERE id = ?");
-        $stmt_upd->bind_param("i", $comment_id);
+			if ($count === 0) {
+				echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'comment_not_faved')]);
+				exit;
+			}
 
-        if ($stmt->execute() && $stmt_upd->execute()) {
-            $stmt_count = $conn->prepare("SELECT votes FROM comments WHERE id = ?");
-            $stmt_count->bind_param("i", $comment_id);
-            $stmt_count->execute();
-            $stmt_count->bind_result($count);
-            $stmt_count->fetch();
-            $stmt_count->close();
+			$stmt = $conn->prepare("DELETE FROM comment_votes WHERE comment_id = ? AND user_id = ?");
+			$stmt->bind_param("ii", $comment_id, $id);
 
-            echo json_encode(['success' => true, 'message' => 'Comment unfavorited', 'count' => Numbers::format($count)]);
-        } else {
-            echo json_encode(['success' => false, 'error' => 'Failed to unfavorite']);
-        }
-        $stmt->close();
-    }
+			$stmt_upd = $conn->prepare("UPDATE comments SET votes = votes - 1 WHERE id = ?");
+			$stmt_upd->bind_param("i", $comment_id);
+
+			if ($stmt->execute() && $stmt_upd->execute()) {
+				$stmt_count = $conn->prepare("SELECT votes FROM comments WHERE id = ?");
+				$stmt_count->bind_param("i", $comment_id);
+
+				if($stmt_count->execute()) {
+					$count_res = $stmt_count->get_result();
+					$count = $count_res->fetch_assoc()['votes'] ?? 0;
+					$stmt_count->close();
+				} else {
+					echo json_encode(['success' => false, 'error' => ErrorRegistry::get('db', 'query_fail')]);
+					exit;
+				}
+
+				echo json_encode(['success' => true, 'message' => 'Comment unfavorited', 'count' => Numbers::format($count ?? 0)]);
+			} else {
+				echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'comment_unfav_fail')]);
+			}
+			$stmt->close();
+			exit;
+		}
+
+		echo json_encode(['success' => false, 'error' => ErrorRegistry::get('db', 'query_fail')]);
+		exit;
+	}
 }
 ?>
