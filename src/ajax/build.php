@@ -345,7 +345,7 @@ function fetch_build($model_id, $csrf) {
     global $bbcode;
 
     if (empty($csrf) || $csrf != $_SESSION['csrf']) {
-        return json_encode(["success" => false, "message" => 'No CSRF token provided, or it is invalid!',]);
+        return json_encode(["success" => false, "message" => ErrorRegistry::get('auth', 'bad_csrf')]);
     }
 
     if (!is_numeric($model_id)){
@@ -400,11 +400,10 @@ function fetch_build($model_id, $csrf) {
     $description_markdown = Slimdown::render(htmlspecialchars($row2['description']));
     $name = htmlentities($row2['name'] ?? 'Untited creation');
 
-    //$row = User::getUser($userid);
 	$row = UserProfile::raw_user($userid, false);
     $user_exists = true;
 
-    if(!$row['user']) {
+    if(!isset($row['user'])) {
         $user_exists = false;
     } else if((bool)$row['user']['suspended'] !== false) {
         $user_exists = false;

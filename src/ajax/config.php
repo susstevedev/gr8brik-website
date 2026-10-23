@@ -24,17 +24,10 @@ require_once 'what_browser.php';
 
 class SessHandler implements SessionHandlerInterface {
     private ?mysqli $db = null;
-    private string $dbServer;
-    private string $dbUser;
-    private string $dbPassword;
-    private string $dbName;
     private mixed $userId = null;
 
-    public function __construct(string $server, string $user, string $password, string $name) {
-        $this->dbServer = $server;
-        $this->dbUser = $user;
-        $this->dbPassword = $password;
-        $this->dbName = $name;
+    public function __construct(mysqli $db) {
+        $this->db = $db;
     }
 
     public function user(mixed $user): void {
@@ -42,8 +35,7 @@ class SessHandler implements SessionHandlerInterface {
     }
 
     public function open($save_path, $session_name):bool {
-        $this->db = new mysqli($this->dbServer, $this->dbUser, $this->dbPassword, $this->dbName);
-        if ($this->db->connect_error) {
+		if (!$this->db || $this->db->connect_error) {
             return false;
         }
         return true;
@@ -51,7 +43,6 @@ class SessHandler implements SessionHandlerInterface {
 
     public function close():bool {
         if ($this->db) {
-            $this->db->close();
             return true;
         }
         return false;
@@ -99,7 +90,7 @@ class SessHandler implements SessionHandlerInterface {
     }
 }
 
-$handler = new SessHandler(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
+$handler = new SessHandler(Database::get(DB_NAME, false, true));
 session_set_save_handler($handler, true);
 
 ini_set('session.gc_maxlifetime', 172800);

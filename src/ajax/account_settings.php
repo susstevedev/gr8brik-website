@@ -17,6 +17,7 @@ class ScreenNameUtils {
     }
 
     public function check_username_available(string $new) {
+		require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/auth.php';
         global $current_user;
         global $conn;
 
@@ -63,8 +64,7 @@ class ScreenNameUtils {
             return ['available' => false, 'reason' => 'Username must be at least 3 characters.'];
         }
 
-        $isBanned = User::isBanned($new, 'username');
-        if($isBanned !== false) {
+        if(AccountManager::blacklisted($new, 'name') !== false) {
             return ['available' => false, 'reason' => 'This username is unavailable. Please choose another.'];
         }
 

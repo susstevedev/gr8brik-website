@@ -4,6 +4,7 @@
     This page, auth.php, is exactly what it sounds like: an authentication system used by Gr8brik
 */
 
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/account_settings.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
@@ -158,6 +159,51 @@ class AccountManager
 			return false;
 		}
 	}
+	
+	public static function blacklisted(string $value, string $type) {
+        $conn = Database::get(DB_NAME);
+
+		switch ($type):
+            case 'email':
+                $value = hash('sha256', strtolower(trim($value)));
+				$sql = "SELECT * FROM blacklist WHERE value = ? AND type = 'email'";
+                break;
+            case 'name':
+                $value = strtolower(trim($value));
+				$sql = "SELECT * FROM blacklist WHERE value = ? AND type = 'username'";
+                break;
+			case 'id':
+				$value = (int)$value;
+				$sql = "SELECT * FROM blacklist WHERE userid = ?";
+				break;
+			default:
+				break;
+		endswitch;
+
+		if($sql !== null) {
+			$sql .= ' AND (created_at IS NULL OR created_at <= CURRENT_TIMESTAMP()) 
+					AND (ignore_at IS NULL OR ignore_at >= CURRENT_TIMESTAMP()) 
+					LIMIT 1';
+
+			$stmt = $conn->prepare($sql);
+			if ($stmt) {
+				$stmt->bind_param("s", $value);
+
+				if($stmt->execute()) {
+					$res = $stmt->get_result();
+					$row = $res->fetch_assoc();
+					$stmt->close();
+
+					if ($row) {
+						$row['reason'] = !empty($row['reason']) ? $row['reason'] : null;
+						return $row;
+					}
+				}
+			}
+		}
+
+        return false;
+    }
 
     public function login_user($user, $pwd, $remember)
     {
@@ -171,12 +217,12 @@ class AccountManager
 
         if (empty($user)) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Email or username cannot be blank"];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'field_missing', ['email or username'])];
         }
 
         if (loggedin()) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Already logged in"];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'authed')];
         }
 
         $stmt = $conn->prepare("SELECT id, username, email, password, deactive, suspended FROM users WHERE (email = ? OR username = ?) AND (deactive IS NULL OR deactive < NOW() + INTERVAL 14 DAY) LIMIT 1");
@@ -187,7 +233,7 @@ class AccountManager
 
         if (!$row) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Invalid combination of email or username and password."];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'bad_password')];
         }
 
         $db_hashed_pwd = null;
@@ -203,18 +249,15 @@ class AccountManager
 
         if (!$correct_pwd) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Invalid combination of email or username and password."];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'bad_password')];
         }
-
-        $user_agent = htmlspecialchars($_SERVER['HTTP_USER_AGENT']);
-        $user_agent = get_browser_name($user_agent) . ", " . get_system_name($user_agent);
 
         if ($db_hashed_pwd !== null) {
             $new_hash = password_hash($pwd, PASSWORD_DEFAULT);
             $updateStmt = $conn->prepare("UPDATE users SET password = ?, salt = NULL WHERE id = ?");
             $updateStmt->bind_param("si", $new_hash, $row['id']);
             if (!$updateStmt->execute()) {
-                return ['success' => false, 'error' => "We couldn't rehash this password. Contact " . DB_MAIL];
+                return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'bad_password')];
             }
         }
 
@@ -223,32 +266,28 @@ class AccountManager
 
     public function register_user($username, $password, $email) 
     {
-        $conn = mysqli_connect(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME);
-        if (mysqli_connect_errno()) {
-            http_response_code(500);
-            return ['success' => false, 'error' => "Database connection failed"];
-        }
+        $conn = Database::get(DB_NAME);
 
-        $username = mysqli_real_escape_string($conn, htmlspecialchars((urldecode($username))));
-        $email = mysqli_real_escape_string($conn, trim($email ?? ''));
+        $username = urldecode($username ?? '');
+        $email = trim($email ?? '');
         $token_raw = bin2hex(random_bytes(32));
 
         if (empty($password) || empty($email) || empty($username)) {
             http_response_code(400);
             if (empty($password)) {
-                return ['success' => false, 'error' => "Password field is blank"];
+                return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'field_missing', ['password'])];
             }
             if (empty($email)) {
-                return ['success' => false, 'error' => "Email field is blank"];
+                return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'field_missing', ['email'])];
             }
             if (empty($username)) {
-                return ['success' => false, 'error' => "Username field is blank"];
+                return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'field_missing', ['user name'])];
             }
         }
 
 		if (loggedin()) {
             http_response_code(400);
-            return ['error' => "Already logged in"];
+            return ['error' => ErrorRegistry::get('auth_login', 'authed')];
         }
 
         $usernameutils = new ScreenNameUtils();
@@ -260,32 +299,25 @@ class AccountManager
 
         if (strlen($password) < 8) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Password cannot be less than 8 characters"];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'password_short')];
         }
 
-        if (strlen($password) > 250) {
+        if (strlen($password) > 128) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Password cannot be more than 250 characters"];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'password_long')];
         }
 
         $password = password_hash($password, PASSWORD_DEFAULT);
         $current_local = strtolower(explode('@', $email)[0]);
 
-        if (str_contains($current_local, '+') || str_contains($current_local, '.')) {
+        if (str_contains($current_local, '+') || str_contains($current_local, '.') || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Invalid email address format"];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'bad_format', ['email'])];
         }
 
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (self::blacklisted($email, 'email') !== false) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Invalid email address format"];
-        }
-
-        //Account email blacklist system
-        $isBanned = User::isBanned($email, 'email');
-        if ($isBanned !== false) {
-            http_response_code(400);
-            return ['success' => false, 'error' => "Email address is not valid"];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'field_not_avaliable', ['email'])];
         }
 
         $sql_check = "SELECT 1 FROM users WHERE email = '$email'";
@@ -293,7 +325,7 @@ class AccountManager
 
         if (mysqli_num_rows($stmt) > 0) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Email address is not avaliable"];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'field_not_avaliable', ['email'])];
         }
 
         $insert = self::insert_user($conn, $token_raw, $username, $password, $email, $token_raw, null, null, null, null, null, null);
@@ -302,7 +334,7 @@ class AccountManager
             return $this->login_final($conn, $insert, 1);
         } else {
             http_response_code(500);
-            return ['success' => false, 'error' => $insert['error'] ?? "Failed to register account."];
+            return ['success' => false, 'error' => ErrorRegistry::get('db', 'query_fail')];
         }
     }
 
@@ -369,10 +401,9 @@ class AccountManager
             return ['success' => false, 'error' => "Invalid email address format"];
         }
 
-        $isBanned = User::isBanned($email, 'email');
-        if ($isBanned !== false) {
+        if (self::blacklisted($email, 'email') !== false) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Email address is not avaliable"];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'field_not_avaliable', ['email'])];
         }
 
         $token_raw = bin2hex(random_bytes(32));
@@ -445,10 +476,9 @@ class AccountManager
             return ['success' => false, 'error' => "Invalid email address format"];
         }
 
-        $isBanned = User::isBanned($email, 'email');
-        if ($isBanned !== false) {
+        if (self::blacklisted($email, 'email') !== false) {
             http_response_code(400);
-            return ['success' => false, 'error' => "Email address is not avaliable"];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth_login', 'field_not_avaliable', ['email'])];
         }
 
         $token_raw = bin2hex(random_bytes(32));
@@ -497,31 +527,32 @@ class AccountManager
         $token_raw = bin2hex(random_bytes(32));
         $token_hashed = hash('sha256', $token_raw);
 
-        $isBanned = User::isBannedByID($userid);
+		if((bool)$row['suspended'] === true) {
+			$isBanned = self::blacklisted($userid, 'id') !== false;
+			if ($isBanned !== false) {
+				http_response_code(500);
+				$until = isset($isBanned['ignore_at']) ? 'until ' . $isBanned['ignore_at'] : 'indefinitely';
+				$reason = isset($isBanned['reason']) ? $isBanned['reason'] : null;
+				$text = "Your account has been suspended by an administrator " . $until . ".";
 
-        if ($isBanned !== false) {
-            http_response_code(500);
-            $until = isset($isBanned['ignore_at']) ? 'until ' . $isBanned['ignore_at'] : 'indefinitely';
-            $reason = isset($isBanned['reason']) ? $isBanned['reason'] : null;
-            $text = "Your account has been suspended by an administrator " . $until . ".";
+				if($reason) {
+					$text .= " The reason provided by an administrator is as follows:";
+				}
 
-            if($reason) {
-                $text .= " The reason provided by an administrator is as follows:";
-            }
-
-            return [
-                'success' => false,
-                'title' => 'Account suspension',
-                'popup' => $text,
-                'error' => false,
-                'extras' => $reason,
-                'links' => [
-                    'btn_cancel' => 'Okay',
-                    'btn' => 'Appeal',
-                    'goto' => '/appeal.php',
-                ],
-            ];
-        }
+				return [
+					'success' => false,
+					'title' => 'Account suspension',
+					'popup' => $text,
+					'error' => false,
+					'extras' => $reason,
+					'links' => [
+						'btn_cancel' => 'Okay',
+						'btn' => 'Appeal',
+						'goto' => '/appeal.php',
+					],
+				];
+			}
+		}
 
         if (!empty($row['deactive']) || (bool)$row['suspended'] === true) {
             $stmt = $conn->prepare("INSERT INTO sessions (id, login_from, user_agent, user, timestamp, remember) VALUES (?, ?, ?, ?, ?, 0)");

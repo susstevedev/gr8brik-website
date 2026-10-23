@@ -10,12 +10,22 @@ class ErrorRegistry {
             'unverified' => 'Please verify your account to continue this action.',
             'unauthed' => 'Please login to continue this action.',
             'bad_csrf' => 'Your cross-site-request-forgery token seems to be invalid.',
+			'ip_ban' => 'Banned at %s, until %s',
         ],
+		'auth_login' => [
+			'field_missing' => 'Field %s cannot be empty.',
+			'authed' => 'Already logged in.',
+			'bad_password' => 'Invalid combination of email or username and password.',
+			'bad_format' => 'Invalid format for %s',
+			'password_short' => 'Password cannot be less than 8 characters.',
+			'password_long' => 'Password cannot be more than 128 characters.',
+			'field_not_avaliable' => 'This %s is not avaliable',
+		],
         'account_settings' => [
             'banner_upload_fail' => "Sorry, there was an error uploading your file.",
         ],
         'db' => [
-            'conn_fail' => 'Connection failed.',
+            'conn_fail' => 'Connection to %s failed',
             'query_fail' => 'Query execution failed.',
         ],
         'creation' => [
@@ -55,8 +65,14 @@ class ErrorRegistry {
         ],
     ];
 
-    public static function get(string $type, string $code): string {
-        return self::$errors[$type][$code] ?? self::$errors['generic'];
+    public static function get(string $type, string $code, ?array $placeholders = []): string {
+		if(!empty($placeholders)) {
+			$error = vsprintf(self::$errors[$type][$code], $placeholders);
+		} else {
+			$error = self::$errors[$type][$code];
+		}
+
+        return $error ?? self::$errors['generic'];
     }
 }
 ?>

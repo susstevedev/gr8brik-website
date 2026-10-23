@@ -209,7 +209,7 @@ class UserProfile {
 
         if ($user_arr['user']['suspended'] || $user_arr['user']['deactive']) {
             http_response_code(403);
-            $banrow = User::isBannedByID($profile_id);
+            $banrow = AccountManager::blacklisted($profile_id, 'id');
 
             if($banrow) {
                 $until = isset($banrow['ignore_at']) ? ('until ' . date("d M Y", strtotime($banrow['ignore_at']))) : 'indefinitely';
@@ -1005,6 +1005,11 @@ class UserAdmin {
 class UserContent {
     public string $creation;
     public string $userid;
+    public int $me;
+
+    public function __construct(?int $me = 0) {
+        $this->me = $me;
+    }
 
     public function returnModels($userid, $page) {
         $creation_conn = Database::get(DB_NAME2);
@@ -1023,13 +1028,13 @@ class UserContent {
 
         $limit = 9;
         $offset = ($page - 1) * $limit;
-        $user = User::getUser($userid);
+        $user = UserProfile::raw_user($userid, false);
 
-        if(!$user || User::isDeleted($userid)) {
+        if(!$user['user'] || (bool)$user['user']['deactive'] || (bool)$user['user']['suspended']) {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if(!User::isMe($userid) && !User::isFollowing($userid) && User::isPrivate($userid)) {
+        if($userid != $this->me && !User::isFollowing($userid) && User::isPrivate($userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
@@ -1040,8 +1045,8 @@ class UserContent {
 
         $creations = [];
         while ($creation = $result->fetch_assoc()) {
-            $creation['username'] = $user->username ?? null;
-            $creation['user'] = $user->id ?? null;
+            $creation['username'] = $user['user']['username'] ?? null;
+            $creation['user'] = $userid ?? null;
                     
             if (empty($creation['name'])) {
                 $creation['name'] = $creation['username'] . "'s creation";
@@ -1078,15 +1083,13 @@ class UserContent {
 
         $limit = 9;
         $offset = ($page - 1) * $limit;
-        $user = User::getUser($userid);
+        $user = UserProfile::raw_user($userid, false);
 
-        $user = User::getUser($userid);
-
-        if(!$user || User::isDeleted($userid)) {
+        if(!$user['user'] || (bool)$user['user']['deactive'] || (bool)$user['user']['suspended']) {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if(!User::isMe($userid) && !User::isFollowing($userid) && User::isPrivate($userid)) {
+        if($userid != $this->me && !User::isFollowing($userid) && User::isPrivate($userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
@@ -1113,7 +1116,7 @@ class UserContent {
                     $usero = User::getUser($model_user_id);
                     $row2['username'] = $usero->username ?? null;
 
-                    if(User::isDeleted($model_user_id) || User::isBannedByID($model_user_id) || (User::isPrivate($model_user_id) && !User::isFollowing($model_user_id) && !User::isMe($model_user_id))) {
+                    if((User::isPrivate($model_user_id) && !User::isFollowing($model_user_id) && $model_user_id != $this->me)) {
                         continue;
                     }
 
@@ -1162,13 +1165,13 @@ class UserContent {
             return ['success' => false, 'error' => "Sign in to view comments of a user"];
         }
 
-        $user = User::getUser($userid);
+        $user = UserProfile::raw_user($userid, false);
 
-        if(!$user || User::isDeleted($userid)) {
+        if(!$user['user'] || (bool)$user['user']['deactive'] || (bool)$user['user']['suspended']) {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if(!User::isMe($userid) && !User::isFollowing($userid) && User::isPrivate($userid)) {
+        if($userid != $this->me && !User::isFollowing($userid) && User::isPrivate($userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
@@ -1197,8 +1200,8 @@ class UserContent {
 
             $comment2['type'] = 'model';
             $comment2['id'] = $comment['id'];
-            $comment2['username'] = $user->username ?? null;
-            $comment2['userid'] = $user->id ?? null;
+            $comment2['username'] = $user['user']['username'] ?? null;
+            $comment2['userid'] = $userid ?? null;
             $comment2['content'] = mb_strimwidth($comment['comment'], 0, 33, '...');
             $comment2['parent'] = $parent;
             $comment2['date'] = time_ago(date("D, M d, Y", (int)$comment['date']));
@@ -1227,8 +1230,8 @@ class UserContent {
 
             $reply2['type'] = 'forum';
             $reply2['id'] = $reply['id'];
-            $reply2['username'] = $user->username ?? null;
-            $reply2['userid'] = $user->id ?? null;
+            $reply2['username'] = $user['user']['username'] ?? null;
+            $reply2['userid'] = $userid ?? null;
             $reply2['content'] = mb_strimwidth($reply['content'], 0, 33, '...');
             $reply2['parent'] = $parent;
             $reply2['parent_name'] = $parent_name;
@@ -1267,13 +1270,13 @@ class UserContent {
             return ['success' => false, 'error' => "Sign in to forum posts of a user"];
         }
 
-        $user = User::getUser($userid);
+        $user = UserProfile::raw_user($userid, false);
 
-        if(!$user || User::isDeleted($userid)) {
+        if(!$user['user'] || (bool)$user['user']['deactive'] || (bool)$user['user']['suspended']) {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if(!User::isMe($userid) && !User::isFollowing($userid) && User::isPrivate($userid)) {
+        if($userid != $this->me && !User::isFollowing($userid) && User::isPrivate($userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
@@ -1286,8 +1289,8 @@ class UserContent {
             $p2 = [];
 
             $p2['id'] = $p['id'];
-            $p2['username'] = $user->username ?? null;
-            $p2['userid'] = $user->id ?? null;
+            $p2['username'] = $user['user']['username'] ?? null;
+            $p2['userid'] = $userid ?? null;
             $p2['title'] = mb_strimwidth($p['title'], 0, 33, '...');
             $p2['date'] = time_ago(date("D, M d, Y", strtotime($p['timestamp'])));
 
@@ -1298,6 +1301,13 @@ class UserContent {
     }
 }
 
+$current_user_id = 0;
+if(loggedin() && isset($current_user)) {
+    $current_user_id = $current_user->id;
+}
+
+$UserContent = new UserContent($current_user_id);
+
 if(isset($_GET['getUserBuilds'])) {
     header('Content-Type: application/json');
 
@@ -1307,7 +1317,6 @@ if(isset($_GET['getUserBuilds'])) {
     }
 
     $page = $_GET['page'] ?? 0;
-    $UserContent = new UserContent();
     $creations = $UserContent->returnModels($_GET['userid'], $page);
 
     echo json_encode($creations);
@@ -1323,7 +1332,6 @@ if(isset($_GET['getUserForums'])) {
     }
 
     $page = $_GET['page'] ?? 0;
-    $UserContent = new UserContent();
     $posts = $UserContent->returnForums($_GET['userid'], $page);
 
     echo json_encode($posts);
@@ -1337,7 +1345,6 @@ if(isset($_GET['getUserLiked'])){
     }
 
     $page = $_GET['page'] ?? 0;
-    $UserContent = new UserContent();
     $result = $UserContent->returnLikedModels($_GET['userid'], $page);
     echo json_encode($result);
     exit;
@@ -1352,7 +1359,6 @@ if(isset($_GET['getUserComments'])) {
     }
 
     $page = $_GET['page'] ?? 0;
-    $UserContent = new UserContent();
     $comments = $UserContent->returnComments($_GET['userid'], $page);
     $comments_arr = [];
     $json = null;
