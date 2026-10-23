@@ -320,59 +320,37 @@
                 }
             });
         });
-		
-		//todo: make this similar to the creation favoriate one, where it's one event listener
 
-        $(document).on("click", ".upvote-btn", function () {
+        $(document).on("click", ".upvote-btn, .downvote-btn", function () {
             event.preventDefault();
             let btn = $(this);
             var $parent = $(this).closest('.comment');
             var comment_id = $parent.attr('data-testid');
 
-            $.ajax({
-                url: "/ajax/build",
-                method: "POST",
-                dataType: 'json',
-                data: {
-                    comment_favs: true,
-					fav: true,
-                    comment_id: comment_id
-                },
-                success: function (response) {
-                    if (response.success) {
-                        $parent.find(".votes .count").text(response.count);
-                        btn.replaceWith(`<button data-id="${comment_id}" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>`);
-                    } else if (response.error) {
-                        showError(response.error);
-                    }
-                },
-                error: (jqXHR, textStatus, errorThrown) => {
-                    console.error("error:", textStatus, errorThrown, jqXHR);
-                    const response = JSON.parse(jqXHR.responseText);
-                    showError(response.error);
-                }
-            });
-        });
+			var data = {
+				comment_favs: true,
+				comment_id: comment_id,
+			}
 
-        $(document).on("click", ".downvote-btn", function () {
-            event.preventDefault();
-            let btn = $(this);
-            var $parent = $(this).closest('.comment');
-            var comment_id = $parent.attr('data-testid');
+			if(btn.hasClass('upvote-btn')) {
+				data.fav = true;
+			} else if(btn.hasClass('downvote-btn')) {
+				data.unfav = true;
+			}
 
             $.ajax({
                 url: "/ajax/build",
                 method: "POST",
                 dataType: 'json',
-                data: {
-                    comment_favs: true,
-					unfav: true,
-                    comment_id: comment_id
-                },
+                data: data,
                 success: function (response) {
                     if (response.success) {
                         $parent.find(".votes .count").text(response.count);
-                        btn.replaceWith(`<button data-id="${comment_id}" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>`);
+						if(btn.hasClass('upvote-btn')) {
+							btn.replaceWith(`<button data-id="${comment_id}" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>`);
+						} else if(btn.hasClass('downvote-btn')) {
+							btn.replaceWith(`<button data-id="${comment_id}" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>`);
+						}
                     } else if (response.error) {
                         showError(response.error);
                     }
