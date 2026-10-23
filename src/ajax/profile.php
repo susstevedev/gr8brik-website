@@ -79,7 +79,7 @@ class UserProfile {
     /**
      * Raw user table row
     */
-    private static function raw_user(mixed $identifier, $usename = true) {
+    public static function raw_user(mixed $identifier, $usename = false) {
         $conn = Database::get(DB_NAME);
 
         switch ($usename) {
@@ -347,7 +347,7 @@ class UserProfile {
             'twitter' => isset($user_arr['profile']['twitter']) ? htmlspecialchars($user_arr['profile']['twitter']) : '',
             'bsky' => $bsky,
             'age' => isset($user_arr['user']['age']) ? htmlspecialchars($user_arr['user']['age']) : '',
-            'picture' => htmlspecialchars($user_arr['profile']['picture_small'] ?? $user_arr['profile']['picture']),
+            'picture' => htmlspecialchars($user_arr['profile']['picture'] ?? '/img/no_image.png'),
             'banner' => isset($user_arr['profile']['banner']) ? htmlspecialchars($user_arr['profile']['banner']) : null,
             'stats' => [
                 'creation_count' => $model_count,

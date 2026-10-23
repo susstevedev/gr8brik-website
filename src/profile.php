@@ -310,7 +310,7 @@ if(isset($_POST['unban-submit'])) {
                 <form id="unblockUser" action="" method="post"></form>
             </span>
             <?php } else { ?>
-                <a href="/acc/index">Edit Profile</a>&nbsp;
+                <a href="/acc/" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-round-small w3-border w3-border-indigo"><i class="fa fa-pencil" aria-hidden="true"></i> Edit Profile</a> 
             <?php } ?>
         <?php } ?>
 

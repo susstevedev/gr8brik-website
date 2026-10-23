@@ -338,6 +338,7 @@ if (isset($_POST['save_build_v2'])) {
 }
 
 function fetch_build($model_id, $csrf) {
+	require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
     global $current_user;
     global $conn;
     global $conn2;
@@ -399,20 +400,21 @@ function fetch_build($model_id, $csrf) {
     $description_markdown = Slimdown::render(htmlspecialchars($row2['description']));
     $name = htmlentities($row2['name'] ?? 'Untited creation');
 
-    $row = User::getUser($userid);
+    //$row = User::getUser($userid);
+	$row = UserProfile::raw_user($userid, false);
     $user_exists = true;
 
-    if(!$row) {
+    if(!$row['user']) {
         $user_exists = false;
-    } else if($row->suspended !== false) {
+    } else if((bool)$row['user']['suspended'] !== false) {
         $user_exists = false;
-    } else if($row->deactive !== null) {
+    } else if($row['user']['deactive'] !== null) {
         $user_exists = false;
     }
 
     if($user_exists) {
-        $user_name = $row->username ?? '';
-        $user_image = $row->picture_small;
+        $user_name = $row['user']['username'] ?? '';
+        $user_image = $row['profile']['picture_small'];
 
         if (!isset($name) || empty($name)) {
             $name = $user_name . "'s creation";
@@ -501,9 +503,9 @@ function fetch_build($model_id, $csrf) {
         'user' => [
             'exists' => $user_exists,
             'id' => $userid ?? 0,
-            'name' => $user_name ?? 'Deleted User',
+            'name' => $user_name ?? '[deleted]',
             'image' => $user_image ?? '/img/no_image.png',
-            'admin' => $row->admin ?? false,
+            'admin' => $row['user']['admin'] ?? false,
             'followers' => $followers ?? 0,
         ],
         'modelid' => $model_id,
