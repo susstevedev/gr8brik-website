@@ -338,13 +338,12 @@ if (isset($_POST['save_build_v2'])) {
 }
 
 function fetch_build($model_id, $csrf) {
-	require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
     global $current_user;
     global $conn;
     global $conn2;
     global $bbcode;
 
-    if (empty($csrf) || $csrf != $_SESSION['csrf']) {
+    if (empty($csrf) || !valid_csrf($csrf)) {
         return json_encode(["success" => false, "message" => ErrorRegistry::get('auth', 'bad_csrf')]);
     }
 
@@ -400,23 +399,20 @@ function fetch_build($model_id, $csrf) {
     $description_markdown = Slimdown::render(htmlspecialchars($row2['description']));
     $name = htmlentities($row2['name'] ?? 'Untited creation');
 
-	$row = UserProfile::raw_user($userid, false);
+	$usero = User::getUser($userid);
     $user_exists = true;
 
-    if(!isset($row['user'])) {
+    if(!isset($usero)) {
         $user_exists = false;
-    } else if((bool)$row['user']['suspended'] !== false) {
+    } else if($usero->suspended !== false) {
         $user_exists = false;
-    } else if($row['user']['deactive'] !== null) {
+    } else if($usero->deactive !== null) {
         $user_exists = false;
     }
 
     if($user_exists) {
-        $user_name = $row['user']['username'] ?? '';
-        $user_image = $row['profile']['picture_small'];
-
         if (!isset($name) || empty($name)) {
-            $name = $user_name . "'s creation";
+            $name = ($row->username ?? '') . "'s creation";
         }
     }
 
@@ -502,9 +498,9 @@ function fetch_build($model_id, $csrf) {
         'user' => [
             'exists' => $user_exists,
             'id' => $userid ?? 0,
-            'name' => $user_name ?? '[deleted]',
-            'image' => $user_image ?? '/img/no_image.png',
-            'admin' => $row['user']['admin'] ?? false,
+            'name' => $usero->username ?? '[deleted]',
+            'image' => $usero->profile->picture ?? '/img/no_image.png',
+            'admin' => $usero->admin ?? false,
             'followers' => $followers ?? 0,
         ],
         'modelid' => $model_id,
@@ -552,8 +548,8 @@ function fetch_comments($model_id, $csrf) {
     global $current_user;
     global $bbcode;
 
-    if (empty($csrf) || $csrf != $_SESSION['csrf']) {
-        return json_encode(["error" => 'Invalid CSRF token provided']);
+    if (empty($csrf) || !valid_csrf($csrf)) {
+        return json_encode(["error" => ErrorRegistry::get('auth', 'bad_csrf')]);
     }
 
     $model_id = (int)$model_id;
@@ -793,6 +789,7 @@ if(isset($_GET['comments'])) {
 }
 
 if(isset($_POST['comment'])) {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
     header('Content-Type: application/json');
 
     $comment = isset($_POST['commentbox']) ? $_POST['commentbox'] : 0;
@@ -800,7 +797,7 @@ if(isset($_POST['comment'])) {
     $csrf = $_POST['csrf_token'];
     $model_id = $_POST['buildId'];
 
-    if ($_SESSION['csrf'] !== $_POST['csrf_token']) {
+    if (!valid_csrf($csrf)) {
         echo json_encode(['error' => ErrorRegistry::get('auth', 'bad_csrf')]);
         exit;
     }
@@ -892,7 +889,7 @@ if(isset($_POST['comment'])) {
 
 	$date = time();
     $is_op = $id === $userid ? 1 : 0;
-    $comment = $bbcode->Screennameify($comment);
+    $comment = UserProfile::Screennameify($comment);
 
     $sql = "INSERT INTO comments (user, model, comment, parent, date, is_op) VALUES (?, ?, ?, ?, ?, ?) LIMIT 1";
     $stmt2 = $conn->prepare($sql);
@@ -931,19 +928,24 @@ if(isset($_POST['comment'])) {
 
         echo json_encode([
             'success' => 'Comment sent.',
+            'id' => $last_id,
+            'userid' => $id,
             'comment' => [
                 'id' => $last_id,
                 //'text' => MarkdownExtra::defaultTransform($comment),
                 'text' => Slimdown::render(htmlspecialchars($comment)),
-                'username' => $current_user->username ?? null,
-                'userid' => $current_user->id ?? null,
-                'admin' => $current_user->admin ?? false,
-                'op' => $is_op,
+                'text_og' => htmlspecialchars($comment),
                 'parent' => $parent,
-                'picture' => $current_user->picture,
                 'date' => time_ago(date('Y-m-d H:i:s', $date)),
                 'replies' => $reply_count,
                 'favs' => $favs_count
+            ],
+            'user' => [
+                'id' => $id,
+                'picture' => $current_user->profile->picture,
+                'name' => $current_user->username ?? null,
+                'admin' => $current_user->admin ?? false,
+                'op' => $is_op,
             ],
         ]);
         exit;
@@ -955,6 +957,7 @@ if(isset($_POST['comment'])) {
 }
 
 if (isset($_POST['edit_comment'])) {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
     header('Content-Type: application/json');
 
     if ($_SESSION['csrf'] === $_POST['csrf_token']) {
@@ -965,6 +968,8 @@ if (isset($_POST['edit_comment'])) {
             $date = time();
 
             if(!empty($comment_id) || !empty($comment_text)) {
+                $comment_text = UserProfile::Screennameify($comment_text);
+
                 $sql = "SELECT id, hidden, user, model FROM comments WHERE id = ?";
                 $stmt = $conn->prepare($sql);
                 $stmt->bind_param("i", $comment_id);
@@ -1160,6 +1165,8 @@ if (loggedin() && isset($current_user)) {
 
         $model_id = (int)$_POST['model_id'];
 		$type = $_POST['type'];
+        $model_user = null;
+        $likes = null;
 
 		if($type !== 'comment' && $type !== 'creation_fav') {
 			echo json_encode(['error' => 'Invalid type of method']);
@@ -1202,6 +1209,8 @@ if (loggedin() && isset($current_user)) {
 
         $model_id = (int)$_POST['model_id'];
 		$type = $_POST['type'];
+        $model_user = null;
+        $likes = null;
 
 		if($type !== 'comment' && $type !== 'creation_fav') {
 			echo json_encode(['error' => 'Invalid type of method']);
@@ -1242,17 +1251,17 @@ if (loggedin() && isset($current_user)) {
 			exit;
 		}
 
-		$comment_id = (int)$_POST['comment_id'];
+        $comment_user = null;
 		$count = 0;
 
 		$stmt = $conn->prepare("SELECT id, user FROM comments WHERE id = ? AND hidden = 0 LIMIT 1");
-		$stmt->bind_param("i", $comment_id);
+		$stmt->bind_param("i", $_POST['comment_id']);
 		$stmt->execute();
 		$stmt->bind_result($comment_id, $comment_user);
 		$stmt->fetch();
 		$stmt->close();
 
-		if (!$comment_id) {
+		if (!isset($comment_id) || !isset($comment_user)) {
 			echo json_encode(['error' => ErrorRegistry::get('comment', 'not_found')]);
 			exit;
 		}

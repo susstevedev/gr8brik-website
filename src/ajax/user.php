@@ -94,6 +94,7 @@ class User {
     public ?bool $private_profile;
     public ?string $deactive;
     public ?int $changed;
+    public ?object $profile;
 
     private const FIELDS = [
         'id',
@@ -117,18 +118,40 @@ class User {
         'changed'
     ];
 
+    private const FIELDS_PROFILE = [
+        'picture',
+        'picture_small',
+        'banner',
+        'twitter',
+        'bsky',
+        'private_profile',
+        'description'
+    ];
+
     /**
      * Constuct user from database array using the defined public variables
      * Sets value as null if not found in array
     */
-    public function __construct(?array $data = [])
-    {
+    public function __construct(?array $data = [], ?array $profile = []) {
         foreach (self::FIELDS as $field) {
             $this->$field = $data[$field] ?? null;
         }
 
+        $this->profile = self::__profile($profile);
         $this->picture ??= $this->email ? $this->userGravatar($this->email, 200) : '/img/no_image.png';
         $this->picture_small ??= $this->picture;
+    }
+
+    private function __profile(?array $data = []) {
+        $profile = new \stdClass;
+        foreach (self::FIELDS_PROFILE as $field) {
+            $profile->$field = $data[$field] ?? null;
+        }
+
+        $profile->picture ??= $this->email ? $this->userGravatar($this->email, 200) : '/img/no_image.png';
+        $profile->picture_small ??= $this->picture;
+
+        return $profile;
     }
 
     /**
@@ -439,7 +462,7 @@ class User {
             $profile = $p_stmt->get_result()->fetch_assoc() ?? [];
             $p_stmt->close();
 
-            return new User(array_merge($user, $profile));
+            return new User(array_merge($user, $profile), $profile);
         }
 
         return null;
@@ -465,7 +488,7 @@ class User {
             $profile = $p_stmt->get_result()->fetch_assoc() ?? [];
             $p_stmt->close();
 
-            return new User(array_merge($user, $profile));
+            return new User(array_merge($user, $profile), $profile);
         }
 
         return null;
@@ -486,7 +509,6 @@ class User {
 
         $profiles = [];
         $users = [];
-        $users = [];
 
         $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE id IN ($placeholders) AND deactive IS NULL");
         $types = str_repeat('i', count($ids));
@@ -494,8 +516,8 @@ class User {
         $u_stmt->execute();
         $u_res = $u_stmt->get_result();
 
-        while ($row = $u_res->fetch_assoc()) {
-            $users[$row['id']] = $row;
+        while ($r = $u_res->fetch_assoc()) {
+            $users[$r['id']] = $r;
         }
 
         $p_stmt = $conn->prepare("SELECT userid, picture, picture_small, banner, twitter, bsky, private_profile, description FROM user_profiles WHERE userid IN ($placeholders)");
@@ -504,16 +526,16 @@ class User {
         $p_stmt->execute();
         $p_res = $p_stmt->get_result();
 
-        while ($row = $p_res->fetch_assoc()) {
-            $profiles[$row['userid']] = $row;
+        while ($r = $p_res->fetch_assoc()) {
+            $profiles[$r['userid']] = $r;
         }
 
         foreach ($ids as $id) {
             $user = $users[$id] ?? [];
             $profile = $profiles[$id] ?? [];
 
-            $usero = new User(array_merge($user, $profile));
-            $users[$usero->id] = $usero;
+            $usero = new User(array_merge($user, $profile), $profile);
+            $users[$id] = $usero;
         }
 
         $u_stmt->close();

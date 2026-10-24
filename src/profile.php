@@ -410,51 +410,56 @@ if(isset($_POST['unban-submit'])) {
     <span id="data-user-actions" class="w3-panel">
         <div class="tab" id="creationstab">
             <a href="#creations" id="creations"></a>
-            <div class="w3-row">
+            <div class="contain w3-row">
                 <template id="gr8-creation-template">
                     <div class="w3-col l4 m6 s12 w3-padding-small">
-                        <div class="gr8-theme creation w3-card-2 w3-light-grey w3-padding creation-card">
+                        <div class="gr8-theme creation creation-card w3-card-2 w3-light-grey w3-padding w3-round">
                             <a href="/build/" class="creation-link">
-                                <img src="" loading="lazy" class="cre-image w3-hover-opacity w3-card-2 w3-grey creation-thumbnail">
+                                <img src="" loading="lazy" class="cre-image w3-hover-opacity w3-card-2 w3-round w3-border w3-border-light-grey w3-grey creation-thumbnail">
                                 <h4 class="creation-title"></h4>
                             </a>
                             <div class="creation-meta">
                                 <span class="meta-author">
-                                    By <b><a href=""></a></b> <span></span>
+                                    By <a href=""><i class="fa fa-at" aria-hidden="true"></i></a>, <span></span>
                                 </span>
+                                <div class="meta-stats">
+                                    <span class="views"><i class="fa fa-eye"></i> </span> •
+                                    <span class="favs"><i class="fa fa-star"></i> </span> •
+                                    <span class="comments"><i class="fa fa-comments"></i> </span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </template>
             </div>
-            <br /><button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
-            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button>
+            <!--<br /><button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
+            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button>-->
+            <button class="foward-button w3-btn w3-large w3-block w3-light-grey w3-border">LOAD MORE</button>
         </div>
 
         <div class="tab" id="poststab">
             <a href="#posts" id="posts"></a>
-            <div class="w3-row">
+            <div class="contain w3-row">
                 <template id="gr8-posts-template">
                     <div class='posts w3-display-container w3-left w3-padding' width="50%">
-                        <div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>
+                        <div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small w3-round'>
                             <a class='link-name' href=''>
                                 <h4 class='text'></h4>
                             </a>
-                            <span><a class='user' href='/user/'></a> replied to <a class='title' href=''></a> <span class='time'></span></span>
+                            <span><a class='user' href='/user/'></a> created <span class='time'></span></span>
                         </div>
                     </div>
                 </template>
             </div>
-            <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
-            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button>
+            <button class="foward-button w3-btn w3-large w3-block w3-light-grey w3-border">LOAD MORE</button>
         </div>
 
         <div class="tab" id="commentstab">
             <a href="#comments" id="comments"></a>
-            <div class="w3-row">
+            <div class="contain w3-row">
                 <template id="gr8-comment-template">
                     <div class='comment w3-display-container w3-left w3-padding' width="50%">
-                        <div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small'>
+                        <div class='w3-card-2 gr8-theme w3-light-grey w3-padding-small w3-round'>
                             <a class='link-name' href=''>
                                 <h4 class='text'></h4>
                             </a>
@@ -463,13 +468,12 @@ if(isset($_POST['unban-submit'])) {
                     </div>
                 </template>
             </div>
-            <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
-            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button>
+            <button class="foward-button w3-btn w3-large w3-block w3-light-grey w3-border">LOAD MORE</button>
         </div>
         
         <div class="tab" id="likestab">
 		    <a href="#likes" id="likes"></a>
-			<div class="w3-row">
+			<div class="contain w3-row">
                 <template id="gr8-likes-template">
                     <div class="w3-col l4 m6 s12 w3-padding-small">
                         <div class="gr8-theme liked w3-card-2 w3-light-grey w3-padding creation-card">
@@ -486,8 +490,7 @@ if(isset($_POST['unban-submit'])) {
                     </div>
                 </template>
 		    </div><br />
-            <button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
-            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button>
+            <button class="foward-button w3-btn w3-large w3-block w3-light-grey w3-border">LOAD MORE</button>
         </div>
     </span>
 

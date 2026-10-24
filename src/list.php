@@ -34,7 +34,7 @@ if (isset($_GET['feature_v3'])) {
                 'model_id' => $row2['id'],
                 'user' => $userid,
                 'username' => $truncated_username,
-                'pfp' => $usero->picture ?? null,
+                'pfp' => $usero->profile->picture ?? null,
                 'title' => $truncated_name,
                 'views' => $row2['views'],
                 'likes' => $row2['likes'],
@@ -251,6 +251,8 @@ if (isset($_GET['feature_v3'])) {
                     <h4><i class="fa fa-info-circle w3-padding-small" aria-hidden="true"></i><?php echo $result2->num_rows; ?> creations found</h4>
                 </div>
             <?php } ?>
+
+            <br />
 
             <?php
             while ($row = $result2->fetch_assoc()) {

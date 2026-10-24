@@ -157,12 +157,33 @@ if ($requests >= 50) {
     exit;
 }
 
-if (!isset($_SESSION['csrf']) || !isset($_SESSION['csrf_last_updated']) || $_SESSION['csrf_last_updated'] - time() >= 5) {
-    $_SESSION['csrf'] = bin2hex(random_bytes(32));
-    $_SESSION['csrf_last_updated'] = time();
+if (!isset($_SESSION['_csrf']) || $_SESSION['_csrf']['updated'] - time() >= 60) {
+    $token = bin2hex(random_bytes(16));
+    $_SESSION['csrf'] = $token;
+    $_SESSION['_csrf'] = [
+        'token' => $token,
+        'updated' => time(),
+    ];
+    unset($token);
 }
 
 define('csrf', $_SESSION['csrf']);
+
+/**
+ * Checks if a given string is the set CSRF token
+ * @param string $string user input
+ */
+function valid_csrf(string $string):bool {
+    if(isset($_SESSION['_csrf'])) {
+        if(isset($_SESSION['_csrf']['token'])) {
+            if(hash_equals($_SESSION['_csrf']['token'], $string)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
 
 $db = Database::get(DB_NAME);
 $ipbano = new IpBans($db);
@@ -309,7 +330,7 @@ if(!in_array('site-prefs', Cookie::controls())) {
 }
 
 if (isset($_GET['get_csrf_token'])) {
-    echo json_encode(['csrf_token' => $_SESSION['csrf']]);
+    echo json_encode(['new' => $_SESSION['_csrf'], 'csrf_token' => $_SESSION['csrf']]);
     exit;
 }
 ?>

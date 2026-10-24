@@ -363,39 +363,41 @@
             });
         });
 
-        function renderComment(elm, comment, depth) {
+        function renderComment(elm, res, depth) {
             let $clone = $($('#comment-template').html());
             let marg = depth * 25 + 'px';
             let width = Math.max(40, 60 - (depth * 2)) + '%';
 
-            $clone.find(".text").html(comment.text);
-            $clone.find(".comment-user").text(comment.username).attr('href', '/@' + comment.username);
+            $clone.find(".text").html(res.comment.text);
+            $clone.find(".edit .edit-textarea").html(res.comment.text_og);
+
+            $clone.find(".comment-user").text(res.user.name).attr('href', '/@' + res.user.name);
             $clone.find(".comment-body").css("width", width);
             $clone.css("margin-left", marg);
 
-            $clone.find(".reply-btn").attr('data-id', comment.id);
-            $clone.find(".edit-btn").attr('data-id', comment.id);
+            $clone.find(".reply-btn").attr('data-id', res.id);
+            $clone.find(".edit-btn").attr('data-id', res.id);
 
-            if (comment.admin) {
+            if (res.user.admin) {
                 $clone.find(".comment-user").addClass('w3-text-red w3-hover-text-yellow');
             }
 
-            if (comment.picture) {
-                $clone.find(".comment-profile-picture img").attr('src', comment.picture);
+            if (res.user.picture) {
+                $clone.find(".comment-profile-picture img").attr('src', res.user.picture);
             }
 
-            if (comment.op) {
+            if (res.user.op) {
                 $clone.find(".is-op").html('<b>OP</b> -');
             }
 
-            $clone.find(".date").text(comment.date);
-            $clone.find(".votes .count").text(comment.favs);
-            $clone.find(".upvote-btn").attr('data-id', comment.id);
-            $clone.attr('data-testid', comment.id);
+            $clone.find(".date").text(res.comment.date);
+            $clone.find(".votes .count").text(res.comment.favs);
+            $clone.find(".upvote-btn").attr('data-id', res.id);
+            $clone.attr('data-testid', res.id);
             $clone.attr('data-level', depth);
-            $clone.attr('id', 'comment' + comment.id);
+            $clone.attr('id', 'comment' + res.id);
 
-            $("#comment-count").text(comment.replies);
+            $("#comment-count").text(res.comment.replies);
 
             if(depth > 0) {
                 elm.after($clone);
@@ -595,7 +597,7 @@
                             var elm = $('#data-comment-wrapper');
 
                             if (response.comment) {
-                                renderComment(elm, response.comment, 0);
+                                renderComment(elm, response, 0);
                                 window.mode();
                                 $("html, body").animate({ scrollTop: $(document).height() }, "slow");
                             } else {
@@ -738,7 +740,7 @@
                             btn.prop("disabled", false);
 
                             if (response.comment) {
-                                renderComment($parent_elm, response.comment, depth);
+                                renderComment($parent_elm, response, depth);
                                 window.mode();
                                 $parent_elm.find('#reply-form-container-' + parent).remove();
                             } else {

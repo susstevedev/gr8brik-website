@@ -177,6 +177,36 @@ class UserProfile {
     }
 
     /**
+     * Change given @username string to a url
+     */
+    public static function Screennameify($str) {
+        $db = Database::get(DB_NAME);
+        preg_match_all('/@([a-zA-Z0-9_]+)/', $str, $matches);
+
+        if (!empty($matches[1])) {
+            $usernames = array_unique($matches[1]);
+            $placeholders = implode(',', array_fill(0, count($usernames), '?'));
+            $stmt = $db->prepare("SELECT id, username FROM users WHERE username IN ($placeholders)");
+            $stmt->execute($usernames);
+            $result = $stmt->get_result();
+
+            $map = [];
+            while ($row = $result->fetch_assoc()) {
+                $map[$row['username']] = $row['id'];
+            }
+
+            if(!empty($map)) {
+                return preg_replace_callback('/@([a-zA-Z0-9_]+)/', function($match) use ($map) {
+                    $link = isset($map[$match[1]]) ? "/user/{$map[$match[1]]}" : "/@{$match[1]}";
+                    return "[@{$match[1]}]({$link})";
+                }, $str);
+            }
+        }
+
+        return $str;
+    }
+
+    /**
      * Returns public user profile
     */
     public static function get(mixed $identifier, mixed $csrf, bool $use_name = true) {
@@ -194,7 +224,7 @@ class UserProfile {
 
         $conn = Database::get(DB_NAME);
         $user_arr = self::raw_user($identifier, $use_name);
-        $profile_id = $user_arr['user']['id'];
+        $profile_id = $user_arr['id'] ?? 0;
 
         if (!isset($user_arr) || !$user_arr) {
             http_response_code(404);
@@ -1007,11 +1037,12 @@ class UserContent {
     public string $userid;
     public int $me;
 
-    public function __construct(?int $me = 0) {
+    public function __construct(?int $me = 0, ?int $userid = 0) {
         $this->me = $me;
+        $this->userid = $userid;
     }
 
-    public function returnModels($userid, $page) {
+    public function returnModels($page) {
         $creation_conn = Database::get(DB_NAME2);
 
         if ($creation_conn->connect_error) {
@@ -1028,26 +1059,26 @@ class UserContent {
 
         $limit = 9;
         $offset = ($page - 1) * $limit;
-        $user = UserProfile::raw_user($userid, false);
+        $user = User::getUser($this->userid);
 
-        if(!$user['user'] || (bool)$user['user']['deactive'] || (bool)$user['user']['suspended']) {
+        if(!$user || $user->deactive || $user->suspended) {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if($userid != $this->me && !User::isFollowing($userid) && User::isPrivate($userid)) {
+        if($this->userid != $this->me && !User::isFollowing($this->userid) && User::isPrivate($this->userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
-        $stmt = $creation_conn->prepare("SELECT id, name, user, date, screenshot, views, likes, replies FROM model WHERE user = ? AND visibility = 'public' AND removed = 0 ORDER BY date DESC LIMIT $limit OFFSET $offset");
-        $stmt->bind_param("i", $userid);
+        $stmt = $creation_conn->prepare("SELECT id, name, user, date, screenshot, views, likes, replies, feature FROM model WHERE user = ? AND visibility = 'public' AND removed = 0 ORDER BY date DESC LIMIT $limit OFFSET $offset");
+        $stmt->bind_param("i", $this->userid);
         $stmt->execute();
         $result = $stmt->get_result();
 
         $creations = [];
         while ($creation = $result->fetch_assoc()) {
-            $creation['username'] = $user['user']['username'] ?? null;
-            $creation['user'] = $userid ?? null;
-                    
+            $creation['username'] = $user->username ?? null;
+            $creation['user'] = $this->userid ?? null;
+
             if (empty($creation['name'])) {
                 $creation['name'] = $creation['username'] . "'s creation";
             }
@@ -1066,7 +1097,7 @@ class UserContent {
         return ['success' => true, 'creations' => $creations];
     }
 
-    public function returnLikedModels($userid, $page) {
+    public function returnLikedModels($page) {
         $creation_conn = Database::get(DB_NAME2);
 
 		if ($creation_conn->connect_error) {
@@ -1083,18 +1114,18 @@ class UserContent {
 
         $limit = 9;
         $offset = ($page - 1) * $limit;
-        $user = UserProfile::raw_user($userid, false);
+        $user = User::getUser($this->userid);
 
-        if(!$user['user'] || (bool)$user['user']['deactive'] || (bool)$user['user']['suspended']) {
+        if(!$user || $user->deactive || $user->suspended) {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if($userid != $this->me && !User::isFollowing($userid) && User::isPrivate($userid)) {
+        if($this->userid != $this->me && !User::isFollowing($this->userid) && User::isPrivate($this->userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
         $stmt = $creation_conn->prepare('SELECT * FROM votes WHERE user = ? ORDER BY id DESC LIMIT ? OFFSET ?');
-        $stmt->bind_param('iss', $userid, $limit, $offset);
+        $stmt->bind_param('iss', $this->userid, $limit, $offset);
         $stmt->execute();
         $result = $stmt->get_result();
 
@@ -1106,7 +1137,7 @@ class UserContent {
                 $liked[] = $row['creation'];
             }
 
-            $stmt2 = $creation_conn->prepare("SELECT id, name, user, date, screenshot, views, likes, replies FROM model WHERE id IN (" . implode(',', $liked) . ") AND visibility = 'public' AND removed = 0 ORDER BY date DESC");
+            $stmt2 = $creation_conn->prepare("SELECT id, name, user, date, screenshot, views, likes, replies, feature FROM model WHERE id IN (" . implode(',', $liked) . ") AND visibility = 'public' AND removed = 0 ORDER BY date DESC");
             $stmt2->execute();
             $result2 = $stmt2->get_result();
 
@@ -1137,7 +1168,7 @@ class UserContent {
         return ['success' => false, 'error' => "Couldn't load creations that this user liked"];
     }
 
-    public function returnComments($userid, $page) {
+    public function returnComments($page) {
         $conn_creations = Database::get(DB_NAME2);
         $conn_forum = Database::get(DB_NAME3);
 
@@ -1146,6 +1177,7 @@ class UserContent {
 
         $creation_replies = [];
         $forum_replies = [];
+        $comments_arr = [];
 
         if ($conn_forum->connect_error) {
             echo $conn_forum->connect_error;
@@ -1165,18 +1197,18 @@ class UserContent {
             return ['success' => false, 'error' => "Sign in to view comments of a user"];
         }
 
-        $user = UserProfile::raw_user($userid, false);
+        $user = User::getUser($this->userid);
 
-        if(!$user['user'] || (bool)$user['user']['deactive'] || (bool)$user['user']['suspended']) {
+        if(!$user || $user->deactive || $user->suspended) {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if($userid != $this->me && !User::isFollowing($userid) && User::isPrivate($userid)) {
+        if($this->userid != $this->me && !User::isFollowing($this->userid) && User::isPrivate($this->userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
         // comments and replies
-        $profileid = $userid; // whatever
+        $profileid = $this->userid;
         $profile_stmt = $conn_creations->prepare("SELECT id, user, comment, model, date FROM comments WHERE hidden = 0 AND user = ? ORDER BY id DESC LIMIT $limit OFFSET $offset;");
         $profile_stmt->bind_param("s", $profileid);
         $profile_stmt->execute();
@@ -1200,13 +1232,13 @@ class UserContent {
 
             $comment2['type'] = 'model';
             $comment2['id'] = $comment['id'];
-            $comment2['username'] = $user['user']['username'] ?? null;
-            $comment2['userid'] = $userid ?? null;
+            $comment2['username'] = $user->username ?? null;
+            $comment2['userid'] = $this->userid ?? null;
             $comment2['content'] = mb_strimwidth($comment['comment'], 0, 33, '...');
             $comment2['parent'] = $parent;
             $comment2['date'] = time_ago(date("D, M d, Y", (int)$comment['date']));
 
-            $creation_replies[] = $comment2;
+            $comments_arr[] = $comment2;
         }
 
         $sql = "SELECT id, userid, deleted_at, content, parent, timestamp FROM messages WHERE userid = $profileid AND deleted_at IS NULL AND parent != 0 ORDER BY timestamp DESC LIMIT $limit OFFSET $offset;";
@@ -1230,26 +1262,28 @@ class UserContent {
 
             $reply2['type'] = 'forum';
             $reply2['id'] = $reply['id'];
-            $reply2['username'] = $user['user']['username'] ?? null;
-            $reply2['userid'] = $userid ?? null;
+            $reply2['username'] = $user->username ?? null;
+            $reply2['userid'] = $this->userid ?? null;
             $reply2['content'] = mb_strimwidth($reply['content'], 0, 33, '...');
             $reply2['parent'] = $parent;
             $reply2['parent_name'] = $parent_name;
             $reply2['date'] = time_ago(date("D, M d, Y", strtotime($reply['timestamp'])));
 
-            $forum_replies[] = $reply2;
+            $comments_arr[] = $reply2;
         }
 
-        $arr = array([
+        /*$arr = array([
             'success' => true,
             'creation_replies' => $creation_replies,
             'forum_replies' => $forum_replies,
-        ]);
+        ]);*/
+
+        $arr = ['success' => true, 'comments' => $comments_arr];
 
         return $arr;
     }
 
-    public function returnForums($userid, $page) {
+    public function returnForums($page) {
         $conn_forum = Database::get(DB_NAME3);
 
         $limit = 12;
@@ -1270,18 +1304,18 @@ class UserContent {
             return ['success' => false, 'error' => "Sign in to forum posts of a user"];
         }
 
-        $user = UserProfile::raw_user($userid, false);
+        $user = User::getUser($this->userid);
 
-        if(!$user['user'] || (bool)$user['user']['deactive'] || (bool)$user['user']['suspended']) {
+        if(!$user || $user->deactive || $user->suspended) {
             return ['success' => false, 'error' => "What user is this?"];
         }
 
-        if($userid != $this->me && !User::isFollowing($userid) && User::isPrivate($userid)) {
+        if($this->userid != $this->me && !User::isFollowing($this->userid) && User::isPrivate($this->userid)) {
             return ['success' => false, 'error' => "This profile is private."];
         }
 
         $profile_stmt = $conn_forum->prepare("SELECT * FROM messages WHERE userid = ? AND (parent = 0 OR parent IS NULL) ORDER BY id DESC LIMIT $limit OFFSET $offset;");
-        $profile_stmt->bind_param("s", $userid);
+        $profile_stmt->bind_param("s", $this->userid);
         $profile_stmt->execute();
         $result = $profile_stmt->get_result();
 
@@ -1289,8 +1323,8 @@ class UserContent {
             $p2 = [];
 
             $p2['id'] = $p['id'];
-            $p2['username'] = $user['user']['username'] ?? null;
-            $p2['userid'] = $userid ?? null;
+            $p2['username'] = $user->username ?? null;
+            $p2['userid'] = $this->userid ?? null;
             $p2['title'] = mb_strimwidth($p['title'], 0, 33, '...');
             $p2['date'] = time_ago(date("D, M d, Y", strtotime($p['timestamp'])));
 
@@ -1301,83 +1335,70 @@ class UserContent {
     }
 }
 
-$current_user_id = 0;
-if(loggedin() && isset($current_user)) {
-    $current_user_id = $current_user->id;
-}
+if(isset($_GET['user_content']) && isset($_GET['userid']) && isset($_GET['page'])) {
+    $current_user_id = 0;
+    if(loggedin() && isset($current_user)) {
+        $current_user_id = $current_user->id;
+    }
 
-$UserContent = new UserContent($current_user_id);
+    $UserContent = new UserContent($current_user_id, $_GET['userid']);
 
-if(isset($_GET['getUserBuilds'])) {
-    header('Content-Type: application/json');
+    if(isset($_GET['cre'])) {
+        header('Content-Type: application/json');
 
-    if(!isset($_GET['userid'])) {
-        echo "User id is missing";
+        $page = $_GET['page'] ?? 0;
+        $creations = $UserContent->returnModels($page);
+
+        echo json_encode($creations);
         exit;
     }
 
-    $page = $_GET['page'] ?? 0;
-    $creations = $UserContent->returnModels($_GET['userid'], $page);
+    if(isset($_GET['topics'])) {
+        header('Content-Type: application/json');
 
-    echo json_encode($creations);
-    exit;
-}
+        $page = $_GET['page'] ?? 0;
+        $posts = $UserContent->returnForums($page);
 
-if(isset($_GET['getUserForums'])) {
-    header('Content-Type: application/json');
-
-    if(!isset($_GET['userid'])) {
-        echo "User id is missing";
+        echo json_encode($posts);
         exit;
     }
 
-    $page = $_GET['page'] ?? 0;
-    $posts = $UserContent->returnForums($_GET['userid'], $page);
+    if(isset($_GET['favs'])){
+        header('Content-Type: application/json');
 
-    echo json_encode($posts);
-    exit;
-}
-
-if(isset($_GET['getUserLiked'])){
-    if(!isset($_GET['userid'])) {
-        echo "User id is missing";
+        $page = $_GET['page'] ?? 0;
+        $result = $UserContent->returnLikedModels($page);
+        echo json_encode($result);
         exit;
     }
 
-    $page = $_GET['page'] ?? 0;
-    $result = $UserContent->returnLikedModels($_GET['userid'], $page);
-    echo json_encode($result);
-    exit;
-}
+    if(isset($_GET['comments'])) {
+        header('Content-Type: application/json');
 
-if(isset($_GET['getUserComments'])) {
-    header('Content-Type: application/json');
+        $page = $_GET['page'] ?? 0;
+        $comments = $UserContent->returnComments($page);
+        echo json_encode($comments);
+        exit;   
 
-    if(!isset($_GET['userid'])) {
-        echo json_encode(['success' => false, 'error' => 'Invalid user id']);
-        exit;
-    }
+        /*$comments_arr = [];
+        $json = null;
 
-    $page = $_GET['page'] ?? 0;
-    $comments = $UserContent->returnComments($_GET['userid'], $page);
-    $comments_arr = [];
-    $json = null;
+        if(isset($comments['success']) && $comments['success'] !== true) {
+            $json = json_encode($comments);
+        } else {
+            foreach($comments[0]['creation_replies'] as $comment) {
+                $comments_arr[] = $comment;
+            }
 
-    if(isset($comments['success']) && $comments['success'] !== true) {
-        $json = json_encode($comments);
-    } else {
-        foreach($comments[0]['creation_replies'] as $comment) {
-            $comments_arr[] = $comment;
+            foreach($comments[0]['forum_replies'] as $comment) {
+                $comments_arr[] = $comment;
+            }
+
+            $json = json_encode(['success' => true, 'comments' => $comments_arr]);
         }
 
-        foreach($comments[0]['forum_replies'] as $comment) {
-            $comments_arr[] = $comment;
-        }
-
-        $json = json_encode(['success' => true, 'comments' => $comments_arr]);
+        echo $json;
+        exit;*/
     }
-
-    echo $json;
-    exit;
 }
 ?>
