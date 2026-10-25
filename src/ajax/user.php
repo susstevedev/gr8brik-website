@@ -137,19 +137,19 @@ class User {
             $this->$field = $data[$field] ?? null;
         }
 
-        $this->profile = self::__profile($profile);
+        $this->profile = $this->__profile($profile);
         $this->picture ??= $this->email ? $this->userGravatar($this->email, 200) : '/img/no_image.png';
         $this->picture_small ??= $this->picture;
     }
 
-    private function __profile(?array $data = []) {
+    public function __profile(?array $data = []) {
         $profile = new \stdClass;
         foreach (self::FIELDS_PROFILE as $field) {
             $profile->$field = $data[$field] ?? null;
         }
 
-        $profile->picture ??= $this->email ? $this->userGravatar($this->email, 200) : '/img/no_image.png';
-        $profile->picture_small ??= $this->picture;
+        $profile->picture ??= $this->userGravatar($this->email, 200);
+        $profile->picture_small ??= $this->userGravatar($this->email, 50);
 
         return $profile;
     }
@@ -446,7 +446,7 @@ class User {
     /**
      * Grabs and constucts a user object from an ID
      */
-    public static function getUser(?int $id = 0) {
+    /*public static function getUser(?int $id = 0) {
         $conn = Database::get(DB_NAME);
 
         $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE id = ? AND deactive IS NULL");
@@ -466,6 +466,44 @@ class User {
         }
 
         return null;
+    }*/
+
+    /**
+     * Grabs and constructs a user object from an ID
+     */
+    public static function getUser(?int $id = 0) {
+        $conn = Database::get(DB_NAME);
+
+        $sql = "SELECT 
+                    u.id, u.username, u.github_id, u.google_id, u.email, u.password, 
+                    u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
+                    p.picture, p.picture_small, p.banner, p.twitter, p.bsky, 
+                    p.private_profile, p.description 
+                FROM users u
+                LEFT JOIN user_profiles p ON p.userid = ?
+                WHERE u.id = ? AND u.deactive IS NULL";
+
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ii", $id, $id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if ($row) {
+            $profile = [
+                'picture' => $row['picture'],
+                'picture_small' => $row['picture_small'],
+                'banner' => $row['banner'],
+                'twitter' => $row['twitter'],
+                'bsky' => $row['bsky'],
+                'private_profile' => $row['private_profile'],
+                'description' => $row['description']
+            ];
+
+            return new User($row, $profile);
+        }
+
+        return null;
     }
 
     /**
@@ -474,21 +512,33 @@ class User {
     public static function getUserByName(?string $username) {
         $conn = Database::get(DB_NAME);
 
-        $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE username = ? AND deactive IS NULL");
-        $u_stmt->bind_param("s", $username);
-        $u_stmt->execute();
-        $user = $u_stmt->get_result()->fetch_assoc() ?? [];
-        $userid = $user['id'];
-        $u_stmt->close();
+        $sql = "SELECT
+                    u.id, u.username, u.github_id, u.google_id, u.email, u.password,
+                    u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
+                    p.picture, p.picture_small, p.banner, p.twitter, p.bsky,
+                    p.private_profile, p.description
+                FROM users u
+                LEFT JOIN user_profiles p ON p.userid = u.id
+                WHERE u.username = ? AND u.deactive IS NULL";
 
-        if($user) {
-            $p_stmt = $conn->prepare("SELECT picture, picture_small, banner, twitter, bsky, private_profile, description FROM user_profiles WHERE userid = ?");
-            $p_stmt->bind_param("i", $userid);
-            $p_stmt->execute();
-            $profile = $p_stmt->get_result()->fetch_assoc() ?? [];
-            $p_stmt->close();
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("s", $username);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
 
-            return new User(array_merge($user, $profile), $profile);
+        if ($row) {
+            $profile = [
+                'picture' => $row['picture'] ?? null,
+                'picture_small' => $row['picture_small'] ?? null,
+                'banner' => $row['banner'] ?? null,
+                'twitter' => $row['twitter'] ?? null,
+                'bsky' => $row['bsky'] ?? null,
+                'private_profile' => $row['private_profile'] ?? null,
+                'description' => $row['description'] ?? null
+            ];
+
+            return new User($row, $profile);
         }
 
         return null;
@@ -506,40 +556,45 @@ class User {
         $conn = Database::get(DB_NAME);
         $ids = array_unique(array_map('intval', $ids));
         $placeholders = implode(', ', array_fill(0, count($ids), '?'));
-
-        $profiles = [];
         $users = [];
 
-        $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE id IN ($placeholders) AND deactive IS NULL");
-        $types = str_repeat('i', count($ids));
-        $u_stmt->bind_param($types, ...$ids);
-        $u_stmt->execute();
-        $u_res = $u_stmt->get_result();
+        $sql = "SELECT
+                    u.id, u.username, u.github_id, u.google_id, u.email, u.password,
+                    u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
+                    p.picture, p.picture_small, p.banner, p.twitter, p.bsky,
+                    p.private_profile, p.description
+                FROM users u
+                LEFT JOIN user_profiles p ON p.userid = u.id
+                WHERE u.id IN ($placeholders) AND u.deactive IS NULL";
 
-        while ($r = $u_res->fetch_assoc()) {
+        $stmt = $conn->prepare($sql);
+        $types = str_repeat('i', count($ids));
+        $stmt->bind_param($types, ...$ids);
+        $stmt->execute();
+        $res = $stmt->get_result();
+
+        while ($r = $res->fetch_assoc()) {
             $users[$r['id']] = $r;
-        }
-
-        $p_stmt = $conn->prepare("SELECT userid, picture, picture_small, banner, twitter, bsky, private_profile, description FROM user_profiles WHERE userid IN ($placeholders)");
-        $types = str_repeat('i', count($ids));
-        $p_stmt->bind_param($types, ...$ids);
-        $p_stmt->execute();
-        $p_res = $p_stmt->get_result();
-
-        while ($r = $p_res->fetch_assoc()) {
-            $profiles[$r['userid']] = $r;
         }
 
         foreach ($ids as $id) {
             $user = $users[$id] ?? [];
-            $profile = $profiles[$id] ?? [];
 
-            $usero = new User(array_merge($user, $profile), $profile);
+            $profile = [
+                'picture' => $user['picture'] ?? null,
+                'picture_small' => $user['picture_small'] ?? null,
+                'banner' => $user['banner'] ?? null,
+                'twitter' => $user['twitter'] ?? null,
+                'bsky' => $user['bsky'] ?? null,
+                'private_profile' => $user['private_profile'] ?? null,
+                'description' => $user['description'] ?? null
+            ];
+
+            $usero = new User($user, $profile);
             $users[$id] = $usero;
         }
 
-        $u_stmt->close();
-        $p_stmt->close();
+        $stmt->close();
         return $users;
     }
 

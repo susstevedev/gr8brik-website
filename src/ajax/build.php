@@ -576,8 +576,6 @@ function fetch_comments($model_id, $csrf) {
 
     $blocked = [];
     $privated = [];
-    $suspended = [];
-	$admin = [];
 
     while ($row = $comResult->fetch_assoc()) {
         $rows[$row['id']] = $row;
@@ -585,7 +583,7 @@ function fetch_comments($model_id, $csrf) {
 
     if (!empty($rows)) {
         $userIds = array_column($rows, 'user');
-        $users = UserProfile::multi_raw_users($userIds);
+        $users = User::getUsers($userIds);
 
         if(loggedin()) {
             $commentIds = array_map('intval', array_column($rows, 'id'));
@@ -618,21 +616,11 @@ function fetch_comments($model_id, $csrf) {
         }
 
         foreach ($users as $c_user) {
-            $c_user_id = (int)$c_user['id'] ?? 0;
+            $c_user_id = (int)$c_user->id ?? 0;
 
-			if(!empty($c_user['profile'])) {
-				if(((bool)$c_user['profile']['private_profile'] && !User::isFollowing($c_user_id) && $c_user_id !== $id)) {
+			if(!empty($c_user->profile)) {
+				if($c_user->profile->private_profile && !User::isFollowing($c_user_id) && $c_user_id !== $id) {
 					$privated[$c_user_id] = true;
-				}
-			}
-
-			if(!empty($c_user['user'])) {
-				if(((bool)$c_user['user']['suspended'])) {
-					$suspended[$c_user_id] = true;
-				}
-
-				if(((bool)$c_user['user']['admin'])) {
-					$admin[$c_user_id] = true;
 				}
 			}
         }
@@ -672,18 +660,18 @@ function fetch_comments($model_id, $csrf) {
         //c_user_blablabla got annoying
         $c_user_data = [
             'id' => $c_user_id ?? 0,
-            'name' => $userRow['user']['username'] ?? '[deleted]',
-            'admin' => $admin[$c_user_id] ?? false,
+            'name' => $userRow->username ?? '[deleted]',
+            'admin' => (bool)$userRow->admin ?? false,
             'is_op' => $row['is_op'] ?? 0,
-            'picture' => $userRow['profile']['picture_small'] ?? '/img/no_image.png',
-            'banned' => $suspended[$c_user_id] ?? false,
-            'removed' => !$userRow['user'] ? true : false,
+            'picture' => $userRow->profile->picture_small ?? '/img/no_image.png',
+            'banned' => $userRow->suspended ?? false,
+            'removed' => !$userRow ? true : false,
             'private' => $privated[$c_user_id] ?? false,
 			'you_blocked' => $blocked[$c_user_id]['you_blocked'] ?? false,
 			'they_blocked' => $blocked[$c_user_id]['they_blocked'] ?? false,
         ];
 
-        if(!$userRow['user'] || (bool)$userRow['user']['deactive']) {
+        if(!$userRow || (bool)$userRow->deactive) {
 			$message = ErrorRegistry::get('comment', 'owner_not_found');
             $c_user_data['removed'] = true;
             $c_user_data['picture'] = null;
@@ -714,16 +702,19 @@ function fetch_comments($model_id, $csrf) {
             if ($c_user_data['you_blocked'] && $c_user_data['they_blocked']) {
                 $c_user_data['removed'] = true;
 				$c_user_data['picture'] = null;
-                $message = "You blocked @" . $c_user_data['username'] . ", and they blocked you. Their comments and profile will not be visible.";
+                //$message = "You blocked @" . $c_user_data['username'] . ", and they blocked you. Their comments and profile will not be visible.";
+                $message = ErrorRegistry::get('comment', 'user_blocked_blocking');
 
 				$actions['reply'] = false;
 				$actions['fav'] = false;
             } elseif ($c_user_data['you_blocked']) {
-                $message = "You blocked @" . $c_user_data['username'] . ". Your comments and profile will not be visible to them.";
+                //$message = "You blocked @" . $c_user_data['username'] . ". Your comments and profile will not be visible to them.";
+                $message = ErrorRegistry::get('comment', 'user_blocking');
             } elseif ($c_user_data['they_blocked']) {
                 $c_user_data['removed'] = true;
 				$c_user_data['picture'] = null;
-                $message = "You're blocked from @" . $c_user_data['username'] . ". Their comments and profile will not be visible.";
+                //$message = "You're blocked from @" . $c_user_data['username'] . ". Their comments and profile will not be visible.";
+                $message = ErrorRegistry::get('comment', 'user_blocked');
 
 				$actions['reply'] = false;
 				$actions['fav'] = false;

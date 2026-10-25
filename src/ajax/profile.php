@@ -223,10 +223,20 @@ class UserProfile {
         }
 
         $conn = Database::get(DB_NAME);
-        $user_arr = self::raw_user($identifier, $use_name);
-        $profile_id = $user_arr['id'] ?? 0;
+        //$user_arr = self::raw_user($identifier, $use_name);
 
-        if (!isset($user_arr) || !$user_arr) {
+        switch ($use_name) {
+            case true:
+                $usero = User::getUserByName($identifier);
+                $profile_id = $usero->id ?? 0;
+                break;
+            case false:
+                $usero = User::getUser($identifier);
+                $profile_id = $usero->id ?? (int)$identifier;
+                break;
+        }
+
+        if (!isset($usero)) {
             http_response_code(404);
             return [
                 "success" => false,
@@ -237,7 +247,7 @@ class UserProfile {
             ];
         }
 
-        if ($user_arr['user']['suspended'] || $user_arr['user']['deactive']) {
+        if ($usero->suspended || $usero->deactive) {
             http_response_code(403);
             $banrow = AccountManager::blacklisted($profile_id, 'id');
 
@@ -262,18 +272,18 @@ class UserProfile {
             }
 
             if(loggedin() && $current_user->admin) {
-                $arr['email'] = $user_arr['user']['email'];
+                $arr['email'] = $usero->email;
             }
 
             return $arr;
         }
 
-        $bsky = $user_arr['profile']['bsky'] ?? null;
+        $bsky = $usero->profile->bsky ?? null;
         $is_blocking = false;
         $is_following = false;
         $is_me = false;
         $is_admin = false;
-        $is_private = $user_arr['profile']['private_profile'] ?? false;
+        $is_private = $usero->profile->private_profile ?? false;
 
         if(loggedin()) {
             $blocks = User::isBlocking($profile_id);
@@ -311,7 +321,7 @@ class UserProfile {
             }
 
             if($current_user->admin) {
-                $adm_email = isset($user_arr['user']['email']) ? htmlspecialchars($user_arr['user']['email']) : '';
+                $adm_email = isset($usero->email) ? htmlspecialchars($usero->email) : '';
                 $is_admin = true;
             }
         }
@@ -371,14 +381,14 @@ class UserProfile {
         $data = [
             'success' => true,
             'userid' => $profile_id,
-            'username' => htmlspecialchars($user_arr['user']['username'] ?? ''),
-            'admin' => (string)$user_arr['user']['admin'],
-            'description' => isset($user_arr['profile']['description']) ? Slimdown::render($user_arr['profile']['description']) : '', 
-            'twitter' => isset($user_arr['profile']['twitter']) ? htmlspecialchars($user_arr['profile']['twitter']) : '',
+            'username' => htmlspecialchars($usero->username ?? ''),
+            'admin' => (string)$usero->admin,
+            'description' => isset($usero->profile->description) ? Slimdown::render($usero->profile->description) : '', 
+            'twitter' => isset($usero->profile->twitter) ? htmlspecialchars($usero->profile->twitter) : '',
             'bsky' => $bsky,
-            'age' => isset($user_arr['user']['age']) ? htmlspecialchars($user_arr['user']['age']) : '',
-            'picture' => htmlspecialchars($user_arr['profile']['picture'] ?? '/img/no_image.png'),
-            'banner' => isset($user_arr['profile']['banner']) ? htmlspecialchars($user_arr['profile']['banner']) : null,
+            'age' => isset($usero->age) ? htmlspecialchars($usero->age) : '',
+            'picture' => htmlspecialchars($usero->profile->picture ?? '/img/no_image.png'),
+            'banner' => isset($usero->profile->banner) ? htmlspecialchars($usero->profile->banner) : null,
             'stats' => [
                 'creation_count' => $model_count,
                 'followers' => $followers,
