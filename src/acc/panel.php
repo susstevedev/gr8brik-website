@@ -8,7 +8,7 @@
 	</div><br />
 <?php } ?>
 
-<div class="gr8-theme w3-container w3-card-2 w3-light-grey w3-padding w3-border w3-center">
+<div class="gr8-theme w3-container w3-card-2 w3-light-grey w3-padding w3-border w3-border-grey w3-round-small w3-center">
     <?php
         $alert = User::get_alert($current_user->id);
         if($alert) { 
@@ -26,7 +26,7 @@
             <li class="fa fa-user-o" aria-hidden="true"></li>
             Profile
         </a>&nbsp;
-        
+
         <a href="/acc/notifications" class="gr8-panelbtn gr8-panelbtn-notifications w3-btn w3-hover-opacity w3-large w3-white w3-mobile w3-border w3-padding w3-round-small">
             <i class="fa fa-bell-o" aria-hidden="true"></i>
       		Notifications

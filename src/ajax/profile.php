@@ -30,8 +30,7 @@ if (isset($_GET['followed_by'])) {
     $conn = Database::get(DB_NAME);
 
     //selects user follow row(s), selects users actual account, fliters invalid accounts
-    $query = "
-        SELECT DISTINCT u.id, u.username, p.picture
+    $query = "SELECT DISTINCT u.id, u.username, p.picture_small
         FROM follow f1
         INNER JOIN follow f2 ON f1.userid = f2.profileid
         INNER JOIN users u ON f1.userid = u.id
@@ -40,8 +39,8 @@ if (isset($_GET['followed_by'])) {
         AND f2.userid = ?
         AND u.deactive IS NULL
         AND u.suspended = 0
-        ORDER BY u.id DESC
-    ";
+        AND p.private_profile = 0
+        ORDER BY u.id DESC";
 
     $stmt = $conn->prepare($query);
     $stmt->bind_param("ii", $profile_id, $current_user_id);
@@ -49,23 +48,21 @@ if (isset($_GET['followed_by'])) {
     $result = $stmt->get_result();
 
     $followed_by = [];
-    $rows = $result->fetch_assoc();
+    $rows = [];
 
-    foreach($rows as $row) {
-        if(!$rows || (isset($_SESSION['fb'][$profile_id]))) {
-            http_response_code(301);
-            unset($_SESSION['fb']);
-            exit;
+    while ($row = $result->fetch_assoc()) {
+        $rows[] = $row;
+    }
+
+    if(!empty($rows)) {
+        foreach($rows as $row) {
+            $followed_by[] = [
+                'url' => '/@' . urlencode($row['username'] ?? ''),
+                'userid' => $row['id'] ?? 0, 
+                'pfp' => $row['picture_small'] ?? '/img/no_image.png',
+                'username' => htmlspecialchars($row['username'] ?? '')
+            ];
         }
-
-        if(!isset($row['id'])) continue;
-
-        $followed_by[] = [
-            'url' => '/@' . urlencode($row['username'] ?? ''),
-            'userid' => $row['id'], 
-            'pfp' => $row['picture'] ?? '/img/no_image.png',
-            'username' => htmlspecialchars($row['username'] ?? '')
-        ];
     }
 
     $stmt->close();

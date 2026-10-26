@@ -661,7 +661,7 @@ function fetch_comments($model_id, $csrf) {
         $c_user_data = [
             'id' => $c_user_id ?? 0,
             'name' => $userRow->username ?? '[deleted]',
-            'admin' => (bool)$userRow->admin ?? false,
+            'admin' => $userRow->admin ?? false,
             'is_op' => $row['is_op'] ?? 0,
             'picture' => $userRow->profile->picture_small ?? '/img/no_image.png',
             'banned' => $userRow->suspended ?? false,
