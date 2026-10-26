@@ -33,10 +33,10 @@ if (!$post_row) {
 
 	$conn2 = Database::get(DB_NAME);
 
-	$user = UserProfile::raw_user($userid, false);
-	$username = $user['user']['username'] ?? null;
+	$user = User::getUser($userid);
+	$username = $user->username ?? null;
 
-	if(!$user['user'] || (bool)$user['user']['deactive'] || (bool)$user['user']['suspended']) {
+	if(!$user || $user->deactive || $user->suspended) {
 		http_response_code(404);
 		$post_row['error'] = 'The user that created this thread does not exist';
 	}
@@ -279,7 +279,7 @@ if (!$post_row) {
 
     <div class='gr8-theme w3-container w3-light-grey w3-card-4 w3-round-small'>
         <h2><?php echo $post_row['title'] ?></h2>
-        <h4>By <a href='/user/<?php echo $userid ?>'><?php echo $username ?></a> on <?php echo $date ?><?php echo $edit_date ? ", edited ${edit_date}" : null ?>. <?php echo $post_row['views'] ?> total views.</h4>
+        <h4>By <a href='/@<?php echo urlencode($username) ?>'>@<?php echo $username ?></a> on <?php echo $date ?><?php echo $edit_date ? ", edited {$edit_date}" : null ?>. <?php echo $post_row['views'] ?> total views.</h4>
         <h4><?php echo $reply_count ?> replies, <?php echo $total_pages ?> pages, on page <?php echo $page ?>, in <?php echo $category ?></h4>
     </div><br />
 
@@ -297,7 +297,7 @@ if (!$post_row) {
 
     if (!empty($rows)) {
         $userIds = array_column($rows, 'userid');
-        $users = UserProfile::multi_raw_users($userIds);
+        $users = User::getUsers($userIds);
 
         if (loggedin()) {
             foreach($userIds as $userId) {
@@ -327,18 +327,18 @@ if (!$post_row) {
             $c_edited = $row['edited'] ?? null;
 
 			$c_user = $row['userid'] ?? null;
-			$c_user_o = $users[$c_user];
-            $c_username = htmlspecialchars($c_user_o['user']['username'] ?? '');
+			$c_user_o = $users[$c_user] ?? null;
+            $c_username = htmlspecialchars($c_user_o->username ?? '[deleted]');
             $c_user_blocked = $blocked[$c_user]['they_blocked'] ?? false;
 
             $c_user_exists = true;
-            if(!$c_user_o['user'] || $c_user_o['user']['suspended']) {
+            if(!$c_user_o || $c_user_o->deactive || $c_user_o->suspended) {
                 $c_user_exists = false;
                 $isAdmin = false;
                 $pfp = '/img/no_image.png';
             } else {
-                $isAdmin = $c_user_o['user']['admin'] ?? false;
-                $pfp = $c_user_o['profile']['picture'] ?? '/img/no_image.png';
+                $isAdmin = $c_user_o->admin ?? false;
+                $pfp = $c_user_o->profile->picture ?? '/img/no_image.png';
             }
 
 			if ($c_user_exists) {
@@ -358,7 +358,7 @@ if (!$post_row) {
 			<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-margin-right w3-col m3 l3">
 				<img id="pfp" src="<?php echo $pfp ?>"><br />
 				<?php if ($c_user_exists) { ?>
-					<a href="/@<?php echo urlencode($c_user_o['user']['username']) ?>">
+					<a href="/@<?php echo urlencode($c_username) ?>">
 				<?php } ?>
 					<span class="<?php echo $isAdmin ? "w3-text-red" : "" ?>" style="text-overflow: ellipsis;">
 						<?php echo $c_username ?>
@@ -446,31 +446,30 @@ if (!$post_row) {
 
     if ($category === "pinnedLocked" || $category === "locked") {
         echo "<b id='commentboxcontainer'>This conversation is locked. New replies cannot be posted.</b><br />";
-        if (loggedin()) {
-            ?>
-                <a href='#commentboxlink'>permalink to replybox</a><br />
-                <a id='commentboxlink'>
-                    <form id='commentboxcontainer' method='post' action=''>
-                        <textarea name='commentbox' placeholder='<?php echo $randomWordDisplay ?>' rows='4' cols='50'></textarea><br />
-                    </form>
+	} else if (loggedin()) {
+		?>
+			<a href='#commentboxlink'>permalink to replybox</a><br />
+			<a id='commentboxlink'>
+				<form id='commentboxcontainer' method='post' action=''>
+					<textarea name='commentbox' placeholder='<?php echo $randomWordDisplay ?>' rows='4' cols='50'></textarea><br />
+				</form>
 
-                    <button id="post-reply" name='comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo'>
-                        <span id="post-reply-text"><i class="fa fa-comment-o" aria-hidden="true"></i> Reply</span>
-                    </button>
+				<button id="post-reply" name='comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo'>
+					<span id="post-reply-text"><i class="fa fa-comment-o" aria-hidden="true"></i> Reply</span>
+				</button>
 
-                    <button id="attach-image" class="w3-btn w3-white w3-hover-opacity w3-round-small w3-border w3-border-grey">
-                        <span id="attach-image-btn-text"><i class="fa fa-image" aria-hidden="true"></i> Attach image</span>
-                    </button>
-                </a><br />
+				<button id="attach-image" class="w3-btn w3-white w3-hover-opacity w3-round-small w3-border w3-border-grey">
+					<span id="attach-image-btn-text"><i class="fa fa-image" aria-hidden="true"></i> Attach image</span>
+				</button>
+			</a><br />
 
-                <form id="attach-upload" method="post" action="">
-                    <input type="file" name="imagefile" id="imagefile">
-                </form>
-            <?php
-        } else {
-            echo "<b id='commentboxcontainer'>Please <a href='../acc/login'>login</a> to post a reply.</b><br />";
-        }
-    }
+			<form id="attach-upload" method="post" action="">
+				<input type="file" name="imagefile" id="imagefile">
+			</form>
+		<?php
+	} else {
+		echo "<b id='commentboxcontainer'>Please <a href='../acc/login'>login</a> to post a reply.</b><br />";
+	}
 
     include $_SERVER['DOCUMENT_ROOT'] . '/linkbar.php';
     ?>

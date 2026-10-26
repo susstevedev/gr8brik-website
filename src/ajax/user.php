@@ -557,6 +557,7 @@ class User {
         $ids = array_unique(array_map('intval', $ids));
         $placeholders = implode(', ', array_fill(0, count($ids), '?'));
         $users = [];
+        $final = [];
 
         $sql = "SELECT
                     u.id, u.username, u.github_id, u.google_id, u.email, u.password,
@@ -578,24 +579,26 @@ class User {
         }
 
         foreach ($ids as $id) {
-            $user = $users[$id] ?? [];
+            if(isset($users[$id])) {
+                $user = $users[$id] ?? [];
 
-            $profile = [
-                'picture' => $user['picture'] ?? null,
-                'picture_small' => $user['picture_small'] ?? null,
-                'banner' => $user['banner'] ?? null,
-                'twitter' => $user['twitter'] ?? null,
-                'bsky' => $user['bsky'] ?? null,
-                'private_profile' => $user['private_profile'] ?? null,
-                'description' => $user['description'] ?? null
-            ];
+                $profile = [
+                    'picture' => $user['picture'] ?? null,
+                    'picture_small' => $user['picture_small'] ?? null,
+                    'banner' => $user['banner'] ?? null,
+                    'twitter' => $user['twitter'] ?? null,
+                    'bsky' => $user['bsky'] ?? null,
+                    'private_profile' => $user['private_profile'] ?? null,
+                    'description' => $user['description'] ?? null
+                ];
 
-            $usero = new User($user, $profile);
-            $users[$id] = $usero;
+                $usero = new User($user, $profile);
+                $final[$id] = $usero;
+            }
         }
 
         $stmt->close();
-        return $users;
+        return $final;
     }
 
     /**
