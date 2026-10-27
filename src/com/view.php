@@ -3,6 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . "/com/bbcode.php";
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/forum.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . "/ajax/time.php";
 $bbcode = new BBCode;
@@ -14,48 +15,16 @@ if (loggedin()) {
 $conn = Database::get(DB_NAME3);
 $post_id = htmlspecialchars($_GET['id']);
 
-$stmt = $conn->prepare("SELECT id, userid, username, title, timestamp, edited, views, status FROM messages WHERE id = ? AND (parent IS NULL OR parent = 0) AND deleted_at IS NULL LIMIT 1");
-$stmt->bind_param("i", $post_id);
-$stmt->execute();
-$result = $stmt->get_result();
-$post_row = $result->fetch_assoc() ?? [];
-$stmt->close();
+$post_row = gettopic($conn, $post_id);
 
-if (!$post_row) {
-    http_response_code(404);
-    $post_row['error'] = "This conversation does not exist.";
-} else {
-	$userid = $post_row['userid'];
-	$date = $post_row['timestamp'];
-	$views = $post_row['views'];
-	$category = $post_row['status'];
-	$edit_date = $post_row['edited'] ?? null;
-
-	$conn2 = Database::get(DB_NAME);
-
-	$user = User::getUser($userid);
-	$username = $user->username ?? null;
-
-	if(!$user || $user->deactive || $user->suspended) {
-		http_response_code(404);
-		$post_row['error'] = 'The user that created this thread does not exist';
-	}
-
-	if (!isset($_SESSION['viewed_post_ids'])) {
-		$_SESSION['viewed_post_ids'] = [];
-	}
-
-	if (!in_array($post_id, $_SESSION['viewed_post_ids'])) {
-		$view_stmt = $conn->prepare("UPDATE messages SET views = views + 1 WHERE id = ?");
-		$view_stmt->bind_param("i", $post_id);
-		$view_stmt->execute();
-		$_SESSION['viewed_post_ids'][] = $post_id;
-	}
-
-	if ($category === "deleted") {
-		http_response_code(404);
-		$post_row['error'] = "This conversation has been removed because it violated our <a href='/rules'>rules</a>.";
-	}
+if(isset($post_row['success']) && $post_row['success'] === true) {
+	$title = $post_row['title'] ?? 'untitled';
+	$userid = $post_row['user']['id'] ?? 0;
+	$username = $post_row['user']['name'] ?? '[deleted]';
+	$date = $post_row['date'] ?? 0;
+	$views = $post_row['views'] ?? 0;
+	$category = $post_row['category'] ?? null;
+	$edit_date = $post_row['edit_date'] ?? null;
 
 	if (isset($_POST['comment_edit'])) {
 		header('Content-Type: Application/JSON');
@@ -246,7 +215,7 @@ if (!$post_row) {
 <html lang="en">
 
 <head>
-    <title><?php echo $post_row['title'] ?? 'topic' ?></title>
+    <title><?php echo $title ?? 'topic' ?></title>
     <?php include $_SERVER['DOCUMENT_ROOT'] . '/header.php' ?>
 	<script type="text/javascript" src="/lib/forum.js"></script>
 </head>
@@ -260,12 +229,9 @@ if (!$post_row) {
     $limit = 10;
     $offset = ($page - 1) * $limit;
 
-    $count_sql = "SELECT COUNT(*) as reply_count FROM messages WHERE parent = '$post_id'";
-    $count_result = $conn->query($count_sql);
-    $count_row = $count_result->fetch_assoc();
-    $reply_count = $count_row['reply_count'];
-
-    $total_pages = ceil($reply_count / $limit);
+	$counts = getreplycount($conn, $post_id);
+	$reply_count = $counts['replies'];
+	$total_pages = $counts['total_pages'];
 
     if (isset($post_row['error'])) {
         echo '<div class="message w3-padding w3-round w3-red">' . $post_row['error'] . '</div><br /><br />';
@@ -278,8 +244,8 @@ if (!$post_row) {
     ?>
 
     <div class='gr8-theme w3-container w3-light-grey w3-card-4 w3-round-small'>
-        <h2><?php echo $post_row['title'] ?></h2>
-        <h4>By <a href='/@<?php echo urlencode($username) ?>'>@<?php echo $username ?></a> on <?php echo $date ?><?php echo $edit_date ? ", edited {$edit_date}" : null ?>. <?php echo $post_row['views'] ?> total views.</h4>
+        <h2><?php echo $title ?></h2>
+        <h4>By <a href='/@<?php echo urlencode($username) ?>'>@<?php echo $username ?></a> on <?php echo $date ?><?php echo $edit_date ? ", edited {$edit_date}" : null ?>. <?php echo $views ?> total views.</h4>
         <h4><?php echo $reply_count ?> replies, <?php echo $total_pages ?> pages, on page <?php echo $page ?>, in <?php echo $category ?></h4>
     </div><br />
 

@@ -178,32 +178,34 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
                     $last_post_username = null;
                 }
 
-			    $conn = Database::get(DB_NAME4);
-				$sql = "SELECT id, user, title, post, date FROM posts ORDER BY date DESC LIMIT $limit OFFSET $offset";
-				$stmt = $conn->prepare($sql);
-				$stmt->execute();
-				$result = $stmt->get_result();
+                if(APP_FEATURES['BLOG_ENABLE']) {
+                    $conn = Database::get(DB_NAME4);
+                    $sql = "SELECT id, user, title, post, date FROM posts ORDER BY date DESC LIMIT $limit OFFSET $offset";
+                    $stmt = $conn->prepare($sql);
+                    $stmt->execute();
+                    $result = $stmt->get_result();
 
-                while ($row = $result->fetch_assoc()) {
-					$user_row = User::getUser($row['user']);
-                    $username = $user_row->username ?? null;
+                    while ($row = $result->fetch_assoc()) {
+                        $user_row = User::getUser($row['user']);
+                        $username = $user_row->username ?? null;
 
-                    $shortTitle = substr($row['title'], 0, 25);
-                    if (strlen($row['title']) > 25) {
-                        $shortTitle .= "...";
+                        $shortTitle = substr($row['title'], 0, 25);
+                        if (strlen($row['title']) > 25) {
+                            $shortTitle .= "...";
+                        }
+
+                        if(empty($shortTitle)) {
+                            $shortTitle = 'Untitled';
+                        }
+
+                        $date = date("Y-m-d H:i:s", $row['date']);
+
+                        echo "<tr><td><a href='http://blog.gr8brik.rf.gd/t/" . $row['id'] . "' target='_blank'><i class='fa fa-pencil-square w3-padding-small w3-text-grey' aria-hidden='true' title='Blog Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
+                        echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
+                        echo "<td><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</td>";
+                        echo "<td><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</td></tr>";
+                        $username = null;
                     }
-
-                    if(empty($shortTitle)) {
-                        $shortTitle = 'Untitled';
-                    }
-
-                    $date = date("Y-m-d H:i:s", $row['date']);
-
-                    echo "<tr><td><a href='http://blog.gr8brik.rf.gd/t/" . $row['id'] . "' target='_blank'><i class='fa fa-pencil-square w3-padding-small w3-text-grey' aria-hidden='true' title='Blog Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
-                    echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $date . "</td>";
-                    echo "<td><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</td>";
-                    echo "<td><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</td></tr>";
-                    $username = null;
                 }
 
             ?>
