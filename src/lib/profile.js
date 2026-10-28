@@ -10,14 +10,14 @@
                     if (response.length <= 3) {
                         followedBy = response.map(user => `
                             <a href="${user.url}">
-                            <img src="${user.pfp}" width="15px" height="15px" />
-                            ${user.username}</a>`).join(", ");
+                            <img src="${user.pfp}" width="17px" height="17px" class="w3-circle" />
+                            <i class="fa fa-at" aria-hidden="true"></i>${user.username}</a>`).join(", ");
                     } else {
                         let first = response.slice(0, 3);
                         let others = response.length - 3;
                         followedBy = first.map(user => `<a href="${user.url}">
                             <img src="${user.pfp}" width="17px" height="17px" class="w3-circle" />
-                            ${user.username}</a>`).join(", ");
+                            <i class="fa fa-at" aria-hidden="true"></i>${user.username}</a>`).join(", ");
                         followedBy += ` and ${others} others you know`;
                     }
                 } else {
@@ -29,11 +29,13 @@
             error: function (xhr, text, err) {
                 console.error(xhr.status + ' ' + err);
                 if(xhr.status === 401) {
-                    $("#followedby-wrapper").html('Please login to view followed users.');
+                    $("#followedby-wrapper").html('Login to view users that follow them');
                 } else if(xhr.status === 404) {
                     $("#followedby-wrapper").html('This user\'s profile either doesn\'t exist, is private, or deactivated.');
-                } else {
+                } else if(xhr.status === 500 || xhr.status === 502 || xhr.status === 503) {
                     $("#followedby-wrapper").html('Internal server error');
+                } else {
+                    $("#followedby-wrapper").html('An error has occured');
                 }
             }
         });
@@ -47,8 +49,6 @@
                     dataType: "json",
                     success: function (response) {
                         let elm = $('#creationstab .contain')
-                        //elm.children().not('#gr8-creation-template').remove();
-
                         if (response.success === true && response.creations) {
                             response.creations.forEach(function (r) {
                                 let $clone = $($('#gr8-creation-template').html());
@@ -70,9 +70,10 @@
                             });
                         } else if (response.creations === null) {
                             $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div>`).appendTo(elm);
+                            $(".foward-button").hide();
                         } else if (response.error) {
-                            console.error(response.error);
                             $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div>`).appendTo(elm);
+                            $(".foward-button").hide();
                         } else {
                             console.log(response);
                         }
@@ -91,8 +92,6 @@
                     dataType: "json",
                     success: function (response) {
                         let elm = $('#likestab .contain')
-                        //elm.children().not('#gr8-likes-template').remove();
-
                         if (response.success === true && response.creations) {
                             response.creations.forEach(function (r) {
                                 let $clone = $($('#gr8-likes-template').html());
@@ -109,9 +108,10 @@
                             });
                         } else if (response.creations === null) {
                             $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div>`).appendTo(elm);
+                            $(".foward-button").hide();
                         } else if (response.error) {
-                            console.error(response.error);
                             $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div>`).appendTo(elm);
+                            $(".foward-button").hide();
                         } else {
                             console.log(response);
                         }
@@ -146,9 +146,10 @@
                             });
                         } else if (response.posts === null) {
                             $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div><br />`).appendTo(elm);
+                            $(".foward-button").hide();
                         } else if (response.error) {
-                            console.error(response.error);
                             $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div><br />`).appendTo(elm);
+                            $(".foward-button").hide();
                         } else {
                             console.log(response);
                         }
@@ -191,9 +192,10 @@
                             });
                         } else if (response.comments === null) {
                             $(`<div class='message w3-padding w3-round w3-light-grey'>${response.error}</div><br />`).appendTo(elm);
+                            $(".foward-button").hide();
                         } else if (response.error) {
-                            console.error(response.error);
                             $(`<div class='message w3-padding w3-round w3-red'>${response.error}</div><br />`).appendTo(elm);
+                            $(".foward-button").hide();
                         } else {
                             console.log(response);
                         }
@@ -255,7 +257,6 @@
             'likestab': { page: 1, fetch: uc.favs }
         }
 
-        //$(".foward-button, .back-button").on("click", function () {
         $(".foward-button").on("click", function () {
             var $tab = $(this).closest("#creationstab, #commentstab, #poststab, #likestab");
             if(!$tab) {
@@ -269,7 +270,6 @@
 
             var tabPage = tabPages[tabId];
 
-            //tabPage.page += $(this).hasClass("foward-button") ? 1 : -1;
             tabPage.page += 1;
             tabPage.fetch(tabPage.page);
         });

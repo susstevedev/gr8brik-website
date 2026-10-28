@@ -229,7 +229,7 @@ if(isset($post_row['success']) && $post_row['success'] === true) {
     $limit = 10;
     $offset = ($page - 1) * $limit;
 
-	$counts = getreplycount($conn, $post_id);
+	$counts = getreplycount($post_id);
 	$reply_count = $counts['replies'];
 	$total_pages = $counts['total_pages'];
 
@@ -250,88 +250,59 @@ if(isset($post_row['success']) && $post_row['success'] === true) {
     </div><br />
 
     <?php
-    $sql = "SELECT * FROM messages WHERE (parent = $post_id OR id = $post_id) AND deleted_at IS NULL ORDER BY timestamp ASC LIMIT $limit OFFSET $offset";
-    $comResult = $conn->query($sql);
-    $rows = [];
-    $blocked = [];
-
-    if ($comResult->num_rows > 0) {
-        while ($row = $comResult->fetch_assoc()) {
-            $rows[] = $row;
-        }
-    }
+    $replies = getreplies($post_id, $page);
+	$rows = $replies['rows'] ?? [];
+	$users = $replies['users'] ?? [];
+	$blocked = $replies['blocked'] ?? [];
 
     if (!empty($rows)) {
-        $userIds = array_column($rows, 'userid');
-        $users = User::getUsers($userIds);
-
-        if (loggedin()) {
-            foreach($userIds as $userId) {
-                $result = $conn2->query("SELECT userid, profileid FROM user_blocks WHERE userid = $userId OR profileid = $userId");
-
-                while ($row = $result->fetch_assoc()) {
-                    print_r($row);
-
-                    $block_userid = (int)$row['userid'];
-                    $block_profileid = (int)$row['profileid'];
-
-                    if ($block_userid === $userId && $userId !== $block_profileid) {
-                        $blocked[$block_profileid]['you_blocked'] = true;
-                    }
-
-                    if ($block_profileid === $userId && $userId !== $block_userid) {
-                        $blocked[$userid]['they_blocked'] = true;
-                    }
-                }
-            }
-        }
-
         foreach($rows as $row) {
             $c_comment = $row['content'] ?? '[empty]';
             $c_date = $row['timestamp'] ?? time();
             $decoded_comment = htmlspecialchars($c_comment);
             $c_edited = $row['edited'] ?? null;
 
-			$c_user = $row['userid'] ?? null;
+			$c_user = (int)$row['userid'] ?? null;
 			$c_user_o = $users[$c_user] ?? null;
             $c_username = htmlspecialchars($c_user_o->username ?? '[deleted]');
-            $c_user_blocked = $blocked[$c_user]['they_blocked'] ?? false;
 
             $c_user_exists = true;
             if(!$c_user_o || $c_user_o->deactive || $c_user_o->suspended) {
                 $c_user_exists = false;
                 $isAdmin = false;
+				$hasBadge = false;
                 $pfp = '/img/no_image.png';
             } else {
                 $isAdmin = $c_user_o->admin ?? false;
+				$hasBadge = $c_user_o->profile->verified_badge ?? false;
                 $pfp = $c_user_o->profile->picture ?? '/img/no_image.png';
             }
 
 			if ($c_user_exists) {
-				$user_post_count_result = $conn->query("SELECT COUNT(*) as reply_count FROM messages WHERE userid = '$c_user' AND deleted_at IS NULL");
-				$user_post_count = $user_post_count_result->fetch_assoc()['reply_count'] ?? 0;
+				$user_post_count = userreplycount($c_user) ?? 0;
+				$c_user_blocked = isset($blocked[$c_user]['they_blocked']) ? true : false;
 
-                if(loggedin()) {
-                    if ($c_user_blocked) {
-                        continue;
-                    }
-                }
+				if ($c_user_blocked) {
+					echo "<p>" . ErrorRegistry::get('topic_reply', 'user_blocked') . "</p>";
+					continue;
+				}
 			}
 
     ?>
 
 		<div id="comment-<?php echo $row['id'] ?>" class="reply w3-row" style="display:flex;width:100%;">
 			<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-margin-right w3-col m3 l3">
-				<img id="pfp" src="<?php echo $pfp ?>"><br />
+				<img id="pfp" class="w3-round w3-border w3-border-grey" src="<?php echo $pfp ?>"><br />
 				<?php if ($c_user_exists) { ?>
 					<a href="/@<?php echo urlencode($c_username) ?>">
 				<?php } ?>
-					<span class="<?php echo $isAdmin ? "w3-text-red" : "" ?>" style="text-overflow: ellipsis;">
+					<span class="<?php echo $isAdmin ? "w3-text-red" : null ?>" style="text-overflow: ellipsis;">
 						<?php echo $c_username ?>
 					</span>
 				<?php if ($c_user_exists) { ?>
 					</a>
 				<?php } ?>
+				<?php echo $hasBadge ? "&check;" : null ?>
 				<br />
 				<time title="<?php echo $c_date ?>" datetime="<?php echo $c_date ?>">Posted <?php echo time_ago($c_date) ?></time><br />
 				<?php if(!empty($c_edited)) { ?>
@@ -351,9 +322,9 @@ if(isset($post_row['success']) && $post_row['success'] === true) {
 				<span class="w3-display-bottomleft">
 					<?php
 					if (loggedin() && isset($current_user)) {
-						if ($row['parent'] === $post_id && ($current_user->admin || trim($current_user->id) === trim($c_user))) {
+						if ($row['parent'] === (int)$post_id && ($current_user->admin || trim($current_user->id) === trim($c_user))) {
 							?>
-							<div class="delete gr8-theme w3-hide w3-light-grey w3-round-small w3-padding-small w3-margin-bottom">
+							<div class="delete gr8-theme w3-hide w3-card-2 w3-light-grey w3-round-small w3-padding-small w3-margin-bottom w3-border w3-border-grey">
 								<p>Are you sure you want to delete this reply?</p>
 								<button class="confirm-delete-btn w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" data-id="<?php echo $row['id'] ?>">Yes</button>
 								<button class="cancel-delete-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
@@ -375,11 +346,10 @@ if(isset($post_row['success']) && $post_row['success'] === true) {
         ?>
         <br />
     <?php
-        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>&nbsp;';
-        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page + 1) . '">Next</a>';
+        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?p=' . ($page - 1) . '">Back</a> <a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?p=' . ($page + 1) . '">Next</a>';
     } else {
         echo "<p>No replies yet.</p><br />";
-        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?id=' . $post_id . '&p=' . ($page - 1) . '">Back</a>';
+        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?p=' . ($page - 1) . '">Back</a>';
     }
 
     $words = [

@@ -212,15 +212,18 @@ if(isset($_POST['unban-submit'])) {
 
         <span class="w3-large">
             <img id="picture" width="75px" height="75px" class="w3-round" src="<?php echo $data['picture'] ?>" />
-
-            <?php if($data['admin']) { ?>
-                <span id="username" class="w3-padding-small w3-xlarge w3-text-red"><?php echo $data['username'] ?></span>
-            <?php } else { ?>
-                <span id="username" class="w3-padding-small w3-xlarge"><?php echo $data['username'] ?></span>
-            <?php } ?>
+            <span id="username" class="<?php echo $data['admin'] ? "w3-text-red" : null ?> w3-padding-small w3-xlarge"><i class="fa fa-at" aria-hidden="true"></i><?php echo $data['username'] ?></span>
 
             <?php if($data['is_private']) { ?>
-                <i class='fa fa-lock w3-xlarge w3-text-yellow' title="This profile has been privated. You can only view public contibutions if you follow them." aria-hidden='true'></i>
+                <i class='fa fa-lock w3-xlarge w3-text-yellow' title="This user's profile has been privated. You can only view public contibutions if you follow them." aria-hidden='true'></i>
+            <?php } ?>
+
+            <?php if($data['badge']) { ?>
+                <i class='fa fa-check-circle w3-xlarge w3-text-blue' title="This user has been verified as offical & trusted." aria-hidden='true'></i>
+            <?php } ?>
+
+            <?php if($data['admin']) { ?>
+                <i class='fa fa-gavel w3-xlarge w3-text-red' title="This user is a moderator of Gr8Brik." aria-hidden='true'></i>
             <?php } ?>
 
             <span id="stats" class="w3-padding-small">
@@ -310,7 +313,7 @@ if(isset($_POST['unban-submit'])) {
                 <form id="unblockUser" action="" method="post"></form>
             </span>
             <?php } else { ?>
-                <a href="/acc/" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-round-small w3-border w3-border-indigo"><i class="fa fa-pencil" aria-hidden="true"></i> Edit Profile</a> 
+                <a href="/acc/" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo"><i class="fa fa-pencil" aria-hidden="true"></i> Edit Profile</a> 
             <?php } ?>
         <?php } ?>
 

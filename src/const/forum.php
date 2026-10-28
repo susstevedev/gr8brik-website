@@ -5,24 +5,23 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . "/com/bbcode.php";
 require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . "/ajax/time.php";
+
 $bbcode = new BBCode;
 $page_limit = 10;
+$crud = new mysqli_crud(DB_NAME3);
+$user_crud = new mysqli_crud(DB_NAME);
 
 if (loggedin()) {
     $id = $current_user->id ?? 0;
 }
 
 function gettopic($conn, $post_id) {
-    $stmt = $conn->prepare("SELECT id, userid, username, title, timestamp, edited, views, status FROM messages WHERE id = ? AND (parent IS NULL OR parent = 0) AND deleted_at IS NULL LIMIT 1");
-    $stmt->bind_param("i", $post_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $post_row = $result->fetch_assoc() ?? [];
-    $stmt->close();
+    global $crud;
+
+    $post_row = $crud->readone("messages", "id,userid,username,title,timestamp,edited,views,status", "id = ? and (parent IS NULL OR parent = 0) and deleted_at is null", [$post_id]);
 
     if (!$post_row) {
         http_response_code(404);
-        //$post_row['error'] = "This conversation does not exist.";
         return ['success' => false, 'error' => "This conversation does not exist."];
     }
 
@@ -32,14 +31,10 @@ function gettopic($conn, $post_id) {
     $views = $post_row['views'];
     $category = $post_row['status'];
     $edit_date = $post_row['edited'] ?? null;
-
-    $conn2 = Database::get(DB_NAME);
-
     $user = User::getUser($userid);
 
     if(!$user || $user->deactive || $user->suspended) {
         http_response_code(404);
-        //$post_row['error'] = 'The user that created this thread does not exist';
         return ['success' => false, 'error' => "The user that created this thread does not exist"];
     }
 
@@ -59,7 +54,6 @@ function gettopic($conn, $post_id) {
 
     if ($category === "deleted") {
         http_response_code(404);
-        //$post_row['error'] = "This conversation has been removed because it violated our <a href='/rules'>rules</a>.";
         return ['success' => false, 'error' => "This conversation has been removed because it violated our <a href='/rules'>rules</a>."];
     }
 
@@ -91,57 +85,66 @@ function gettopic($conn, $post_id) {
     return $data ?? [];
 }
 
-function getreplies($db, $post_id, $page) {
+function getreplies($post_id, $page) {
+    global $page_limit, $crud, $user_crud;
+
     $offset = ($page - 1) * $page_limit;
-
-    $sql = "SELECT * FROM messages WHERE (parent = $post_id OR id = $post_id) AND deleted_at IS NULL ORDER BY timestamp ASC LIMIT $limit OFFSET $offset";
-    $comResult = $db->query($sql);
-    $rows = [];
+    $rows = $crud->readall("messages", "*", "(parent = ? OR id = ?) and deleted_at is null", [$post_id, $post_id], "timestamp asc", $page_limit, $offset);
     $blocked = [];
-
-    if ($comResult->num_rows > 0) {
-        while ($row = $comResult->fetch_assoc()) {
-            $rows[] = $row;
-        }
-    }
+    $users = [];
 
     if (!empty($rows)) {
         $userIds = array_column($rows, 'userid');
         $users = User::getUsers($userIds);
 
         if (loggedin()) {
-            foreach($userIds as $userId) {
-                $result = $conn2->query("SELECT userid, profileid FROM user_blocks WHERE userid = $userId OR profileid = $userId");
+            $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+            $params = array_merge($userIds, $userIds);
+            $blocked = $user_crud->readall('user_blocks', 'userid, profileid', "userid IN ($placeholders) OR profileid IN ($placeholders)", $params);
 
-                while ($row = $result->fetch_assoc()) {
-                    print_r($row);
+            foreach ($blocked as $row) {
+                $block_userid = (int)$row['userid'];
+                $block_profileid = (int)$row['profileid'];
 
-                    $block_userid = (int)$row['userid'];
-                    $block_profileid = (int)$row['profileid'];
+                //A user in our list blocked someone else
+                if (isset($users[$block_userid]) && $block_userid !== $block_profileid) {
+                    $blocked[$block_profileid]['you_blocked'] = true;
+                }
 
-                    if ($block_userid === $userId && $userId !== $block_profileid) {
-                        $blocked[$block_profileid]['you_blocked'] = true;
-                    }
-
-                    if ($block_profileid === $userId && $userId !== $block_userid) {
-                        $blocked[$userid]['they_blocked'] = true;
-                    }
+                //Someone else blocked a user in our list
+                if (isset($users[$block_profileid]) && $block_profileid !== $block_userid) {
+                    $blocked[$block_profileid]['they_blocked'] = true;
                 }
             }
         }
     }
+
+    return [
+        'users' => $users,
+        'blocked' => $blocked,
+        'rows' => $rows,
+    ];
 }
 
-function getreplycount($db, $post_id) {
-    global $page_limit;
+function getreplycount($post_id) {
+    global $page_limit, $crud;
 
-    $count_result = $db->query("SELECT COUNT(*) as reply_count FROM messages WHERE parent = '$post_id' OR id = '$post_id'");
-    $reply_count = $count_result->fetch_assoc()['reply_count'] ?? 0;
+    $count_result = $crud->readone('messages', 'COUNT(*) as reply_count', 'parent = ? OR id = ?', [$post_id, $post_id]);
+    //$count_result = $crud->query("SELECT COUNT(*) as reply_count FROM messages WHERE parent = '$post_id' OR id = '$post_id'");
+    $reply_count = $count_result['reply_count'] ?? 0;
     $total_pages = ceil($reply_count / $page_limit);
 
     return [
+        'raw' => $count_result,
         'replies' => $reply_count,
         'total_pages' => $total_pages,
     ];
+}
+
+function userreplycount($userid) {
+    global $crud;
+
+    $count_result = $crud->readone('messages', 'COUNT(*) as reply_count', 'userid = ? and deleted_at is null', [$userid]);
+    return $count_result['reply_count'] ?? 0;
 }
 ?>

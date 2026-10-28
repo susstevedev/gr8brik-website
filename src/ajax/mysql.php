@@ -73,4 +73,150 @@ class Database {
     /* prevent cloning of instance */
     private function __clone() {}
 }
+
+/**
+ * Reusable CRUD class
+ */
+class mysqli_crud {
+    public mysqli $db;
+
+    public function __construct($dbname) {
+        $this->db = Database::get($dbname);
+    }
+
+    /**
+     * Function to bind prepared statement object parameters
+     */
+    private function bind_params($stmt, $params) {
+        $types = "";
+
+        if (!empty($params)) {
+            foreach ($params as $param) {
+                if (is_int($param)) {
+                    $types .= "i";
+                } elseif (is_float($param)) {
+                    $types .= "d";
+                } else {
+                    $types .= "s";
+                }
+            }
+            $stmt->bind_param($types, ...$params);
+        }
+    }
+
+    /**
+     * Insert data into a table
+    **/
+    public function create($table, $data) {
+        $columns = implode(", ", array_keys($data));
+        $placeholders = implode(", ", array_fill(0, count($data), "?"));
+        $stmt = $this->db->prepare("insert into `$table` ($columns) values ($placeholders)");
+
+        if ($stmt) {
+            $this->bind_params($stmt, array_values($data));
+            $result = $stmt->execute();
+            $stmt->close();
+            return $result;
+        }
+
+        return false;
+    }
+
+    /**
+     * Select one row from a table
+    **/
+    public function readone($table, $columns = "*", $where = "", $params = []) {
+        $sql = "select $columns from `$table`";
+
+        if (!empty($where)) {
+            $sql .= " where $where";
+        }
+
+        $stmt = $this->db->prepare($sql);
+
+        if ($stmt) {
+            $this->bind_params($stmt, $params);
+            $stmt->execute();
+            $data = $stmt->get_result()->fetch_assoc() ?? false;
+            $stmt->close();
+            return $data;
+        }
+
+        return false;
+    }
+
+    /**
+     * Select multiple rows from a table
+    **/
+    public function readall($table, $columns = "*", $where = "", $params = [], $order = "", $limit = null, $offset = null) {
+        $sql = "select $columns from `$table`";
+
+        if (!empty($where)) {
+            $sql .= " where $where";
+        }
+
+        if (!empty($order)) {
+            $sql .= " order by $order";
+        }
+
+        if (!empty($limit)) {
+            $sql .= " limit $limit";
+        }
+
+        if (!empty($offset)) {
+            $sql .= " offset $offset";
+        }
+
+        $stmt = $this->db->prepare($sql);
+
+        if ($stmt) {
+            $this->bind_params($stmt, $params);
+            $stmt->execute();
+            $data = $stmt->get_result()->fetch_all(MYSQLI_ASSOC) ?? false;
+            $stmt->close();
+            return $data;
+        }
+
+        return false;
+    }
+
+    /**
+     * Modify data in a table
+    **/
+    public function update($table, $data, $where, $where_params = []) {
+        $segments = [];
+        foreach (array_keys($data) as $column) {
+            $segments[] = "`$column` = ?";
+        }
+
+        $set_string = implode(", ", $segments);
+        $sql = "update `$table` set $set_string where $where";
+        $stmt = $this->db->prepare($sql);
+
+        if ($stmt) {
+            $all_params = array_merge(array_values($data), $where_params);
+            $this->bind_params($stmt, $all_params);
+            $result = $stmt->execute();
+            $stmt->close();
+            return $result;
+        }
+        return false;
+    }
+
+    /**
+     * Remove data from a table
+    **/
+    public function delete($table, $where, $params = []) {
+        $sql = "delete from `$table` where $where";
+        $stmt = $this->db->prepare($sql);
+
+        if ($stmt) {
+            $this->bind_params($stmt, $params);
+            $result = $stmt->execute();
+            $stmt->close();
+            return $result;
+        }
+        return false;
+    }
+}
 ?>

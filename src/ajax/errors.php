@@ -66,6 +66,10 @@ class ErrorRegistry {
 			'comment_unfav_fail' => 'Failed to unfavorite',
 			'comment_fav_fail' => 'Failed to favorite this comment',
         ],
+        'topic_reply' => [
+            'user_blocked' => 'The creator of this Reply has blocked you.',
+            'user_blocking' => 'You have blocked the creator of this Reply.',
+        ],
     ];
 
     public static function get(string $type, string $code, ?array $placeholders = []): string {

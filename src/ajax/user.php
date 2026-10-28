@@ -115,17 +115,7 @@ class User {
         'private_profile',
         'suspended',
         'deactive',
-        'changed'
-    ];
-
-    private const FIELDS_PROFILE = [
-        'picture',
-        'picture_small',
-        'banner',
-        'twitter',
-        'bsky',
-        'private_profile',
-        'description'
+        'changed',
     ];
 
     /**
@@ -137,21 +127,12 @@ class User {
             $this->$field = $data[$field] ?? null;
         }
 
-        $this->profile = $this->__profile($profile);
+        $this->profile = new ProfileUser($data);
         $this->picture ??= $this->email ? $this->userGravatar($this->email, 200) : '/img/no_image.png';
         $this->picture_small ??= $this->picture;
-    }
 
-    public function __profile(?array $data = []) {
-        $profile = new \stdClass;
-        foreach (self::FIELDS_PROFILE as $field) {
-            $profile->$field = $data[$field] ?? null;
-        }
-
-        $profile->picture ??= $this->userGravatar($this->email, 200);
-        $profile->picture_small ??= $this->userGravatar($this->email, 50);
-
-        return $profile;
+        $this->profile->picture ??= $this->userGravatar($this->email, 200);
+        $this->profile->picture_small ??= $this->userGravatar($this->email, 50);
     }
 
     /**
@@ -444,31 +425,6 @@ class User {
     }
 
     /**
-     * Grabs and constucts a user object from an ID
-     */
-    /*public static function getUser(?int $id = 0) {
-        $conn = Database::get(DB_NAME);
-
-        $u_stmt = $conn->prepare("SELECT id, username, github_id, google_id, email, password, verify_token, admin, deactive, suspended, age, changed FROM users WHERE id = ? AND deactive IS NULL");
-        $u_stmt->bind_param("i", $id);
-        $u_stmt->execute();
-        $user = $u_stmt->get_result()->fetch_assoc() ?? [];
-        $u_stmt->close();
-
-        if($user) {
-            $p_stmt = $conn->prepare("SELECT picture, picture_small, banner, twitter, bsky, private_profile, description FROM user_profiles WHERE userid = ?");
-            $p_stmt->bind_param("i", $id);
-            $p_stmt->execute();
-            $profile = $p_stmt->get_result()->fetch_assoc() ?? [];
-            $p_stmt->close();
-
-            return new User(array_merge($user, $profile), $profile);
-        }
-
-        return null;
-    }*/
-
-    /**
      * Grabs and constructs a user object from an ID
      */
     public static function getUser(?int $id = 0) {
@@ -478,7 +434,7 @@ class User {
                     u.id, u.username, u.github_id, u.google_id, u.email, u.password, 
                     u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
                     p.picture, p.picture_small, p.banner, p.twitter, p.bsky, 
-                    p.private_profile, p.description 
+                    p.private_profile, p.description, p.verified_badge
                 FROM users u
                 LEFT JOIN user_profiles p ON p.userid = ?
                 WHERE u.id = ? AND u.deactive IS NULL";
@@ -491,13 +447,14 @@ class User {
 
         if ($row) {
             $profile = [
-                'picture' => $row['picture'],
-                'picture_small' => $row['picture_small'],
-                'banner' => $row['banner'],
-                'twitter' => $row['twitter'],
-                'bsky' => $row['bsky'],
-                'private_profile' => $row['private_profile'],
-                'description' => $row['description']
+                'picture' => $row['picture'] ?? null,
+                'picture_small' => $row['picture_small'] ?? null,
+                'banner' => $row['banner'] ?? null,
+                'twitter' => $row['twitter'] ?? null,
+                'bsky' => $row['bsky'] ?? null,
+                'private_profile' => $row['private_profile'] ?? null,
+                'description' => $row['description'] ?? null,
+                'verified_badge' => $row['verified_badge'] ?? null
             ];
 
             return new User($row, $profile);
@@ -516,7 +473,7 @@ class User {
                     u.id, u.username, u.github_id, u.google_id, u.email, u.password,
                     u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
                     p.picture, p.picture_small, p.banner, p.twitter, p.bsky,
-                    p.private_profile, p.description
+                    p.private_profile, p.description, p.verified_badge
                 FROM users u
                 LEFT JOIN user_profiles p ON p.userid = u.id
                 WHERE u.username = ? AND u.deactive IS NULL";
@@ -535,7 +492,8 @@ class User {
                 'twitter' => $row['twitter'] ?? null,
                 'bsky' => $row['bsky'] ?? null,
                 'private_profile' => $row['private_profile'] ?? null,
-                'description' => $row['description'] ?? null
+                'description' => $row['description'] ?? null,
+                'verified_badge' => $row['verified_badge'] ?? null
             ];
 
             return new User($row, $profile);
@@ -563,7 +521,7 @@ class User {
                     u.id, u.username, u.github_id, u.google_id, u.email, u.password,
                     u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
                     p.picture, p.picture_small, p.banner, p.twitter, p.bsky,
-                    p.private_profile, p.description
+                    p.private_profile, p.description, p.verified_badge
                 FROM users u
                 LEFT JOIN user_profiles p ON p.userid = u.id
                 WHERE u.id IN ($placeholders) AND u.deactive IS NULL";
@@ -589,7 +547,8 @@ class User {
                     'twitter' => $user['twitter'] ?? null,
                     'bsky' => $user['bsky'] ?? null,
                     'private_profile' => $user['private_profile'] ?? null,
-                    'description' => $user['description'] ?? null
+                    'description' => $user['description'] ?? null,
+                    'verified_badge' => $row['verified_badge'] ?? null
                 ];
 
                 $usero = new User($user, $profile);
@@ -635,6 +594,24 @@ class User {
         return 0;
     }
 
+    public static function get_badges(User $usero) {
+        $strings = "";
+
+        if($usero->profile->private_profile) {
+            $strings .= '<i class="fa fa-lock w3-text-yellow" title="This user\'s profile has been privated" aria-hidden="true"></i>';
+        }
+
+        if($usero->profile->verified_badge) {
+            $strings .= " <i class='fa fa-check-circle w3-text-blue' title='This user has been verified as offical & trusted' aria-hidden='true'></i>";
+        }
+
+        if($usero->admin) {
+            $strings .= " <i class='fa fa-gavel w3-text-red' title='This user is a moderator' aria-hidden='true'></i>";
+        }
+
+        return $strings;
+    }
+
     /**
      * Check if an account is email verified
      * @deprecated, check if verify_token is null instead
@@ -660,6 +637,34 @@ class User {
             return true;
         } else {
             return false;
+        }
+    }
+}
+
+class ProfileUser {
+    public ?string $picture;
+    public ?string $banner;
+    public ?string $picture_small;
+    public ?string $description;
+    public ?string $twitter;
+    public ?string $bsky;
+    public ?bool $private_profile;
+    public ?bool $verified_badge;
+
+    private const FIELDS = [
+        'picture',
+        'picture_small',
+        'banner',
+        'twitter',
+        'bsky',
+        'private_profile',
+        'description',
+        'verified_badge',
+    ];
+
+    public function __construct(?array $data = []) {
+        foreach (self::FIELDS as $field) {
+            $this->$field = $data[$field] ?? null;
         }
     }
 }
