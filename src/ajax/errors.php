@@ -25,6 +25,7 @@ class ErrorRegistry {
             'banner_upload_fail' => "Sorry, there was an error uploading your file.",
         ],
         'db' => [
+            'generic' => 'An unknown error has occured. Please try again later.',
             'conn_fail' => 'Connection to %s failed',
             'query_fail' => 'Query execution failed.',
         ],
@@ -45,6 +46,18 @@ class ErrorRegistry {
         ],
         'user' => [
             'not_found' => 'User not found in database',
+            'private_profile' => 'User has privated their profile.',
+            'private_profile_detailed' => "When an account is private, other users can\'t view the profile unless they are following said user, or said user is following them.",
+        ],
+        'profile_follow' => [
+            'generic' => "An error occured while following this user",
+            'generic_unfollow' => "An error occured while unfollowing this user",
+            'self_follow' => "You cannot follow yourself",
+        ],
+        'profile_block' => [
+            'generic' => "An error occured while blocking this user",
+            'generic_unblock' => 'An error occurred while unblocking this user',
+            'self_block' => "You cannot block yourself",
         ],
         'comment' => [
             'generic' => 'Could not send comment. Please try again later.',

@@ -24,12 +24,12 @@ if(isset($data) && !$data['success'] && !empty($data['message'])) {
 
 if(isset($data) && isset($data['userid'])) {
 	$_GET['id'] = $data['userid'];
+    $profile_id = (int)$data['userid'];
 }
 
 $interactions = new UserInteractions();
 
 if (isset($_POST['follow'])) {
-    $profile_id = (int)$_GET['id'];
     $p_data = $interactions->followUser($profile_id);
     $error_title = $p_data['title'] ?? 'Follow';
 
@@ -45,7 +45,6 @@ if (isset($_POST['follow'])) {
 }
 
 if(isset($_POST['unfollow'])) {
-    $profile_id = (int)$_GET['id'];
     $p_data = $interactions->unfollowUser($profile_id);
     $error_title = $p_data['title'] ?? 'Unfollow';
 
@@ -61,7 +60,6 @@ if(isset($_POST['unfollow'])) {
 }
 
 if (isset($_POST['block'])) {
-    $profile_id = (int)$_GET['id'];
     $p_data = $interactions->blockUser($profile_id);
     $error_title = $p_data['title'] ?? 'Block and unfollow';
 
@@ -77,7 +75,6 @@ if (isset($_POST['block'])) {
 }
 
 if(isset($_POST['unblock'])) {
-    $profile_id = (int)$_GET['id'];
     $p_data = $interactions->unblockUser($profile_id);
     $error_title = $p_data['title'] ?? 'Unblock';
 
@@ -96,7 +93,6 @@ $admin = new UserAdmin();
 
 if(isset($_POST['warn'])) {
     $reason = isset($_POST['reason']) ? $_POST['reason'] : null;
-    $profile_id = (int)$_GET['id'];
     $p_data = $admin->warnUser($profile_id, $reason);
     $error_title = $p_data['title'] ?? 'Warn';
 
@@ -112,8 +108,6 @@ if(isset($_POST['warn'])) {
 }
 
 if(isset($_POST['delete'])) {
-    $profile_id = (int)$_GET['id'];
-
     $ignore = filter_has_var(INPUT_POST,'ignore') ? true : false;
     $use_email = filter_has_var(INPUT_POST,'use_email') ? true : false;
     $until = isset($_POST['until']) ? $_POST['until'] : null;
@@ -135,7 +129,6 @@ if(isset($_POST['delete'])) {
 }
 
 if(isset($_POST['unban-submit'])) {
-    $profile_id = (int)$_GET['id'];
     $email = isset($data['email']) ? $data['email'] : null;
 
     $p_data = $admin->unblacklistUser($profile_id, $email);
@@ -155,12 +148,12 @@ if(isset($_POST['unban-submit'])) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title><?php echo isset($data['username']) ? $data['username'] . '\'s profile' : 'Unknown profile' ?></title>
+    <title><?php echo isset($data['username']) ? '@' . $data['username'] . '\'s profile' : 'Unknown profile' ?></title>
     <?php include 'header.php' ?>
 
     <script type="text/javascript">
         $(document).ready(function() {
-            window.userid = '<?php echo (int)$_GET['id'] ?>';
+            window.userid = '<?php echo (int)$data['userid'] ?>';
         });
     </script>
     <script type="text/javascript" src="/lib/profile.js"></script>
@@ -177,9 +170,7 @@ if(isset($_POST['unban-submit'])) {
             <?php if(isset($error_code) && $error_code === 'profile_private' && loggedin()) {?>
                 <form id="followUser" action="" method="post"></form>
                 <input id="button-follow" name="follow" form="followUser" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" type="submit" value="Follow user">
-            <?php } ?>
-
-            <?php if(isset($error_code) && $error_code === 'profile_private' && !loggedin()) {?>
+            <?php } else if(isset($error_code) && $error_code === 'profile_private' && !loggedin()) {?>
                 <a href="/acc/login" id="button-follow" name="follow" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Login to follow user</a>
             <?php } ?>
 
@@ -188,6 +179,7 @@ if(isset($_POST['unban-submit'])) {
                 <input id="unban-submit" name="unban-submit" form="unbanUser" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-border w3-border-pink" type="submit" value="Unban user">
             <?php } ?>
         </div>
+        <?php include('linkbar.php') ?>
         <?php exit; ?>
     <?php } ?>
 
@@ -211,7 +203,7 @@ if(isset($_POST['unban-submit'])) {
         <?php } ?>
 
         <span class="w3-large">
-            <img id="picture" width="75px" height="75px" class="w3-round" src="<?php echo $data['picture'] ?>" />
+            <img id="picture" width="75px" height="75px" class="w3-round" src="<?php echo $data['picture'] ?? '/img/no_image.png' ?>" />
             <span id="username" class="<?php echo $data['admin'] ? "w3-text-red" : null ?> w3-padding-small w3-xlarge"><i class="fa fa-at" aria-hidden="true"></i><?php echo $data['username'] ?></span>
 
             <?php if($data['is_private']) { ?>
@@ -273,7 +265,7 @@ if(isset($_POST['unban-submit'])) {
         <span id="followedby-wrapper"></span><br />
 
         <?php if(loggedin()) { ?>
-            <?php if($userid != trim($_GET['id'])) { ?>
+            <?php if($userid != trim($data['userid'])) { ?>
             <span id="action-buttons">
                 <?php if($data['is_following'] === true) { ?>
                     <button onclick='document.getElementById("modal-unfollow").style.display="block"' name="unfollow" class="button-unfollow w3-btn w3-red w3-hover-opacity w3-round-small w3-border w3-border-pink" />

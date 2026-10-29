@@ -215,12 +215,11 @@ class UserProfile {
                 "success" => false,
                 "code" => 'csrf_missing',
                 "title" => 'Something tech-related',
-                "message" => 'No CSRF (cross-site-request-forgery) token provided, or it is invalid!',
+                "message" => ErrorRegistry::get('auth', 'bad_csrf'),
             ];
         }
 
         $conn = Database::get(DB_NAME);
-        //$user_arr = self::raw_user($identifier, $use_name);
 
         switch ($use_name) {
             case true:
@@ -233,6 +232,14 @@ class UserProfile {
                 break;
         }
 
+        if(!isset($profile_id)) {
+            http_response_code(400);
+            return [
+                "success" => false,
+                "message" => ErrorRegistry::get('db', 'query_fail'),
+            ];
+        }
+
         if (!isset($usero)) {
             http_response_code(404);
             return [
@@ -240,7 +247,7 @@ class UserProfile {
                 "userid" => $profile_id,
                 "code" => 'not_found',
                 "title" => '404 Not Found',
-                "message" => 'This profile wasn\'t found. Maybe you typed the username wrong?',
+                "message" => ErrorRegistry::get('user', 'not_found'),
             ];
         }
 
@@ -331,7 +338,7 @@ class UserProfile {
                 "userid" => $profile_id,
                 "code" => 'profile_private',
                 "title" => 'Profile private',
-                "message" => 'The owner of this account has privated their profile.<br />When an account is private, other users can\'t view the profile unless they are following said user, or said user is following them.',
+                "message" => ErrorRegistry::get('user', 'private_profile') . '<br />' . ErrorRegistry::get('user', 'private_profile_detailed'),
             ];
         }
 
@@ -448,7 +455,7 @@ class UserInteractions {
         $error_title = 'Follow user';
 
         if(!loggedin()) {
-            $error = "Please login to follow this user";
+            $error = ErrorRegistry::get('auth', 'unauthed');
             return [
                 'success' => false,
                 'message' => $error,
@@ -457,7 +464,7 @@ class UserInteractions {
         }
 
         if(User::isDeleted($profile_id)) {
-            $error = "No user found";
+            $error = ErrorRegistry::get('user', 'not_found');
             return [
                 'success' => false,
                 'message' => $error,
@@ -468,7 +475,7 @@ class UserInteractions {
         $time = time();
 
         if((int)$this->userid === $profile_id) {
-            $error = "You cannot follow yourself";
+            $error = ErrorRegistry::get('profile_follow', 'self_follow');
             return [
                 'success' => false,
                 'message' => $error,
@@ -477,7 +484,7 @@ class UserInteractions {
         }
 
         if($this->current_user->verify_token !== NULL) {
-            $error = "User account is not verified";
+            $error = ErrorRegistry::get('auth', 'unverified');
             return [
                 'success' => false,
                 'message' => $error,
@@ -505,7 +512,7 @@ class UserInteractions {
                     'title' => 'Success!'
                 ];
             } else {
-                $error = "An error occured while following this user";
+                $error = ErrorRegistry::get('profile_follow', 'generic');
                 return [
                     'success' => false,
                     'message' => $error,
@@ -522,7 +529,7 @@ class UserInteractions {
         $error_title = 'Unfollow user';
 
         if(!loggedin()) {
-            $error = "Please login to unfollow this user";
+            $error = ErrorRegistry::get('auth', 'unauthed');;
             return [
                 'success' => false,
                 'message' => $error,
@@ -531,16 +538,7 @@ class UserInteractions {
         }
 
         if(User::isDeleted($profile_id)) {
-            $error = "No user found";
-            return [
-                'success' => false,
-                'message' => $error,
-                'title' => $error_title
-            ];
-        }
-
-        if((int)$this->userid === $profile_id) {
-            $error = "You cannot unfollow yourself";
+            $error = ErrorRegistry::get('user', 'not_found');;
             return [
                 'success' => false,
                 'message' => $error,
@@ -549,7 +547,7 @@ class UserInteractions {
         }
 
         if($this->current_user->verify_token !== NULL) {
-            $error = "User account is not verified";
+            $error = ErrorRegistry::get('auth', 'unverified');
             return [
                 'success' => false,
                 'message' => $error,
@@ -569,14 +567,14 @@ class UserInteractions {
             if ($result) {
                 $stmt_follow->close();
 
-                $message = "Unollowed this user with success";
+                $message = "Unfollowed this user with success";
                 return [
                     'success' => true,
                     'message' => $message,
                     'title' => 'Success!'
                 ];
             } else {
-                $error = "An error occured while unfollowing this user";
+                $error = ErrorRegistry::get('profile_follow', 'generic_unfollow');
                 return [
                     'success' => false,
                     'message' => $error,
@@ -594,7 +592,7 @@ class UserInteractions {
         $time = time();
 
         if(!loggedin()) {
-            $error = "Please login to block this user";
+            $error = ErrorRegistry::get('auth', 'unauthed');
             return [
                 'success' => false,
                 'message' => $error,
@@ -603,7 +601,7 @@ class UserInteractions {
         }
 
         if(User::isDeleted($profile_id)) {
-            $error = "No user found";
+            $error = ErrorRegistry::get('auth', 'unverified');
             return [
                 'success' => false,
                 'message' => $error,
@@ -612,7 +610,7 @@ class UserInteractions {
         }
 
         if((int)$this->userid === $profile_id) {
-            $error = "You cannot block yourself";
+            $error = ErrorRegistry::get('profile_block', 'self_block');
             return [
                 'success' => false,
                 'message' => $error,
@@ -621,7 +619,7 @@ class UserInteractions {
         }
 
         if($this->current_user->verify_token !== NULL) {
-            $error = "User account is not verified";
+            $error = ErrorRegistry::get('auth', 'unverified');
             return [
                 'success' => false,
                 'message' => $error,
@@ -652,7 +650,7 @@ class UserInteractions {
                         'title' => 'Success!'
                     ];
                 } else {
-                    $error = "An error has happened while blocking this user";
+                    $error = ErrorRegistry::get('profile_block', 'generic');
                     return [
                         'success' => true,
                         'message' => $error,
@@ -660,7 +658,7 @@ class UserInteractions {
                     ];
                 }
             } else {
-                $error = "An error occurred while unfollowing this user";
+                $error = ErrorRegistry::get('profile_follow', 'generic_unfollow');
                 return [
                     'success' => false,
                     'message' => $error,
@@ -677,7 +675,7 @@ class UserInteractions {
         $error_title = 'Unblock user';
 
         if(!loggedin()) {
-            $error = "Please login to unblock this user";
+            $error = ErrorRegistry::get('auth', 'unauthed');
             return [
                 'success' => false,
                 'message' => $error,
@@ -686,16 +684,7 @@ class UserInteractions {
         }
 
         if(User::isDeleted($profile_id)) {
-            $error = "No user found";
-            return [
-                'success' => false,
-                'message' => $error,
-                'title' => $error_title
-            ];
-        }
-
-        if((int)$this->userid === $profile_id) {
-            $error = "You cannot unblock yourself";
+            $error = ErrorRegistry::get('user', 'not_found');
             return [
                 'success' => false,
                 'message' => $error,
@@ -704,7 +693,7 @@ class UserInteractions {
         }
 
         if($this->current_user->verify_token !== NULL) {
-            $error = "User account is not verified";
+            $error = ErrorRegistry::get('auth', 'unverified');
             return [
                 'success' => false,
                 'message' => $error,
@@ -728,7 +717,7 @@ class UserInteractions {
                     'title' => 'Success!'
                 ];
             } else {
-                $error = "An error occurred while unblocking this user";
+                $error = ErrorRegistry::get('profile_block', 'generic_unblock');
                 return [
                     'success' => false,
                     'message' => $error,

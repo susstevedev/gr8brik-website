@@ -127,7 +127,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 <html lang="en">
 
 <head>
-    <title><?php echo $data['name'] ?? "This user's creation"?> by <?php echo $data['user']['name'] ?? null ?></title>
+    <title><?php echo $data['name'] ?? "Unnamed Creation"?> by <?php echo $data['user']['name'] ?? 'A User' ?></title>
     <?php include 'header.php' ?>
 
     <script type="text/javascript">
@@ -201,6 +201,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 
     <?php if (isset($error)) { ?>
         <div class="message w3-red w3-padding w3-round w3-border w3-border-pink"><?php echo $error ?></div><br />
+        <?php include('linkbar.php') ?>
         <?php exit; ?>
     <?php } ?>
 
