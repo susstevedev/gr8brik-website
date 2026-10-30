@@ -426,10 +426,14 @@
         });
 
         $("#comment-form [name='comment-box']").on("input", function(event) {
-            if($.trim($(this).val()).length === 0) {
+            if($.trim($(this).val()).length <= 0) {
                 $("#comment-view-toggle button.preview").addClass('w3-disabled');
             } else {
                 $("#comment-view-toggle button.preview").removeClass('w3-disabled');
+            }
+
+            if($.trim($(this).val()).length >= 500) {
+                $("#comment-form .comment-button").stop().addClass('w3-disabled');
             }
         });
 
@@ -452,6 +456,8 @@
             }
         });
 
+        var PREVIEW_TEXT = null;
+
         $(document).on("click", "#comment-view-toggle button", function (event) {
             event.preventDefault();
             var btn = $(this);
@@ -462,10 +468,10 @@
             if(btn.hasClass('edit')) {
                 $('#comment-form #post').show();
                 $('#comment-form .comment-preview').hide();
-            } else if(btn.hasClass('preview') && !btn.hasClass('w3-disabled') && $.trim(comment_box).length !== 0) {
+            } else if(btn.hasClass('preview') && !btn.hasClass('w3-disabled')) {
                 $('#comment-form #post').hide();
 
-                if($.trim(comment_box) === $.trim(atob(preview_selector.attr('data-preview-text')))) {
+                if($.trim(comment_box) === PREVIEW_TEXT) {
                     $('#comment-form .comment-preview').show();
                     return;
                 }
@@ -484,9 +490,7 @@
                             if (res && res.success && res.comment) {
                                 preview_selector.html(res.comment.text);
                                 preview_date_selector.text(res.comment.edited_at);
-
-                                // base64 to basically excape characters
-                                preview_selector.attr('data-preview-text', btoa(comment_box));
+                                PREVIEW_TEXT = comment_box;
                             } else if (res && res.message && !res.success) {
                                 showError(res.message);
                             } else {
@@ -495,7 +499,7 @@
 
                             if(res && !res.success) {
                                 preview_selector.html(comment_box);
-                                preview_selector.attr('data-preview-text', btoa(comment_box));
+                                PREVIEW_TEXT = comment_box;
                             }
 
                             $('#comment-form .comment-preview').show();
@@ -525,6 +529,10 @@
 
             var file_data = $('#attach-upload #imagefile').prop('files')[0];
             var form_data = new FormData();
+
+            if(!comment_box || btn.hasClass('w3-disabled')) {
+                return;
+            }
 
             form_data.append('imagefile', file_data);
             form_data.append('upload', 'true');
@@ -572,8 +580,7 @@
                 const commentBtnText = $("#comment-btn-text");
                 const csrf = window.csrf_token;
 
-                if(!commentBox) {
-                    btn.hide();
+                if(!commentBox || btn.hasClass('w3-disabled')) {
                     return;
                 }
 

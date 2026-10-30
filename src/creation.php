@@ -350,14 +350,14 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 
                 <div id="comment-form" class="w3-half w3-row w3-display-container">
                     <div class="w3-left xw3-margin-right" id="comment-profile-picture">
-                        <img class="w3-round" width="50px" height="50px" src="<?php echo $current_user->picture ?>">
+                        <img class="w3-round w3-card-2" width="50px" height="50px" src="<?php echo $current_user->profile->picture_small ?>">
                     </div>
 
                     <div class="w3-hide-small w3-left xw3-margin-right">
                         <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
                     </div>
 
-                    <div id="post" class="w3-rest w3-hover-shadow w3-border w3-border-blue">
+                    <div id="post" class="w3-rest">
                         <textarea name="comment-box" id="comment-box" class="w3-input w3-col s12" placeholder="Add a comment... (@username mentions someone, Markdown supported)"></textarea>
                     </div>
 
@@ -368,11 +368,12 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </b>
 
                             <span class="w3-mobile w3-right">
-                                <span class="date"></span>
+                                <span class="date">1 minute ago</span>
+                                <span class="votes"><span class="count">0</span> favorites</span>
                             </span>
                         </header>
 
-                        <span class="text w3-padding-bottom" style="word-wrap: break-word; white-space: normal;" data-preview-text=""></span>
+                        <span class="text"></span>
                     </article>
 
                     <div class="w3-col s12 w3-margin-top">

@@ -180,6 +180,10 @@ if (isset($_POST['delete']) && isset($_POST['id'])) {
                     $stmtComments->bind_param("i", $model_id);
                     $stmtComments->execute();
 
+                    $stmtCommentFavs = $conn2->prepare("DELETE FROM comment_votes WHERE model_id = ?");
+                    $stmtCommentFavs->bind_param("i", $model_id);
+                    $stmtCommentFavs->execute();
+
                     $notifications = new Notifications($conn);
                     $notifications->remove_all_subscribers('comment', $model_id);
                     $notifications->remove_all_subscribers('creation_fav', $model_id);

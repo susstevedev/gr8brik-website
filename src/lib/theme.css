@@ -272,8 +272,22 @@ body.mode-dark .creation-page-meta {
 }
 
 /* creations page comments and related */
+#comment-form #post {
+    display: flex;
+    position: relative;
+}
+
 #comment-form #post textarea[name='comment-box'] {
     height: 60px;
+    box-shadow: inset 1px 1px 6px rgb(33, 150, 243);
+    border: 1px rgba(33, 150, 243, 0.5) solid;
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+#comment-form #post textarea[name='comment-box']:hover,
+#comment-form #post textarea[name='comment-box']:active,
+#comment-form #post textarea[name='comment-box']:focus {
+    box-shadow: inset 2px 2px 8px rgb(33, 150, 243);
 }
 
 #comment-form .comment-button, #comment-form .comment-preview, #attach-upload #imagefile {

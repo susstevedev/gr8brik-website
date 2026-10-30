@@ -1243,16 +1243,17 @@ if (loggedin() && isset($current_user)) {
 		}
 
         $comment_user = null;
+        $model_id = null;
 		$count = 0;
 
-		$stmt = $conn->prepare("SELECT id, user FROM comments WHERE id = ? AND hidden = 0 LIMIT 1");
+		$stmt = $conn->prepare("SELECT id, user, model FROM comments WHERE id = ? AND hidden = 0 LIMIT 1");
 		$stmt->bind_param("i", $_POST['comment_id']);
 		$stmt->execute();
-		$stmt->bind_result($comment_id, $comment_user);
+		$stmt->bind_result($comment_id, $comment_user, $model_id);
 		$stmt->fetch();
 		$stmt->close();
 
-		if (!isset($comment_id) || !isset($comment_user)) {
+		if (!isset($comment_id) || !isset($comment_user) || !isset($model_id)) {
 			echo json_encode(['error' => ErrorRegistry::get('comment', 'not_found')]);
 			exit;
 		}
@@ -1296,8 +1297,8 @@ if (loggedin() && isset($current_user)) {
 				exit;
 			}
 
-			$stmt = $conn->prepare("INSERT INTO comment_votes (comment_id, user_id) VALUES (?, ?)");
-			$stmt->bind_param("ii", $comment_id, $id);
+			$stmt = $conn->prepare("INSERT INTO comment_votes (comment_id, user_id, model_id) VALUES (?, ?, ?)");
+			$stmt->bind_param("iii", $comment_id, $id, $model_id);
 
 			$stmt_upd = $conn->prepare("UPDATE comments SET votes = votes + 1 WHERE id = ?");
 			$stmt_upd->bind_param("i", $comment_id);
