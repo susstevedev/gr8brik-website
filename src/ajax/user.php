@@ -574,26 +574,6 @@ class User {
         return "https://www.gravatar.com/avatar/" . $hash . "?" . http_build_query($params);
     }
 
-    public static function get_alert(?int $userId) {
-        $conn = Database::get(DB_NAME);
-
-        if(!isset($userId)) {
-            return 0;
-        }
-
-        $stmt = $conn->prepare("SELECT COUNT(*) as alert FROM notifications WHERE user = ? AND is_read = 0 AND category2 IS NOT NULL");
-        $stmt->bind_param("i", $userId);
-
-        if($stmt->execute()) {
-            $alert = $stmt->get_result()->fetch_assoc()['alert'] ?? 0;
-            $stmt->close();
-
-            return $alert;
-        }
-
-        return 0;
-    }
-
     public static function get_badges(User $usero) {
         $strings = "";
 
@@ -801,7 +781,7 @@ if(basename($_SERVER['PHP_SELF']) === "user.php") {
             'id' => $current_user->id,
             'pfp' => $current_user->picture_small,
             'user' => $current_user->username,
-            'alert' => User::get_alert($id),
+            'alert' => $current_user->alert,
             'is_verified' => empty($current_user->verify_token) ? true : false,
             'stats' => [
                 'followers' => $followers_count ?? 0,

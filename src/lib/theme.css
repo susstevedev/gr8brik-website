@@ -275,6 +275,7 @@ body.mode-dark .creation-page-meta {
 #comment-form #post {
     display: flex;
     position: relative;
+    border-radius: 6px;
 }
 
 #comment-form #post textarea[name='comment-box'] {

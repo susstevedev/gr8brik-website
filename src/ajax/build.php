@@ -586,14 +586,20 @@ function fetch_comments($model_id, $csrf) {
         $users = User::getUsers($userIds);
 
         if(loggedin()) {
-            $commentIds = array_map('intval', array_column($rows, 'id'));
-            $ids = implode(',', $commentIds);
-            $res = $conn->query("SELECT comment_id FROM comment_votes WHERE user_id = $id AND comment_id IN ($ids)");
+            //comment favs
+            //$commentIds = array_map('intval', array_column($rows, 'id'));
+            //$ids = implode(',', $commentIds);
+            //$res = $conn->query("SELECT comment_id FROM comment_votes WHERE user_id = $id AND comment_id IN ($ids)");
+            $stmtFavs = $conn->prepare("SELECT comment_id FROM comment_votes WHERE user_id = ? AND model_id = ?");
+            $stmtFavs->bind_param("ii", $id, $model_id);
+            $stmtFavs->execute();
+            $favsRes = $stmtFavs->get_result();
 
-            while ($fav = $res->fetch_assoc()) {
+            while ($fav = $favsRes->fetch_assoc()) {
                 $fav_ids[(int)$fav['comment_id']] = true;
             }
 
+            //user blocks
             $result = $conn2->query("
                 SELECT userid, profileid
                 FROM user_blocks
@@ -1000,16 +1006,34 @@ if (isset($_POST['comment_preview']) && isset($_POST['commentbox'])) {
     header('Content-Type: application/json');
 
     if ($_SESSION['csrf'] === $_POST['csrf_token']) {
-        if (loggedin()) {
+        if (loggedin() && isset($current_user)) {
             $comment_text = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
             $date = time();
 
-            echo json_encode(['success' => true, 'comment' => ['text' => Slimdown::render($comment_text), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
+            if(!empty($comment_text)) {
+                echo json_encode([
+                    'success' => true,
+                    'comment' => [
+                        'text' => Slimdown::render($comment_text),
+                        'edited_at' => time_ago(date('Y-m-d H:i:s', $date)),
+                        'favs' => rand(1, 25),
+                    ],
+                    'user' => [
+                        'id' => $current_user->id,
+                        'url' => '/user/' . $current_user->id,
+                        'name' => $current_user->username,
+                        'picture' => $current_user->profile->picture,
+                        'admin' => $current_user->admin,
+                    ],
+                ]);
+            } else {
+                echo json_encode(['success' => false, 'message' => ErrorRegistry::get('comment', 'too_short')]);
+            }
         } else {
-            echo json_encode(['success' => false, 'message' => 'Not logged in']);
+            echo json_encode(['success' => false, 'message' => ErrorRegistry::get('auth', 'unauthed')]);
         }
     } else {
-        echo json_encode(['success' => false, 'message' => 'Oops! Your CSRF token seems to be invalid.']);
+        echo json_encode(['success' => false, 'message' => ErrorRegistry::get('auth', 'bad_csrf')]);
     }
     exit;
 }

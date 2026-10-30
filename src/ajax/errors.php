@@ -23,6 +23,10 @@ class ErrorRegistry {
 		],
         'account_settings' => [
             'banner_upload_fail' => "Sorry, there was an error uploading your file.",
+            'email_change_failure' => 'An error occured while changing the email address',
+            'email_change_bad_format' => 'Email address is not valid',
+            'email_change_taken' => 'Email address is not avaliable',
+            'email_change_not_matching' => 'Old email address does not equal %s',
         ],
         'db' => [
             'generic' => 'An unknown error has occured. Please try again later.',

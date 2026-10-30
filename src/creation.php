@@ -364,12 +364,11 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                     <article class="comment-preview w3-rest gr8-theme w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
                         <header class="w3-padding-bottom">
                             <b>
-                                <a href="/@<?php echo urlencode($current_user->username) ?>" class="<?php echo $current_user->admin ? 'w3-text-red w3-hover-text-yellow' : ''; ?>"><?php echo $current_user->username ?></a>
+                                <a href="/@<?php echo urlencode($current_user->username) ?>" class="username <?php echo $current_user->admin ? 'w3-text-red w3-hover-text-yellow' : ''; ?>"><?php echo $current_user->username ?></a>
                             </b>
 
                             <span class="w3-mobile w3-right">
-                                <span class="date">1 minute ago</span>
-                                <span class="votes"><span class="count">0</span> favorites</span>
+                                <span class="date">1 minute ago</span> - <span class="votes"><span class="count">0</span> favorites</span>
                             </span>
                         </header>
 

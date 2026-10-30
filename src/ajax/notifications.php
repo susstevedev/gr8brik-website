@@ -28,7 +28,7 @@ class Notifications
 
         $result = $stmt->get_result();
         $notif = $this->db->prepare("INSERT INTO notifications (user, profile, timestamp, content, category2) VALUES (?, ?, ?, ?, ?)");
-        $alert = $this->db->prepare("UPDATE users SET alert = alert + 1 WHERE id = ? AND deactive IS NULL"); //legacy ass code
+        $alert = $this->db->prepare("UPDATE users SET alert = alert + 1 WHERE id = ? AND deactive IS NULL AND suspended = 0");
 
         $time = time();
 
@@ -174,7 +174,7 @@ class Notifications
 
         if ($result->num_rows !== 0) {
             if($notif_count > 0) {
-                $alertsql = "UPDATE users SET alert = 0 WHERE id = ?";
+                $alertsql = "UPDATE users SET alert = 0 WHERE id = ? AND deactive IS NULL AND suspended = 0";
                 $alertstmt = $this->db->prepare($alertsql);
                 $alertstmt->bind_param("i", $userId);
 
@@ -244,6 +244,7 @@ class Notifications
     public function toHTML($notifs) {
         global $current_user;
         $id = $current_user->id ?? 0;
+        $html = '';
 
         foreach ($notifs as $group_name => $group) {
             if(!is_array($group)) {
@@ -425,6 +426,7 @@ class Notifications
 
         <?php
         }
+        return $html;
     }
 }
 

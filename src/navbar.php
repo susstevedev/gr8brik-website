@@ -17,7 +17,7 @@
 
                 <span class='w3-red w3-tag w3-round'>
                     <?php
-                        $alert = User::get_alert($current_user->id);
+                        $alert = $current_user->alert;
                         if ($alert > 0) {
                             require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
                             echo Numbers::format($alert);

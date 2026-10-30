@@ -10,7 +10,7 @@
 
 <div class="gr8-theme w3-container w3-card-2 w3-light-grey w3-padding w3-border w3-border-grey w3-round-small w3-center">
     <?php
-        $alert = User::get_alert($current_user->id);
+        $alert = $current_user->alert;
         if($alert) { 
     ?>
 		<h2 class="w3-text-red"><?php echo number_format($alert) ?> notifications</h2>

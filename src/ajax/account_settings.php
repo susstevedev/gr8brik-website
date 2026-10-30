@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 
 $conn = Database::get(DB_NAME);
@@ -349,27 +350,26 @@ class AccountSettings {
         $conn = Database::get(DB_NAME);
 
         if(!loggedin()) {
-            header("HTTP/1.0 403 Forbidden");
-            return ['error' => 'Not authenticated, please sign in using traditional means', 'code' => '403', 'version' => 'NEW'];
+            return ['success' => false, 'error' => ErrorRegistry::get('auth', 'unauthed')];
         }
 
         $id = $current_user->id;
         $rand = bin2hex(random_bytes(32));
 
         if (!filter_var($new, FILTER_VALIDATE_EMAIL)) {
-            return ['error' => 'Invalid email address format'];
+            return ['success' => false, 'error' => ErrorRegistry::get('account_settings', 'email_change_bad_format')];
         }
 
         $isBanned = User::isBanned($new, 'email');
         if ($isBanned !== false) {
-            return ['error' => "Email address is not valid"];
+            return ['success' => false, 'error' => ErrorRegistry::get('account_settings', 'email_change_taken')];
         }
 
         $sql_check = "SELECT 1 FROM users WHERE email = '$new'";
         $stmt = mysqli_query($conn, $sql_check);
 
         if (mysqli_num_rows($stmt) > 0) {
-            return ['error' => "Email address is not avaliable"];
+            return ['success' => false, 'error' => ErrorRegistry::get('account_settings', 'email_change_taken')];
         }
 
         $sql = "SELECT email FROM users WHERE id = '$id' AND deactive IS NULL";
@@ -379,25 +379,24 @@ class AccountSettings {
         if($result->num_rows != 0) {
             if($row['email'] === $old) {
                 $sql2 = "UPDATE users SET email = '$new', verify_token = '$rand' WHERE id = '$id' AND deactive IS NULL";
-                $email = AccountManager::send_verify_email($rand, $new);
+                if(APP_FEATURES['SEND_OUTGOING_EMAILS']) {
+                    $email = AccountManager::send_verify_email($rand, $new);
 
-                if ($conn->query($sql2) === TRUE && $email) {
-                    header("HTTP/1.0 200 OK");
-                    return ['success' => 'Email address updated.'];
+                    if ($conn->query($sql2) === TRUE && $email) {
+                        header("HTTP/1.0 200 OK");
+                        return ['success' => 'Email address updated.'];
+                    } else {
+                        return ['success' => false, 'error' => ErrorRegistry::get('account_settings', 'email_change_failure')];
+                    }
                 } else {
-                    $error_message = "An error occured while changing the email address.";
-                    header("HTTP/1.0 500 Internal Server Error");
-                    return ['error' => $error_message];
+                    http_response_code(500);
+                    return ['success' => false, 'error' => ErrorRegistry::get('account_settings', 'email_change_failure')];
                 }
             } else {
-                $error_message = htmlspecialchars($row['email']) . " is not equal to " . htmlspecialchars($old) . ".";
-                header("HTTP/1.0 500 Internal Server Error");
-                return ['success' => false, 'error' => $error_message];
+                return ['success' => false, 'error' => ErrorRegistry::get('account_settings', 'email_change_not_matching', [htmlspecialchars($old)])];
             }
         } else {
-            $error_message = "Your account wasn't found";
-            header("HTTP/1.0 500 Internal Server Error");
-            return ['success' => false, 'error' => $error_message];
+            return ['success' => false, 'error' => ErrorRegistry::get('user', 'not_found')];
         }
     }
 

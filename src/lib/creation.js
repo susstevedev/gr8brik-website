@@ -4,7 +4,6 @@
             $.get("/ajax/config.php", {
                 get_csrf_token: true
             }, function (data) {
-                console.log(data);
                 $("#csrf_token").val(data.csrf_token);
                 window.csrf_token = data.csrf_token;
                 callback();
@@ -434,6 +433,8 @@
 
             if($.trim($(this).val()).length >= 500) {
                 $("#comment-form .comment-button").stop().addClass('w3-disabled');
+            } else {
+                $("#comment-form .comment-button").stop().removeClass('w3-disabled');
             }
         });
 
@@ -463,16 +464,23 @@
             var btn = $(this);
             var comment_box = $("#comment-form [name='comment-box']").val();
             var preview_selector = $('#comment-form .comment-preview .text');
-            var preview_date_selector = $('#comment-form .comment-preview .w3-right .date');
+            var preview_button = $('#comment-form .comment-preview');
+            var comment_button = $('#comment-form #post');
+
+            var preview_sels = {
+                'image': $('#comment-form #comment-profile-picture img'),
+                'user_name': $('#comment-form .comment-preview .username'),
+                'date': $('#comment-form .comment-preview .date'),
+                'favs': $('#comment-form .comment-preview .votes .count'),
+            };
 
             if(btn.hasClass('edit')) {
-                $('#comment-form #post').show();
-                $('#comment-form .comment-preview').hide();
+                comment_button.show();
+                preview_button.hide();
             } else if(btn.hasClass('preview') && !btn.hasClass('w3-disabled')) {
-                $('#comment-form #post').hide();
-
                 if($.trim(comment_box) === PREVIEW_TEXT) {
-                    $('#comment-form .comment-preview').show();
+                    preview_button.show();
+                    comment_button.hide();
                     return;
                 }
 
@@ -487,22 +495,23 @@
                         },
                         type: 'POST',
                         success: function(res) {
-                            if (res && res.success && res.comment) {
-                                preview_selector.html(res.comment.text);
-                                preview_date_selector.text(res.comment.edited_at);
-                                PREVIEW_TEXT = comment_box;
-                            } else if (res && res.message && !res.success) {
-                                showError(res.message);
-                            } else {
-                                showError("Couldn\'t load the preview");
+                            if(res) {
+                                if (res.success && res.comment) {
+                                    preview_selector.html(res.comment.text);
+                                    preview_sels.image.attr('src', res.user.picture);
+                                    preview_sels.user_name.html(res.user.name);
+                                    preview_sels.user_name.attr('href', res.user.url);
+                                    preview_sels.date.html(res.comment.edited_at);
+                                    preview_sels.favs.html(res.comment.favs);
+                                    PREVIEW_TEXT = comment_box;
+                                } else if (res.message && !res.success) {
+                                    showError(res.message);
+                                    preview_selector.html(comment_box);
+                                    PREVIEW_TEXT = comment_box;
+                                }
+                                preview_button.show();
+                                comment_button.hide();
                             }
-
-                            if(res && !res.success) {
-                                preview_selector.html(comment_box);
-                                PREVIEW_TEXT = comment_box;
-                            }
-
-                            $('#comment-form .comment-preview').show();
                         },
                         error: function(xhr, text, error) {
                             showError("Couldn\'t load the preview");

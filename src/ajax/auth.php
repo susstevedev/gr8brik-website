@@ -330,7 +330,9 @@ class AccountManager
 
         $insert = self::insert_user($conn, $token_raw, $username, $password, $email, $token_raw, null, null, null, null, null, null);
         if (isset($insert['id'])) {
-            self::send_verify_email($token_raw, $email, $username);
+            if(APP_FEATURES['SEND_OUTGOING_EMAILS']) {
+                self::send_verify_email($token_raw, $email, $username);
+            }
             return $this->login_final($conn, $insert, 1);
         } else {
             http_response_code(500);
@@ -410,7 +412,9 @@ class AccountManager
 
         $insert = self::insert_user($conn, $token_raw, $username, null, $email, $token_raw, $avatar, null, $github_id, $bio, $twitter, null);
         if (isset($insert['id'])) {
-            self::send_verify_email($token_raw, $email, $username);
+            if(APP_FEATURES['SEND_OUTGOING_EMAILS']) {
+                self::send_verify_email($token_raw, $email, $username);
+            }
             return $this->login_final($conn, $insert, 1);
         }
     }
@@ -485,7 +489,9 @@ class AccountManager
 
         $insert = self::insert_user($conn, $token_raw, $username, null, $email, $token_raw, $avatar, $google_id, null, null, null, null);
         if (isset($insert['id'])) {
-            self::send_verify_email($token_raw, $email, $username);
+            if(APP_FEATURES['SEND_OUTGOING_EMAILS']) {
+                self::send_verify_email($token_raw, $email, $username);
+            }
             return $this->login_final($conn, $insert, 1);
         }
     }
