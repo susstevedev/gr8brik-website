@@ -87,6 +87,14 @@ class ErrorRegistry {
             'user_blocked' => 'The creator of this Reply has blocked you.',
             'user_blocking' => 'You have blocked the creator of this Reply.',
         ],
+        'direct_message' => [
+            'not_found' => 'Group not found in database.',
+            'message_too_short' => 'Message shall contain text.',
+            'compose_users_empty' => 'No usernames provided.',
+            'compose_cannot_message_self' => 'You cannot message yourself.',
+            'compose_users_not_found' => 'One or more users were not found',
+            'delete_perms_missing' => 'No permission to delete this group.',
+        ],
     ];
 
     public static function get(string $type, string $code, ?array $placeholders = []): string {

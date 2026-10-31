@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
@@ -11,7 +12,7 @@ $conn = Database::get(DB_NAME);
 if (isset($_GET['group'])) {
     if(!loggedin() || !isset($current_user)) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => "Please login to continue."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'unauthed')]);
         exit;
     }
 
@@ -22,7 +23,7 @@ if (isset($_GET['group'])) {
         mg.group_name,
         mg.timestamp,
         GROUP_CONCAT(u.username SEPARATOR ', ') AS members,
-        GROUP_CONCAT(u.picture SEPARATOR ', ') AS member_pics
+        GROUP_CONCAT(p.picture SEPARATOR ', ') AS member_pics
     FROM message_group mg
     JOIN message_users me
         ON me.groupid = mg.id
@@ -35,6 +36,8 @@ if (isset($_GET['group'])) {
         ON u.id = mu.userid
         AND deactive IS NULL
         AND suspended = 0
+    JOIN user_profiles p
+        ON p.userid = mu.userid
     GROUP BY
         mg.id,
         mg.is_group,
@@ -61,7 +64,7 @@ if (isset($_GET['group'])) {
                 $group['picture'] = isset($member_pics[0]) ? $member_pics[0] : null;
             }
 
-            $group['joined'] = isset($row['timestamp']) ? 'Last messaged ' . time_ago($row['timestamp']) : null;
+            $group['joined'] = !empty($row['timestamp']) ? ('Last messaged ' . time_ago($row['timestamp'])) : null;
 
             $data[] = [
                 'success' => true,
@@ -84,7 +87,8 @@ if (isset($_GET['message'])) {
     $uadmin = $current_user->admin ?? false;
 
     if (empty($message)) {
-        echo json_encode(['success' => false, 'message' => 'Empty message ID']);
+        http_response_code(400);
+        echo json_encode(['success' => false]);
         exit;
     }
 
@@ -109,7 +113,7 @@ if (isset($_GET['message'])) {
     $group_res = $stmt->get_result();
 
     if ($group_res->num_rows === 0) {
-        echo json_encode(['success' => false, 'message' => 'Group not found in database.']);
+        echo json_encode(['success' => false, 'message' => ErrorRegistry::get('direct_message', 'not_found')]);
         exit;
     }
 
@@ -202,7 +206,7 @@ if (isset($_POST['comment'])) {
     header('Content-type: application/json');
     if(!loggedin() || !isset($current_user)) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => "Please login to continue."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'unauthed')]);
         exit;
     }
 
@@ -211,7 +215,7 @@ if (isset($_POST['comment'])) {
     $conn2 = Database::get(DB_NAME);
 
     if ($comment === "" || $comment === null || empty($comment)) {
-        echo json_encode(['success' => false, 'error' => "Message shall contain text."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('direct_message', 'message_too_short')]);
         exit;
     }
 
@@ -224,7 +228,7 @@ if (isset($_POST['comment'])) {
     $result = $stmt->get_result();
 
     if($result->num_rows === 0){
-        echo json_encode(['success' => false, 'error' => "Group not found in database."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('direct_message', 'not_found')]);
         exit;
     }
 
@@ -235,7 +239,7 @@ if (isset($_POST['comment'])) {
     $stmt2->bind_param("iisi", $id, $groupid, $comment, $date);
 
     if (!$stmt2->execute()) {
-        echo json_encode(['success' => false, 'error' => "An error has occured. Please try again later."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('db', 'query_fail')]);
         exit;
     } else {
         $stmt3 = $conn2->prepare("UPDATE message_group SET timestamp = NOW() WHERE id = ?");
@@ -258,7 +262,7 @@ if (isset($_POST['group_create'])) {
     header('Content-type: application/json');
     if(!loggedin() || !isset($current_user)) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => "Please login to continue."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'unauthed')]);
         exit;
     }
 
@@ -266,15 +270,15 @@ if (isset($_POST['group_create'])) {
     $comment = trim($_POST['commentbox'] ?? '');
 
     if ($comment === "") {
-        echo json_encode(['success' => false, 'error' => "Empty user field"]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('direct_message', 'compose_users_empty')]);
         exit;
     }
 
-    $usernames = array_filter(array_unique(array_map('trim', explode(',', $comment))));
+    $usernames = array_filter(array_unique(array_map('trim', explode(',', preg_replace('/^@/', '', $comment)))));
 
     foreach ($usernames as $username) {
         if (strcasecmp($username, $current_user->username) === 0) {
-            echo json_encode(['success' => false, 'error' => "You cannot message yourself"]);
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('direct_message', 'compose_cannot_message_self')]);
             exit;
         }
     }
@@ -293,7 +297,7 @@ if (isset($_POST['group_create'])) {
     }
 
     if (count($found_users) !== count($usernames)) {
-        echo json_encode(['success' => false, 'error' => "One or more users were not found"]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('direct_message', 'compose_users_not_found')]);
         exit;
     }
 
@@ -392,7 +396,7 @@ if (isset($_POST['group_create'])) {
 
     } catch (Exception $e) {
         $conn->rollback();
-        echo json_encode(['success' => false, 'error' => "An error occurred. Please try again later."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('db', 'query_failed')]);
         exit;
     }
 }
@@ -400,7 +404,7 @@ if (isset($_POST['group_create'])) {
 if(isset($_POST['group_delete'])) {
     if(!loggedin() || !isset($current_user)) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => "Please login to continue."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'unauthed')]);
         exit;
     }
 
@@ -414,7 +418,7 @@ if(isset($_POST['group_delete'])) {
     $exists_res = $exists_stmt->get_result();
 
     if($exists_res->num_rows === 0){
-        echo json_encode(['success' => false, 'error' => "Group not found in database."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('direct_message', 'not_found')]);
         exit;
     }
 
@@ -427,7 +431,7 @@ if(isset($_POST['group_delete'])) {
     $check_res = $check_stmt->get_result();
 
     if ($check_res->num_rows === 0) {
-        echo json_encode(['success' => false, 'error' => "No permission to delete this group."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('direct_message', 'delete_perms_missing')]);
         exit;
     }
 
@@ -436,7 +440,7 @@ if(isset($_POST['group_delete'])) {
     $delete_stmt->bind_param("i", $groupid);
 
     if (!$delete_stmt->execute()) {
-        echo json_encode(['success' => false, 'error' => "An error has occured. Please try again later."]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('db', 'query_fail')]);
         exit;
     } else {
         echo json_encode(['success' => true, 'groupid' => $groupid]);

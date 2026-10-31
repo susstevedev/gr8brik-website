@@ -463,11 +463,11 @@
             event.preventDefault();
             var btn = $(this);
             var comment_box = $("#comment-form [name='comment-box']").val();
-            var preview_selector = $('#comment-form .comment-preview .text');
             var preview_button = $('#comment-form .comment-preview');
             var comment_button = $('#comment-form #post');
 
             var preview_sels = {
+                'text': $('#comment-form .comment-preview .text'),
                 'image': $('#comment-form #comment-profile-picture img'),
                 'user_name': $('#comment-form .comment-preview .username'),
                 'date': $('#comment-form .comment-preview .date'),
@@ -497,7 +497,7 @@
                         success: function(res) {
                             if(res) {
                                 if (res.success && res.comment) {
-                                    preview_selector.html(res.comment.text);
+                                    preview_sels.text.html(res.comment.text);
                                     preview_sels.image.attr('src', res.user.picture);
                                     preview_sels.user_name.html(res.user.name);
                                     preview_sels.user_name.attr('href', res.user.url);
@@ -506,7 +506,7 @@
                                     PREVIEW_TEXT = comment_box;
                                 } else if (res.message && !res.success) {
                                     showError(res.message);
-                                    preview_selector.html(comment_box);
+                                    preview_sels.text.html(comment_box);
                                     PREVIEW_TEXT = comment_box;
                                 }
                                 preview_button.show();
