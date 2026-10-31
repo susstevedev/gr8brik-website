@@ -148,13 +148,15 @@ if (isset($_GET['message'])) {
         sender.id AS sender_id,
         sender.username AS sender_username,
         sender.deactive AS sender_inactive,
-        sender.picture AS sender_picture,
+        sender_profile.picture AS sender_picture,
         sender.age AS sender_age
     FROM direct_message dm
     LEFT JOIN users sender
         ON sender.id = dm.userid
         AND sender.deactive IS NULL
         AND sender.suspended = 0
+    LEFT JOIN user_profiles sender_profile
+        ON sender_profile.userid = dm.userid
     WHERE dm.groupid = ?
     ORDER BY dm.timestamp DESC";
 
@@ -184,6 +186,7 @@ if (isset($_GET['message'])) {
             'id' => $row['message_id'],
             'userID' => $row['sender_id'],
             'user' => htmlentities($username),
+            'picture' => $row['sender_picture'] ?? '/img/no_image.png',
             'url' => $url,
             'message' => $post,
             'color' => $p_color,
