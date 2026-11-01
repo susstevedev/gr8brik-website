@@ -24,13 +24,13 @@ class Formatter
     {
         try {
             //excape
-            $text = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-
-            //emoji
-            $text = Twemoji::text($text)->png()->toHtml();
+            $text = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
 
             //username
             $text = self::username($text, 'id');
+
+            //emoji
+            $text = Twemoji::text($text)->png()->toHtml();
 
             //markdown
             $text = Slimdown::render($text);
