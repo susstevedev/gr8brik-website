@@ -9,6 +9,7 @@ class ErrorRegistry {
         'auth' => [
             'unverified' => 'Please verify your account to continue this action.',
             'unauthed' => 'Please login to continue this action.',
+            'bad_auth' => 'You do not have permission to do this',
             'bad_csrf' => 'Your cross-site-request-forgery token seems to be invalid.',
 			'ip_ban' => 'Banned at %s, until %s',
         ],

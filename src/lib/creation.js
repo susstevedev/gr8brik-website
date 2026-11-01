@@ -676,7 +676,7 @@
                             }
 
                             container.find('.comment-body .text').html(response.comment.text).toggleClass('w3-hide');
-                            container.find('.edit-textarea').val(response.comment.text);
+                            container.find('.edit-textarea').val(response.comment.text_og);
                             container.find('.edit').toggleClass('w3-hide');
                         } else if(response.error) {
                             showError(response.error);

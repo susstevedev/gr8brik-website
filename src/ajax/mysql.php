@@ -19,6 +19,7 @@ class Database {
     private function __construct($dbname) {
 		try {
 			$this->conn = new mysqli($this->host, $this->user, $this->pass, $dbname);
+            $this->conn->set_charset("utf8mb4");
 		} catch(Exception $e) {
             error_log($e->getMessage());
 			?>

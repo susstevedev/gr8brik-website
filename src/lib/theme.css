@@ -313,6 +313,11 @@ body.mode-dark .creation-page-meta {
     max-width: 100%;
 }
 
+#data-comment-wrapper .comment .comment-body img.twemoji {
+    width: 50px;
+    height: 50px;
+}
+
 #data-comment-wrapper .comment .comment-body article {
     min-height: 75px;
 }

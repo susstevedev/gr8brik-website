@@ -8,6 +8,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/toMarkdown.php';
 //require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/Michelf/MarkdownExtra.inc.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
 $bbcode = new BBCode;
@@ -396,7 +397,8 @@ function fetch_build($model_id, $csrf) {
     $votes = $row2['likes'];
     $description_raw = $row2['description'];
     $decoded_description = $bbcode->toHTML($row2['description'], true, true);
-    $description_markdown = Slimdown::render(htmlspecialchars($row2['description']));
+    //$description_markdown = Slimdown::render(htmlspecialchars($row2['description']));
+    $description_markdown = Formatter::render($row2['description']);
     $name = htmlentities($row2['name'] ?? 'Untited creation');
 
 	$usero = User::getUser($userid);
@@ -645,7 +647,7 @@ function fetch_comments($model_id, $csrf) {
         $comment_votes = Numbers::format($row['votes']);
 
         $comment_og = htmlspecialchars($row['comment']);
-        $comment_md = Slimdown::render($comment_og);
+        $comment_md = Formatter::render($comment_og);
 
 		$c_user_id = (int)$row['user'] ?? 0;
         $userRow = $users[$c_user_id] ?? [];
@@ -886,7 +888,7 @@ if(isset($_POST['comment'])) {
 
 	$date = time();
     $is_op = $id === $userid ? 1 : 0;
-    $comment = UserProfile::Screennameify($comment);
+    $comment = Formatter::prepare($comment);
 
     $sql = "INSERT INTO comments (user, model, comment, parent, date, is_op) VALUES (?, ?, ?, ?, ?, ?) LIMIT 1";
     $stmt2 = $conn->prepare($sql);
@@ -930,7 +932,7 @@ if(isset($_POST['comment'])) {
             'comment' => [
                 'id' => $last_id,
                 //'text' => MarkdownExtra::defaultTransform($comment),
-                'text' => Slimdown::render(htmlspecialchars($comment)),
+                'text' => Formatter::render($comment),
                 'text_og' => htmlspecialchars($comment),
                 'parent' => $parent,
                 'date' => time_ago(date('Y-m-d H:i:s', $date)),
@@ -965,7 +967,7 @@ if (isset($_POST['edit_comment'])) {
             $date = time();
 
             if(!empty($comment_id) || !empty($comment_text)) {
-                $comment_text = UserProfile::Screennameify($comment_text);
+                $comment_text = Formatter::prepare($comment_text);
 
                 $sql = "SELECT id, hidden, user, model FROM comments WHERE id = ?";
                 $stmt = $conn->prepare($sql);
@@ -980,24 +982,31 @@ if (isset($_POST['edit_comment'])) {
                         $stmt2->bind_param("ssi", $comment_text, $date, $comment_id);
 
                         if ($stmt2->execute()) {
-                            echo json_encode(['success' => 'Comment edited', 'comment' => ['text' => Slimdown::render($comment_text), 'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0))]]);
+                            echo json_encode([
+                                'success' => true,
+                                'comment' => [
+                                    'text' => Formatter::render($comment_text),
+                                    'text_og' => $comment_text,
+                                    'edited_at' => time_ago(date('Y-m-d H:i:s', is_numeric($date) ? $date : 0)),
+                                ],
+                            ]);
                         } else {
-                            echo json_encode(['error' => 'Error editing comment']);
+                            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('db', 'query_fail')]);
                         }
                     } else {
-                        echo json_encode(['error' => 'An authentication error has occured']);
+                        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'bad_auth')]);
                     }
                 } else {
-                    echo json_encode(['error' => 'Comment not found']);
+                    echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'not_found')]);
                 }
             } else {
-                echo json_encode(['error' => 'No comment Id or comment text provided']);
+                echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'bad_id')]);
             }
         } else {
-            echo json_encode(['error' => 'Not logged in']);
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'unauthed')]);
         }
     } else {
-        echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'bad_csrf')]);
     }
     exit;
 }
@@ -1014,7 +1023,7 @@ if (isset($_POST['comment_preview']) && isset($_POST['commentbox'])) {
                 echo json_encode([
                     'success' => true,
                     'comment' => [
-                        'text' => Slimdown::render($comment_text),
+                        'text' => Formatter::render(Formatter::prepare($comment_text)),
                         'edited_at' => time_ago(date('Y-m-d H:i:s', $date)),
                         'favs' => rand(1, 25),
                     ],
