@@ -318,6 +318,10 @@ body.mode-dark .creation-page-meta {
     height: 50px;
 }
 
+#data-comment-wrapper .comment .comment-body a.user-mention {
+    color: #0077ff;
+}
+
 #data-comment-wrapper .comment .comment-body article {
     min-height: 75px;
 }

@@ -507,9 +507,9 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                     <p class="comment-error w3-text-grey"><i class="fa fa-info-circle" aria-hidden="true"></i> <i>This comment has been removed</i></p>
                                 <?php } ?>
 
-                                <span class="text">
+                                <div class="text">
                                     <?php echo $comment['comment_md'] ?? '<p><i>This comment has been removed</i></p>' ?>
-                                </span>
+                                </div>
 
                                 <?php if ($loggedin && $comment['actions']['edit']) { ?>
                                     <form class="edit w3-hide">
@@ -634,7 +634,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </span>
                         </header>
 
-                        <span class="text"></span>
+                        <div class="text"></div>
 
                         <form class="edit w3-hide">
                             <textarea class="edit-textarea"></textarea><br />

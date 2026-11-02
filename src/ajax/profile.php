@@ -386,6 +386,7 @@ class UserProfile {
             'success' => true,
             'userid' => $profile_id,
             'username' => htmlspecialchars($usero->username ?? ''),
+            'url' => '/@' . urlencode($usero->username),
             'admin' => (string)$usero->admin,
             'description' => isset($usero->profile->description) ? Slimdown::render($usero->profile->description) : '',
             'badge' => $usero->profile->verified_badge ?? false,
