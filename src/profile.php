@@ -427,8 +427,6 @@ if(isset($_POST['unban-submit'])) {
                     </div>
                 </template>
             </div>
-            <!--<br /><button class="back-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button>
-            <button class="foward-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Foward</button>-->
             <button class="foward-button w3-btn w3-large w3-block w3-light-grey w3-border">LOAD MORE</button>
         </div>
 

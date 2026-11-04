@@ -265,12 +265,11 @@ if (isset($_GET['feature_v3'])) {
 
                 foreach($rows as $row) {
                     $model_id = $row['id'];
-                    $userid = $row['user'];
-                    //$user = User::getUser($userid);
+                    $userid = $row['user'] ?? null;
                     $user = $users[$userid] ?? null;
 
                     if (empty($row['name'])) {
-                        $row['name'] = ($user->username ?? '') . "'s creation";
+                        $row['name'] = ($user->username ?? 'User') . "'s creation";
                     }
 
                     $truncatedName = (mb_strlen($row['name']) > 30) ? mb_substr($row['name'], 0, 30) . '...' : $row['name'];
@@ -278,24 +277,25 @@ if (isset($_GET['feature_v3'])) {
 
                 <!-- new ui because old one got boring -->
                 <div class="w3-col l4 m6 s12 w3-margin-bottom">
-                    <div class="gr8-theme w3-card-2 w3-light-grey w3-padding creation-card">
+                    <div class="gr8-theme w3-card-2 w3-light-grey w3-padding creation-card w3-padding w3-round">
                         <a href="/build/<?php echo $row['id']; ?>" class="creation-link">
-                            <img src="<?php echo !empty($row['screenshot']) ? $row['screenshot'] : '/img/no_image.png'; ?>" loading="lazy" class="cre-image w3-hover-opacity w3-card-2 w3-grey creation-thumbnail" alt="<?php echo htmlspecialchars($row['name']); ?>">
+                            <img src="<?php echo !empty($row['screenshot']) ? $row['screenshot'] : '/img/no_image.png'; ?>" loading="lazy" class="cre-image w3-hover-opacity w3-card-2 w3-grey w3-round w3-border w3-border-light-grey creation-thumbnail" alt="<?php echo htmlspecialchars($row['name']); ?>">
                             <h4 class="creation-title"><?php echo htmlspecialchars($truncatedName); ?></h4>
                         </a>
                         <div class="creation-meta">
                             <span class="meta-author">
-                                <?php if ($user) { ?>
-                                    By <a href="/@<?php echo rawurlencode($user->username); ?>"><b><?php echo $user->username; ?></b></a>
-                                <?php } else { ?>
+                                <?php if (!$user) { ?>
                                     By <i>Deleted User</i>
+                                <?php } else { ?>
+                                    By <a class="<?php echo $user->admin ? 'w3-text-red' : null ?>" href="/@<?php echo rawurlencode($user->username); ?>"><i class="fa fa-at" aria-hidden="true"></i><?php echo $user->username; ?></a>
                                 <?php } ?>
                                 on <?php echo date("d M Y", strtotime($row['date'])); ?>
                             </span>
 
                             <div class="meta-stats">
-                                <span><i class="fa fa-eye"></i> <?php echo Numbers::format($row['views']); ?> views</span> •
-                                <span><i class="fa fa-star"></i> <?php echo Numbers::format($row['likes']); ?> favorites</span>
+                                <span class="views"><i class="fa fa-eye"></i> <?php echo Numbers::format($row['views']); ?> views</span> •
+                                <span class="favs"><i class="fa fa-star"></i> <?php echo Numbers::format($row['likes']); ?> favorites</span> •
+                                <span class="comments"><i class="fa fa-comments"></i> <?php echo Numbers::format($row['replies']); ?> comments</span>
                                 <span class="w3-right"><?php echo Numbers::filesize($row['size']); ?></span>
                             </div>
                         </div>
