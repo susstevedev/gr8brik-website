@@ -527,6 +527,54 @@
             $("#attach-upload #imagefile").click();
         });
 
+        /*$(document).on("change", ".attach-upload", function (event) {
+            event.preventDefault();
+
+            var btn = $(this);
+            var btntext = btn.closest('.attach-btn .btn-text');
+            var prevbtntext = btntext.html();
+
+            var comment_box = btn.closest(".attach-container");
+
+            var file_data = btn.find('[name="imagefile"]').prop('files')[0];
+            var form_data = new FormData();
+
+            if(!comment_box || btn.hasClass('w3-disabled')) {
+                return;
+            }
+
+            form_data.append('imagefile', file_data);
+            form_data.append('upload', 'true');
+
+            btntext.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
+            btn.prop("disabled", true);
+
+            $.ajax({
+                url: "../ajax/image",
+                dataType: 'json',
+                contentType: false,
+                processData: false,
+                data: form_data,
+                type: 'POST',
+                success: function(res) {
+                    btntext.html(prevbtntext);
+                    btn.prop("disabled", false);
+
+                    if (res && res.success && res.image && res.image.markdown) {
+                        comment_box.val(comment_box.val() + ($.trim(comment_box.val()).length === 0 ? "" : "\n") + res.image.markdown);
+                    } else if (res && res.message && !res.success) {
+                        showError(res.message);
+                    }
+                },
+                error: function(xhr, text, error) {
+                    btntext.html(prevbtntext);
+                    btn.prop("disabled", false);
+
+                    showError(text + error);
+                }
+            });
+        });*/
+
         $(document).on("change", "#attach-upload #imagefile", function (event) {
             event.preventDefault();
 
@@ -644,6 +692,7 @@
 
             container.find('.comment-body .edit').toggleClass('w3-hide');
             container.find('.comment-body .text').toggleClass('w3-hide');
+            container.find('.edit')[0].reset();
         });
 
         $(document).on('click', '.save-btn', function(event) {
@@ -726,8 +775,8 @@
 
             fetchCSRFToken(function () {
                 const replyBox = $('#reply-box-' + parent).val();
-                const prevText = $("#comment-btn-text").html();
-                const commentText = $("#comment-btn-text");
+                const commentText = $(".post-reply .btn-text");
+                const prevText = commentText.html();
                 const csrf = window.csrf_token;
 
                 if(!replyBox) {
@@ -737,19 +786,17 @@
                 commentText.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
                 btn.prop("disabled", true);
 
-                const data = {
-                    comment: true,
-                    buildId: embed_model,
-                    commentbox: replyBox,
-                    parent: parent,
-                    csrf_token: csrf
-                }
-
                 $.ajax({
                     url: "/ajax/build",
                     method: "POST",
                     dataType: 'json',
-                    data: data,
+                    data: {
+                        comment: true,
+                        buildId: embed_model,
+                        commentbox: replyBox,
+                        parent: parent,
+                        csrf_token: csrf
+                    },
                     success: function (response) {
                         if (response.success) {
                             commentText.html(prevText);
@@ -768,13 +815,18 @@
                             showError(response.error);
                         }
                     },
-                    error: (xhr, text, err) => {
+                    error: function(xhr, text, err) {
                         commentText.html(prevText);
                         console.error("error:", text, err, xhr);
                     },
                 });
             });
         });
+
+        /*$(document).on("click", ".reply-attach-image", function (event) {
+            event.preventDefault();
+            $(".attach-upload[data-type='reply'] input[name='imagefile']").click();
+        });*/
 
         var USER_MENTIONS = [];
 

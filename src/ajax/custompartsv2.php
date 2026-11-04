@@ -27,7 +27,7 @@
 
             $id = $current_user->id ?? 0;
 
-            if(!isset($current_user) || User::isDeleted($id)) {
+            if(!$current_user) {
                 return ['success' => false, 'message' => "Invalid login."];
             }
 
@@ -154,7 +154,7 @@
                 $userid = $row['userid'];
                 $usero = User::getUser($userid);
 
-                if(!isset($usero) || User::isDeleted($userid)) {
+                if(!$usero) {
                     return ['success' => false, 'message' => "Invalid user for custom part."];
                 }
 
@@ -253,7 +253,7 @@
         $token = $current_user->verify_token ?? null;
         $parts_arr = [];
 
-        if(User::isDeleted($id)) {
+        if(!User::exists($current_user ?? null)) {
             echo json_encode(['error' => true, 'code' => "INV_LOGIN"]); //invalid login
             exit;
         }
@@ -262,26 +262,6 @@
             echo json_encode(['error' => true, 'code' => "USR_NOT_VERIFY"]); //invalid login
             exit;
         }
-
-        /*$parts_stmt = $cooldb->prepare("SELECT id, name, part, reference, attachment_id FROM parts WHERE userid = ? ORDER BY id DESC");
-        $parts_stmt->bind_param("i", $id);
-        $parts_stmt->execute();
-        $parts = $parts_stmt->get_result();
-
-        while ($row = $parts->fetch_assoc()) {
-            $attachment_id = $row['attachment_id'] ?? null;
-
-            $attach_stmt = $membership_db->prepare("SELECT url FROM attachments WHERE id = ? AND is_deleted = 0");
-            $attach_stmt->bind_param("i", $attachment_id);
-            $attach_stmt->execute();
-            $attach_res = $attach_stmt->get_result();
-            $attachment = $attach_res->fetch_assoc();
-
-            if($attachment) {
-                $res = array_merge($row, $attachment);
-                $parts_arr[] = $res;
-            }
-        }*/
 
         $query = "
             SELECT p.id, p.name, p.part, p.reference, p.attachment_id, p.thumbnail, p.color, a.url 

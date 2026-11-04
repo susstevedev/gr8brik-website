@@ -464,7 +464,7 @@ class UserInteractions {
             ];
         }
 
-        if(User::isDeleted($profile_id)) {
+        if(!($profile_id)) {
             $error = ErrorRegistry::get('user', 'not_found');
             return [
                 'success' => false,
@@ -538,7 +538,7 @@ class UserInteractions {
             ];
         }
 
-        if(User::isDeleted($profile_id)) {
+        if(!$profile_id) {
             $error = ErrorRegistry::get('user', 'not_found');;
             return [
                 'success' => false,
@@ -601,7 +601,7 @@ class UserInteractions {
             ];
         }
 
-        if(User::isDeleted($profile_id)) {
+        if(!$profile_id) {
             $error = ErrorRegistry::get('auth', 'unverified');
             return [
                 'success' => false,
@@ -684,7 +684,7 @@ class UserInteractions {
             ];
         }
 
-        if(User::isDeleted($profile_id)) {
+        if(!$profile_id) {
             $error = ErrorRegistry::get('user', 'not_found');
             return [
                 'success' => false,
@@ -777,7 +777,7 @@ class UserAdmin {
             ];
         }
 
-        if(User::isDeleted($profile_id)) {
+        if(!$profile_id) {
             $error = "No user found";
             return [
                 'success' => false,
@@ -859,7 +859,7 @@ class UserAdmin {
             ];
         }
 
-        if(User::isDeleted($profile_id)) {
+        if(!$profile_id) {
             $error = "No user found";
             return [
                 'success' => false,

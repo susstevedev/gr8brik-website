@@ -136,6 +136,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
         });
     </script>
     <script type="text/javascript" src="/lib/creation.js"></script>
+    <script type="text/javascript" src="/lib/attachment.js"></script>
 </head>
 
 <body class="w3-light-blue w3-container">
@@ -603,11 +604,22 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 
         <template id="reply-box">
             <div id="reply-form-container-" class="w3-margin reply-form-box">
-                <div class="w3-right w3-block">
-                    <textarea name="reply-box" id="reply-box-" class="reply-box w3-input w3-border w3-border-blue w3-hover-shadow" placeholder="Add a reply... (@username mentions someone, Markdown supported)" rows="2"></textarea>
-                    <button data-parent="" class="post-reply w3-right w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
-                        <span class="comment-btn-text"><i class="fa fa-reply" aria-hidden="true"></i> Post reply</span>
-                    </button>
+                <form data-type="reply" class="attach-upload w3-hide" method="post" action="">
+                    <input type="file" name="imagefile">
+                </form>
+
+                <div class="w3-right w3-threequarter">
+                    <textarea name="reply-box" id="reply-box-" class="reply-box attach-container w3-input w3-round w3-border w3-border-blue w3-hover-shadow" placeholder="Add a reply... (@username mentions someone, Markdown supported)" rows="2"></textarea>
+
+                    <span class="w3-right">
+                        <button data-parent="" class="post-reply w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
+                            <span class="btn-text"><i class="fa fa-reply" aria-hidden="true"></i> Post reply</span>
+                        </button>
+
+                        <button data-feature="attach-image" data-file-selector=".attach-upload[data-type='reply'] input[name='imagefile']" data-textarea=".attach-container" class="reply-attach-image attach-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">
+                            <span class="btn-text"><i class="fa fa-image" aria-hidden="true"></i> Add attachment</span>
+                        </button>
+                    </span>
                 </div>
             </div>
         </template>

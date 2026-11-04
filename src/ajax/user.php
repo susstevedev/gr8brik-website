@@ -175,6 +175,30 @@ class User {
     }
 
     /**
+     * New method to check exitance of a User in the Database
+     * Replaces ::isDeleted
+     */
+    public static function exists(?User $usero) {
+        $conn = Database::get(DB_NAME);
+
+        if (!$usero) {
+            return false;
+        }
+
+        $stmt = $conn->prepare("SELECT deactive FROM users WHERE id = ?");
+        $stmt->bind_param("i", $usero->id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if (empty($row) || !empty($row['deactive']) || $row['deactive'] !== null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Check if a users profile is private
      */
     public static function isPrivate(?int $id): bool {
