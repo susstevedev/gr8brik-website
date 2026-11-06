@@ -170,7 +170,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
             <div class="w3-container">
                 <span onclick="$('#delete-model').hide();" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
                 <form id="deleteModelForm">
-                    <h2>Are you sure you want to <?php echo $data['is_removed'] ? 'Restore' : 'Delete'; ?> this creation?</h2>
+                    <h2>Are you sure you want to <?php echo $data['is_removed'] ? 'restore' : 'remove'; ?> this creation?</h2>
 
                     <input type="hidden" name="model_id" value="<?php echo $model_id; ?>">
                     <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf']; ?>">
@@ -265,19 +265,6 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <?php } ?>
 
                 <div class="w3-right">
-					<?php /* if ($data['can_edit']) { ?>
-						<div class="w3-dropdown-click" style="z-index: 999;">
-							<div class="tooltip">
-								<span class="w3-tag w3-blue tooltiptext">Download this model's screenshot and json file</span>
-								<button onclick="dropdown('dropdown-download')" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo"><i class="fa fa-download" aria-hidden="true"></i> Download</button>
-							</div>
-							<div id="dropdown-download" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
-								<a id="data-gr8-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['model'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['user']['name']) ?>.<?php echo substr(strrchr($data['model'], '.'), 1) ?>">Creation file</a>
-								<a id="data-webp-download" class="w3-bar-item w3-btn w3-hover-blue w3-border" href="<?php echo $data['screenshot'] ?>" download="<?php echo htmlspecialchars($data['name']) ?> by <?php echo htmlspecialchars($data['user']['name']) ?>.<?php echo substr(strrchr($data['screenshot'], '.'), 1) ?>">Thumbnail file</a>
-							</div>
-						</div>
-					<?php } */ ?>
-
                     <?php if ($loggedin) { ?>
                         <?php if ($data['voted'] === true) { ?>
                             <div class="tooltip" id="data-unlike-creation">
@@ -308,15 +295,6 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 							</div>
 						</div>
 
-                        <?php if ($is_admin) { ?>
-                            <div class="tooltip" id="data-delete-model">
-                                <span class="w3-tag w3-blue tooltiptext"><?php echo $data['is_removed'] ? 'Restore' : 'Delete'; ?> this creation as an admin</span>
-                                <button onclick='document.getElementById("delete-model").style.display="block"' name="delete" class="w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink" />
-                                <i class="fa fa-trash" aria-hidden="true"></i> <?php echo $data['is_removed'] ? 'Restore' : 'Delete'; ?>
-                                </button>
-                            </div>
-                        <?php } ?>
-
                         <?php if ($data['can_edit']) { ?>
                             <div class="tooltip" id="data-edit-model">
                                 <span class="w3-tag w3-blue tooltiptext">Edit this creation</span>
@@ -328,12 +306,21 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </div>
                         <?php } ?>
 
-                        <div class="tooltip" id="data-report-model">
-                            <span class="w3-tag w3-blue tooltiptext">Report this creation to moderators</span>
-                            <button data-id="<?php echo $_GET['id'] ?>" id="report-creation-button"  name="flag" class="w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink" />
-                            <i class="fa fa-flag" aria-hidden="true"></i> Report
-                            </button>&nbsp;
-                        </div>
+                        <?php if ($is_admin) { ?>
+                            <div class="tooltip" id="data-delete-model">
+                                <span class="w3-tag w3-blue tooltiptext"><?php echo $data['is_removed'] ? 'Restore' : 'Remove'; ?> this creation as an admin</span>
+                                <button onclick='document.getElementById("delete-model").style.display="block"' name="delete" class="w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink" />
+                                <i class="fa fa-trash" aria-hidden="true"></i> <?php echo $data['is_removed'] ? 'Restore' : 'Remove'; ?>
+                                </button>
+                            </div>
+                        <?php } else { ?>
+                            <div class="tooltip" id="data-report-model">
+                                <span class="w3-tag w3-blue tooltiptext">Report this creation to moderators</span>
+                                <button data-id="<?php echo $_GET['id'] ?>" id="report-creation-button"  name="flag" class="w3-btn w3-red w3-hover-opacity w3-padding-small w3-border w3-border-pink" />
+                                <i class="fa fa-flag" aria-hidden="true"></i> Report
+                                </button>
+                            </div>
+                        <?php } ?>
                     <?php } ?>
                 </div>
                 <p><span class="w3-large">Embed:</span></p>
@@ -358,8 +345,10 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
                     </div>
 
-                    <div id="post" class="w3-rest">
-                        <textarea name="comment-box" id="comment-box" class="w3-input w3-col s12" placeholder="Add a comment... (@username mentions someone, Markdown supported)"></textarea>
+                    <div id="post" class="w3-threequarter">
+                        <div class="w3-block">
+                            <textarea name="comment-box" id="comment-box" class="w3-input w3-round w3-hover-shadow w3-border w3-border-blue" placeholder="Add a comment... (@username mentions someone, Markdown supported)" required></textarea>
+                        </div>
                     </div>
 
                     <article class="comment-preview w3-rest gr8-theme w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
@@ -377,18 +366,18 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                     </article>
 
                     <div class="w3-col s12 w3-margin-top">
-                        <button id="post-comment" class="comment-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
+                        <button id="post-comment" type="submit" class="comment-button w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">
                             <span id="comment-btn-text"><i class="fa fa-paper-plane-o" aria-hidden="true"></i> Post comment</span>
                         </button>
 
-                        <button id="attach-image" class="comment-button w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">
+                        <button id="attach-image" data-feature="attach-image" data-file-selector=".attach-upload[data-type='comment'] input[name='imagefile']" data-textarea="#comment-box" class="comment-button w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">
                             <span id="attach-image-btn-text"><i class="fa fa-image" aria-hidden="true"></i> Add attachment</span>
                         </button>
                     </div>
                 </div>
 
-                <form id="attach-upload" method="post" action="">
-                    <input type="file" name="imagefile" id="imagefile">
+                <form class="attach-upload w3-hide" data-type="comment" method="post" action="">
+                    <input type="file" name="imagefile">
                 </form>
             <?php } else if($loggedin && isset($current_user) && $current_user->verify_token !== null) { ?>
                 <div class="gr8-theme w3-card-2 w3-light-grey w3-border w3-padding" style="width:65%">
@@ -616,11 +605,47 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             <span class="btn-text"><i class="fa fa-reply" aria-hidden="true"></i> Post reply</span>
                         </button>
 
-                        <button data-feature="attach-image" data-file-selector=".attach-upload[data-type='reply'] input[name='imagefile']" data-textarea=".attach-container" class="reply-attach-image attach-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">
+                        <button data-feature="attach-image" data-file-selector=".attach-upload[data-type='reply'] input[name='imagefile']" data-textarea=".reply-box" class="reply-attach-image attach-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">
                             <span class="btn-text"><i class="fa fa-image" aria-hidden="true"></i> Add attachment</span>
                         </button>
                     </span>
                 </div>
+            </div>
+        </template>
+
+        <template id="comment-formatting-toolbar">
+            <div class="formatting-toolbar w3-bar w3-margin-top w3-light-grey w3-round w3-padding w3-border w3-border-grey">
+                <button class="w3-bar-item w3-btn w3-white w3-hover-opacity w3-padding-small w3-border w3-border-grey" data-format="bold" title="Bold">
+                    <i class="fa fa-bold" aria-hidden="true"></i>
+                </button>
+
+                <button class="w3-bar-item w3-btn w3-white w3-hover-opacity w3-padding-small w3-border w3-border-grey" data-format="italic" title="Italic">
+                    <i class="fa fa-italic" aria-hidden="true"></i>
+                </button>
+
+                <button class="w3-bar-item w3-btn w3-white w3-hover-opacity w3-padding-small w3-border w3-border-grey" data-format="del" title="Strikethrough">
+                    <i class="fa fa-strikethrough" aria-hidden="true"></i>
+                </button>
+
+                <button class="w3-bar-item w3-btn w3-white w3-hover-opacity w3-padding-small w3-border w3-border-grey" data-format="url" title="Hyperlink">
+                    <i class="fa fa-globe" aria-hidden="true"></i>
+                </button>
+
+                <button class="w3-bar-item w3-btn w3-white w3-hover-opacity w3-padding-small w3-border w3-border-grey" data-format="img" title="Image">
+                    <i class="fa fa-picture-o" aria-hidden="true"></i>
+                </button>
+
+                <button class="w3-bar-item w3-btn w3-white w3-hover-opacity w3-padding-small w3-border w3-border-grey" data-format="head1" title="Header size 1">
+                    <i class="fa fa-header" aria-hidden="true">1</i>
+                </button>
+
+                <button class="w3-bar-item w3-btn w3-white w3-hover-opacity w3-padding-small w3-border w3-border-grey" data-format="head2" title="Header size 2">
+                    <i class="fa fa-header" aria-hidden="true">2</i>
+                </button>
+
+                <button class="w3-bar-item w3-btn w3-white w3-hover-opacity w3-padding-small w3-border w3-border-grey" data-format="head3" title="Header size 3">
+                    <i class="fa fa-header" aria-hidden="true">3</i>
+                </button>
             </div>
         </template>
 
@@ -671,7 +696,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </div>
 
                             <div class="tooltip" id="data-report-comment">
-                                <span class="w3-blue tooltiptext">Delete this comment</span>
+                                <span class="w3-blue tooltiptext">Remove this comment</span>
                                 <button id="delete-comment-button" name="delete-comment" class="fa fa-trash w3-btn w3-red w3-hover-opacity w3-padding-small w3-round"></button>
                             </div>
                         </div>

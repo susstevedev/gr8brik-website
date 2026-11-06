@@ -4,7 +4,7 @@ $(document).on("click", "[data-feature='attach-image']", function (event) {
     var attach_btn = $(this);
     var upload_sel = attach_btn.attr('data-file-selector');
     var textarea_sel = attach_btn.attr('data-textarea');
-    var textarea = attach_btn.closest(textarea_sel);
+    var textarea = $(textarea_sel);
 
     console.log(textarea);
 

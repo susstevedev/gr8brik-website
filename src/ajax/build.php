@@ -788,7 +788,6 @@ if(isset($_GET['comments'])) {
 }
 
 if(isset($_POST['comment'])) {
-    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
     header('Content-Type: application/json');
 
     $comment = isset($_POST['commentbox']) ? $_POST['commentbox'] : 0;
@@ -797,29 +796,29 @@ if(isset($_POST['comment'])) {
     $model_id = $_POST['buildId'];
 
     if (!valid_csrf($csrf)) {
-        echo json_encode(['error' => ErrorRegistry::get('auth', 'bad_csrf')]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'bad_csrf')]);
         exit;
     }
 
     if(!loggedin() || !isset($current_user)) {
-        echo json_encode(['error' => ErrorRegistry::get('comment', 'unauthed')]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'unauthed')]);
         exit;
     }
 
     $id = $current_user->id ?? 0;
 
     if($current_user->verify_token != NULL) {
-        echo json_encode(['error' => ErrorRegistry::get('comment', 'unverified')]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'unverified')]);
         exit;
     }
 
     if(strlen($comment) > 500) {
-        echo json_encode(['error' => ErrorRegistry::get('comment', 'too_long')]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'too_long')]);
         exit;
     }
 
     if(empty($comment)) {
-        echo json_encode(['error' => ErrorRegistry::get('comment', 'too_short')]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'too_short')]);
         exit;
     }
 
@@ -829,7 +828,7 @@ if(isset($_POST['comment'])) {
     $result = $stmt4->get_result();
 
     if($result->num_rows === 0) {
-        echo json_encode(['error' => ErrorRegistry::get('creation', 'not_found')]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('creation', 'not_found')]);
         exit;
     }
 
@@ -844,10 +843,10 @@ if(isset($_POST['comment'])) {
         $row = $result->fetch_assoc();
 
         if($row['userid'] === $id && $row['profileid'] === $userid) {
-            echo json_encode(['error' => ErrorRegistry::get('creation', 'user_blocked')]);
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('creation', 'user_blocked')]);
             exit;
         } else if($row['profileid'] === $id && $row['userid'] === $userid) {
-            echo json_encode(['error' => ErrorRegistry::get('creation', 'user_blocking')]);
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('creation', 'user_blocking')]);
             exit;
         }
     }
@@ -859,7 +858,7 @@ if(isset($_POST['comment'])) {
         $result = $stmt_reply->get_result();
 
         if($result->num_rows === 0) {
-            echo json_encode(['error' => ErrorRegistry::get('creation', 'reply_not_found')]);
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('creation', 'reply_not_found')]);
             exit;
         }
 
@@ -874,13 +873,13 @@ if(isset($_POST['comment'])) {
             $row = $result->fetch_assoc();
 
             if($row['userid'] === $id && $row['profileid'] === $c_user) {
-                echo json_encode(['error' => 'You have blocked the user you are trying to reply to.']);
+                echo json_encode(['success' => false, 'error' => 'You have blocked the user you are trying to reply to.']);
                 exit;
             } else if($row['profileid'] === $id && $row['userid'] === $c_user) {
-                echo json_encode(['error' => 'The person you are trying to reply to has you blocked.']);
+                echo json_encode(['success' => false, 'error' => 'The person you are trying to reply to has you blocked.']);
                 exit;
             } else {
-                echo json_encode(['error' => 'You or the user you are replying to have blocked one or the other.']);
+                echo json_encode(['success' => false, 'error' => 'You or the user you are replying to have blocked one or the other.']);
                 exit;
             }
         }
@@ -926,18 +925,18 @@ if(isset($_POST['comment'])) {
         }
 
         echo json_encode([
-            'success' => 'Comment sent.',
-            'id' => $last_id,
-            'userid' => $id,
+            'success' => true,
+            'message' => 'Comment sent!',
             'comment' => [
                 'id' => $last_id,
-                //'text' => MarkdownExtra::defaultTransform($comment),
                 'text' => Formatter::render($comment),
                 'text_og' => htmlspecialchars($comment),
                 'parent' => $parent,
                 'date' => time_ago(date('Y-m-d H:i:s', $date)),
-                'replies' => $reply_count,
                 'favs' => $favs_count
+            ],
+            'thread' => [
+                'replies' => $reply_count,
             ],
             'user' => [
                 'id' => $id,
@@ -950,7 +949,7 @@ if(isset($_POST['comment'])) {
         exit;
     } else {
         $stmt2->close();
-        echo json_encode(['error' => ErrorRegistry::get('comment', 'generic')]);
+        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'generic')]);
         exit;
     }
 }
