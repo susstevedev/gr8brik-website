@@ -1,7 +1,5 @@
 <?php
 
-//use Michelf\MarkdownExtra;
-
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
@@ -9,8 +7,6 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/const/toMarkdown.php';
-//require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/Michelf/MarkdownExtra.inc.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
 $bbcode = new BBCode;
 
 $conn = Database::get(DB_NAME2);
@@ -73,8 +69,8 @@ if (isset($_POST['save_build_v2'])) {
         exit;
     }
 
-    $desc = $_POST['desc'] ?: '';
-    $name = $_POST['name'] ?: "Untitled Creation";
+    $desc = Formatter::prepare($_POST['desc'] ?: '');
+    $name = Formatter::prepare($_POST['name'] ?: "Untitled Creation");
     $name_trim = preg_replace('/[^A-Za-z0-9]/', '_', $name);
     $modelJson = $_POST['creation'] ?: null;
     $visible = $_POST['visibility'] ?: null;
@@ -397,9 +393,8 @@ function fetch_build($model_id, $csrf) {
     $votes = $row2['likes'];
     $description_raw = $row2['description'];
     $decoded_description = $bbcode->toHTML($row2['description'], true, true);
-    //$description_markdown = Slimdown::render(htmlspecialchars($row2['description']));
     $description_markdown = Formatter::render($row2['description']);
-    $name = htmlentities($row2['name'] ?? 'Untited creation');
+    $name = Formatter::render($row2['name'] ?? 'Untited creation');
 
 	$usero = User::getUser($userid);
     $user_exists = true;
@@ -493,7 +488,7 @@ function fetch_build($model_id, $csrf) {
     }
     $Tag_stmt->close();
 
-    $soft_message = isset($soft_message) ? Slimdown::render($soft_message) : null;
+    $soft_message = isset($soft_message) ? Formatter::render($soft_message) : null;
     http_response_code(200);
     $data = [
         'success' => true,
@@ -812,6 +807,20 @@ if(isset($_POST['comment'])) {
         exit;
     }
 
+    if(!isset($_SESSION['comment'])) {
+        $_SESSION['comment'] = [];
+    }
+
+    if(isset($_SESSION['comment']['last_time'])) {
+        $lt = $_SESSION['comment']['last_time'];
+        $cd = 120;
+        if((time() - $lt) < $cd) {
+            $remaining = $cd - (time() - $lt);
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'cooldown_active', [$remaining])]);
+            exit;
+        }
+    }
+
     if(strlen($comment) > 500) {
         echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'too_long')]);
         exit;
@@ -895,6 +904,10 @@ if(isset($_POST['comment'])) {
 
     if ($stmt2->execute()) {
         $last_id = $conn->insert_id;
+        $_SESSION['comment']['last_id'] = $last_id;
+        $_SESSION['comment']['last_user'] = $current_user->username ?? '';
+        $_SESSION['comment']['last_content'] = $comment;
+        $_SESSION['comment']['last_time'] = $date;
         $stmt2->close();
 
         $stmtCountUpd = $conn->prepare("UPDATE model SET replies = replies + 1 WHERE id = ?");

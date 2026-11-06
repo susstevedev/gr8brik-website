@@ -203,7 +203,7 @@ if(isset($_POST['unban-submit'])) {
         <?php } ?>
 
         <span class="w3-large">
-            <img id="picture" width="75px" height="75px" class="w3-round" src="<?php echo $data['picture'] ?? '/img/no_image.png' ?>" />
+            <img id="picture" width="75px" height="75px" class="w3-card w3-grey w3-round w3-border w3-border-grey" src="<?php echo $data['picture'] ?? '/img/no_image.png' ?>" />
             <span id="username" class="<?php echo $data['admin'] ? "w3-text-red" : null ?> w3-padding-small w3-xlarge"><i class="fa fa-at" aria-hidden="true"></i><?php echo $data['username'] ?></span>
 
             <?php if($data['is_private']) { ?>
