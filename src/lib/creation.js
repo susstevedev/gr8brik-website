@@ -21,7 +21,7 @@
             $('#ajax-success').text(text).slideDown('fast').delay(5000).slideUp('fast');
         }
 
-        $(document).on("click", "#report-comment-button", function () {
+        $(document).on("click", "#report-comment-button", function (event) {
             event.preventDefault();
             var $parent = $(this).closest('.comment');
             var comment_id = $parent.attr('data-testid');
@@ -59,16 +59,17 @@
                                 showError(response.error);
                             }
                         },
-                        error: function () {
+                        error: function(xhr, text, error) {
                             $("#report-comment").hide();
-                            showError("An error occurred. Please try again later.");
+                            console.error(xhr, text, error);
+                            showError(error);
                         }
                     });
                 });
             });
         });
 
-        $(document).on("click", "#report-creation-button", function () {
+        $(document).on("click", "#report-creation-button", function (event) {
             event.preventDefault();
             let creation_id = $(this).data("id");
 
@@ -105,16 +106,17 @@
                                 showError(response.error);
                             }
                         },
-                        error: function () {
+                        error: function(xhr, text, error) {
                             $("#report-comment").hide();
-                            showError("An error occurred. Please try again later.");
+                            console.error(xhr, text, error);
+                            showError(error);
                         }
                     });
                 });
             });
         });
 
-        $(document).on("click", "#delete-comment-button", function () {
+        $(document).on("click", "#delete-comment-button", function (event) {
             event.preventDefault();
             $('#delete-comment').show();
             var $parent = $(this).closest('.comment');
@@ -160,9 +162,10 @@
                                 showError(response.error);
                             }
                         },
-                        error: function () {
+                        error: function(xhr, text, error) {
                             $("#delete-comment").hide();
-                            showError("An error occurred. Please try again later.");
+                            console.error(xhr, text, error);
+                            showError(error);
                         }
                     });
                 });
@@ -185,8 +188,9 @@
                             showError(response.error);
                         }
                     },
-                    error: function () {
-                        showError("An error occurred. Please try again later.");
+                    error: function(xhr, text, error) {
+                        console.error(xhr, text, error);
+                        showError(error);
                     }
                 });
             });
@@ -346,18 +350,17 @@
                     if (response.success) {
                         $parent.find(".votes .count").text(response.count);
 						if(btn.hasClass('upvote-btn')) {
-							btn.replaceWith(`<button data-id="${comment_id}" class="downvote-btn fa fa-star w3-btn w3-pink w3-hover-opacity w3-round w3-padding-small"></button>`);
+                            btn.removeClass('upvote-btn fa fa-star-o w3-yellow').addClass('downvote-btn fa fa-star w3-pink');
 						} else if(btn.hasClass('downvote-btn')) {
-							btn.replaceWith(`<button data-id="${comment_id}" class="upvote-btn fa fa-star-o w3-btn w3-yellow w3-hover-opacity w3-round w3-padding-small"></button>`);
+                            btn.removeClass('downvote-btn fa fa-star w3-pink').addClass('upvote-btn fa fa-star-o w3-yellow');
 						}
                     } else if (response.error) {
                         showError(response.error);
                     }
                 },
-                error: (jqXHR, textStatus, errorThrown) => {
-                    console.error("error:", textStatus, errorThrown, jqXHR);
-                    const response = JSON.parse(jqXHR.responseText);
-                    showError(response.error);
+                error: function(xhr, text, error) {
+                    console.error(xhr, text, error);
+                    showError(error);
                 }
             });
         });
@@ -679,8 +682,9 @@
                         }
                     },
                     error: function(xhr, text, err) {
-                        commentText.html(prevText);
-                        console.error("error:", text, err, xhr);
+                        commentBtnText.html(prevText);
+                        console.error(xhr, text, err);
+                        showError(err);
                     },
                 });
             });
@@ -732,7 +736,11 @@
                         } else if(response.error) {
                             showError(response.error);
                         }
-                    }
+                    },
+                    error: function(xhr, text, err) {
+                        console.error(xhr, text, err);
+                        showError(err);
+                    },
                 });
             });
         });
@@ -769,63 +777,6 @@
                 formatting_init('#reply-box-' + comment);
             }
         });
-
-        /*$(document).on("click", ".post-reply", function (event) {
-            event.preventDefault();
-            const btn = $(this);
-            const parent = btn.attr('data-parent');
-            const $parent_elm = $(this).closest('.comment');
-            const depth = parseInt($parent_elm.attr('data-level')) + 1;
-
-            fetchCSRFToken(function () {
-                const replyBox = $('#reply-box-' + parent).val();
-                const commentText = $(".post-reply .btn-text");
-                const prevText = commentText.html();
-                const csrf = window.csrf_token;
-
-                if(!replyBox) {
-                    return;
-                }
-
-                commentText.html('<img src="/img/loading.gif" style="width: 20px; height: 20px;" />');
-                btn.prop("disabled", true);
-
-                $.ajax({
-                    url: "/ajax/build",
-                    method: "POST",
-                    dataType: 'json',
-                    data: {
-                        comment: true,
-                        buildId: embed_model,
-                        commentbox: replyBox,
-                        parent: parent,
-                        csrf_token: csrf
-                    },
-                    success: function (response) {
-                        if (response.success) {
-                            commentText.html(prevText);
-                            btn.prop("disabled", false);
-
-                            if (response.comment) {
-                                renderComment($parent_elm, response, depth);
-                                window.mode();
-                                $parent_elm.find('#reply-form-container-' + parent).remove();
-                            } else {
-                                window.location.reload();
-                            }
-                        } else if (response.error) {
-                            commentText.html(prevText);
-                            btn.prop("disabled", false);
-                            showError(response.error);
-                        }
-                    },
-                    error: function(xhr, text, err) {
-                        commentText.html(prevText);
-                        console.error("error:", text, err, xhr);
-                    },
-                });
-            });
-        });*/
 
         var USER_MENTIONS = [];
 

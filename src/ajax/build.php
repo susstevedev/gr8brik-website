@@ -338,7 +338,6 @@ function fetch_build($model_id, $csrf) {
     global $current_user;
     global $conn;
     global $conn2;
-    global $bbcode;
 
     if (empty($csrf) || !valid_csrf($csrf)) {
         return json_encode(["success" => false, "message" => ErrorRegistry::get('auth', 'bad_csrf')]);
@@ -392,9 +391,8 @@ function fetch_build($model_id, $csrf) {
     $views = $row2['views'];
     $votes = $row2['likes'];
     $description_raw = $row2['description'];
-    $decoded_description = $bbcode->toHTML($row2['description'], true, true);
     $description_markdown = Formatter::render($row2['description']);
-    $name = Formatter::render($row2['name'] ?? 'Untited creation');
+    $name = htmlentities($row2['name'] ?? 'Untited creation');
 
 	$usero = User::getUser($userid);
     $user_exists = true;
@@ -502,7 +500,6 @@ function fetch_build($model_id, $csrf) {
         ],
         'modelid' => $model_id,
         'model' => $row2['model'],
-        'description' => $decoded_description,
         'description_raw' => $description_raw,
         'description_markdown' => $description_markdown,
         'tags' => $model_tags,
@@ -539,11 +536,9 @@ if(isset($_GET['fetch'])) {
 }
 
 function fetch_comments($model_id, $csrf) {
-	require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
     global $conn;
     global $conn2;
     global $current_user;
-    global $bbcode;
 
     if (empty($csrf) || !valid_csrf($csrf)) {
         return json_encode(["error" => ErrorRegistry::get('auth', 'bad_csrf')]);
@@ -569,6 +564,7 @@ function fetch_comments($model_id, $csrf) {
     $rows = [];
     $comments = [];
 	$tree = [];
+    $lookup = [];
     $fav_ids = [];
 
     $blocked = [];
@@ -584,9 +580,6 @@ function fetch_comments($model_id, $csrf) {
 
         if(loggedin()) {
             //comment favs
-            //$commentIds = array_map('intval', array_column($rows, 'id'));
-            //$ids = implode(',', $commentIds);
-            //$res = $conn->query("SELECT comment_id FROM comment_votes WHERE user_id = $id AND comment_id IN ($ids)");
             $stmtFavs = $conn->prepare("SELECT comment_id FROM comment_votes WHERE user_id = ? AND model_id = ?");
             $stmtFavs->bind_param("ii", $id, $model_id);
             $stmtFavs->execute();
@@ -597,12 +590,12 @@ function fetch_comments($model_id, $csrf) {
             }
 
             //user blocks
-            $result = $conn2->query("
-                SELECT userid, profileid
+            $result = $conn2->query(
+                "SELECT userid, profileid
                 FROM user_blocks
                 WHERE userid = $id
-                OR profileid = $id
-            ");
+                OR profileid = $id"
+            );
 
             while ($row = $result->fetch_assoc()) {
                 $userid = (int)$row['userid'];
@@ -618,9 +611,7 @@ function fetch_comments($model_id, $csrf) {
             }
         }
 
-        foreach ($users as $c_user) {
-            $c_user_id = (int)$c_user->id ?? 0;
-
+        foreach ($users as $c_user_id => $c_user) {
 			if(!empty($c_user->profile)) {
 				if($c_user->profile->private_profile && !User::isFollowing($c_user_id) && $c_user_id !== $id) {
 					$privated[$c_user_id] = true;
@@ -640,7 +631,6 @@ function fetch_comments($model_id, $csrf) {
 
         $comment_id = $row['id'];
         $comment_votes = Numbers::format($row['votes']);
-
         $comment_og = htmlspecialchars($row['comment']);
         $comment_md = Formatter::render($comment_og);
 
@@ -662,7 +652,6 @@ function fetch_comments($model_id, $csrf) {
 
         //c_user_blablabla got annoying
         $c_user_data = [
-            'id' => $c_user_id ?? 0,
             'name' => $userRow->username ?? '[deleted]',
             'admin' => $userRow->admin ?? false,
             'is_op' => $row['is_op'] ?? 0,
@@ -705,18 +694,15 @@ function fetch_comments($model_id, $csrf) {
             if ($c_user_data['you_blocked'] && $c_user_data['they_blocked']) {
                 $c_user_data['removed'] = true;
 				$c_user_data['picture'] = null;
-                //$message = "You blocked @" . $c_user_data['username'] . ", and they blocked you. Their comments and profile will not be visible.";
                 $message = ErrorRegistry::get('comment', 'user_blocked_blocking');
 
 				$actions['reply'] = false;
 				$actions['fav'] = false;
             } elseif ($c_user_data['you_blocked']) {
-                //$message = "You blocked @" . $c_user_data['username'] . ". Your comments and profile will not be visible to them.";
                 $message = ErrorRegistry::get('comment', 'user_blocking');
             } elseif ($c_user_data['they_blocked']) {
                 $c_user_data['removed'] = true;
 				$c_user_data['picture'] = null;
-                //$message = "You're blocked from @" . $c_user_data['username'] . ". Their comments and profile will not be visible.";
                 $message = ErrorRegistry::get('comment', 'user_blocked');
 
 				$actions['reply'] = false;
@@ -747,19 +733,19 @@ function fetch_comments($model_id, $csrf) {
             'conversation_subbed' => $notifications->get_subscribers('comment_reply', $comment_id),
 			'actions' => $actions,
         ];
+        $lookup[$comment_id] = $comments[$comment_id];
         $message = null;
     }
 
-	//ampersands are needed; DO NOT REMOVE THEM!
-	foreach ($rows as $row) {
-		if (!$row['parent'] || !isset($comments[$row['parent']])) {
-			if(isset($comments[$row['id']])) {
-				$tree[$row['id']] = &$comments[$row['id']];
-			}
-		} elseif (isset($comments[$row['parent']])) {
-			$comments[$row['parent']]['children'][$row['id']] = &$comments[$row['id']];
-		}
-	}
+    foreach ($lookup as $id => $comment) {
+        if (!$comment['parent']) {
+            $tree[$id] = &$lookup[$id];
+        } else {
+            if (isset($lookup[$comment['parent']])) {
+                $lookup[$comment['parent']]['children'][] = &$lookup[$id];
+            }
+        }
+    }
 
     $comResult->free();
     return json_encode($tree); 
@@ -811,8 +797,12 @@ if(isset($_POST['comment'])) {
         $_SESSION['comment'] = [];
     }
 
-    if(isset($_SESSION['comment']['last_time'])) {
-        $lt = $_SESSION['comment']['last_time'];
+    if(!isset($_SESSION['comment']['last'])) {
+        $_SESSION['comment']['last'] = [];
+    }
+
+    if(isset($_SESSION['comment']['last']['time'])) {
+        $lt = $_SESSION['comment']['last']['time'];
         $cd = 120;
         if((time() - $lt) < $cd) {
             $remaining = $cd - (time() - $lt);
@@ -904,10 +894,8 @@ if(isset($_POST['comment'])) {
 
     if ($stmt2->execute()) {
         $last_id = $conn->insert_id;
-        $_SESSION['comment']['last_id'] = $last_id;
-        $_SESSION['comment']['last_user'] = $current_user->username ?? '';
-        $_SESSION['comment']['last_content'] = $comment;
-        $_SESSION['comment']['last_time'] = $date;
+        $_SESSION['comment']['last']['id'] = $last_id;
+        $_SESSION['comment']['last']['time'] = $date;
         $stmt2->close();
 
         $stmtCountUpd = $conn->prepare("UPDATE model SET replies = replies + 1 WHERE id = ?");
@@ -915,17 +903,20 @@ if(isset($_POST['comment'])) {
         $stmtCountUpd->execute();
         $stmtCountUpd->close();
 
-        $stmtCountGet = $conn->prepare("SELECT replies FROM model WHERE id = ? AND removed = 0");
-        $stmtCountGet->bind_param("i", $model_id);
+        $stmtCountGet = $conn->prepare(
+            "SELECT m.replies, c.votes
+            FROM model m
+            INNER JOIN comments c ON c.id = ?
+            WHERE m.id = ?
+            AND m.removed = 0
+            AND c.hidden = 0"
+        );
+
+        $stmtCountGet->bind_param("ii", $last_id, $model_id);
         $stmtCountGet->execute();
         $result = $stmtCountGet->get_result();
-        $reply_count = $result->fetch_assoc()['replies'];
-
-        $stmtFavsGet = $conn->prepare("SELECT votes FROM comments WHERE id = ? AND hidden = 0");
-        $stmtFavsGet->bind_param("i", $last_id);
-        $stmtFavsGet->execute();
-        $result = $stmtFavsGet->get_result();
-        $favs_count = $result->fetch_assoc()['votes']; //the rare case that someone favorites a comment right after publish. it is (technically) possible.
+        $reply_count = $result->fetch_assoc()['replies'] ?? 0;
+        $favs_count = $result->fetch_assoc()['votes'] ?? 0; //the rare case that someone favorites a comment right after publish. it is (technically) possible.
 
         $notifications = new Notifications($conn2);
         $notifications->subscribe($id, 'comment', $model_id);
@@ -944,12 +935,16 @@ if(isset($_POST['comment'])) {
                 'id' => $last_id,
                 'text' => Formatter::render($comment),
                 'text_og' => htmlspecialchars($comment),
+                'model' => $model_id,
                 'parent' => $parent,
                 'date' => time_ago(date('Y-m-d H:i:s', $date)),
                 'favs' => $favs_count
             ],
             'thread' => [
                 'replies' => $reply_count,
+                'creation' => [
+                    'comments' => json_decode(fetch_comments($model_id, $_SESSION['csrf']), true),
+                ],
             ],
             'user' => [
                 'id' => $id,
@@ -968,7 +963,6 @@ if(isset($_POST['comment'])) {
 }
 
 if (isset($_POST['edit_comment'])) {
-    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
     header('Content-Type: application/json');
 
     if ($_SESSION['csrf'] === $_POST['csrf_token']) {
@@ -1028,14 +1022,14 @@ if (isset($_POST['comment_preview']) && isset($_POST['commentbox'])) {
 
     if ($_SESSION['csrf'] === $_POST['csrf_token']) {
         if (loggedin() && isset($current_user)) {
-            $comment_text = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
+            $comment_text = isset($_POST['commentbox']) ? Formatter::prepare($_POST['commentbox']) : null;
             $date = time();
 
             if(!empty($comment_text)) {
                 echo json_encode([
                     'success' => true,
                     'comment' => [
-                        'text' => Formatter::render(Formatter::prepare($comment_text)),
+                        'text' => Formatter::render($comment_text),
                         'edited_at' => time_ago(date('Y-m-d H:i:s', $date)),
                         'favs' => rand(1, 25),
                     ],
@@ -1366,9 +1360,7 @@ if (loggedin() && isset($current_user)) {
 			}
 			$stmt->close();
 			exit;
-		}
-
-		if (isset($_POST['unfav'])) {
+		} else if (isset($_POST['unfav'])) {
 			$alr_stmt = $conn->prepare("SELECT COUNT(*) as vote_count FROM comment_votes WHERE comment_id = ? AND user_id = ?");
 			$alr_stmt->bind_param("ii", $comment_id, $id);
 
@@ -1408,10 +1400,10 @@ if (loggedin() && isset($current_user)) {
 			}
 			$stmt->close();
 			exit;
-		}
-
-		echo json_encode(['success' => false, 'error' => ErrorRegistry::get('db', 'query_fail')]);
-		exit;
+		} else {
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('db', 'query_fail')]);
+		    exit;
+        }
 	}
 }
 ?>

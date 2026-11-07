@@ -67,11 +67,11 @@ if(isset($data)) {
             // white people be like yeah i don't update my servers json i just do it when requested
             if(isset($raw_array['metadata'])) {
                 if(isset($raw_array['metadata']['name'])) {
-                    $raw_array['metadata']['name'] = $cdata['name'];
+                    $raw_array['metadata']['name'] = $cdata['name'] ?? null;
                 }
 
                 if(isset($raw_array['metadata']['description'])) {
-                    $raw_array['metadata']['description'] = $cdata['description'];
+                    $raw_array['metadata']['description'] = $cdata['description_raw'] ?? null;
                 }
 
                 if(isset($raw_array['metadata']['generator'])) {
