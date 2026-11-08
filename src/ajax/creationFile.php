@@ -79,6 +79,11 @@ if(isset($data)) {
                 }
             }
 
+            $raw_array['resource'] = [
+                'id' => $model_id,
+                'url' => $cdata['model'],
+            ];
+
             $_SESSION['viewer_auth'] = uuid();
             echo json_encode($raw_array);
             exit;

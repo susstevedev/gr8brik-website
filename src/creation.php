@@ -420,6 +420,10 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
         $comment_data = json_decode(fetch_comments($model_id, $_SESSION['csrf']), true);
 
         if ($comment_data && is_array($comment_data)) {
+            if(isset($comment_data['error'])) {
+                echo $comment_data['error'];
+            }
+
             if(isset($_GET['depth']) && isset($_GET['parent'])) {
                 ?>
                     You are viewing the replies of a comment.<br />
@@ -444,9 +448,13 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
 			}
 
             function comment_tree(array $grouped_comments, $parent_id, $depth = 0) {
-                global $current_user, $loggedin;
+                global $loggedin;
 
                 foreach ($grouped_comments as $comment) {
+                    if(!is_array($comment)) {
+                        continue;
+                    }
+
                     $indentation = $depth * 25;
                     ?>
                     <div id="comment<?php echo $comment['id'] ?>" data-testid="<?php echo $comment['id'] ?>" data-level="<?php echo $depth ?>" data-parent="<?php echo $comment['parent'] ?>" class="comment w3-row w3-section" style="margin-left: <?php echo $indentation; ?>px;">
@@ -475,11 +483,12 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                         <div id="comment-text" class="comment-body w3-col" style="width: <?php echo max(40, 60 - ($depth * 2)); ?>%;">
                             <article class="<?php echo $comment['votes'] >= 100 ? 'w3-orange' : 'gr8-theme w3-light-grey' ?> w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
                                 <header class="w3-padding-bottom">
-                                    <b>
+                                    <b class="<?php echo $comment['user']['admin'] ? 'w3-text-red' : null ?>">
                                         <?php if (!$comment['user']['removed']) { ?>
-                                            <a href="/@<?php echo urlencode($comment['user']['name']) ?>" class="<?php echo $comment['user']['admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>">
+                                            <a href="/@<?php echo urlencode($comment['user']['name']) ?>" class="user-mention" data-username="<?php echo $comment['user']['name'] ?>">
                                         <?php } ?>
                                         <?php echo $comment['user']['name'] ?>
+                                        <?php echo $comment['user']['verified'] ? "<i class='fa fa-check-circle w3-text-blue' title='This user has been verified as offical & trusted' aria-hidden='true'></i>" : null ?>
                                         <?php if (!$comment['user']['removed']) { ?>
                                             </a>
                                         <?php } ?>
@@ -494,7 +503,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 </header>
 
                                 <?php if(!empty($comment['is_hidden'])) { ?>
-                                    <p class="comment-error w3-text-grey"><i class="fa fa-info-circle" aria-hidden="true"></i> <i>This comment has been removed</i></p>
+                                    <p class="comment-error w3-text-grey"><i>This comment has been removed</i></p>
                                 <?php } ?>
 
                                 <div class="text">

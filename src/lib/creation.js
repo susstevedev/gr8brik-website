@@ -783,21 +783,15 @@
         $(".user-mention").on("mouseover", function (event) {
             event.preventDefault();
             var mention = $(this);
-            var username = mention.attr('data-username');
+            var userid = mention.attr('data-userid');
             var active = mention.attr('data-active') ? true : false;
 
-            if(!username) {
+            if(!userid || active) {
                 return;
             }
 
-            if(active) {
-                $('.mention-details').remove();
-                mention.attr('data-active', null);
-                return;
-            }
-
-            if(USER_MENTIONS[username]) {
-                success(USER_MENTIONS[username], mention);
+            if(USER_MENTIONS[userid]) {
+                success(USER_MENTIONS[userid], mention);
             } else {
                 $.ajax({
                     url: "/ajax/profile",
@@ -805,7 +799,7 @@
                     dataType: 'json',
                     data: {
                         profile: true,
-                        actorName: username,
+                        actorId: userid,
                     },
                     success: function (response) {
                         if (response.success) {
@@ -825,19 +819,40 @@
                 $(`<div class="mention-details-error w3-red w3-padding w3-margin-bottom w3-round w3-border w3-border-pink" style="display:none">
                     <h3>${err.title}</h3>
                     <h4>${err.message}</h4>
-                </div>`).insertAfter(mention).slideToggle('fast').delay(2500).slideToggle('fast');
+                </div>`).insertAfter(mention).slideToggle('fast').delay(5000).slideToggle('fast');
             }
 
             function success(response, mention) {
                 mention.attr('data-active', true);
-                USER_MENTIONS[username] = response;
+                USER_MENTIONS[userid] = response;
 
-                $(`<div class="mention-details w3-card-2 w3-light-grey w3-round w3-padding-small w3-border w3-border-grey" style="display:none">
+                $(`<div class="mention-details w3-card-2 w3-light-grey w3-round w3-padding-small w3-border w3-border-grey" data-userid="${userid}" style="display:none">
                     <img width="50px" height="50px" class="w3-round" src="${response.picture}">
                     <a href="${response.url}" class="w3-padding-small ${response.admin ? 'w3-text-red' : null}"><i class="fa fa-at" aria-hidden="true"></i>${response.username}</a>
+                    ${response.badge ? "<i class='fa fa-check-circle w3-text-blue w3-padding-small' aria-hidden='true'></i>" : '' }
                     <span>${response.stats.followers} followers • ${response.stats.following} following</span>
                     <p>Member since ${response.age}</p>
                 </div>`).insertAfter(mention).fadeIn('fast');
+
+                $(".mention-details, .user-mention").on("mouseleave", function (event) {
+                    event.preventDefault();
+
+                    var next = event.relatedTarget || event.originalEvent.toElement;
+                    var userid = $(this).attr('data-userid');
+                    var popover = $(`.mention-details[data-userid=${userid}]`);
+                    var mention = $(`.user-mention[data-userid=${userid}]`);
+                    var active = mention.attr('data-active') ? true : false;
+
+                    console.log(next);
+
+                    if(active && $(next).hasClass('mention-details') || active && $(next).hasClass('user-mention')) {
+                        return;
+                    }
+
+                    popover.remove();
+                    mention.attr('data-active', null);
+                    return;
+                });
             }
         });
     });

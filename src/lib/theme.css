@@ -271,6 +271,14 @@ body.mode-dark .creation-page-meta {
     display:none;
 }
 
+a.user-mention {
+    text-decoration: none;
+}
+
+a.user-mention:hover {
+    text-decoration: underline;
+}
+
 /* creations page comments and related */
 #comment-form #post textarea[name='comment-box'] {
     height: 60px;
@@ -304,7 +312,7 @@ body.mode-dark .creation-page-meta {
     height: 50px;
 }
 
-#data-comment-wrapper .comment .comment-body a.user-mention {
+#data-comment-wrapper .comment .comment-body .text a.user-mention {
     color: #0077ff;
 }
 

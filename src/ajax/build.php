@@ -562,7 +562,6 @@ function fetch_comments($model_id, $csrf) {
 
     $comResult = $conn->query($sql);
     $rows = [];
-    $comments = [];
 	$tree = [];
     $lookup = [];
     $fav_ids = [];
@@ -654,6 +653,7 @@ function fetch_comments($model_id, $csrf) {
         $c_user_data = [
             'name' => $userRow->username ?? '[deleted]',
             'admin' => $userRow->admin ?? false,
+            'verified' => $userRow->profile->verified_badge ?? false,
             'is_op' => $row['is_op'] ?? 0,
             'picture' => $userRow->profile->picture_small ?? '/img/no_image.png',
             'banned' => $userRow->suspended ?? false,
@@ -710,13 +710,14 @@ function fetch_comments($model_id, $csrf) {
             }
         }
 
-        $comments[$comment_id] = [
+        $lookup[$comment_id] = [
             'message' => $message ?? null,
             'id' => $comment_id,
 			'user' => [
 				'id' => $c_user_id,
 				'removed' => $c_user_data['removed'],
 				'admin' => $c_user_data['admin'],
+                'verified' => $c_user_data['verified'],
 				'name' => $c_user_data['name'],
 				'is_op' => $c_user_data['is_op'],
 				'picture' => $c_user_data['picture'],
@@ -733,7 +734,6 @@ function fetch_comments($model_id, $csrf) {
             'conversation_subbed' => $notifications->get_subscribers('comment_reply', $comment_id),
 			'actions' => $actions,
         ];
-        $lookup[$comment_id] = $comments[$comment_id];
         $message = null;
     }
 
@@ -857,7 +857,7 @@ if(isset($_POST['comment'])) {
         $result = $stmt_reply->get_result();
 
         if($result->num_rows === 0) {
-            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('creation', 'reply_not_found')]);
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'reply_not_found')]);
             exit;
         }
 
@@ -975,7 +975,7 @@ if (isset($_POST['edit_comment'])) {
             if(!empty($comment_id) || !empty($comment_text)) {
                 $comment_text = Formatter::prepare($comment_text);
 
-                $sql = "SELECT id, hidden, user, model FROM comments WHERE id = ?";
+                $sql = "SELECT id, hidden, user, model FROM comments WHERE id = ? AND hidden = 0";
                 $stmt = $conn->prepare($sql);
                 $stmt->bind_param("i", $comment_id);
                 $stmt->execute();

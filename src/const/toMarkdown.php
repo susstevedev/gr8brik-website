@@ -66,7 +66,7 @@ class Formatter
                 $regex = '/userid:([0-9]+)/';
                 $sql = 'SELECT id, username FROM users WHERE id';
                 //$formatted_str = '[**@%s**](/user/%s)';
-                $formatted_str = '<a href="/user/%s" class="user-mention" data-username="%s">@%s</a>';
+                $formatted_str = '<a href="/user/%s" class="user-mention" data-userid="%s">@%s</a>';
                 break;
             case 'name':
                 $regex = '/@([a-zA-Z0-9_]+)/';
@@ -94,7 +94,7 @@ class Formatter
                     if (isset($map[$match[1]])) {
                         $row = $map[$match[1]];
                         //$fill = ($type === 'id') ? [$row['username'], $row['id']] : [$row['id']];
-                        $fill = ($type === 'id') ? [$row['id'], $row['username'], $row['username']] : [$row['id']];
+                        $fill = ($type === 'id') ? [$row['id'], $row['id'], $row['username']] : [$row['id']];
 
                         return vsprintf($formatted_str, $fill);
                     }

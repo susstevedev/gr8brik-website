@@ -100,13 +100,17 @@ class ErrorRegistry {
     ];
 
     public static function get(string $type, string $code, ?array $placeholders = []): string {
-		if(!empty($placeholders)) {
-			$error = vsprintf(self::$errors[$type][$code], $placeholders);
-		} else {
-			$error = self::$errors[$type][$code];
-		}
+        if(isset(self::$errors[$type][$code])) {
+            if(!empty($placeholders)) {
+                $error = vsprintf(self::$errors[$type][$code], $placeholders);
+            } else {
+                $error = self::$errors[$type][$code];
+            }
+        } else {
+            $error = self::$errors['generic'];
+        }
 
-        return $error ?? self::$errors['generic'];
+        return $error;
     }
 }
 ?>
