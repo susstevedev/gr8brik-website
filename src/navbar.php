@@ -5,8 +5,8 @@
     <a href="/com" class="w3-bar-item w3-button"><i class="fa fa-commenting-o" aria-hidden="true"></i>Community</a>
     <a href="http://blog.gr8brik.rf.gd/" class="w3-bar-item w3-button" target="_blank"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>Blog</a>
 
-    <div class="gr8-navbarsearch-parent" xstyle="color: #000; display: inline-flex; height: 32px; padding-right: 0px; padding-left: 10px; border-radius: 6px;">
-        <a class="fa fa-search gr8-navbarsearch" xstyle="background-color: #fff; cursor: pointer; padding-right: 6px; padding-left: 6px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);" id="search-button"></a>
+    <div class="gr8-navbarsearch-parent">
+        <a class="fa fa-search gr8-navbarsearch" id="search-button"></a>
         <input class="w3-input w3-border gr8-navbarsearch-input" type="text" id="search-input" placeholder="Search for...">
     </div><hr />
 

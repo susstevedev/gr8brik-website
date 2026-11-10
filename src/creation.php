@@ -133,6 +133,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     <script type="text/javascript">
         $(document).ready(function() {
             window.embed_model = <?php echo (int)$_GET['id'] ?>;
+            window.viewer_auth = <?php echo $_SESSION['viewer_auth'] ?>;
         });
     </script>
     <script type="text/javascript" src="/lib/creation.js"></script>
@@ -220,9 +221,9 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
         <div id="ajax-success" class="w3-col m9 w3-bottom w3-light-grey w3-card-2 w3-padding w3-margin-bottom w3-round w3-border w3-border-grey"></div>
 
         <figure class="model-screenshot">
-            <iframe id="model-embed" src="/viewer.html?model=<?php echo urlencode($_GET['id']) ?>" class="w3-border w3-card-2"></iframe>
+            <iframe id="model-embed" src="/viewer.html?model=<?php echo urlencode($_GET['id']) ?>" class="w3-border w3-border-grey w3-card-2"></iframe>
 
-            <figcaption data-testid="description" class="gr8-theme w3-light-grey w3-card-2 w3-border w3-padding" style="width: 65%">
+            <figcaption data-testid="description" class="gr8-theme w3-light-grey w3-card-2 w3-border w3-border-grey w3-padding" style="width: 65%">
                 <header>
                     <h3 class="creation-page-title" id="name"><?php echo $data['name'] ?></h3>
 
@@ -231,7 +232,8 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             <b class="meta-author">
                                 <a id="user-link" class="<?php echo $data['user']['admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>" href="/@<?php echo urlencode($data['user']['name'])?>"><i class="fa fa-at" aria-hidden="true"></i><?php echo $data['user']['name'] ?></a>
                             </b>
-                            • <span id="user-link-followers"><?php echo $data['user']['followers'] ?> followers</span>
+                            • <span id="user-link-creations"><?php echo $data['user']['stats']['creations'] ?> creations</span>
+                            • <span id="user-link-favorites"><?php echo $data['user']['stats']['favorites'] ?> favorites</span>
                         </p>
                     <?php } ?>
 

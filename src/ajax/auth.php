@@ -534,7 +534,7 @@ class AccountManager
         $token_hashed = hash('sha256', $token_raw);
 
 		if((bool)$row['suspended'] === true) {
-			$isBanned = self::blacklisted($userid, 'id') !== false;
+			$isBanned = self::blacklisted($userid, 'id');
 			if ($isBanned !== false) {
 				http_response_code(500);
 				$until = isset($isBanned['ignore_at']) ? 'until ' . $isBanned['ignore_at'] : 'indefinitely';
@@ -607,7 +607,7 @@ class AccountManager
                 ]);
             }
 
-            return ['success' => true, 'sid' => $token_raw, 'href' => '/acc/creations'];
+            return ['success' => true, 'sid' => $token_raw, 'href' => "/acc/creations?sid={$token_raw}", 'ajax_href' => '/ajax/user?ajax=true'];
         }
     }
 

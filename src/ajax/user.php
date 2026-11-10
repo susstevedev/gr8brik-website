@@ -456,7 +456,7 @@ class User {
 
         $sql = "SELECT 
                     u.id, u.username, u.github_id, u.google_id, u.email, u.password, 
-                    u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
+                    u.alert, u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
                     p.picture, p.picture_small, p.banner, p.twitter, p.bsky, 
                     p.private_profile, p.description, p.verified_badge
                 FROM users u
@@ -495,7 +495,7 @@ class User {
 
         $sql = "SELECT
                     u.id, u.username, u.github_id, u.google_id, u.email, u.password,
-                    u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
+                    u.alert, u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
                     p.picture, p.picture_small, p.banner, p.twitter, p.bsky,
                     p.private_profile, p.description, p.verified_badge
                 FROM users u
@@ -543,7 +543,7 @@ class User {
 
         $sql = "SELECT
                     u.id, u.username, u.github_id, u.google_id, u.email, u.password,
-                    u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
+                    u.alert, u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
                     p.picture, p.picture_small, p.banner, p.twitter, p.bsky,
                     p.private_profile, p.description, p.verified_badge
                 FROM users u

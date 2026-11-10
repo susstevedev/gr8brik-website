@@ -49,6 +49,12 @@ class ErrorRegistry {
             'thumbnail_encoding_bad' => "Thumbnail is not a valid image encoded in Webp or PNG.",
             'thumbnail_save_fail' => "Failed to save thumbnail.",
         ],
+        'creation_file' => [
+            'cannot_edit' => 'You are not allowed to edit this Creation. Please contact the creator via direct messages.',
+            'json_not_found' => 'There is no valid JSON file for this Creation.',
+            'format_invalid' => "Invalid Creation format.",
+            'tmp_copy_fail' => 'Failed to generate temporary instance of this Creation.',
+        ],
         'user' => [
             'not_found' => 'User not found in database',
             'private_profile' => 'User has privated their profile.',

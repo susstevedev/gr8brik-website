@@ -233,7 +233,7 @@ if (isset($_POST['save_build_v2'])) {
 
         imagealphablending($image, false);
         imagesavealpha($image, true);
-        $saved = imagewebp($image, $screenshot_path, 80);
+        $saved = imagewebp($image, $screenshot_path, 85);
         imagedestroy($image);
 
         if (!$saved) {
@@ -388,14 +388,16 @@ function fetch_build($model_id, $csrf) {
     }
 
     $userid = $row2['user'];
-    $views = $row2['views'];
-    $votes = $row2['likes'];
+    $views = number_format($row2['views'] ?? 0);
+    $favs = number_format($row2['likes'] ?? 0);
+    $replies = number_format($row2['replies'] ?? 0);
     $description_raw = $row2['description'];
     $description_markdown = Formatter::render($row2['description']);
     $name = htmlentities($row2['name'] ?? 'Untited creation');
 
 	$usero = User::getUser($userid);
     $user_exists = true;
+    $counts = [];
 
     if(!isset($usero)) {
         $user_exists = false;
@@ -405,25 +407,29 @@ function fetch_build($model_id, $csrf) {
         $user_exists = false;
     }
 
-    if($user_exists) {
-        if (!isset($name) || empty($name)) {
-            $name = ($row->username ?? '') . "'s creation";
-        }
+    if (!isset($name) || empty($name)) {
+        $name = ($row->username ?? '') . "'s creation";
     }
 
-    $did_track = false;
-    if(loggedin()) {
-        $cookie = new Cookie($id);
-        if($cookie->analytics_creation($conn2, $userid, $name)) {
-            $did_track = true;
-        }
-    }
-
-    $stmt = $conn2->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
-    $stmt->bind_param("s", $userid);
-    $stmt->execute();
-    $followers = $stmt->get_result()->fetch_assoc()['following'];
+    $stmt = $conn2->prepare(
+        "SELECT SUM(CASE WHEN userid = ? THEN 1 ELSE 0 END) AS following,
+        SUM(CASE WHEN profileid = ? THEN 1 ELSE 0 END) AS followers
+        FROM follow WHERE userid = ? OR profileid = ?"
+    );
+    $stmt->execute([$userid, $userid, $userid, $userid]);
+    $row = $stmt->get_result()->fetch_assoc();
+    $counts['followers'] = number_format($row['followers'] ?? 0);
+    $counts['following'] = number_format($row['following'] ?? 0);
     $stmt->close();
+
+    $stmt = $conn->prepare("SELECT COUNT(*) AS creations, SUM(likes) AS favs, SUM(views) AS views FROM model WHERE user = ? AND removed = 0");
+    $stmt->execute([$userid]);
+    $row = $stmt->get_result()->fetch_assoc();
+    $counts['favorites'] = number_format($row['favs'] ?? 0);
+    $counts['creations'] = number_format($row['creations'] ?? 0);
+    $counts['views'] = number_format($row['views'] ?? 0);
+    $stmt->close();
+    unset($row, $stmt);
 
     $notifications = new Notifications($conn2);
 
@@ -496,7 +502,7 @@ function fetch_build($model_id, $csrf) {
             'name' => $usero->username ?? '[deleted]',
             'image' => $usero->profile->picture ?? '/img/no_image.png',
             'admin' => $usero->admin ?? false,
-            'followers' => $followers ?? 0,
+            'stats' => $counts,
         ],
         'modelid' => $model_id,
         'model' => $row2['model'],
@@ -508,15 +514,14 @@ function fetch_build($model_id, $csrf) {
         'screenshot' => $row2['screenshot'],
         'views' => $views,
         'is_removed' => $row2['removed'],
-        'did_track' => $did_track,
         'legacy' => $row2['legacy'],
         'can_edit' => $can_edit,
         'voted' => $voted,
         'is_subbed' => $is_subbed ?? false,
 		'is_subbed_comment' => $is_subbed_comment ?? false,
 		'is_subbed_fav' => $is_subbed_fav ?? false,
-        'likes' => $votes,
-        'comments' => $row2['replies'],
+        'likes' => $favs,
+        'comments' => $replies,
         'soft_message' => $soft_message,
     ];
     return json_encode($data);
