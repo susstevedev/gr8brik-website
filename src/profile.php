@@ -215,7 +215,7 @@ if(isset($_POST['unban-submit'])) {
             <?php } ?>
 
             <?php if($data['admin']) { ?>
-                <i class='fa fa-gavel w3-xlarge w3-text-red' title="This user is a moderator of Gr8Brik." aria-hidden='true'></i>
+                <i class='fa fa-shield w3-xlarge w3-text-red' title="This user is a moderator of Gr8Brik." aria-hidden='true'></i>
             <?php } ?>
 
             <span id="stats" class="w3-padding-small">

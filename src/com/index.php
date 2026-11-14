@@ -104,11 +104,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
                 while ($row = $result->fetch_assoc()) {
                     $user_row = User::getUser($row['userid']);
-                    $username = $user_row->username ?? null;
+                    $username = $user_row->username ?? '';
 
                     if($row['last_posted'] != 0) {
                         $last_posted = $row['last_posted'];
-                        $last_post_username = User::getUser($row['last_posted'])->username ?? null;
+                        $last_post_username = User::getUser($row['last_posted'])->username ?? '';
                     } else {
                         $last_posted = $row['userid'];
                         $last_post_username = $username;
@@ -129,8 +129,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
                     echo "<tr><td><a href='/topic/" . $row['id'] . "?p=" . $row['last_page'] . "'><i class='fa fa-map-pin w3-padding-small w3-text-grey' aria-hidden='true' title='Pinned Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                     echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $row['timestamp'] . "</td>";
-                    echo "<td><a href='/user/" . $row['userid'] . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</a></td>";
-                    echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $last_post_username . "</a></td></tr>";
+                    echo "<td><a href='/@" . urlencode($username) . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</a></td>";
+                    echo "<td><a href='/@" . urlencode($last_post_username) . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $last_post_username . "</a></td></tr>";
                     $username = null;
                     $last_post_username = null;
                 }
@@ -147,11 +147,11 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
                 while ($row = $result->fetch_assoc()) {
                     $user_row = User::getUser($row['userid']);
-                    $username = $user_row->username ?? null;
+                    $username = $user_row->username ?? '';
                     
                     if($row['last_posted'] != 0) {
                         $last_posted = $row['last_posted'];
-                        $last_post_username = User::getUser($last_posted)->username ?? null;
+                        $last_post_username = User::getUser($last_posted)->username ?? '';
                     } else {
                       $last_posted = $row['userid'];
                       $last_post_username = $username;
@@ -172,8 +172,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 
                     echo "<tr><td><a href='/topic/" . $row['id'] . "?p=" . $row['last_page'] . "'><i class='fa fa-users w3-padding-small w3-text-grey' aria-hidden='true' title='General Post'></i>" . htmlspecialchars($shortTitle) . "</a></td>";
                     echo "<td><i class='fa fa-calendar-o w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $row['timestamp'] . "</td>";
-                    echo "<td><a href='/user/" . $row['userid'] . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</a></td>";
-                    echo "<td><a href='/user/" . $last_posted . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $last_post_username . "</a></tr>";
+                    echo "<td><a href='/@" . urlencode($username) . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $username . "</a></td>";
+                    echo "<td><a href='/@" . urlencode($last_post_username) . "'><i class='fa fa-at w3-padding-small w3-text-grey' aria-hidden='true'></i>" . $last_post_username . "</a></tr>";
                     $username = null;
                     $last_post_username = null;
                 }

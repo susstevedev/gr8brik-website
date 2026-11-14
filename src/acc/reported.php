@@ -250,7 +250,7 @@ if (isset($_POST['deny'])) {
                                 $valid = true;
                                 $group['reported_type_string'] = "User profile";
                                 $group['reported_name'] = $c_row['username'] ?: '';
-                                $group['reported_link'] = '/user/' . $group['reported_id'];
+                                $group['reported_link'] = '/@' . urlencode($c_row['username']);
                                 $group['reported_user'] = $c_row['username'] ?: '';
                                 $group['reported_date'] = date("F j, Y, g:i a", strtotime($c_row['age']));
                             }
@@ -286,7 +286,7 @@ if (isset($_POST['deny'])) {
             ?>
                 <article class='w3-card-2 gr8-theme w3-light-grey w3-padding-small w3-round'>
                     <header>
-                        <h3><a href='/user/<?php echo $uid ?>'><?php echo $group['reporter_username'] ?></a> reported a <?php echo $group['reported_type_string'] ?? $group['reported_type'] ?></h3>
+                        <h3><a href='/@<?php echo urlencode($group['reporter_username']) ?>'><?php echo $group['reporter_username'] ?></a> reported a <?php echo $group['reported_type_string'] ?? $group['reported_type'] ?></h3>
                     </header>
                     <div id="content">
                         <h4>

@@ -105,56 +105,58 @@ if (isset($_SESSION['userid'])) {
     $handler->user($_SESSION['userid']);
 }
 
-if (!isset($_SESSION['requests'])) {
-    $_SESSION['requests'] = [];
-}
+if(APP_FEATURES['RATE_LIMITING_ENABLE']) {
+    if (!isset($_SESSION['requests'])) {
+        $_SESSION['requests'] = [];
+    }
 
-$_SESSION['requests'] = array_filter($_SESSION['requests'] ?? [], function ($timestamp) {
-    return $timestamp > time() - 100;
-});
+    $_SESSION['requests'] = array_filter($_SESSION['requests'] ?? [], function ($timestamp) {
+        return $timestamp > time() - 100;
+    });
 
-$_SESSION['requests'][] = time();
-$requests = count($_SESSION['requests']);
+    $_SESSION['requests'][] = time();
+    $requests = count($_SESSION['requests']);
 
-if ($requests >= 50) {
-    if ($requests >= 100) {
-        $db = Database::get(DB_NAME);
+    if ($requests >= 60) {
+        if ($requests >= 100) {
+            $db = Database::get(DB_NAME);
 
-        $ipbano = new IpBans($db);
-        $ban = $ipbano->getBan();
-        if($ban) {
-            $ipbano->displayBan($ban);
-        } else {
-            $ip = $_SERVER['REMOTE_ADDR'];
-            $date = date("Y-m-d H:i:s");
-            $until = date('Y-m-d H:i:s', strtotime('+1 hour'));
-            $reason = "IP banned for one hour due to spam.";
+            $ipbano = new IpBans($db);
+            $ban = $ipbano->getBan();
+            if($ban) {
+                $ipbano->displayBan($ban);
+            } else {
+                $ip = $_SERVER['REMOTE_ADDR'];
+                $date = date("Y-m-d H:i:s");
+                $until = date('Y-m-d H:i:s', strtotime('+1 hour'));
+                $reason = "IP banned for one hour due to spam.";
 
-            $block = $db->prepare("INSERT INTO ip_bans (ip, ban_at, ban_until, reason) VALUES (?, ?, ?, ?)");
-            $block->bind_param("ssss", $ip, $date, $until, $reason);
-            $block->execute();
-            $block->close();
-            $db->close();
+                $block = $db->prepare("INSERT INTO ip_bans (ip, ban_at, ban_until, reason) VALUES (?, ?, ?, ?)");
+                $block->bind_param("ssss", $ip, $date, $until, $reason);
+                $block->execute();
+                $block->close();
+                $db->close();
+            }
         }
+
+        $oldest = min($_SESSION['requests']);
+        $remaining = max(1, 100 - (time() - $oldest)); 
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
+        $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+        $json = (stripos($contentType, 'application/json') !== false) || (stripos($accept, 'application/json') !== false);
+
+        http_response_code(429);
+        header("Retry-After: " . $remaining);
+        $message = 'You are sending too many requests. Please wait ' . $remaining . ' seconds.';
+
+        if (!$json) {
+            echo $message;
+        } else {
+            header('Content-Type: application/json');
+            echo json_encode(['error' => $message, 'message' => $message, 'success' => false, 'code' => '429']);
+        }
+        exit;
     }
-
-    $oldest = min($_SESSION['requests']);
-    $remaining = max(1, 100 - (time() - $oldest)); 
-    $contentType = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
-    $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
-    $json = (stripos($contentType, 'application/json') !== false) || (stripos($accept, 'application/json') !== false);
-
-    http_response_code(429);
-    header("Retry-After: " . $remaining);
-    $message = 'You are sending too many requests. Please wait ' . $remaining . ' seconds.';
-
-    if (!$json) {
-        echo $message;
-    } else {
-        header('Content-Type: application/json');
-        echo json_encode(['error' => $message, 'message' => $message, 'success' => false, 'code' => '429']);
-    }
-    exit;
 }
 
 if (!isset($_SESSION['_csrf']) || $_SESSION['_csrf']['updated'] - time() >= 60) {

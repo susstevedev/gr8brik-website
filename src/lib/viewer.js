@@ -458,7 +458,7 @@ import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawCondit
                 stat_name.innerHTML += `<a href="/build/${_json.modelid}" target="_blank">${_json.name}</a>`;
 
                 stat_username.style.display = "block";
-                stat_username.innerHTML += `<a href="/user/${_json.user.id}" target="_blank"><img src='${_json.user.image}.webp' alt='User icon' title='User icon' />${_json.user.name}</a>`;
+                stat_username.innerHTML += `<a href="/@${encodeURIComponent(_json.user.name)}" target="_blank"><img src='${_json.user.image}' alt='User icon' title='User icon' />${_json.user.name}</a>`;
 
                 stat_date.style.display = "block";
                 stat_date.innerHTML += `${_json.date}`;

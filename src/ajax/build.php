@@ -233,7 +233,7 @@ if (isset($_POST['save_build_v2'])) {
 
         imagealphablending($image, false);
         imagesavealpha($image, true);
-        $saved = imagewebp($image, $screenshot_path, 85);
+        $saved = imagewebp($image, $screenshot_path, APP_FEATURES['CREATION']['THUMBNAIL_MAX_QUALITY']);
         imagedestroy($image);
 
         if (!$saved) {
@@ -464,34 +464,6 @@ function fetch_build($model_id, $csrf) {
         $voted = false;
     }
 
-    $saved_prefs = Cookie::controls();
-    if(in_array('site-prefs', $saved_prefs)) {
-        if (!isset($_SESSION['viewed_creation_ids'])) {
-            $_SESSION['viewed_creation_ids'] = [];
-        }
-
-        if (!in_array($model_id, $_SESSION['viewed_creation_ids'])) {
-            $view_stmt = $conn->prepare("UPDATE model SET views = views + 1 WHERE id = ? AND removed = 0");
-            $view_stmt->bind_param("i", $model_id);
-            $view_stmt->execute();
-            $_SESSION['viewed_creation_ids'][] = $model_id;
-        }
-    }
-    
-    $model_tags = [];
-    $Tag_stmt = $conn->prepare("SELECT * FROM tags WHERE model_id = ?");
-    $Tag_stmt->bind_param("i", $model_id);
-    $Tag_stmt->execute();
-    $Tag_result = $Tag_stmt->get_result();
-
-    while ($tags_row = $Tag_result->fetch_assoc()) {
-        $model_tags[] = [
-            'name' => $tags_row['tag_name'],
-            'display' => true
-        ];
-    }
-    $Tag_stmt->close();
-
     $soft_message = isset($soft_message) ? Formatter::render($soft_message) : null;
     http_response_code(200);
     $data = [
@@ -500,7 +472,7 @@ function fetch_build($model_id, $csrf) {
             'exists' => $user_exists,
             'id' => $userid ?? 0,
             'name' => $usero->username ?? '[deleted]',
-            'image' => $usero->profile->picture ?? '/img/no_image.png',
+            'image' => $usero->profile->picture_small ?? '/img/no_image.png',
             'admin' => $usero->admin ?? false,
             'stats' => $counts,
         ],
@@ -508,7 +480,6 @@ function fetch_build($model_id, $csrf) {
         'model' => $row2['model'],
         'description_raw' => $description_raw,
         'description_markdown' => $description_markdown,
-        'tags' => $model_tags,
         'name' => $name,
         'date' => date("F j, Y, g:i a", strtotime($row2['date'])),
         'screenshot' => $row2['screenshot'],
@@ -516,6 +487,7 @@ function fetch_build($model_id, $csrf) {
         'is_removed' => $row2['removed'],
         'legacy' => $row2['legacy'],
         'can_edit' => $can_edit,
+        'is_owner' => $is_owner,
         'voted' => $voted,
         'is_subbed' => $is_subbed ?? false,
 		'is_subbed_comment' => $is_subbed_comment ?? false,
@@ -540,7 +512,47 @@ if(isset($_GET['fetch'])) {
     exit($data);
 }
 
-function fetch_comments($model_id, $csrf) {
+function view_creation(int $cid) {
+    $con = Database::get(DB_NAME2);
+
+    if (!isset($_SESSION['viewed_creation_ids'])) {
+        $_SESSION['viewed_creation_ids'] = [];
+    }
+
+    if (!in_array($cid, $_SESSION['viewed_creation_ids'])) {
+        $view_stmt = $con->prepare("UPDATE model SET views = views + 1 WHERE id = ? AND removed = 0");
+        $view_stmt->execute([$cid]);
+        $_SESSION['viewed_creation_ids'][] = $cid;
+    }
+}
+
+function fetch_tags(int $cid) {
+    $con = Database::get(DB_NAME2);
+    $tags = [];
+
+    $Tag_stmt = $con->prepare
+    ("SELECT t.id, t.tag_name, t.slug
+    FROM tags t
+    LEFT JOIN model_tags mt ON t.id = mt.tag_id
+    WHERE mt.model_id = ?
+    ");
+
+    $Tag_stmt->execute([$cid]);
+    $Tag_result = $Tag_stmt->get_result();
+
+    while ($t = $Tag_result->fetch_assoc()) {
+        $tags[$t['id']] = [
+            'id' => $t['id'],
+            'name' => $t['tag_name'],
+            'slug' => $t['slug'],
+        ];
+    }
+
+    $Tag_stmt->close();
+    return $tags;
+}
+
+function fetch_comments(int $model_id, string $csrf): mixed {
     global $conn;
     global $conn2;
     global $current_user;
@@ -668,7 +680,7 @@ function fetch_comments($model_id, $csrf) {
 			'they_blocked' => $blocked[$c_user_id]['they_blocked'] ?? false,
         ];
 
-        if(!$userRow || (bool)$userRow->deactive) {
+        if(!$userRow || $userRow->deactive !== null) {
 			$message = ErrorRegistry::get('comment', 'owner_not_found');
             $c_user_data['removed'] = true;
             $c_user_data['picture'] = null;
@@ -715,31 +727,46 @@ function fetch_comments($model_id, $csrf) {
             }
         }
 
-        $lookup[$comment_id] = [
-            'message' => $message ?? null,
-            'id' => $comment_id,
-			'user' => [
-				'id' => $c_user_id,
-				'removed' => $c_user_data['removed'],
-				'admin' => $c_user_data['admin'],
-                'verified' => $c_user_data['verified'],
-				'name' => $c_user_data['name'],
-				'is_op' => $c_user_data['is_op'],
-				'picture' => $c_user_data['picture'],
-			],
-            'is_hidden' => $row['hidden'],
-            'parent' => $row['parent'],
-			'children' => [],
-            'comment_md' => !$c_user_data['they_blocked'] ? $comment_md : null,
-            'comment_og' => $comment_og,
-            'date' => $date,
-            'edited_at' => $edited_at,
-            'votes' => $comment_votes,
-            'voted' => isset($fav_ids[$comment_id]),
-            'conversation_subbed' => $notifications->get_subscribers('comment_reply', $comment_id),
-			'actions' => $actions,
-        ];
+        $valid = true;
+
+        if($valid) {
+            $lookup[$comment_id] = [
+                'success' => true,
+                'message' => $message ?? null,
+                'id' => $comment_id,
+                'user' => [
+                    'id' => $c_user_id,
+                    'removed' => $c_user_data['removed'],
+                    'admin' => $c_user_data['admin'],
+                    'verified' => $c_user_data['verified'],
+                    'name' => $c_user_data['name'],
+                    'is_op' => $c_user_data['is_op'],
+                    'picture' => $c_user_data['picture'],
+                ],
+                'is_hidden' => $row['hidden'],
+                'parent' => $row['parent'],
+                'children' => [],
+                'comment_md' => !$c_user_data['they_blocked'] ? $comment_md : null,
+                'comment_og' => $comment_og,
+                'date' => $date,
+                'edited_at' => $edited_at,
+                'votes' => $comment_votes,
+                'voted' => isset($fav_ids[$comment_id]),
+                'conversation_subbed' => $notifications->get_subscribers('comment_reply', $comment_id),
+                'actions' => $actions,
+            ];
+        } else {
+            $lookup[$comment_id] = [
+                'success' => false,
+                'message' => $message ?? null,
+                'id' => $comment_id,
+                'parent' => $row['parent'],
+                'children' => [],
+                'conversation_subbed' => $notifications->get_subscribers('comment_reply', $comment_id),
+            ];
+        }
         $message = null;
+        $valid = null;
     }
 
     foreach ($lookup as $id => $comment) {
@@ -756,7 +783,29 @@ function fetch_comments($model_id, $csrf) {
     return json_encode($tree); 
 }
 
-function comment_subscribers($model_id) {
+/**
+ * Finds comment by ID in threaded comment array
+ */
+function comment_find_by_id(array $comments, int $parent_id) {
+    foreach ($comments as $comment) {
+        if ($comment['id'] == $parent_id) {
+            return $comment;
+        }
+
+        if (!empty($comment['children'])) {
+            $found = comment_find_by_id($comment['children'], $parent_id);
+            if ($found !== null) {
+                return $found;
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * Returns array of subscribers for comment
+ */
+function comment_subscribers(int $model_id) {
     global $conn2;
     $notifications = new Notifications($conn2);
 
@@ -766,36 +815,51 @@ function comment_subscribers($model_id) {
     return $data;
 }
 
+if(isset($_GET['tags'])) {
+    header('Content-Type: application/json');
+    $model_id = isset($_GET['buildId']) ? (int)$_GET['buildId'] : 0;
+    echo json_encode(fetch_tags($model_id));
+    exit;
+}
+
 if(isset($_GET['comments'])) {
     header('Content-Type: application/json');
-    $model_id = htmlspecialchars((int)$_GET['buildId']);
+    $model_id = isset($_GET['buildId']) ? (int)$_GET['buildId'] : 0;
     $comment_data = fetch_comments($model_id, $_SESSION['csrf']);
-    exit($comment_data);
+    echo json_encode($comment_data);
+    exit;
 }
 
 if(isset($_POST['comment'])) {
     header('Content-Type: application/json');
 
-    $comment = isset($_POST['commentbox']) ? $_POST['commentbox'] : 0;
+    $comment = isset($_POST['commentbox']) ? $_POST['commentbox'] : null;
     $parent = isset($_POST['parent']) ? (int)$_POST['parent'] : 0;
-    $csrf = $_POST['csrf_token'];
-    $model_id = $_POST['buildId'];
+    $csrf = isset($_POST['csrf_token']) ? $_POST['csrf_token'] : null;
+    $model_id = isset($_POST['buildId']) ? $_POST['buildId'] : null;
+
+    echo json_encode(add_comment($model_id, $csrf, $comment, $parent));
+    exit;
+}
+
+function add_comment($model_id, $csrf, $comment, $parent) {
+    global $current_user;
+
+    $conn = Database::get(DB_NAME2);
+    $conn2 = Database::get(DB_NAME);
 
     if (!valid_csrf($csrf)) {
-        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'bad_csrf')]);
-        exit;
+        return ['success' => false, 'error' => ErrorRegistry::get('auth', 'bad_csrf')];
     }
 
     if(!loggedin() || !isset($current_user)) {
-        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'unauthed')]);
-        exit;
+        return ['success' => false, 'error' => ErrorRegistry::get('comment', 'unauthed')];
     }
 
     $id = $current_user->id ?? 0;
 
     if($current_user->verify_token != NULL) {
-        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'unverified')]);
-        exit;
+        return ['success' => false, 'error' => ErrorRegistry::get('comment', 'unverified')];
     }
 
     if(!isset($_SESSION['comment'])) {
@@ -811,19 +875,16 @@ if(isset($_POST['comment'])) {
         $cd = 120;
         if((time() - $lt) < $cd) {
             $remaining = $cd - (time() - $lt);
-            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'cooldown_active', [$remaining])]);
-            exit;
+            return ['success' => false, 'error' => ErrorRegistry::get('comment', 'cooldown_active', [$remaining])];
         }
     }
 
     if(strlen($comment) > 500) {
-        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'too_long')]);
-        exit;
+        return ['success' => false, 'error' => ErrorRegistry::get('comment', 'too_long')];
     }
 
     if(empty($comment)) {
-        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'too_short')]);
-        exit;
+        return ['success' => false, 'error' => ErrorRegistry::get('comment', 'too_short')];
     }
 
     $stmt4 = $conn->prepare("SELECT user FROM model WHERE id = ? AND removed = 0");
@@ -832,8 +893,7 @@ if(isset($_POST['comment'])) {
     $result = $stmt4->get_result();
 
     if($result->num_rows === 0) {
-        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('creation', 'not_found')]);
-        exit;
+        return ['success' => false, 'error' => ErrorRegistry::get('creation', 'not_found')];
     }
 
     $userid = $result->fetch_assoc()['user'] ?? null;
@@ -847,11 +907,9 @@ if(isset($_POST['comment'])) {
         $row = $result->fetch_assoc();
 
         if($row['userid'] === $id && $row['profileid'] === $userid) {
-            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('creation', 'user_blocked')]);
-            exit;
+            return ['success' => false, 'error' => ErrorRegistry::get('creation', 'user_blocked')];
         } else if($row['profileid'] === $id && $row['userid'] === $userid) {
-            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('creation', 'user_blocking')]);
-            exit;
+            return ['success' => false, 'error' => ErrorRegistry::get('creation', 'user_blocking')];
         }
     }
 
@@ -862,8 +920,7 @@ if(isset($_POST['comment'])) {
         $result = $stmt_reply->get_result();
 
         if($result->num_rows === 0) {
-            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'reply_not_found')]);
-            exit;
+            return ['success' => false, 'error' => ErrorRegistry::get('comment', 'reply_not_found')];
         }
 
         $c_user = $result->fetch_assoc()['user'];
@@ -877,14 +934,11 @@ if(isset($_POST['comment'])) {
             $row = $result->fetch_assoc();
 
             if($row['userid'] === $id && $row['profileid'] === $c_user) {
-                echo json_encode(['success' => false, 'error' => 'You have blocked the user you are trying to reply to.']);
-                exit;
+                return ['success' => false, 'error' => 'You have blocked the user you are trying to reply to.'];
             } else if($row['profileid'] === $id && $row['userid'] === $c_user) {
-                echo json_encode(['success' => false, 'error' => 'The person you are trying to reply to has you blocked.']);
-                exit;
+                return ['success' => false, 'error' => 'The person you are trying to reply to has you blocked.'];
             } else {
-                echo json_encode(['success' => false, 'error' => 'You or the user you are replying to have blocked one or the other.']);
-                exit;
+                return ['success' => false, 'error' => 'You or the user you are replying to have blocked one or the other.'];
             }
         }
     }
@@ -933,7 +987,7 @@ if(isset($_POST['comment'])) {
             $notifications->notify_subscribers('comment_reply', $parent, $id);
         }
 
-        echo json_encode([
+        return [
             'success' => true,
             'message' => 'Comment sent!',
             'comment' => [
@@ -958,12 +1012,10 @@ if(isset($_POST['comment'])) {
                 'admin' => $current_user->admin ?? false,
                 'op' => $is_op,
             ],
-        ]);
-        exit;
+        ];
     } else {
         $stmt2->close();
-        echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'generic')]);
-        exit;
+        return ['success' => false, 'error' => ErrorRegistry::get('comment', 'generic')];
     }
 }
 
@@ -1040,7 +1092,7 @@ if (isset($_POST['comment_preview']) && isset($_POST['commentbox'])) {
                     ],
                     'user' => [
                         'id' => $current_user->id,
-                        'url' => '/user/' . $current_user->id,
+                        'url' => '/@' . urlencode($current_user->username),
                         'name' => $current_user->username,
                         'picture' => $current_user->profile->picture,
                         'admin' => $current_user->admin,
@@ -1064,12 +1116,7 @@ if (loggedin() && isset($current_user)) {
     if (isset($_POST['downvote'])) {
         header('Content-Type: application/json');
 
-        if (!isset($_POST['model_id']) || !is_numeric($_POST['model_id'])) {
-            echo json_encode(['error' => 'Invalid model id provided']);
-            exit;
-        }
-
-        $model_id = (int)$_POST['model_id'];
+        $model_id = isset($_POST['model_id']) ? $_POST['model_id'] : null;
         $likes = $vote_count = null;
 
         $stmt = $conn->prepare("SELECT likes FROM model WHERE id = ? LIMIT 1");
@@ -1112,12 +1159,7 @@ if (loggedin() && isset($current_user)) {
     if (isset($_POST['upvote'])) {
         header('Content-Type: application/json');
 
-        if (!isset($_POST['model_id']) || !is_numeric($_POST['model_id'])) {
-            echo json_encode(['success' => false, 'error' => 'Invalid creation id provided']);
-            exit;
-        }
-
-        $model_id = (int)$_POST['model_id'];
+        $model_id = isset($_POST['model_id']) ? $_POST['model_id'] : null;
         $likes = $model_user = $vote_count = null;
 
         $stmt = $conn->prepare("SELECT user, likes FROM model WHERE id = ? AND removed = 0 LIMIT 1");
@@ -1127,7 +1169,7 @@ if (loggedin() && isset($current_user)) {
         $stmt->fetch();
         $stmt->close();
 
-        if ($model_id === 0) {
+        if (!$model_id) {
             echo json_encode(['error' => 'Creation does not exist in the database']);
             exit;
         }
@@ -1193,18 +1235,14 @@ if (loggedin() && isset($current_user)) {
     if (isset($_POST['subscribe'])) {
         header('Content-Type: application/json');
 
-        if (!isset($_POST['model_id']) || !is_numeric($_POST['model_id'])) {
-            echo json_encode(['success' => false, 'error' => 'Invalid creation id provided']);
-            exit;
-        }
-
-        $model_id = (int)$_POST['model_id'];
-		$type = $_POST['type'];
+        $model_id = isset($_POST['model_id']) ? $_POST['model_id'] : null;
+		$type = isset($_POST['type']) ? $_POST['type'] : null;
         $model_user = null;
         $likes = null;
 
 		if($type !== 'comment' && $type !== 'creation_fav') {
-			echo json_encode(['error' => 'Invalid type of method']);
+            http_response_code(400);
+			echo json_encode(['success' => false]);
             exit;
 		}
 
@@ -1215,14 +1253,14 @@ if (loggedin() && isset($current_user)) {
         $stmt->fetch();
         $stmt->close();
 
-        if ($model_id === 0) {
-            echo json_encode(['error' => 'Creation does not exist in the database']);
+        if (!$model_id) {
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('creation', 'not_found')]);
             exit;
         }
 
         if($current_user->verify_token != NULL) {
             http_response_code(401);
-            echo json_encode(['error' => "Please verify your account to continue this action."]);
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'unverified')]);
             exit;
         }
 
@@ -1237,18 +1275,14 @@ if (loggedin() && isset($current_user)) {
     if (isset($_POST['unsubscribe'])) {
         header('Content-Type: application/json');
 
-        if (!isset($_POST['model_id']) || !is_numeric($_POST['model_id'])) {
-            echo json_encode(['success' => false, 'error' => 'Invalid creation id provided']);
-            exit;
-        }
-
-        $model_id = (int)$_POST['model_id'];
-		$type = $_POST['type'];
+        $model_id = isset($_POST['model_id']) ? $_POST['model_id'] : null;
+		$type = isset($_POST['type']) ? $_POST['type'] : null;
         $model_user = null;
         $likes = null;
 
 		if($type !== 'comment' && $type !== 'creation_fav') {
-			echo json_encode(['error' => 'Invalid type of method']);
+			http_response_code(400);
+			echo json_encode(['success' => false]);
             exit;
 		}
 
@@ -1259,14 +1293,14 @@ if (loggedin() && isset($current_user)) {
         $stmt->fetch();
         $stmt->close();
 
-        if ($model_id === 0) {
-            echo json_encode(['error' => 'Creation does not exist in the database']);
+        if (!$model_id) {
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('creation', 'not_found')]);
             exit;
         }
 
         if($current_user->verify_token != NULL) {
             http_response_code(401);
-            echo json_encode(['error' => "Please verify your account to continue this action."]);
+            echo json_encode(['success' => false, 'error' => ErrorRegistry::get('auth', 'unverified')]);
             exit;
         }
 
@@ -1359,7 +1393,7 @@ if (loggedin() && isset($current_user)) {
 					exit;
 				}
 
-				echo json_encode(['success' => true, 'message' => 'Comment favorited', 'count' => Numbers::format($count ?? 0)]);
+				echo json_encode(['success' => true, 'message' => 'Comment favorited', 'count' => number_format($count ?? 0)]);
 			} else {
 				echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'comment_fav_fail')]);
 			}
@@ -1399,7 +1433,7 @@ if (loggedin() && isset($current_user)) {
 					exit;
 				}
 
-				echo json_encode(['success' => true, 'message' => 'Comment unfavorited', 'count' => Numbers::format($count ?? 0)]);
+				echo json_encode(['success' => true, 'message' => 'Comment unfavorited', 'count' => number_format($count ?? 0)]);
 			} else {
 				echo json_encode(['success' => false, 'error' => ErrorRegistry::get('comment', 'comment_unfav_fail')]);
 			}

@@ -121,7 +121,7 @@ if (isset($_POST['delete_comment'])) {
     exit;
 }
 
-$model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?model=" . htmlspecialchars($_GET['id']) . "' id='model_embed' title='model_embed' width='300' height='200'></iframe>");
+$model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?model=" . urlencode($_GET['id']) . "' id='model_embed' title='model_embed' width='300' height='200'></iframe>");
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -131,10 +131,8 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     <?php include 'header.php' ?>
 
     <script type="text/javascript">
-        $(document).ready(function() {
-            window.embed_model = <?php echo (int)$_GET['id'] ?>;
-            window.viewer_auth = <?php echo $_SESSION['viewer_auth'] ?>;
-        });
+        window.embed_model = <?php echo $_GET['id'] ?>;
+        window.viewer_auth = '<?php echo isset($_SESSION['viewer_auth']) ? $_SESSION['viewer_auth'] : null ?>';
     </script>
     <script type="text/javascript" src="/lib/creation.js"></script>
     <script type="text/javascript" src="/lib/attachment.js"></script>
@@ -227,47 +225,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <header>
                     <h3 class="creation-page-title" id="name"><?php echo $data['name'] ?></h3>
 
-                    <?php if($data['user']['exists']) { ?>
-                        <p class="creation-page-meta">By 
-                            <b class="meta-author">
-                                <a id="user-link" class="<?php echo $data['user']['admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>" href="/@<?php echo urlencode($data['user']['name'])?>"><i class="fa fa-at" aria-hidden="true"></i><?php echo $data['user']['name'] ?></a>
-                            </b>
-                            • <span id="user-link-creations"><?php echo $data['user']['stats']['creations'] ?> creations</span>
-                            • <span id="user-link-favorites"><?php echo $data['user']['stats']['favorites'] ?> favorites</span>
-                        </p>
-                    <?php } ?>
-
-                    <p class="creation-page-meta" id="stats">
-                        <span title="<?php echo $data['date'] ?>">Published <?php echo time_ago($data['date']) ?></span> • <span><?php echo $data['views'] ?> views</span>
-                    </p>
-                </header>
-                <hr />
-
-                <?php if (!empty($data['description_markdown'])) { ?>
-                    <h4><span id="description" class="w3-large"><?php echo $data['description_markdown'] ?></span></h4>
-                    <hr />
-                <?php } ?>
-
-                <?php if (!empty($data['tags'])) { ?>
-                    <h4><span id="tags" class="w3-medium">
-                            <?php
-                            $_tags = $data['tags'];
-                            foreach ($_tags as $_tagg) {
-                                if ($_tagg['display'] === true) {
-                            ?>
-                                    <a href="/list?t=<?php echo urlencode(htmlspecialchars($_tagg['name'])) ?>" class="w3-button w3-padding-small w3-hover-dark-grey w3-light-grey w3-border">
-                                        <?php echo htmlspecialchars($_tagg['name']) ?>
-                                    </a>
-                            <?php
-                                }
-                            }
-                            ?>
-                        </span><br /></h4>
-                    <hr />
-                <?php } ?>
-
-                <div class="w3-right">
-                    <?php if ($loggedin) { ?>
+                    <div id="actions" class="w3-right">
                         <?php if ($data['voted'] === true) { ?>
                             <div class="tooltip" id="data-unlike-creation">
                                 <span class="w3-tag w3-blue tooltiptext">Unfavorite this creation</span>
@@ -284,25 +242,34 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             </div>
                         <?php } ?>
 
-						<div class="w3-dropdown-click" style="z-index: 999;">
-							<div class="tooltip">
-								<span class="w3-tag w3-blue tooltiptext"><?php if ($data['is_subbed']) { ?> Unsubscribe to cancel notifications out for this creation <?php } else { ?> Subscribe to get notifications for this creation <?php }?></span>
-								<button onclick="dropdown('dropdown-subscribe')" class="w3-btn creation-subscribe <?php if ($data['is_subbed']) { ?> w3-red w3-border w3-border-pink <?php } else { ?> w3-yellow w3-border w3-border-orange <?php } ?> w3-hover-opacity w3-padding-small"><span class="fa <?php if ($data['is_subbed']) { ?> fa-plus-square <?php } else { ?> fa-plus-square-o <?php } ?>"></span>
+                        <div class="w3-dropdown-click" style="z-index: 999;">
+                            <div class="tooltip">
+                                <span class="w3-tag w3-blue tooltiptext"><?php if ($data['is_subbed']) { ?> Unsubscribe to cancel notifications out for this creation <?php } else { ?> Subscribe to get notifications for this creation <?php }?></span>
+                                <button onclick="dropdown('dropdown-subscribe')" class="w3-btn creation-subscribe <?php if ($data['is_subbed']) { ?> w3-red w3-border w3-border-pink <?php } else { ?> w3-yellow w3-border w3-border-orange <?php } ?> w3-hover-opacity w3-padding-small"><span class="fa <?php if ($data['is_subbed']) { ?> fa-plus-square <?php } else { ?> fa-plus-square-o <?php } ?>"></span>
                                     <span class="text"><?php if ($data['is_subbed']) { ?> Unsubscribe <?php } else { ?> Subscribe <?php } ?></span>
                                 </button>
-							</div>
-							<div id="dropdown-subscribe" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
-								<a class="<?php if ($data['is_subbed_comment']) { ?> creation-comment-unsubscribe w3-red <?php } else { ?> creation-comment-subscribe w3-yellow <?php } ?> w3-bar-item w3-btn w3-hover-blue w3-border"><?php if ($data['is_subbed_comment']) { ?> Unsubscribe from <?php } else { ?> Subscribe to <?php } ?> comments</a>
-								<a class="<?php if ($data['is_subbed_fav']) { ?> creation-fav-unsubscribe w3-red <?php } else { ?> creation-fav-subscribe w3-yellow <?php } ?> w3-bar-item w3-btn w3-hover-blue w3-border"><?php if ($data['is_subbed_fav']) { ?> Unsubscribe from <?php } else { ?> Subscribe to <?php } ?> favorites</a>
-							</div>
-						</div>
+                            </div>
+                            <div id="dropdown-subscribe" class="w3-dropdown-content w3-bar-block w3-border" style="z-index: 999;">
+                                <a class="<?php if ($data['is_subbed_comment']) { ?> creation-comment-unsubscribe w3-red <?php } else { ?> creation-comment-subscribe w3-yellow <?php } ?> w3-bar-item w3-btn w3-hover-blue w3-border"><?php if ($data['is_subbed_comment']) { ?> Unsubscribe from <?php } else { ?> Subscribe to <?php } ?> comments</a>
+                                <a class="<?php if ($data['is_subbed_fav']) { ?> creation-fav-unsubscribe w3-red <?php } else { ?> creation-fav-subscribe w3-yellow <?php } ?> w3-bar-item w3-btn w3-hover-blue w3-border"><?php if ($data['is_subbed_fav']) { ?> Unsubscribe from <?php } else { ?> Subscribe to <?php } ?> favorites</a>
+                            </div>
+                        </div>
 
-                        <?php if ($data['can_edit']) { ?>
+                        <?php if($data['is_owner']) {?>
                             <div class="tooltip" id="data-edit-model">
                                 <span class="w3-tag w3-blue tooltiptext">Edit this creation</span>
                                 <a href="/acc/creations?edit=<?php echo $_GET['id'] ?>">
                                     <button name="edit" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo" />
                                         <i class="fa fa-pencil" aria-hidden="true"></i> Edit
+                                    </button>
+                                </a>
+                            </div>
+                        <?php } else if ($data['can_edit']) { ?>
+                            <div class="tooltip" id="data-edit-model">
+                                <span class="w3-tag w3-blue tooltiptext">Edit this creation in the Modeler</span>
+                                <a href="/modeler?build_id=<?php echo $_GET['id'] ?>">
+                                    <button name="edit" class="w3-btn w3-blue w3-hover-opacity w3-padding-small w3-border w3-border-indigo" />
+                                        <i class="fa fa-cubes" aria-hidden="true"></i> Modeler
                                     </button>
                                 </a>
                             </div>
@@ -323,10 +290,52 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 </button>
                             </div>
                         <?php } ?>
+                    </div>
+
+                    <p class="creation-page-meta" id="stats">
+                        <span title="<?php echo $data['date'] ?>">Published <?php echo time_ago($data['date']) ?></span> • <span><?php echo $data['views'] ?> views • <span><?php echo $data['likes'] ?> favorites</span>
+                    </p>
+                    
+                    <?php if($data['user']['exists']) { ?>
+                        <p class="creation-page-meta">By 
+                            <b class="meta-author">
+                                <a id="user-link" class="<?php echo $data['user']['admin'] === true ? 'w3-text-red w3-hover-text-yellow' : ''; ?>" href="/@<?php echo urlencode($data['user']['name'])?>"><i class="fa fa-at" aria-hidden="true"></i><?php echo $data['user']['name'] ?></a>
+                            </b>
+                            • <span id="user-link-creations"><?php echo $data['user']['stats']['creations'] ?> creations</span>
+                            • <span id="user-link-favorites"><?php echo $data['user']['stats']['favorites'] ?> favorites</span>
+                        </p>
                     <?php } ?>
+                </header><hr />
+
+                <?php if (!empty($data['description_markdown'])) { ?>
+                    <div id="description">
+                        <?php echo $data['description_markdown'] ?>
+                    </div>
+                    <hr />
+                <?php } ?>
+
+                <?php
+                $tags = fetch_tags($model_id);
+
+                if (!empty($tags)) { ?>
+                    <div id="tags" class="w3-medium">
+                        <h4>Tags (<?php echo count($tags) ?>)</h4>
+                        <?php
+                            foreach ($tags as $_tagg) {?>
+                                <a href="/list.php?t=<?php echo urlencode($_tagg['name']) ?>" class="w3-button w3-padding-small w3-hover-orange w3-light-grey w3-round">
+                                    <?php echo htmlspecialchars($_tagg['name']) ?>
+                                </a>
+                        <?php
+                            }
+                        ?>
+                        </div>
+                    <hr />
+                <?php } ?>
+
+                <div id="embed">
+                    <h4>Embed 3d viewer</h4>
+                    <p><textarea class="w3-input w3-round" readonly><?php echo $model_embed ?></textarea></p>
                 </div>
-                <p><span class="w3-large">Embed:</span></p>
-                <p><textarea class="w3-card-2 w3-round" rows='2' cols='75' readonly><?php echo $model_embed ?></textarea></p>
                 <hr />
             </figcaption>
         </figure>
@@ -433,23 +442,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                 <?php
             }
 
-			function comment_find_by_id(array $comments, int $parent_id) {
-				foreach ($comments as $comment) {
-					if ($comment['id'] == $parent_id) {
-						return $comment;
-					}
-
-					if (!empty($comment['children'])) {
-						$found = comment_find_by_id($comment['children'], $parent_id);
-						if ($found !== null) {
-							return $found;
-						}
-					}
-				}
-				return null;
-			}
-
-            function comment_tree(array $grouped_comments, $parent_id, $depth = 0) {
+            function comment_tree(array $grouped_comments, int $parent_id, $depth = 0) {
                 global $loggedin;
 
                 foreach ($grouped_comments as $comment) {
@@ -482,7 +475,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                             <i class="w3-large w3-text-white fa fa-play fa-rotate-180"></i>
                         </div>
 
-                        <div id="comment-text" class="comment-body w3-col" style="width: <?php echo max(40, 60 - ($depth * 2)); ?>%;">
+                        <div class="comment-body w3-col" style="width: <?php echo max(40, 60 - ($depth * 2)); ?>%;">
                             <article class="<?php echo $comment['votes'] >= 100 ? 'w3-orange' : 'gr8-theme w3-light-grey' ?> w3-card-2 w3-padding-small w3-round w3-border w3-border-grey">
                                 <header class="w3-padding-bottom">
                                     <b class="<?php echo $comment['user']['admin'] ? 'w3-text-red' : null ?>">
@@ -509,7 +502,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                 <?php } ?>
 
                                 <div class="text">
-                                    <?php echo $comment['comment_md'] ?? '<p><i>This comment has been removed</i></p>' ?>
+                                    <?php echo $comment['comment_md'] ?? '[deleted]' ?>
                                 </div>
 
                                 <?php if ($loggedin && $comment['actions']['edit']) { ?>
@@ -540,7 +533,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
                                                     ?>
                                                     <span class="tooltip avatar">
                                                         <span class="w3-blue tooltiptext"><?php echo $subbed['username'] ?></span>
-                                                        <a href="/user/<?php echo $subbed['id'] ?>"><img src="<?php echo $subbed['picture'] ?>" class="w3-circle w3-grey" width="25px" height="25px" alt="User Avatar" /></a>
+                                                        <a href="/@<?php echo urlencode($subbed['username']) ?>"><img src="<?php echo $subbed['picture'] ?>" class="w3-circle w3-grey" width="25px" height="25px" alt="User Avatar" /></a>
                                                     </span>
                                                     <?php
                                                 }

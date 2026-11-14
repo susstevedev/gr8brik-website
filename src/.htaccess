@@ -1,6 +1,7 @@
 php_value display_errors On
 php_value mbstring.http_input auto
 php_value date.timezone America/New_York
+Options -MultiViews
 RewriteEngine On
 
 # RewriteCond %{HTTP_HOST} ^www.(.*)$ [NC]
@@ -19,16 +20,31 @@ ErrorDocument 500 "<h1>Internal Server Error</h1><p>The server encountered an in
 ErrorDocument 503 default
 
 RewriteRule ^modeler/?$ /mod/new/index.html [QSA,L]
+
 RewriteRule ^user/([0-9]+)/?$ /profile.php?id=$1 [QSA,L]
-RewriteRule ^@(.*)$ /profile.php?name=$1 [B,QSA,L]
+RewriteRule ^users/([0-9]+)/?$ /profile.php?id=$1 [QSA,L]
+RewriteRule ^@([^/]+)$ /profile.php?name=$1 [B,QSA,L]
+RewriteRule ^u/([^/]+)$ /profile.php?name=$1 [QSA,L]
+
 RewriteRule ^build/([0-9]+)/?$ /creation.php?id=$1 [QSA,L]
+RewriteRule ^creation/([0-9]+)/?$ /creation.php?id=$1 [QSA,L]
+RewriteRule ^c/([0-9]+)/?$ /creation.php?id=$1 [QSA,L]
+
 RewriteRule ^topic/([0-9]+)/?$ /com/view.php?id=$1 [QSA,L]
+
+RewriteRule ^forum/?$ /com/ [QSA,L]
+RewriteRule ^forum/create/?$ /com/post.php [QSA,L]
+RewriteRule ^forum/search/([^/]+)$ /com/search.php?q=$1 [QSA,L]
+RewriteRule ^forum/t/([0-9]+)/?$ /com/view.php?id=$1 [QSA,L]
+
 RewriteRule ^acc/users/images/([0-9]+)/?$ /ajax/image.php?imgbb_image=true&id=$1 [QSA,L]
 
-RewriteCond %{REQUEST_FILENAME}.php -f
-RewriteRule !.*.php$ %{REQUEST_FILENAME}.php [QSA,L]
-
 RewriteRule ^acc/creations/edit/([0-9]+)/?$ /acc/creations?edit=$1 [QSA,L]
+
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+# RewriteRule ^(.*)/?$ $1.php [QSA,L]
+RewriteRule ^(.*)$ $1.php [QSA,L]
 
 Redirect 301 /github https://github.com/susstevedev/gr8brik-new
 RewriteRule ^sitemap.xml /sitemap2.php [QSA,L]
@@ -36,11 +52,12 @@ Redirect 301 /new_appeal.php /appeal.php
 # obviously you can remove this if your local copy of gr8brik doesn't have a rules topic yet
 Redirect 301 /rules /com/view.php?id=17
 Redirect 403 /important.php
+Redirect 301 /newsite /list?legacy_site=true
 
 #block direct access to the creation files without new api
 RedirectMatch 403 ^/cre/.*.json$
+RedirectMatch 403 ^/cre/.*.gr8$
 
-# RewriteRule ^index.php /oops.html [QSA,L]
-# RewriteCond %{HTTP:Cookie} admin=yes [NC]
+# RewriteCond %{HTTP:Cookie} admin [NC]
 # RewriteRule .* - [L]
 # RewriteRule .* - [R=503,L]

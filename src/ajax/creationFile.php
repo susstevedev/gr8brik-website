@@ -74,6 +74,7 @@ if(isset($_POST['queryFile']) && isset($_POST['id'])) {
         ];
 
         $_SESSION['viewer_auth'] = bin2hex(random_bytes(32));
+        view_creation($model_id);
 
         if (file_exists($tmp_creation)) {
             unlink($tmp_creation);

@@ -196,20 +196,17 @@ if (isset($_GET['feature_v3'])) {
             $tags = array_filter(array_map('trim', explode(',', $query)));
 
             if (!empty($tags)) {
-                $conditions = array_fill(0, count($tags), "t.tag_name LIKE ?");
-                $where_clause = implode(' OR ', $conditions);
+                $placeholders = implode(', ', array_fill(0, count($tags), '?'));
 
-                //Distinct to prevent duplicates
-                $sql = "SELECT DISTINCT m.* FROM model m JOIN tags t ON m.id = t.model_id WHERE ($where_clause) LIMIT 12 OFFSET " . (int)$offset;
-                $stmt = $conn2->prepare($sql);
+                $stmt = $conn2->prepare
+                ("SELECT DISTINCT m.* FROM model m
+                JOIN model_tags mt ON m.id = mt.model_id
+                JOIN tags t ON mt.tag_id = t.id
+                WHERE t.tag_name IN ($placeholders)
+                LIMIT 12 OFFSET " . (int)$offset);
 
                 $types = str_repeat('s', count($tags));
-                $search_params = [];
-                foreach ($tags as $tag) {
-                    $search_params[] = "%" . $tag . "%";
-                }
-
-                $stmt->bind_param($types, ...$search_params);
+                $stmt->bind_param($types, ...$tags);
                 $stmt->execute();
                 $result2 = $stmt->get_result();
 

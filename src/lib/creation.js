@@ -205,7 +205,7 @@
 
             let is_like = btn.hasClass('like-creation');
             let data = {
-                model_id: embed_model
+                model_id: window.embed_model
             };
 
             if (is_like) {
@@ -273,7 +273,7 @@
 			}
 
             let data = {
-                model_id: embed_model,
+                model_id: window.embed_model,
 				type: type,
             };
 
@@ -651,7 +651,7 @@
                     dataType: 'json',
                     data: {
                         comment: true,
-                        buildId: embed_model,
+                        buildId: window.embed_model,
                         commentbox: commentBox.val(),
                         parent: parent,
                         csrf_token: window.csrf_token

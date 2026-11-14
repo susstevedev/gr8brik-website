@@ -263,11 +263,11 @@ class Notifications
             $user_count = count($users);
 
             if ($user_count === 1) {
-                $user_string = "<a href='/user/" . $users[0]['id'] . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a>";
+                $user_string = "<a href='/@" . urlencode($users[1]['name']) . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a>";
             } elseif ($user_count === 2) {
-                $user_string = "<a href='/user/" . $users[0]['id'] . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a> and <a href='/user/" . $users[1]['id'] . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[1]['name'] . "</a>";
+                $user_string = "<a href='/@" . urlencode($users[1]['name']) . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a> and <a href='/@" . urlencode($users[1]['name']) . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[1]['name'] . "</a>";
             } else {
-                $user_string = "<a href='/user/" . $users[0]['id'] . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a> and " . ($user_count - 1) . " others";
+                $user_string = "<a href='/@" . urlencode($users[1]['name']) . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a> and " . ($user_count - 1) . " others";
             }
 
             switch ($category):

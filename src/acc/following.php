@@ -40,7 +40,6 @@ if(!loggedin() || !isset($current_user)) {
 
     <div class="message w3-padding-small w3-round-small w3-card-2 w3-yellow w3-text-black">
         <p>Some accounts may not appear here.</p>
-        <p>When an account is deactivated for longer than 14 days, we start deleting data, like follow and block relations, to maintain user privacy.</p>
     </div><br />
 
     <div class="w3-bar">

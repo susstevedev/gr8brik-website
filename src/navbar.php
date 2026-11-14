@@ -17,10 +17,10 @@
 
                 <span class='w3-red w3-tag w3-round'>
                     <?php
+                        require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
                         $alert = $current_user->alert;
                         if ($alert > 0) {
-                            require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
-                            echo Numbers::format($alert);
+                            echo ($alert <= 9) ? $alert : '9+';
                         }
                     ?>
                 </span>
@@ -31,12 +31,12 @@
                     <span><i class='fa fa-cog w3-padding-small' aria-hidden='true'></i>Account Settings</span>
                 </a>
                 
-                <a href="/@<?php echo $current_user->username ?? null ?>" class='w3-bar-item w3-button'>
+                <a href="/@<?php echo urlencode($current_user->username ?? null) ?>" class='w3-bar-item w3-button'>
                     <span><i class='fa fa-user-o w3-padding-small' aria-hidden='true'></i>My Profile</span>
                 </a>
 
                 <a href='/acc/notifications' class='w3-bar-item w3-button'>
-                    <span><i class='fa fa-bell-o w3-padding-small' aria-hidden='true'></i>Notifications <span class='w3-red w3-tag w3-round'><?php echo $alert > 0 ? number_format($alert) : null; ?></span></span>
+                    <span><i class='fa fa-bell-o w3-padding-small' aria-hidden='true'></i>Notifications <span class='w3-red w3-tag w3-round'><?php echo $alert > 0 ? Numbers::format($alert) : null; ?></span></span>
                 </a>
                 
                 <a href='/acc/creations' class='w3-bar-item w3-button'>

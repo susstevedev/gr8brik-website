@@ -6,7 +6,7 @@
         
         if(loggedin() && isset(login()->alert)) {
             $notifs = login()->alert;
-            $notifs_format = ($notifs > 9) ? '9+' : $notifs;
+            $notifs_format = number_format($notifs);
         }
 
         return "<title>" . ((isset($notifs) && $notifs > 0) ? "({$notifs_format}) " : '') . "{$title} - Gr8Brik</title>";

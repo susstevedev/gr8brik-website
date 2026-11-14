@@ -610,7 +610,7 @@ class User {
         }
 
         if($usero->admin) {
-            $strings .= " <i class='fa fa-gavel w3-text-red' title='This user is a moderator' aria-hidden='true'></i>";
+            $strings .= " <i class='fa fa-shield w3-text-red' title='This user is a moderator' aria-hidden='true'></i>";
         }
 
         return $strings;

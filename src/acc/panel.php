@@ -11,10 +11,7 @@
 <div class="gr8-theme w3-container w3-card-2 w3-light-grey w3-padding w3-border w3-border-grey w3-round-small w3-center">
     <?php
         $alert = $current_user->alert;
-        if($alert) { 
     ?>
-		<h2 class="w3-text-red"><?php echo number_format($alert) ?> notifications</h2>
-	<?php } ?>
 	<span><h4>Hello, </h4><span class="usertext"><h2><?php echo $current_user->username ?></h2></span></span>
 
 	<a href='/acc/' class='w3-btn w3-hover-opacity w3-white w3-mobile w3-border w3-padding-small'><i class='fa fa-pencil' aria-hidden='true'></i>Account Settings</a>&nbsp;<br />
@@ -22,7 +19,7 @@
     <button class="w3-hide-large w3-btn w3-hover-opacity w3-large w3-white w3-mobile w3-border w3-padding w3-round-small" onclick='document.getElementById("gr8-drawer").classList.toggle("w3-hide-small");'>Show/hide drawer</button><br />
 
     <div id="gr8-drawer" class="w3-hide-small gr8-drawer">
-        <a href="/user/<?php echo $current_user->id ?>" class="gr8-panelbtn gr8-panelbtn-profile w3-btn w3-hover-opacity w3-large w3-white w3-mobile w3-border w3-padding w3-round-small">
+        <a href="/@<?php echo urlencode($current_user->username) ?>" class="gr8-panelbtn gr8-panelbtn-profile w3-btn w3-hover-opacity w3-large w3-white w3-mobile w3-border w3-padding w3-round-small">
             <li class="fa fa-user-o" aria-hidden="true"></li>
             Profile
         </a>&nbsp;
