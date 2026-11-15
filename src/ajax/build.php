@@ -7,6 +7,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/const/toMarkdown.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/safe_url_id.php';
+
 $bbcode = new BBCode;
 
 $conn = Database::get(DB_NAME2);
@@ -52,6 +54,41 @@ if(isset($_GET['storage'])) {
     exit;
 }
 
+/**
+ * Validate creation json
+ */
+function valid_json_creation(array $decoded_json): bool {
+    if ($decoded_json === null || json_last_error() !== JSON_ERROR_NONE) {
+        return false;
+    }
+
+    if(!isset($decoded_json['metadata'])) {
+        return false;
+    }
+
+    if(!isset($decoded_json['camera'])) {
+        return false;
+    }
+
+    if(!isset($decoded_json['camera']['x']) || !isset($decoded_json['camera']['y']) || !isset($decoded_json['camera']['z'])) {
+        return false;
+    }
+
+    if(!isset($decoded_json['metadata']['file_version'])) {
+        return false;
+    }
+
+    if(!is_int($decoded_json['metadata']['file_version']) || $decoded_json['metadata']['file_version'] < 1.2) {
+        return false;
+    }
+
+    if(!isset($decoded_json['blocks'])) {
+        return false;
+    }
+
+    return true;
+}
+
 if (isset($_POST['save_build_v2'])) {
     header('Content-Type: application/json');
 
@@ -78,7 +115,7 @@ if (isset($_POST['save_build_v2'])) {
 
     $decoded_json = json_decode($modelJson, true);
 
-    if ($decoded_json === null && json_last_error() !== JSON_ERROR_NONE) {
+    if(!valid_json_creation($decoded_json)) {
         http_response_code(400);
         echo json_encode(['error' => ErrorRegistry::get('creation', 'format_invalid')]);
         exit;
@@ -109,7 +146,7 @@ if (isset($_POST['save_build_v2'])) {
             exit;
         }
 
-        $stmt = $conn->prepare("SELECT id, user, model, screenshot, size FROM model WHERE id = ? AND user = ? LIMIT 1");
+        $stmt = $conn->prepare("SELECT id, num_id, user, model, screenshot, size FROM model WHERE id = ? AND user = ? LIMIT 1");
 
         if (!$stmt) {
             http_response_code(500);
@@ -132,6 +169,7 @@ if (isset($_POST['save_build_v2'])) {
     }
 
     if ($updating) {
+        $num_id = $existing['num_id'] ?? $existing['id'];
         $file_name = ".." . $existing['model'];
         $db_file_name = $existing['model'];
 
@@ -145,11 +183,12 @@ if (isset($_POST['save_build_v2'])) {
             $db_screenshot = null;
         }
     } else {
-        $file_id = $name_trim . '_' . bin2hex(random_bytes(16));
+        $num_id = random_url_safe();
+        $file_id = $name_trim . '_' . $num_id;
         $old_file_size = 0;
         $db_files_path = '/cre/';
 
-        $db_file_name = $db_files_path . $file_id . ".gr8";
+        $db_file_name = $db_files_path . $file_id . ".json";
         $file_name = '../' . $db_file_name;
         $db_screenshot = $db_files_path . $file_id . ".webp";
         $screenshot_path = '../' . $db_screenshot;
@@ -274,7 +313,7 @@ if (isset($_POST['save_build_v2'])) {
             exit;
         }
     } else {
-        $stmt = $conn->prepare("INSERT INTO model (user, model, description, name, date, size, screenshot, visibility, can_edit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $conn->prepare("INSERT INTO model (num_id, user, model, description, name, date, size, screenshot, visibility, can_edit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         if (!$stmt) {
             http_response_code(500);
@@ -283,7 +322,8 @@ if (isset($_POST['save_build_v2'])) {
         }
 
         $stmt->bind_param(
-            "issssissi",
+            "sissssissi",
+            $num_id,
             $user,
             $db_file_name,
             $desc,
@@ -317,6 +357,7 @@ if (isset($_POST['save_build_v2'])) {
         'success' => $updating ? "Your creation was updated successfully!" : "Your creation was saved successfully!",
         'creation' => [
             'id' => $build_id,
+            'num_id' => $num_id,
             'url' => $url_view,
             'name' => $name,
             'url_edit' => '/acc/creations?edit=' . $build_id,
