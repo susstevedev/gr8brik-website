@@ -1,13 +1,13 @@
+// this is old dead code don't bug me about it
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/5.1.4/workbox-sw.js');
 
 const CACHE_NAME = "pwabuilder-cache-v3";
-const OFFLINE_FALLBACK_PAGE = "/oops.html";
-precached = ["/modeler", "/mod/new/index.js", "/mod/new/index.css", "/mod/new/index.html", "/ajax/user.php?ajax=true", "/list.php", "/list.php?sort=all", "/list", "/list?sort=all"]
+const OFFLINE_FALLBACK_PAGE = "/lib/static/offline.html";
+precached = ["/lib/static/offline.html", "/lib/static/404.html", "/img/logo.jpg", "/lib/w3_new.css", "/lib/theme.css", "/modeler", "/mod/new/index.js", "/mod/new/index.css", "/mod/new/index.html", "/ajax/user.php?ajax=true", "/list.php", "/list.php?sort=all", "/list", "/list?sort=all"]
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.add(OFFLINE_FALLBACK_PAGE);
       return cache.addAll(precached);
     })
   );
@@ -39,7 +39,9 @@ self.addEventListener('fetch', (event) => {
       (async () => {
         try {
           const preloadResp = await event.preloadResponse;
-          if (preloadResp) return preloadResp;
+          if (preloadResp) {
+            return preloadResp;
+          }
 
           return await fetch(event.request);
         } catch (error) {

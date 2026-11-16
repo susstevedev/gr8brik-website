@@ -14,7 +14,7 @@ ErrorDocument 301 default
 ErrorDocument 400 default
 ErrorDocument 401 default
 ErrorDocument 403 default
-ErrorDocument 404 default
+ErrorDocument 404 /lib/static/404.html
 ErrorDocument 429 default
 ErrorDocument 500 "<h1>Internal Server Error</h1><p>The server encountered an internal error or misconfiguration and was unable to complete your request.</p><p>Please contact the server administrator at <a href='mailto:mail@gr8brik.rf.gd'>mail@gr8brik.rf.gd</a> to inform them of the time this error occurred, and the actions you performed just before this error.</p><p>More information about this error may be available in the server error log.</p>"
 ErrorDocument 503 default
