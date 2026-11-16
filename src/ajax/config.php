@@ -20,7 +20,7 @@ require_once 'constants.php';
 require_once 'mysql.php';
 require_once 'errors.php';
 require_once 'ipban.php';
-require_once 'what_browser.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/what_browser.php';
 
 class SessHandler implements SessionHandlerInterface {
     private ?mysqli $db = null;

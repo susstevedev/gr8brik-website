@@ -1,6 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 
 if (!loggedin() || !isset($current_user)) {

@@ -2,11 +2,9 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . "/com/bbcode.php";
 require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . "/ajax/time.php";
+require_once $_SERVER['DOCUMENT_ROOT'] . "/const/utils/time.php";
 
-$bbcode = new BBCode;
 $page_limit = 10;
 $crud = new mysqli_crud(DB_NAME3);
 $user_crud = new mysqli_crud(DB_NAME);

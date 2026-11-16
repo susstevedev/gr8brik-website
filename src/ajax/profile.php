@@ -2,9 +2,9 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/com/bbcode.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/bbcode.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/time.php';
 $bbcode = new BBCode;
 
 if (isset($_GET['followed_by'])) {

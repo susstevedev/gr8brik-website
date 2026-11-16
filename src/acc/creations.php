@@ -1,8 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/numbers.php';
 
 if (!loggedin() || !isset($current_user)) {
     header('Location:login.php');

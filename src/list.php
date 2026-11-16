@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/numbers.php';
 
 $conn = Database::get(DB_NAME);
 $conn2 = Database::get(DB_NAME2);

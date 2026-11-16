@@ -17,7 +17,7 @@
 
                 <span class='w3-red w3-tag w3-round'>
                     <?php
-                        require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
+                        require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/numbers.php';
                         $alert = $current_user->alert;
                         if ($alert > 0) {
                             echo ($alert <= 9) ? $alert : '9+';

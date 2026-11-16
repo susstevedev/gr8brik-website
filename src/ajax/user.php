@@ -60,7 +60,7 @@ if (loggedin()) {
     }
 
     if (!file_exists($lock_file) || (time() - filemtime($lock_file) > 3600)) {
-        require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/cleanup.php';
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/cleanup.php';
         $cleaner = new Cleaner(Database::get(DB_NAME), Database::get(DB_NAME2), Database::get(DB_NAME3));
 
         $cleaner->delete_inactive_users();
@@ -849,7 +849,7 @@ function logout(?bool $redirect = false) {
 }
 
 function regenerate_session() {
-    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/what_browser.php';
     global $conn;
 
     if (!loggedin()) {

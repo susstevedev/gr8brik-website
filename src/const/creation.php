@@ -1,11 +1,11 @@
 <?php
 
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/time.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/numbers.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/numbers.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/const/toMarkdown.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/const/safe_url_id.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/safe_url_id.php';
 
 $conn = Database::get(DB_NAME2);
 $conn2 = Database::get(DB_NAME);

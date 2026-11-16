@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/what_browser.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/what_browser.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/time.php';
 
 if(!loggedin()) {
     header('Location:login.php');
