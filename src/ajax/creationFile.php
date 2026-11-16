@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/errors.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/build.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/creation.php';
 
 if(isset($_POST['queryFile']) && isset($_POST['id'])) {
     header('Cache-Control: no-store, no-cache, must-revalidate');

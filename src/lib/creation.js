@@ -215,7 +215,7 @@
             }
 
             $.ajax({
-                url: "/ajax/build",
+                url: "/ajax/v2/creations",
                 method: "POST",
                 dataType: 'json',
                 data: data,
@@ -284,7 +284,7 @@
             }
 
             $.ajax({
-                url: "/ajax/build",
+                url: "/ajax/v2/creations",
                 method: "POST",
                 dataType: 'json',
                 data: data,
@@ -342,7 +342,7 @@
 			}
 
             $.ajax({
-                url: "/ajax/build",
+                url: "/ajax/v2/creations",
                 method: "POST",
                 dataType: 'json',
                 data: data,
@@ -572,7 +572,7 @@
 
                 fetchCSRFToken(function () {
                     $.ajax({
-                        url: "../ajax/build",
+                        url: "/ajax/v2/creations",
                         dataType: 'json',
                         data: {
                             comment_preview: true,
@@ -646,7 +646,7 @@
                 btn.prop("disabled", true);
 
                 $.ajax({
-                    url: "/ajax/build",
+                    url: "/ajax/v2/creations",
                     method: "POST",
                     dataType: 'json',
                     data: {
@@ -714,7 +714,7 @@
 
             fetchCSRFToken(function () {
                 $.ajax({
-                    url: '/ajax/build',
+                    url: '/ajax/v2/creations',
                     type: 'POST',
                     data: {
                         edit_comment: true,

@@ -9,8 +9,6 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/bbcode.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/const/toMarkdown.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/const/safe_url_id.php';
 
-$bbcode = new BBCode;
-
 $conn = Database::get(DB_NAME2);
 $conn2 = Database::get(DB_NAME);
 
@@ -111,6 +109,8 @@ if (isset($_POST['save_build_v2'])) {
     $name_trim = preg_replace('/[^A-Za-z0-9]/', '_', $name);
     $modelJson = $_POST['creation'] ?: null;
     $visible = $_POST['visibility'] ?: null;
+    $build_id = $_POST['build_id'] ?: null;
+    $screenshot_data = $_POST['screenshot'] ?: null;
     $can_edit = $_POST['can_edit'] ?: 0;
 
     $decoded_json = json_decode($modelJson, true);
@@ -128,7 +128,6 @@ if (isset($_POST['save_build_v2'])) {
     }
 
     $updating = false;
-    $build_id = null;
     $existing = null;
 	
 	if($visible === 'public' && $current_user->verify_token !== null) {
@@ -138,7 +137,7 @@ if (isset($_POST['save_build_v2'])) {
 	}
 
     if (isset($_POST['build_id']) && $_POST['build_id'] !== null && $_POST['build_id'] !== "null") {
-        $build_id = filter_var($_POST['build_id'], FILTER_VALIDATE_INT);
+        $build_id = $_POST['build_id'];
 
         if ($build_id === false) {
             http_response_code(400);
@@ -168,6 +167,8 @@ if (isset($_POST['save_build_v2'])) {
         }
     }
 
+    $db_files_path = '/cre/';
+
     if ($updating) {
         $num_id = $existing['num_id'] ?? $existing['id'];
         $file_name = ".." . $existing['model'];
@@ -179,14 +180,13 @@ if (isset($_POST['save_build_v2'])) {
             $screenshot_path = ".." . $existing['screenshot'];
             $db_screenshot = $existing['screenshot'];
         } else {
-            $screenshot_path = null;
-            $db_screenshot = null;
+            $db_screenshot = $db_files_path . $num_id . ".webp";
+            $screenshot_path = '../' . $db_screenshot;
         }
     } else {
         $num_id = random_url_safe();
         $file_id = $name_trim . '_' . $num_id;
         $old_file_size = 0;
-        $db_files_path = '/cre/';
 
         $db_file_name = $db_files_path . $file_id . ".json";
         $file_name = '../' . $db_file_name;
@@ -202,8 +202,8 @@ if (isset($_POST['save_build_v2'])) {
         }
     }
 
-    $new_file_size = strlen($modelJson);
-    $stmt = $conn->prepare("SELECT COALESCE(SUM(size), 0) AS total_used FROM model WHERE user = ?");
+    $db_file_size = strlen($modelJson);
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(size), 0) AS total_used FROM model WHERE user = ? AND removed = 0");
 
     if (!$stmt) {
         http_response_code(500);
@@ -213,13 +213,11 @@ if (isset($_POST['save_build_v2'])) {
 
     $stmt->bind_param("i", $user);
     $stmt->execute();
-
     $result = $stmt->get_result();
     $total = (int)$result->fetch_assoc()['total_used'];
-
     $stmt->close();
 
-    $new_total = $total - $old_file_size + $new_file_size;
+    $new_total = $total - $old_file_size + $db_file_size;
 
     if ($new_total > MODEL_STORAGE_LIMIT) {
         http_response_code(413);
@@ -233,10 +231,15 @@ if (isset($_POST['save_build_v2'])) {
         exit;
     }
 
-    $db_file_size = filesize($file_name);
-
-    if (!empty($_POST['screenshot'])) {
-        $screenshot_data = $_POST['screenshot'];
+    if(empty($screenshot_data)) {
+        http_response_code(400);
+        echo json_encode(['error' => ErrorRegistry::get('creation', 'thumbnail_encoding_bad')]);
+        exit;
+    } else if (!$screenshot_path) {
+        http_response_code(500);
+        echo json_encode(['error' => ErrorRegistry::get('creation', 'thumbnail_save_fail')]);
+        exit;
+    } else {
         if (strpos($screenshot_data, 'data:image/png;base64,') === 0) {
             $base64_str = substr($screenshot_data, strlen('data:image/png;base64,'));
         } elseif (strpos($screenshot_data, 'data:image/webp;base64,') === 0) {
@@ -263,29 +266,27 @@ if (isset($_POST['save_build_v2'])) {
             exit;
         }
 
-        if (!$screenshot_path) {
-            $file_id = bin2hex(random_bytes(16));
-
-            $screenshot_path = "../cre/" . $file_id . ".webp";
-            $db_screenshot = "/cre/" . $file_id . ".webp";
-        }
-
         imagealphablending($image, false);
         imagesavealpha($image, true);
-        $saved = imagewebp($image, $screenshot_path, APP_FEATURES['CREATION']['THUMBNAIL_MAX_QUALITY']);
         imagedestroy($image);
 
-        if (!$saved) {
+        if (!imagewebp($image, $screenshot_path, APP_FEATURES['CREATION']['THUMBNAIL_MAX_QUALITY'])) {
             http_response_code(500);
             echo json_encode(['error' => ErrorRegistry::get('creation', 'thumbnail_save_fail')]);
             exit;
         }
+        imagedestroy($image);
     }
 
     $date = date("Y-m-d H:i:s");
 
     if ($updating) {
-        $stmt = $conn->prepare("UPDATE model SET model = ?, description = ?, name = ?, date = ?, size = ?, screenshot = ?, visibility = ?, can_edit = ? WHERE id = ? AND user = ?");
+        $stmt = $conn->prepare(
+            "UPDATE model SET
+            model = ?, description = ?, name = ?, size = ?, screenshot = ?, visibility = ?, can_edit = ?
+            WHERE id = ?
+            AND user = ?"
+        );
 
         if (!$stmt) {
             http_response_code(500);
@@ -294,11 +295,10 @@ if (isset($_POST['save_build_v2'])) {
         }
 
         $stmt->bind_param(
-            "ssssissiii",
+            "sssissiii",
             $db_file_name,
             $desc,
             $name,
-            $date,
             $db_file_size,
             $db_screenshot,
             $visible,
@@ -313,7 +313,11 @@ if (isset($_POST['save_build_v2'])) {
             exit;
         }
     } else {
-        $stmt = $conn->prepare("INSERT INTO model (num_id, user, model, description, name, date, size, screenshot, visibility, can_edit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $conn->prepare(
+            "INSERT INTO model
+            (num_id, user, model, description, name, date, size, screenshot, visibility, can_edit)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        );
 
         if (!$stmt) {
             http_response_code(500);
@@ -355,6 +359,7 @@ if (isset($_POST['save_build_v2'])) {
 
     echo json_encode([
         'success' => $updating ? "Your creation was updated successfully!" : "Your creation was saved successfully!",
+        'message' => $updating ? "Your Creation was updated successfully!" : "Your Creation was saved successfully!",
         'creation' => [
             'id' => $build_id,
             'num_id' => $num_id,
@@ -364,7 +369,6 @@ if (isset($_POST['save_build_v2'])) {
             'url_modeler' => $url_modeler,
             'visibility' => $visible,
             'can_edit' => $can_edit,
-            'rawfile' => $db_file_name, //should be blacklisted but i don't see why not to send this to the client 
         ],
         'user' => [
             'id' => $current_user->id,
@@ -384,7 +388,7 @@ function fetch_build($model_id, $csrf) {
         return json_encode(["success" => false, "message" => ErrorRegistry::get('auth', 'bad_csrf')]);
     }
 
-    if (!is_numeric($model_id)){
+    if (!is_numeric($model_id)) {
         return json_encode(["success" => false, "message" => ErrorRegistry::get('creation', 'bad_id')]);
     }
 
@@ -428,6 +432,7 @@ function fetch_build($model_id, $csrf) {
         $can_edit = $row2['can_edit'];
     }
 
+    $num_id = $row2['num_id'];
     $userid = $row2['user'];
     $views = number_format($row2['views'] ?? 0);
     $favs = number_format($row2['likes'] ?? 0);
@@ -517,6 +522,7 @@ function fetch_build($model_id, $csrf) {
             'admin' => $usero->admin ?? false,
             'stats' => $counts,
         ],
+        'num_id' => $num_id,
         'modelid' => $model_id,
         'model' => $row2['model'],
         'description_raw' => $description_raw,
@@ -540,17 +546,13 @@ function fetch_build($model_id, $csrf) {
     return json_encode($data);
 }
 
-if(isset($_GET['fetch'])) {
+if(isset($_GET['fetch']) || isset($_GET['getCreation'])) {
     header('Content-Type: application/json');
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-        header("Refresh:0");
-		exit;
-    }
 
-    $model_id = htmlspecialchars((int)$_GET['buildId']);
+    $model_id = $_GET['buildId'] ?? $_GET['id'];
     $data = fetch_build($model_id, $_SESSION['csrf']);
-    exit($data);
+    echo $data;
+    exit;
 }
 
 function view_creation(int $cid) {
@@ -572,7 +574,7 @@ function fetch_tags(int $cid) {
     $tags = [];
 
     $Tag_stmt = $con->prepare
-    ("SELECT t.id, t.tag_name, t.slug
+    ("SELECT t.id, t.tag_name
     FROM tags t
     LEFT JOIN model_tags mt ON t.id = mt.tag_id
     WHERE mt.model_id = ?
@@ -585,7 +587,6 @@ function fetch_tags(int $cid) {
         $tags[$t['id']] = [
             'id' => $t['id'],
             'name' => $t['tag_name'],
-            'slug' => $t['slug'],
         ];
     }
 

@@ -74,7 +74,7 @@ import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawCondit
 
         async function load(model_file) {
             try {
-                await fetch(`/ajax/build?buildId=${model_file}&fetch=true`)
+                await fetch(`/ajax/v2/creations?getCreation=true&id=${model_file}`)
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`Server returned the error ${response.statusText}`);

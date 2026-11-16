@@ -3,13 +3,15 @@
 
     $head = preg_replace_callback('/<title>(.*?)<\/title>/i', function ($match) {
         $title = trim($match[1]);
-        
+
         if(loggedin() && isset(login()->alert)) {
             $notifs = login()->alert;
-            $notifs_format = number_format($notifs);
+            if($notifs > 0) {
+                $notifs_format = ($notifs <= 9) ? $notifs : '9+';
+            }
         }
 
-        return "<title>" . ((isset($notifs) && $notifs > 0) ? "({$notifs_format}) " : '') . "{$title} - Gr8Brik</title>";
+        return "<title>" . (isset($notifs_format) ? "({$notifs_format}) " : null) . "{$title} - Gr8Brik</title>";
     }, $head);
 
     echo $head;

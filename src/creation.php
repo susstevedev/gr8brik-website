@@ -1,7 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/time.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/build.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/creation.php';
 
 if (isset($_POST['reportv2'])) {
     require_once __DIR__ . '/ajax/report.php';
