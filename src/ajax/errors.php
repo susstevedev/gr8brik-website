@@ -1,5 +1,8 @@
 <?php
 require_once 'config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/what_browser.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/svgs.php';
+
 /**
  * Class that owns array of errors and method to return such errors
  */
@@ -119,6 +122,78 @@ class ErrorRegistry {
         }
 
         return $error;
+    }
+
+    /**
+     * Function to generate dynamic Gr8brik error page
+     * @param string $TitleError Error to display in page title
+     * @param string $Error Full error message
+     */
+    public static function ErrorPage(string $TitleError, string $Error) {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+    ?>
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+                <title><?php echo $TitleError ?></title>
+                <link rel="stylesheet" href="/lib/w3_new.css">
+                <link rel="stylesheet" href="/lib/theme.css">
+                <link rel="apple-touch-icon" href="/img/logo.jpg" />
+                <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
+                <meta name="theme-color" content="#f1f1f1" />
+            </head>
+            <body class="w3-container w3-center w3-light-grey">
+                <div id="ErrorDetails">
+                    <h4><?php echo $TitleError ?></h4>
+                    <p><?php echo $Error ?>
+                    <p><a href="" class="w3-button w3-round w3-border w3-border-grey">Retry</a></p>
+                </div>
+                <div id="ClientInfo">
+                    <h4>Client details</h4>
+                    <ul>
+                        <li>IP: <?php echo $_SERVER['REMOTE_ADDR'] ?></li>
+                        <li>Device: <?php echo UA ?></li>
+                        <li>UserID: <?php echo $_SESSION['userid'] ?? 'not set' ?></li>
+                    </ul>
+                </div>
+                <hr />
+                <footer id="Footer" class="w3-round w3-padding w3-border w3-border-grey">
+                    <span>©2026 The Gr8Brik Team. All rights reserved.</span>
+                    <a href="/terms.php">Terms and Conditions</a>.
+                    <a href="/privacy.php">Privacy Policy</a>.
+
+                    <a href="mailto:<?php echo DB_MAIL ?>" target="_blank" class="w3-hover-text-red" alt="Email">
+                        <?php GenerateSVGs::get('bi-envelope-at'); ?>
+                    </a>
+
+                    <a href="<?php echo APP_URLS['socials']['twitterinc']['twitter'] ?>" target="_blank" class="w3-hover-text-blue" alt="Twitter">
+                        <?php GenerateSVGs::get('bi-twitter-x'); ?>
+                    </a>
+
+                    <a href="<?php echo APP_URLS['socials']['google']['youtube'] ?>" target="_blank" class="w3-hover-text-red" alt="YouTube">
+                        <?php GenerateSVGs::get('bi-youtube'); ?>
+                    </a>
+
+                    <a href="<?php echo APP_URLS['socials']['microsoft']['github'] ?>" target="_blank" class="w3-hover-text-white" alt="Github">
+                        <?php GenerateSVGs::get('bi-github'); ?>
+                    </a>
+
+                    <a href="<?php echo APP_URLS['socials']['reddit']['reddit'] ?>" target="_blank" class="w3-hover-text-orange" alt="Reddit">
+                        <?php GenerateSVGs::get('bi-reddit'); ?>
+                    </a>
+
+                    <a href="<?php echo APP_URLS['socials']['discordinc']['discord'] ?>" target="_blank" alt="Discord">
+                        <?php GenerateSVGs::get('bi-discord'); ?>
+                    </a>
+                    <p class="w3-small">Lego&#174;, the Lego&#174; logo, the Minifigure&#8482;, and the Brick&#8482; and Knob&#8482; configurations are trademarks of the Lego&#174; company, which does not sponsor, authorize, or endorse this site.</p>
+                </footer><br />
+            </body>
+        </html>
+    <?php
     }
 }
 ?>

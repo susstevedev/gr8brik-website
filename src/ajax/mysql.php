@@ -10,7 +10,6 @@ class Database {
     private $host = DB_SERVER;
     private $user = DB_USER;
     private $pass = DB_PASSWORD;
-	private string $css_url = 'https://cdn.jsdelivr.net/npm/purecss@latest/build/pure-min.css';
     public $conn;
 
     /**
@@ -22,30 +21,7 @@ class Database {
             $this->conn->set_charset("utf8mb4");
 		} catch(Exception $e) {
             error_log($e->getMessage());
-			?>
-				<!DOCTYPE html>
-				<html>
-					<head>
-						<title><?php echo ErrorRegistry::get('db', 'conn_fail', [$dbname]) ?></title>
-						<link rel="stylesheet" href='<?php echo $this->css_url ?>'>
-					</head>
-					<body>
-						<center>
-							<div>
-								<h2><?php echo ErrorRegistry::get('db', 'conn_fail', [$dbname]) ?></h2>
-								<p><?php echo $e->getMessage() ?>
-								<p><a href="" class="pure-button">Retry</a></p>
-							</div>
-							<div>
-								<h2>Client details</h2>
-								<p>IP: <?php echo $_SERVER['REMOTE_ADDR'] ?></p>
-								<p>Device: <?php echo $_SERVER['HTTP_USER_AGENT'] ?></p>
-								<p>UserID: <?php echo $_SESSION['userid'] ?? 'not set' ?></p>
-							</div>
-						</center>
-					</body>
-				</html>
-			<?php
+            ErrorRegistry::ErrorPage(ErrorRegistry::get('db', 'conn_fail', [$dbname]), $e->getMessage());
 			exit;
 		}
     }
