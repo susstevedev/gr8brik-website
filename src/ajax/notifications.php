@@ -174,7 +174,7 @@ class Notifications
 
         if ($result->num_rows !== 0) {
             if($notif_count > 0) {
-                $alertsql = "UPDATE users SET alert = 0 WHERE id = ? AND deactive IS NULL AND suspended = 0";
+                $alertsql = "UPDATE users SET alert = 0 WHERE id = ? AND deactive IS NULL";
                 $alertstmt = $this->db->prepare($alertsql);
                 $alertstmt->bind_param("i", $userId);
 
@@ -263,7 +263,7 @@ class Notifications
             $user_count = count($users);
 
             if ($user_count === 1) {
-                $user_string = "<a href='/@" . urlencode($users[1]['name']) . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a>";
+                $user_string = "<a href='/@" . urlencode($users[0]['name']) . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a>";
             } elseif ($user_count === 2) {
                 $user_string = "<a href='/@" . urlencode($users[1]['name']) . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[0]['name'] . "</a> and <a href='/@" . urlencode($users[1]['name']) . "'><i class='fa fa-at' aria-hidden='true'></i>" . $users[1]['name'] . "</a>";
             } else {

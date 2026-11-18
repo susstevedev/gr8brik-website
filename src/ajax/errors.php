@@ -57,8 +57,10 @@ class ErrorRegistry {
         ],
         'user' => [
             'not_found' => 'User not found in database',
-            'private_profile' => 'User has privated their profile.',
-            'private_profile_detailed' => "When an account is private, other users can\'t view the profile unless they are following said user, or said user is following them.",
+            'deactive_profile' => 'This user has deleted their account',
+            'private_profile' => 'User has privated their profile',
+            'suspended_profile' => 'This account has been suspended %s.<br />When an account is suspended, the owner can\'t sign in or interact with content. However, they can appeal the suspension.',
+            'private_profile_detailed' => "When an account is private, other users can't view the profile unless they are following said user, or said user is following them.",
         ],
         'profile_follow' => [
             'generic' => "An error occured while following this user",

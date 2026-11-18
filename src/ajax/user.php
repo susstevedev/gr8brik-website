@@ -17,25 +17,40 @@ function login() {
     $token_raw = $_SESSION['tokenid'] ?? $_COOKIE['token'];
     $token_hashed = hash('sha256', $token_raw);
 
-    $session_stmt = $conn->prepare("SELECT user, timestamp FROM sessions WHERE id = ? LIMIT 1");
+    $session_stmt = $conn->prepare(
+        "SELECT s.user, s.timestamp,
+        u.id, u.username, u.github_id, u.google_id, u.email, u.password, u.alert, u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
+        p.picture, p.picture_small, p.banner, p.twitter, p.bsky, p.private_profile, p.description, p.verified_badge
+        FROM sessions s
+        LEFT JOIN users u ON u.id = s.user AND u.deactive IS NULL
+        LEFT JOIN user_profiles p ON p.userid = s.user
+        WHERE s.id = ? LIMIT 1"
+    );
+
     $session_stmt->bind_param("s", $token_hashed);
     $session_stmt->execute();
     $session_res = $session_stmt->get_result();
 
     if ($session_res->num_rows <= 0) {
         $session_stmt->close();
-        logout(false);
         return false;
     }
 
-    $id = $session_res->fetch_assoc()['user'] ?? null;
-    $user = User::getUser($id);
+    $session_row = $session_res->fetch_assoc();
+    $id = $session_row['user'] ?? null;
 
-    if(!$user) {
-        $session_stmt->close();
-        logout(false);
-        return false;
-    }
+    $profile = [
+        'picture' => $session_row['picture'],
+        'picture_small' => $session_row['picture_small'],
+        'banner' => $session_row['banner'],
+        'twitter' => $session_row['twitter'],
+        'bsky' => $session_row['bsky'],
+        'private_profile' => $session_row['private_profile'],
+        'description' => $session_row['description'],
+        'verified_badge' => $session_row['verified_badge'],
+    ];
+
+    $user = new User($session_row, $profile);
 
     $user->id = $id;
     $_SESSION['tokenid'] = $token_raw;
@@ -598,7 +613,7 @@ class User {
         return "https://www.gravatar.com/avatar/" . $hash . "?" . http_build_query($params);
     }
 
-    public static function get_badges(User $usero) {
+    public static function get_badges(User|bool $usero) {
         $strings = "";
 
         if($usero->profile->private_profile) {

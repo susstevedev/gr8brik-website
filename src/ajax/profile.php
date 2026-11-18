@@ -234,10 +234,7 @@ class UserProfile {
 
         if(!isset($profile_id)) {
             http_response_code(400);
-            return [
-                "success" => false,
-                "message" => ErrorRegistry::get('db', 'query_fail'),
-            ];
+            return ["success" => false];
         }
 
         if (!isset($usero)) {
@@ -252,7 +249,6 @@ class UserProfile {
         }
 
         if ($usero->suspended || $usero->deactive) {
-            http_response_code(403);
             $banrow = AccountManager::blacklisted($profile_id, 'id');
 
             if($banrow) {
@@ -263,15 +259,16 @@ class UserProfile {
                     "userid" => $profile_id,
                     "code" => 'account_banned',
                     "title" => 'Account suspended',
-                    "message" => 'This account has been suspended ' . $until . '.<br />When an account is suspended, the owner can\'t sign in or interact with content. However, they can appeal the ban.',
+                    "message" => ErrorRegistry::get('user', 'suspended_profile', [$until]),
                 ];
             } else {
+                http_response_code(410);
                 $arr = [
                     "success" => false,
                     "userid" => $profile_id,
-                    "code" => 'not_found',
-                    "title" => 'Something went wrong',
-                    "message" => 'Please try again later',
+                    "code" => 'deactive_profile',
+                    "title" => 'Account Deactivated',
+                    "message" => ErrorRegistry::get('user', 'deactive_profile'),
                 ];
             }
 

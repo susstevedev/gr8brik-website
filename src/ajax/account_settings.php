@@ -7,7 +7,7 @@ $conn = Database::get(DB_NAME);
 
 class ScreenNameUtils {
     public function generateRandomScreenName() {
-        $words = ['Brick', 'Minifig', 'Stud', 'Build', 'Block', 'Stack', 'Baseplate', 'Roadplate', 'Fanatic', 'Craftsman', 'Awesome', 'Great' , 'Master', 'Creator', 'Modeler'];
+        $words = ['Brick', 'Minifig', 'Stud', 'Stack', 'Baseplate', 'Roadplate', 'Fanatic', 'Craftsman', 'Awesome', 'Great' , 'Master', 'Creator', 'Modeler'];
         $randomKeys = array_rand($words, 2);
         $randomWord1 = $words[$randomKeys[0]];
         $randomWord2 = $words[$randomKeys[1]];
@@ -41,14 +41,14 @@ class ScreenNameUtils {
                 return ['available' => false, 'reason' => "Please verify your account to continue this action."];
             }
 
-            if (!empty($current_user->changed)) {
+            if (!empty($current_user->changed ?? 0)) {
                 $remaining = $current_user->changed - time();
                 if ($remaining < 86400) {
                     return ['available' => false, 'reason' => "You can change your username " . time_ago($remaining)];
                 }
             }
 
-            if(trim((strtolower($new))) == trim((strtolower($current_user->username)))) {
+            if(trim((strtolower($new))) == trim((strtolower($current_user->username ?? '')))) {
                 return ['available' => false];
             }
         }
@@ -69,13 +69,13 @@ class ScreenNameUtils {
             return ['available' => false, 'reason' => 'This username is unavailable. Please choose another.'];
         }
 
-        $stmt = $conn->prepare("SELECT username FROM users WHERE username = ? AND username IS NOT NULL LIMIT 1");
+        $stmt = $conn->prepare("SELECT 1 FROM users WHERE username = ? AND username IS NOT NULL LIMIT 1");
         $stmt->bind_param("s", $new);
         $stmt->execute();
         $result = $stmt->get_result();
 
         if($result->num_rows !== 0 || in_array($new, $reserved_names)) {
-            return ['available' => false, 'reason' => 'This username has been taken. Please choose another.'];
+            return ['available' => false, 'reason' => 'This username is unavailable. Please choose another.'];
         }
 
         return ['available' => true, 'reason' => 'Username is available'];
@@ -85,9 +85,7 @@ class ScreenNameUtils {
 if(isset($_GET['check_username_available'])) {
     $username = urldecode(htmlspecialchars($_GET['username']));
     $utils = new ScreenNameUtils();
-    $result = $utils->check_username_available($username);
-    header("HTTP/1.0 200 OK");
-    echo json_encode($result);
+    echo json_encode($utils->check_username_available($username));
     exit;
 }
 
@@ -107,10 +105,16 @@ class AccountSettings {
         $result = $utils->check_username_available($new);
         if ($result['available'] === '0') {
             header("HTTP/1.0 500 Internal Server Error");
-            return ['error' => $result['reason']];
+            return ['success' => false, 'error' => $result['reason'], 'http' => http_response_code()];
         }
 
         $changed = time();
+        $exists = $conn->query("SELECT 1 FROM users WHERE id = '$id' AND deactive IS NULL");
+
+        if($exists->num_rows <= 0) {
+            http_response_code(401);
+            return ['success' => false, 'error' => ErrorRegistry::get('user', 'not_found'), 'http' => http_response_code()];
+        }
 
         $stmt = $conn->prepare("UPDATE users SET username = ?, changed = ? WHERE id = ? AND deactive IS NULL");
         $stmt->bind_param("sis", $new, $changed, $id);
@@ -315,11 +319,10 @@ class AccountSettings {
             return ['error' => "New passwords do not match"];
         }
 
-        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
-        $stmt->bind_param("i", $userid);
-        $stmt->execute();
-        $stmt->bind_result($hash);
-        $stmt->fetch();
+        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ? AND deactive IS NULL");
+        $stmt->execute([$userid]);
+        $result = $stmt->get_result();
+        $hash = $result->fetch_assoc()['password'] ?? null;
         $stmt->close();
 
         if ($hash) {
@@ -640,17 +643,17 @@ if (isset($_POST['remove_picture'])) {
 
     if(loggedin() && isset($current_user)) {
         $id = $current_user->id;
-        $old_pfp = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture;
-        $old_pfp_small = $_SERVER['DOCUMENT_ROOT'] . $current_user->picture_small;
+        $old_pfp = $_SERVER['DOCUMENT_ROOT'] . $current_user->profile->picture;
+        $old_pfp_small = $_SERVER['DOCUMENT_ROOT'] . $current_user->profile->picture_small;
 
-        if (strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($old_pfp)) {
+        if (strpos($current_user->profile->picture, '/acc/users/pfps/') !== false && file_exists($old_pfp)) {
             unlink($old_pfp);
         } else {
             http_response_code(400);
             exit(json_encode(['success' => false, 'error' => 'You do not have an uploaded profile image.']));
         }
 
-        if (strpos($current_user->picture_small, '/acc/users/pfps/') !== false && file_exists($old_pfp_small)) {
+        if (strpos($current_user->profile->picture_small, '/acc/users/pfps/') !== false && file_exists($old_pfp_small)) {
             unlink($old_pfp_small);
         }
 
@@ -659,7 +662,7 @@ if (isset($_POST['remove_picture'])) {
 
         if ($stmt->execute()) {
             http_response_code(200);
-            exit(json_encode(['success' => true, 'message' => 'Profile picture removed.', 'image' => $current_user->picture ?? null]));
+            exit(json_encode(['success' => true, 'message' => 'Profile picture removed.', 'image' => $current_user->profile->picture ?? null]));
         } else {
             http_response_code(500);
             exit(json_encode(['success' => false, 'error' => 'Error removing profile picture. Please try again later.']));
