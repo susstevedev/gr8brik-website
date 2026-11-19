@@ -343,7 +343,7 @@ function fetch_build($model_id, $csrf) {
 
     $id = loggedin() ? ($current_user->id ?? 0) : 0;
     $is_admin = (isset($current_user->admin) && $current_user->admin === true);
-    $is_owner = (loggedin() && isset($current_user) && trim($current_user->id) === trim($row2['user']));
+    $is_owner = (loggedin() && isset($current_user) && trim($id) === trim($row2['user']));
     $soft_message = '';
 
     if ($row2['removed'] === 1) {
@@ -461,7 +461,6 @@ function fetch_build($model_id, $csrf) {
         ],
         'num_id' => $num_id,
         'modelid' => $model_id,
-        'model' => $row2['model'],
         'description_raw' => $row2['description'],
         'description_markdown' => $description_markdown,
         'name' => $name,

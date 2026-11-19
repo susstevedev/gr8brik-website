@@ -19,7 +19,7 @@ import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawCondit
                 },
                 hdri: {
                     enabled: true,
-                    background: true,
+                    background: false,
                     path: 'https://cdn.jsdelivr.net/gh/susstevedev/gr8brik/hdris/autumn_field_puresky_1k.hdr',
                 },
             },
@@ -149,6 +149,8 @@ import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawCondit
         load(model_file);
 
         function load_model_data(model_data) {
+            loading.innerText = "Creating the scene...";
+
             var scene = new THREE.Scene();
 
             var renderer = new THREE.WebGLRenderer({ canvas: viewer, antialias: true, alpha: true });

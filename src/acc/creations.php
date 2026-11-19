@@ -118,7 +118,7 @@ if (isset($_POST['edit']) && isset($_POST['id'])) {
     $name = $_POST['title'];
     $about = $_POST['description'];
     $visibility = $_POST['visibility'];
-    $editior = (bool)$_POST['can_edit'];
+    $editior = filter_var($_POST['can_edit'], FILTER_VALIDATE_BOOLEAN);
 
     if((bool)$data['legacy'] === true) {
         $name = $data['name'];
