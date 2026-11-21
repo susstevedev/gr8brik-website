@@ -1,6 +1,8 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/numbers.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/time.php';
 
 if(isset($_GET['name'])) {
     $use_username = true;
@@ -219,18 +221,18 @@ if(isset($_POST['unban-submit'])) {
             <?php } ?>
 
             <span id="stats" class="w3-padding-small">
-                <b id="model-count"><?php echo number_format($data['stats']['creation_count']) ?></b> creations -
-                <b id="follower-count"><?php echo number_format($data['stats']['followers']) ?></b> followers -
-                <b id="following-count"><?php echo number_format($data['stats']['following']) ?></b> following
+                <b id="model-count"><?php echo Numbers::format($data['stats']['creation_count']) ?></b> creations -
+                <b id="follower-count"><?php echo Numbers::format($data['stats']['followers']) ?></b> followers -
+                <b id="following-count"><?php echo Numbers::format($data['stats']['following']) ?></b> following
             </span><br />
         </span>
 
         <div><p id="description"><?php echo $data['description'] ?></p></div>
 
         <span id="stats-other">
-            <b><?php echo number_format($data['stats']['forum_posts']) ?></b> forum posts -
-            <b><?php echo number_format($data['stats']['views']) ?></b> views -
-            <b><?php echo number_format($data['stats']['likes']) ?></b> likes
+            <b><?php echo Numbers::format($data['stats']['forum_posts']) ?></b> forum posts -
+            <b><?php echo Numbers::format($data['stats']['views']) ?></b> views -
+            <b><?php echo Numbers::format($data['stats']['likes']) ?></b> likes
         </span><br />
 
         <span id="joined-wrapper">

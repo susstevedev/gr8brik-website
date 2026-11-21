@@ -193,6 +193,11 @@ $(document).ready(function() {
         $("#loginAd").hide();
     });
 
+    $("#hideTopbarNews").click(function(event) {
+        $.cookie('hide_news', true, { expires: 365, path: '/' });
+        $("#topbarNews").fadeOut();
+    });
+
     $("#toggleDark, .toggleDark").click(function(event) {
         $.cookie('mode', 'dark', { expires: 365, path: '/' });
         mode();

@@ -3,19 +3,19 @@ Class Numbers {
     // Source - https://stackoverflow.com/a/47763805
     // Posted by Clinton Canarias
     // Retrieved 2026-08-07, License - CC BY-SA 3.0
-    public static function format($n) {
+    public static function format(int $n) {
         if ($n < 900) {
-            $n_format = number_format($n);
+            $n = number_format($n);
         } else if ($n < 900000) {
-            $n_format = number_format($n / 1000) . 'K';
+            $n = number_format($n / 1000) . 'k';
         } else if ($n < 900000000) {
-            $n_format = number_format($n / 1000000) . 'M';
+            $n = number_format($n / 1000000) . 'm';
         } else if ($n < 900000000000) {
-            $n_format = number_format($n / 1000000000) . 'B';
+            $n = number_format($n / 1000000000) . 'b';
         } else {
-            $n_format = number_format($n / 1000000000000) . 'T';
+            $n = number_format($n / 1000000000000) . 't';
         }
-        return $n_format;
+        return $n;
     }
 
     // Source - https://stackoverflow.com/a/5501447

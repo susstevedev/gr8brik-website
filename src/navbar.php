@@ -84,10 +84,13 @@
 <div class="w3-main gr8-main"><br />
 	<span id="popup-wrapper-global"></span>
 
-    <div class="w3-card-2 w3-light-grey w3-padding w3-round-small w3-margin-top gr8-theme">
-		<b>Creation downloads</b>
-		<p>We're removing direct downloading of Creations, due to how we're restructuring the Creation system internally. You will still be able to view and edit creations from Gr8Brik itself; and export creations from the Modeler.</p>
-	</div><br />
+    <?php if(!isset($_COOKIE['hide_news'])) { ?>
+        <div id="topbarNews" class="topbarNewsContainer w3-display-container w3-card-2 w3-light-grey w3-padding w3-round-small w3-border w3-border-grey w3-margin gr8-theme">
+            <span id="hideTopbarNews" class="w3-display-topright w3-red w3-button">&times;</span>
+            <b>Creation downloads</b>
+            <p>We're removing direct downloading of Creations, due to how we're restructuring the Creation system internally. You will still be able to view and edit creations from Gr8Brik itself; and export creations from the Modeler.</p>
+        </div>
+    <?php } ?>
 
     <div id="modal-set-logout" class="w3-modal">
         <div class="w3-modal-content gr8-theme w3-card-2 w3-center w3-light-grey w3-animate-bottom">
@@ -97,7 +100,7 @@
                     <h2>Are you sure you want to logout?</h2>
                     <input type="hidden" value="logout" name="status">
                     <span name="close" class="close w3-btn w3-large w3-white w3-hover-blue w3-round-small">No</span>
-                    <input type="submit" value="Yes" name="logout" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">
+                    <input type="submit" value="Yes" class="w3-btn w3-large w3-white w3-hover-red w3-round-small">
                 </form>
             </div>
         </div>

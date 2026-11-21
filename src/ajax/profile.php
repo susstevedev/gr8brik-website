@@ -285,6 +285,7 @@ class UserProfile {
         $is_me = false;
         $is_admin = false;
         $is_private = $usero->profile->private_profile ?? false;
+        $counts = [];
 
         if(loggedin()) {
             $blocks = User::isBlocking($profile_id);
@@ -345,37 +346,37 @@ class UserProfile {
         $stmt = $conn2->prepare("SELECT COUNT(*) as all_models FROM model WHERE user = ?");
         $stmt->bind_param("s", $profile_id);
         $stmt->execute();
-        $model_count = $stmt->get_result()->fetch_assoc()['all_models'] ?? 0;
+        $counts['creation_count'] = $stmt->get_result()->fetch_assoc()['all_models'] ?? 0;
         $stmt->close();
 
         $stmt = $conn2->prepare("SELECT SUM(views) as total_views FROM model WHERE user = ?");
         $stmt->bind_param("s", $profile_id);
         $stmt->execute();
-        $views = $stmt->get_result()->fetch_assoc()['total_views'] ?? 0;
+        $counts['views'] = $stmt->get_result()->fetch_assoc()['total_views'] ?? 0;
         $stmt->close();
 
         $stmt = $conn2->prepare("SELECT SUM(likes) as total_likes FROM model WHERE user = ?");
         $stmt->bind_param("s", $profile_id);
         $stmt->execute();
-        $likes = $stmt->get_result()->fetch_assoc()['total_likes'] ?? 0;
+        $counts['likes'] = $stmt->get_result()->fetch_assoc()['total_likes'] ?? 0;
         $stmt->close();
 
         $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE profileid = ?");
         $stmt->bind_param("s", $profile_id);
         $stmt->execute();
-        $followers = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
+        $counts['followers'] = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
         $stmt->close();
 
         $stmt = $conn->prepare("SELECT COUNT(*) as following FROM follow WHERE userid = ?");
         $stmt->bind_param("s", $profile_id);
         $stmt->execute();
-        $following = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
+        $counts['following'] = $stmt->get_result()->fetch_assoc()['following'] ?? 0;
         $stmt->close();
 
         $stmt = $conn3->prepare("SELECT COUNT(*) as reply_count FROM messages WHERE userid = ? AND deleted_at IS NULL");
         $stmt->bind_param("i", $profile_id);
         $stmt->execute();
-        $user_post_count = $stmt->get_result()->fetch_assoc()['reply_count'] ?? 0;
+        $counts['forum_posts'] = $stmt->get_result()->fetch_assoc()['reply_count'] ?? 0;
         $stmt->close();
 
         $message = null;
@@ -392,14 +393,7 @@ class UserProfile {
             'age' => isset($usero->age) ? htmlspecialchars($usero->age) : '',
             'picture' => htmlspecialchars($usero->profile->picture ?? '/img/no_image.png'),
             'banner' => isset($usero->profile->banner) ? htmlspecialchars($usero->profile->banner) : null,
-            'stats' => [
-                'creation_count' => $model_count,
-                'followers' => $followers,
-                'following' => $following,
-                'forum_posts' => $user_post_count,
-                'views' => $views,
-                'likes' => $likes,
-            ],
+            'stats' => $counts,
             'is_following' => (bool)$is_following,
             'is_blocking' => (bool)$is_blocking,
             'is_private' => (bool)$is_private,

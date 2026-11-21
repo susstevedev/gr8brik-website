@@ -26,21 +26,15 @@ if(isset($_POST['queryFile']) && isset($_POST['id'])) {
 
     $stmt->execute([$model_id]);
     $row = $stmt->get_result()->fetch_assoc();
+    $is_admin = (isset($current_user->admin) && $current_user->admin === true);
 
-    if (!$row) {
+    if (!$row || ($row['removed'] && !$is_admin)) {
         http_response_code(404);
         echo json_encode(["success" => false, "message" => ErrorRegistry::get('creation', 'not_found')]);
         exit;
     }
 
-    $is_admin = (isset($current_user->admin) && $current_user->admin === true);
     $is_owner = (isset($current_user->id) && trim($current_user->id) === trim($row['user_id']));
-
-    if ($row['removed'] && !$is_admin) {
-        http_response_code(404);
-        echo json_encode(["success" => false, "message" => ErrorRegistry::get('creation_file', 'cannot_edit')]);
-        exit;
-    }
 
     if ($row['visibility'] === 'private' && !$is_admin && !$is_owner) {
         http_response_code(404);
@@ -58,7 +52,7 @@ if(isset($_POST['queryFile']) && isset($_POST['id'])) {
 
     if(!file_exists($file_path)) {
         http_response_code(404);
-        echo json_encode(["success" => false, "message" => ErrorRegistry::get('creation_file', 'json_not_found')]);
+        echo json_encode(["success" => false, "message" => ErrorRegistry::get('creation_file', 'not_found')]);
         exit;
     }
 
