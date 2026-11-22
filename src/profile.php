@@ -117,7 +117,42 @@ if(isset($_POST['delete'])) {
     $email = isset($data['email']) ? $data['email'] : null;
 
     $p_data = $admin->removeUser($profile_id, $ignore, $use_email, $until, $reason, $email);
-    $error_title = $p_data['title'] ?? 'Warn';
+    $error_title = $p_data['title'] ?? 'Suspend';
+
+    if($p_data['success']) {
+        header("HTTP/1.0 200 OK");
+        $message = $p_data['message'] ?? 'Successful';
+        header('refresh:3');
+    } else {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = $p_data['message'] ?? 'An error has occured';
+        header('refresh:3');
+    }
+}
+
+if(isset($_POST['suspend'])) {
+    $ignore = filter_has_var(INPUT_POST,'ignore') ? true : false;
+    $until = isset($_POST['until']) ? $_POST['until'] : null;
+    $reason = isset($_POST['reason']) ? $_POST['reason'] : null;
+    $note = isset($_POST['note']) ? $_POST['note'] : null;
+
+    $p_data = $admin->suspendUser($profile_id, $ignore, $until, $reason, $note);
+    $error_title = $p_data['title'] ?? 'Suspend';
+
+    if($p_data['success']) {
+        header("HTTP/1.0 200 OK");
+        $message = $p_data['message'] ?? 'Successful';
+        header('refresh:3');
+    } else {
+        header("HTTP/1.0 500 Internal Server Error");
+        $error = $p_data['message'] ?? 'An error has occured';
+        header('refresh:3');
+    }
+}
+
+if(isset($_POST['unsuspend'])) {
+    $p_data = $admin->unsuspendUser($profile_id);
+    $error_title = $p_data['title'] ?? 'Unsuspend';
 
     if($p_data['success']) {
         header("HTTP/1.0 200 OK");
@@ -134,7 +169,7 @@ if(isset($_POST['unban-submit'])) {
     $email = isset($data['email']) ? $data['email'] : null;
 
     $p_data = $admin->unblacklistUser($profile_id, $email);
-    $error_title = $p_data['title'] ?? 'Unban';
+    $error_title = $p_data['title'] ?? 'Unsuspend';
 
     if($p_data['success']) {
         header("HTTP/1.0 200 OK");
@@ -176,9 +211,9 @@ if(isset($_POST['unban-submit'])) {
                 <a href="/acc/login" id="button-follow" name="follow" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Login to follow user</a>
             <?php } ?>
 
-            <?php if(isset($error_code) && $error_code === 'account_banned' && loggedin() && $user_admin) {?>
-                <form id="unbanUser" action="" method="post"></form>
-                <input id="unban-submit" name="unban-submit" form="unbanUser" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-border w3-border-pink" type="submit" value="Unban user">
+            <?php if(isset($error_code) && $error_code === 'suspended_profile' && loggedin() && $user_admin) {?>
+                <form id="unsuspendUser" action="" method="post"></form>
+                <input name="unsuspend" form="unsuspendUser" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-border w3-border-pink" type="submit" value="Unsuspend user">
             <?php } ?>
         </div>
         <?php include('linkbar.php') ?>
@@ -297,7 +332,10 @@ if(isset($_POST['unban-submit'])) {
                                 Warn
                             </button>
                             <button id="button-delete-user" onclick='document.getElementById("modal-delete").style.display="block"' name="delete" class="w3-bar-item w3-button" />
-                                Ban
+                                Suspend (old)
+                            </button>
+                            <button id="button-suspend-user" onclick='document.getElementById("modal-suspend").style.display="block"' name="suspend" class="w3-bar-item w3-button" />
+                                Suspend
                             </button>
                         <?php } ?>
                     </div>
@@ -386,6 +424,52 @@ if(isset($_POST['unban-submit'])) {
                         <span name="close" class="w3-btn w3-large w3-white w3-hover-blue" onclick="document.getElementById('modal-delete').style.display='none'">No</span>
                         <input type="submit" value="Yes" name="delete" class="w3-btn w3-large w3-white w3-hover-red">
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-suspend" class="w3-modal">
+            <div class="gr8-theme w3-modal-content w3-card-2 w3-light-grey w3-round w3-padding w3-center">
+                <div class="w3-container">
+                    <span onclick="document.getElementById('modal-suspend').style.display='none'" class="w3-button w3-large w3-red w3-hover-white w3-display-topright">&times;</span>
+                    <form method='post' action=''>
+                        <h2>Are you sure you want to suspend this user?</h2>
+                        <b>You can only suspend this user when they violate our <a href="/rules?src=user.profile" target="_blank"><i class="fa fa-external-link" aria-hidden="true"></i>rules</a>.</b><br />
+
+                        <label for="until">Date until</label>
+                        <input type="date" class="w3-input w3-round w3-hover-opacity" id="until" name="until" min="<?php echo date('Y-m-d') ?>" max="2056-12-31"><br />
+
+                        <input class="w3-check w3-margin-bottom" type="checkbox" id="ignore" name="ignore">
+                        <label for="ignore">Permanent ban</label><br />
+
+                        <label for="reason">Reason<label>
+                        <!--<div name="reasons" class="w3-border w3-margin-bottom w3-border-grey">
+                            <input type="radio" name="reason" value="violent" class="w3-check"> <label>Violent or extreme content</label><br />
+                            <input type="radio" name="reason" value="misinformation" class="w3-check"> <label>Misinformation/disinformation</label><br />
+                            <input type="radio" name="reason" value="inappropriate" class="w3-check"> <label>Inappropriate content</label><br />
+                            <input type="radio" name="reason" value="harrasing-me" class="w3-check"> <label>Harassing me or others</label><br />
+                            <input type="radio" name="reason" value="spam" class="w3-check"> <label>Spam</label><br />
+                            <input type="radio" name="reason" value="underage" class="w3-check"> <label>User is under 13</label><br />
+                            <input type="radio" name="reason" value="copyright" class="w3-check"> <label>Copyrighted content</label><br />
+                            <input type="radio" name="reason" value="other" class="w3-check"> <label>Something else</label><br />
+                        </div>-->
+
+                        <select name="reason" class="w3-input w3-round w3-hover-opacity w3-margin-bottom">
+                            <option value="violent"><label>Violent or extreme content</label></option>
+                            <option value="misinformation"><label>Misinformation/disinformation</label></option>
+                            <option value="inappropriate"><label>Inappropriate content</label></option>
+                            <option value="harrasing-me"><label>Harassing me or others</label></option>
+                            <option value="spam"><label>Spam</label></option>
+                            <option value="underage"><label>User is under 13</label></option>
+                            <option value="copyright"><label>Copyrighted content</label></option>
+                            <option value="other"><label>Something else</label></option>
+                        </select>
+
+                        <textarea name="note" placeholder="Moderator note about this ban" class="w3-input w3-border w3-mobile" rows="4" cols="50" required></textarea><br />
+
+                        <span name="close" class="w3-btn w3-large w3-white w3-round w3-hover-opacity" onclick="document.getElementById('modal-suspend').style.display='none'">No</span>
+                        <input type="submit" value="Yes" name="suspend" class="w3-btn w3-large w3-white w3-round w3-hover-red">
+                    </form><br />
                 </div>
             </div>
         </div>

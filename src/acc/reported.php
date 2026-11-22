@@ -90,7 +90,9 @@ if (isset($_POST['accept'])) {
 
                 if ($stmt->execute()) {
                     if($destruct) {
-                        delete_inactive_users($content_id, true, true);
+                        require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/cleanup.php';
+                        $cleaner = new Cleaner(Database::get(DB_NAME), Database::get(DB_NAME2), Database::get(DB_NAME3));
+                        $cleaner->delete_inactive_users($content_id, true, true);
                     }
 
                     $stmt_del = $conn->prepare("DELETE FROM reports WHERE reportable_id = ?");
@@ -99,7 +101,7 @@ if (isset($_POST['accept'])) {
 
                     exit('Removed profile successfully');
                 } else {
-                    exit('Couldn\'t remove comment.');
+                    exit('Couldn\'t remove user.');
                 }
             case 'direct_message':
                 $messageid = $content_id;

@@ -16,12 +16,12 @@ class Cleaner {
         if (loggedin()) {
             $expiry_short = time() - (60 * 60 * 24 * 1);//1 day
             $expiry_long = time() - (60 * 60 * 24 * 15);//15 day
-            
+
             $old_sessions_stmt = $this->_conn->prepare("DELETE FROM sessions WHERE timestamp < ? AND remember = 0");
             $old_sessions_stmt->bind_param("i", $expiry_short);
             $old_sessions_stmt->execute();
             $old_sessions_stmt->close();
-            
+
             $old_sessions_stmt = $this->_conn->prepare("DELETE FROM sessions WHERE timestamp < ? AND remember = 1");
             $old_sessions_stmt->bind_param("i", $expiry_long);
             $old_sessions_stmt->execute();
@@ -31,7 +31,39 @@ class Cleaner {
         return false;
     }
 
-    public function delete_inactive_users($userid = null, $blacklist_email = false, $blacklist_username = false) {
+    /**
+     * Run sql queries in bulk
+     */
+    private function bulk($db, $sql, $types = null, $ids = null, $return = false) {
+        if ($stmt = $db->prepare($sql)) {
+            if($types && $ids) {
+                $stmt->bind_param($types, ...$ids);
+            }
+
+            if (!$stmt->execute()) {
+                throw new Exception($stmt->error);
+            }
+
+            if($return === true) {
+                $result = $stmt->get_result();
+                return $result;
+            }
+
+            $stmt->close();
+        } else {
+            throw new Exception($db->error);
+        }
+    }
+
+    /**
+     * Deletes users with deactivated accounts
+     * @param $userid Singular user id.
+     * @param $blacklist_email If true, will blacklist the email so it cannot be reused.
+     * @param $blacklist_username If true, will blacklist the Username so it cannot be reused.
+     * @param $only_contents If true, will skip deleting the main user row. Basically, sets the user as a "clean slate".
+     * @param $everything If true, will delete all account information instead of anonymizing contents
+     */
+    public function delete_inactive_users($userid = null, $blacklist_email = false, $blacklist_username = false, $only_contents = false, $everything = false):bool {
         $user_ids = [];
         $user_pics = [];
         $existing_ban = false;
@@ -40,8 +72,7 @@ class Cleaner {
             $user_ids[] = (int)$userid;
             $existing_ban = User::isBannedByID($userid);
         } else {
-            $stmt = $this->_conn->prepare(
-                "SELECT
+            $usr_sql = "SELECT
                     u.id,
                     p.picture,
                     p.picture_small
@@ -50,16 +81,16 @@ class Cleaner {
                     ON u.id = p.userid
                 WHERE u.deactive IS NOT NULL 
                 AND STR_TO_DATE(u.deactive, '%Y-%m-%d %H:%i:%s') < NOW() - INTERVAL 14 DAY 
-                LIMIT 20"
-            );
+                LIMIT 20";
 
-            if (!$stmt || !$stmt->execute()) {
+            $results = $this->bulk($this->_conn, $usr_sql, null, null, true);
+
+            if(!$results) {
                 echo "<div class='w3-light-grey w3-border w3-center w3-border-grey w3-round w3-card-2'>Could not query users</div>";
                 return false;
             }
 
-            $result = $stmt->get_result();
-            while ($row = $result->fetch_assoc()) {
+            while ($row = $results->fetch_assoc()) {
                 $user_ids[] = (int)$row['id'];
 
                 if (!empty($row['picture']) || !empty($row['picture_small'])) {
@@ -69,7 +100,6 @@ class Cleaner {
                     ];
                 }
             }
-            $stmt->close();
         }
 
         if (empty($user_ids)) {
@@ -124,74 +154,128 @@ class Cleaner {
             }
         }
 
-        function bulk($db, $sql, $types, $ids) {
-            if ($stmt = $db->prepare($sql)) {
-                $stmt->bind_param($types, ...$ids);
-                if (!$stmt->execute()) {
-                    throw new Exception($stmt->error);
-                }
-                $stmt->close();
-            } else {
-                throw new Exception($db->error);
-            }
-        };
+        if($this->inactive_bulks($placeholders, $types, $user_ids, $user_pics, $existing_ban, $only_contents, $everything)) {
+            return true;
+        } else {
+            echo "<div class='w3-light-grey w3-border w3-center w3-border-grey w3-round w3-card-2'>The cleanup of deleted users has failed</div>";
+            return false;
+        }
+    }
 
+    /**
+     * Helper function for the above
+     */
+    private function inactive_bulks($placeholders, $types, $user_ids, $pics, $alr_banned = false, $only_contents = false, $full = false) {
         $this->_conn->begin_transaction();
         $this->_conn2->begin_transaction();
         $this->_conn3->begin_transaction();
 
         try {
-            //forum
-            bulk($this->_conn3, "UPDATE messages SET userid = 0 WHERE userid IN ($placeholders)", $types, $user_ids);
+            switch ($full) {
+                case true:
+                    //forum
+                    $this->bulk($this->_conn2, "DELETE FROM messages WHERE parent IN (SELECT id FROM messages WHERE userid IN ($placeholders))", $types, $user_ids);
+                    $this->bulk($this->_conn3, "DELETE FROM messages WHERE userid IN ($placeholders)", $types, $user_ids);
 
-            //creations
-            bulk($this->_conn2, "UPDATE model SET user = 0 WHERE user IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn2, "UPDATE parts SET userid = 0 WHERE userid IN ($placeholders)", $types, $user_ids);
+                    //comments
+                    $this->bulk($this->_conn2, "DELETE FROM comment_votes WHERE user_id IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM comment_votes WHERE comment_id IN (SELECT id FROM comments WHERE model IN (SELECT id FROM model WHERE user IN ($placeholders)))", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM comment_votes WHERE comment_id IN (SELECT id FROM comments WHERE user IN ($placeholders))", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM comments WHERE model IN (SELECT id FROM model WHERE user IN ($placeholders))", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM comments WHERE parent IN (SELECT id FROM comments WHERE user IN ($placeholders))", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM comments WHERE user IN ($placeholders)", $types, $user_ids);
 
-            //comments
-            bulk($this->_conn2, "DELETE FROM comment_votes WHERE user_id IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn2, "DELETE FROM comment_votes WHERE comment_id IN (SELECT id FROM comments WHERE hidden = 1 AND user IN ($placeholders))", $types, $user_ids);
-            bulk($this->_conn2, "UPDATE comments SET user = 0 WHERE hidden = 0 AND user IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn2, "DELETE FROM comments WHERE hidden = 1 AND user IN ($placeholders)", $types, $user_ids);
+                    //user interactions
+                    $this->bulk($this->_conn2, "DELETE FROM votes WHERE user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM votes WHERE creation IN (SELECT id FROM model WHERE user IN ($placeholders))", $types, $user_ids);
+                    $this->bulk($this->_conn, "DELETE FROM attachments WHERE userid IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn, "DELETE FROM follow WHERE userid IN ($placeholders) OR profileid IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
+                    $this->bulk($this->_conn, "DELETE FROM user_blocks WHERE userid IN ($placeholders) OR profileid IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
+                    $this->bulk($this->_conn, "DELETE FROM notifications WHERE user IN ($placeholders) OR profile IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
+                    $this->bulk($this->_conn, "DELETE FROM subscriptions WHERE userid IN ($placeholders)", $types, $user_ids);
 
-            //user interactions
-            bulk($this->_conn2, "DELETE FROM votes WHERE user IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn, "DELETE FROM attachments WHERE is_deleted = 0 AND userid IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn, "UPDATE attachments SET userid = 0 WHERE is_deleted = 1 AND userid IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn, "DELETE FROM follow WHERE userid IN ($placeholders) OR profileid IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
-            bulk($this->_conn, "DELETE FROM user_blocks WHERE userid IN ($placeholders) OR profileid IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
-            bulk($this->_conn, "DELETE FROM notifications WHERE user IN ($placeholders) OR profile IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
-            bulk($this->_conn, "DELETE FROM subscriptions WHERE userid IN ($placeholders)", $types, $user_ids);
+                    //creations
+                    $this->bulk($this->_conn2, "UPDATE model SET user = 0, visibility = 'private' WHERE user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM parts WHERE userid IN ($placeholders)", $types, $user_ids);
 
-            //legacy
-            bulk($this->_conn, "DELETE FROM bans WHERE user IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn2, "DELETE FROM reported WHERE user IN ($placeholders)", $types, $user_ids);
+                    //legacy
+                    $this->bulk($this->_conn, "DELETE FROM bans WHERE user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM reported WHERE user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn, "DELETE FROM analytics WHERE my_user IN ($placeholders) OR their_user IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
 
-            //mod records
-            bulk($this->_conn, "DELETE FROM appeals WHERE user IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn2, "DELETE FROM reports WHERE reporter_user_id IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn2, "DELETE FROM reports WHERE reportable_type = 'profile' AND reportable_id IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn, "DELETE FROM analytics WHERE my_user IN ($placeholders) OR their_user IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
+                    //mod records
+                    $this->bulk($this->_conn, "DELETE FROM appeals WHERE user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM reports WHERE reporter_user_id IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM reports WHERE reportable_type = 'profile' AND reportable_id IN ($placeholders)", $types, $user_ids);
 
-            //dms
-            bulk($this->_conn, "UPDATE direct_message SET userid = 0 WHERE userid IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn, "DELETE FROM message_users WHERE userid IN ($placeholders)", $types, $user_ids);
+                    //dms
+                    $this->bulk($this->_conn, "DELETE FROM direct_message WHERE userid IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn, "DELETE FROM message_users WHERE userid IN ($placeholders)", $types, $user_ids);
 
-            //the actual user
-            if($existing_ban) {
-                bulk($this->_conn, "DELETE FROM blacklist WHERE type = 'userid' AND value IN ($placeholders)", $types, $user_ids);
+                    //the actual user
+                    if(!$only_contents) {
+                        $this->bulk($this->_conn, "DELETE FROM user_profiles WHERE userid IN ($placeholders)", $types, $user_ids);
+                        $this->bulk($this->_conn, "DELETE FROM users WHERE id IN ($placeholders)", $types, $user_ids);
+                    }
+
+                    break;
+                case false:
+                    //forum
+                    $this->bulk($this->_conn3, "UPDATE messages SET userid = 0 WHERE userid IN ($placeholders)", $types, $user_ids);
+
+                    //creations
+                    $this->bulk($this->_conn2, "UPDATE model SET user = 0 WHERE user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "UPDATE parts SET userid = 0 WHERE userid IN ($placeholders)", $types, $user_ids);
+
+                    //comments
+                    $this->bulk($this->_conn2, "DELETE FROM comment_votes WHERE user_id IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM comment_votes WHERE comment_id IN (SELECT id FROM comments WHERE hidden = 1 AND user IN ($placeholders))", $types, $user_ids);
+                    $this->bulk($this->_conn2, "UPDATE comments SET user = 0 WHERE hidden = 0 AND user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM comments WHERE hidden = 1 AND user IN ($placeholders)", $types, $user_ids);
+
+                    //user interactions
+                    $this->bulk($this->_conn2, "DELETE FROM votes WHERE user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn, "DELETE FROM attachments WHERE is_deleted = 1 AND userid IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn, "UPDATE attachments SET userid = 0 WHERE is_deleted = 0 AND userid IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn, "DELETE FROM follow WHERE userid IN ($placeholders) OR profileid IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
+                    $this->bulk($this->_conn, "DELETE FROM user_blocks WHERE userid IN ($placeholders) OR profileid IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
+                    $this->bulk($this->_conn, "DELETE FROM notifications WHERE user IN ($placeholders) OR profile IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
+                    $this->bulk($this->_conn, "DELETE FROM subscriptions WHERE userid IN ($placeholders)", $types, $user_ids);
+
+                    //legacy
+                    $this->bulk($this->_conn, "DELETE FROM bans WHERE user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM reported WHERE user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn, "DELETE FROM analytics WHERE my_user IN ($placeholders) OR their_user IN ($placeholders)", $types . $types, array_merge($user_ids, $user_ids));
+
+                    //mod records
+                    $this->bulk($this->_conn, "DELETE FROM appeals WHERE user IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM reports WHERE reporter_user_id IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn2, "DELETE FROM reports WHERE reportable_type = 'profile' AND reportable_id IN ($placeholders)", $types, $user_ids);
+
+                    //dms
+                    $this->bulk($this->_conn, "UPDATE direct_message SET userid = 0 WHERE userid IN ($placeholders)", $types, $user_ids);
+                    $this->bulk($this->_conn, "DELETE FROM message_users WHERE userid IN ($placeholders)", $types, $user_ids);
+
+                    //the actual user
+                    if(!$only_contents) {
+                        $this->bulk($this->_conn, "DELETE FROM user_profiles WHERE userid IN ($placeholders)", $types, $user_ids);
+                        $this->bulk($this->_conn, "UPDATE users SET github_id = NULL, google_id = NULL, email = NULL, admin = 0, salt = NULL, password = NULL, deactive = '9999-12-31', suspended = 1 WHERE id IN ($placeholders)", $types, $user_ids);
+                        $this->bulk($this->_conn, "DELETE FROM sessions WHERE user IN ($placeholders)", $types, $user_ids);
+                    }
+
+                    break;
             }
-            bulk($this->_conn, "DELETE FROM user_profiles WHERE userid IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn, "DELETE FROM users WHERE id IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn, "DELETE FROM sessions WHERE user IN ($placeholders)", $types, $user_ids);
-            bulk($this->_conn, "DELETE FROM php_sessions WHERE userid IN ($placeholders)", $types, $user_ids);
+
+            if($alr_banned) {
+                $this->bulk($this->_conn, "DELETE FROM blacklist WHERE type = 'userid' AND value IN ($placeholders)", $types, $user_ids);
+            }
 
             $this->_conn->commit();
             $this->_conn2->commit();
             $this->_conn3->commit();
 
-            if (!empty($user_pics)) {
-                foreach ($user_pics as $picture_group) {
+            if (!empty($pics)) {
+                foreach ($pics as $picture_group) {
                     foreach ($picture_group as $path) {
                         if (!empty($path) && file_exists($path) && is_file($path)) {
                             unlink($path);
@@ -199,16 +283,14 @@ class Cleaner {
                     }
                 }
             }
+
+            return true;
         } catch (Exception) {
             $this->_conn->rollback();
             $this->_conn2->rollback();
             $this->_conn3->rollback();
-
-            echo "<div class='w3-light-grey w3-border w3-center w3-border-grey w3-round w3-card-2'>The cleanup of deleted users has failed</div>";
             return false;
         }
-
-        return true;
     }
 }
 ?>

@@ -12,14 +12,17 @@ function login() {
         return false;
     }
 
-    $conn = Database::get(DB_NAME);
+    $token_raw = $_SESSION['tokenid'] ?? $_COOKIE['token'] ?? null;
+    if (!$token_raw) {
+        return false;
+    }
 
-    $token_raw = $_SESSION['tokenid'] ?? $_COOKIE['token'];
+    $conn = Database::get(DB_NAME);
     $token_hashed = hash('sha256', $token_raw);
 
     $session_stmt = $conn->prepare(
-        "SELECT s.user, s.timestamp,
-        u.id, u.username, u.github_id, u.google_id, u.email, u.password, u.alert, u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
+        "SELECT s.user AS id, s.timestamp,
+        u.username, u.github_id, u.google_id, u.email, u.password, u.alert, u.verify_token, u.admin, u.deactive, u.suspended, u.age, u.changed,
         p.picture, p.picture_small, p.banner, p.twitter, p.bsky, p.private_profile, p.description, p.verified_badge
         FROM sessions s
         LEFT JOIN users u ON u.id = s.user AND u.deactive IS NULL
@@ -30,14 +33,15 @@ function login() {
     $session_stmt->bind_param("s", $token_hashed);
     $session_stmt->execute();
     $session_res = $session_stmt->get_result();
+    $session_row = $session_res->fetch_assoc();
+    $session_stmt->close();
 
-    if ($session_res->num_rows <= 0) {
-        $session_stmt->close();
+    if (!$session_row) {
+        unset($_SESSION['tokenid'], $_SESSION['userid'], $_COOKIE['token']);
         return false;
     }
 
-    $session_row = $session_res->fetch_assoc();
-    $id = $session_row['user'] ?? null;
+    $id = $session_row['id'] ?? null;
 
     $profile = [
         'picture' => $session_row['picture'],
@@ -56,7 +60,6 @@ function login() {
     $_SESSION['tokenid'] = $token_raw;
     $_SESSION['userid'] = $id;
 
-    $session_stmt->close();
     return $user;
 }
 
@@ -616,16 +619,18 @@ class User {
     public static function get_badges(User|bool $usero) {
         $strings = "";
 
-        if($usero->profile->private_profile) {
-            $strings .= '<i class="fa fa-lock w3-text-yellow" title="This user\'s profile has been privated" aria-hidden="true"></i>';
-        }
+        if($usero) {
+            if($usero->profile->private_profile) {
+                $strings .= '<i class="fa fa-lock w3-text-yellow" title="This user\'s profile has been privated" aria-hidden="true"></i>';
+            }
 
-        if($usero->profile->verified_badge) {
-            $strings .= " <i class='fa fa-check-circle w3-text-blue' title='This user has been verified as offical & trusted' aria-hidden='true'></i>";
-        }
+            if($usero->profile->verified_badge) {
+                $strings .= " <i class='fa fa-check-circle w3-text-blue' title='This user has been verified as offical & trusted' aria-hidden='true'></i>";
+            }
 
-        if($usero->admin) {
-            $strings .= " <i class='fa fa-shield w3-text-red' title='This user is a moderator' aria-hidden='true'></i>";
+            if($usero->admin) {
+                $strings .= " <i class='fa fa-shield w3-text-red' title='This user is a moderator' aria-hidden='true'></i>";
+            }
         }
 
         return $strings;
@@ -835,6 +840,10 @@ if(basename($_SERVER['PHP_SELF']) === "user.php") {
 function logout(?bool $redirect = false) {
     global $conn;
 
+    if(session_status() !== PHP_SESSION_ACTIVE) {
+        return false;
+    }
+
     $token_raw = $_SESSION['tokenid'] ?? $_COOKIE['token'] ?? null;
 
     if ($token_raw !== null) {
@@ -846,21 +855,23 @@ function logout(?bool $redirect = false) {
             $stmt->execute();
             $stmt->close();
         }
+    } else {
+        return false;
     }
 
     if (session_status() === PHP_SESSION_ACTIVE) {
-        $_SESSION = [];
+        unset($_SESSION['tokenid'], $_SESSION['userid']);
     }
 
     if (isset($_COOKIE['token'])) {
-        setcookie('token', '');
         unset($_COOKIE['token']);
     }
 
     if ($redirect === true) {
         header('Location: /index.php');
-        exit;
     }
+
+    return true;
 }
 
 function regenerate_session() {
@@ -871,16 +882,17 @@ function regenerate_session() {
         return false;
     }
 
-    $old_token = hash('sha256', $_SESSION['tokenid']);
+    $token_raw = $_SESSION['tokenid'] ?? $_COOKIE['token'] ?? null;
+    if(!$token_raw) {
+        return false;
+    }
+
+    $old_token = hash('sha256', $token_raw);
     $user_ip = $_SERVER['REMOTE_ADDR'];
     $raw_ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
     $user_agent = get_browser_name($raw_ua) . ", " . get_system_name($raw_ua);
 
     $stmt_check = $conn->prepare("SELECT remember, login_from, user_agent FROM sessions WHERE id = ?");
-    if (!$stmt_check) {
-        return false;
-    }
-
     $stmt_check->bind_param("s", $old_token);
     $stmt_check->execute();
     $res = $stmt_check->get_result();
@@ -890,10 +902,6 @@ function regenerate_session() {
         $stmt_check->close();
 
         if ($stored['user_agent'] !== $user_agent || !ip_subnet_same($stored['login_from'], $user_ip)) {            
-            $stmt_kill = $conn->prepare("DELETE FROM sessions WHERE id = ?");
-            $stmt_kill->bind_param("s", $old_token);
-            $stmt_kill->execute();
-            $stmt_kill->close();
             return logout(false);
         }
 
@@ -905,23 +913,19 @@ function regenerate_session() {
         return false;
     }
 
-    $new_raw_token = bin2hex(random_bytes(32)); 
-    $new_token = hash('sha256', $new_raw_token);
-    $active = (string)time();
+    $new_raw = bin2hex(random_bytes(32)); 
+    $new_token = hash('sha256', $new_raw);
+    $active = time();
 
-    $stmt = $conn->prepare("UPDATE sessions SET id = ?, timestamp = ?, login_from = ?, user_agent = ? WHERE id = ? AND remember = 1");
-    if (!$stmt) {
-        return false;
-    }
-
-    $stmt->bind_param("sssss", $new_token, $active, $user_ip, $user_agent, $old_token);
-    if ($stmt->execute()) {
-        $stmt->close();
+    $stmt_upd = $conn->prepare("UPDATE sessions SET id = ?, timestamp = ?, login_from = ?, user_agent = ? WHERE id = ? AND remember = 1");
+    $stmt_upd->bind_param("sssss", $new_token, $active, $user_ip, $user_agent, $old_token);
+    if ($stmt_upd->execute()) {
+        $stmt_upd->close();
         session_regenerate_id(true);
-        $_SESSION['tokenid'] = $new_raw_token;
+        $_SESSION['tokenid'] = $new_raw;
         return true;
     } else {
-        $stmt->close();
+        $stmt_upd->close();
         return false;
     }
 }
@@ -938,16 +942,5 @@ function loggedin() {
     }
 
     return false;
-}
-
-/**
-* @deprecated, use if statement with loggedin()
-*/
-function isLoggedin() {
-    if(loggedin()) {
-        return true;
-    } else {
-        return false;
-    }
 }
 ?>

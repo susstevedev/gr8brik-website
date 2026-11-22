@@ -249,15 +249,21 @@ class UserProfile {
         }
 
         if ($usero->suspended || $usero->deactive) {
-            $banrow = AccountManager::blacklisted($profile_id, 'id');
+            //$banrow = AccountManager::blacklisted($profile_id, 'id');
+
+            $stmt_sus = $conn->prepare("SELECT * FROM user_bans WHERE userid = ? ORDER BY created DESC LIMIT 1");
+            $stmt_sus->bind_param("i", $profile_id);
+            $stmt_sus->execute();
+            $result = $stmt_sus->get_result();
+            $banrow = $result->fetch_assoc();
 
             if($banrow) {
-                $until = isset($banrow['ignore_at']) ? ('until ' . date("d M Y", strtotime($banrow['ignore_at']))) : 'indefinitely';
+                $until = isset($banrow['expires']) ? ('until ' . date("d M Y", strtotime($banrow['expires']))) : 'indefinitely';
 
                 $arr = [
                     "success" => false,
                     "userid" => $profile_id,
-                    "code" => 'account_banned',
+                    "code" => 'suspended_profile',
                     "title" => 'Account suspended',
                     "message" => ErrorRegistry::get('user', 'suspended_profile', [$until]),
                 ];
@@ -825,11 +831,198 @@ class UserAdmin {
     }
 
     /**
+     * Suspends a user, preventing them from using the platform
+     */
+    public function suspendUser(int $profile_id, bool $ignore, ?string $until, ?string $reason, ?string $note) {
+        $error_title = 'Remove user';
+        $reason = isset($reason) ? $reason : 'other';
+        $note = isset($note) ? $note : null;
+        $until = isset($until) ? $until : null;
+
+        if(!loggedin()) {
+            $error = "Please login to remove this user";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($this->current_user) || !$this->current_user->admin || $this->current_user->verify_token !== NULL) {
+            $error = "An authentication error has occurred";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        } else {
+            $me = $this->userid;
+        }
+
+        if(!$profile_id) {
+            $error = ErrorRegistry::get('user', 'not_found');
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if((int)$this->userid === $profile_id) {
+            $error = "You cannot suspend yourself";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if (!empty($until) && !$ignore) {
+            $date = new DateTime($until);
+
+            if ($date) {
+                $until = $date->format('Y-m-d H:i:s');
+            } else {
+                $error = "Bad value for until";
+                return [
+                    'success' => false,
+                    'message' => $error,
+                    'title' => $error_title
+                ];
+            }
+        } else {
+            $until = null;
+        }
+
+        if(!isset($error)) {
+            $stmt_block = $this->conn->prepare("INSERT INTO user_bans (userid, banned_by, reason, note, created, expires) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP(), ?)");
+            $stmt_block->bind_param("iisss", $profile_id, $me, $reason, $note, $until);
+            $result_block = $stmt_block->execute();
+            $stmt_block->close();
+
+            if(!$result_block) {
+                $error = "Couldn't suspend this user at this time";
+                return [
+                    'success' => false,
+                    'message' => $error,
+                    'title' => $error_title
+                ];
+            } else {
+                $queries = [["UPDATE sessions SET timestamp = 0 WHERE user = ?", "i", $profile_id], ["UPDATE users SET suspended = 1 WHERE id = ?", "i", $profile_id]];
+
+                foreach ($queries as [$sql, $type, $id]) {
+                    $stmt = $this->conn->prepare($sql);
+                    $stmt->bind_param($type, $id);
+
+                    if (!$stmt->execute()) {
+                        $stmt->close();
+
+                        return [
+                            'success' => false,
+                            'message' => "Couldn't log this user out when suspending the account",
+                            'title' => $error_title
+                        ];
+                    }
+
+                    $stmt->close();
+                }
+
+                $message = "Suspended this user with success";
+                return [
+                    'success' => true,
+                    'message' => $message,
+                    'title' => 'Success!'
+                ];
+            }
+        }
+    }
+
+    /**
+     * Undoes what suspendUser does
+     */
+    public function unsuspendUser(int $profile_id) {
+        $error_title = 'Unsuspend user';
+
+        if(!loggedin()) {
+            $error = "Please login to unsuspend this user";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        if(!isset($this->current_user) || !$this->current_user->admin || $this->current_user->verify_token !== NULL) {
+            $error = "An authentication error has occurred";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        $usero = User::getUser($profile_id);
+
+        if(!$usero) {
+            $error = "User account does not exist";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        }
+
+        $stmt_follow = $this->conn->prepare("SELECT id FROM user_bans WHERE userid = ? ORDER BY created DESC LIMIT 1");
+        $stmt_follow->bind_param("i", $profile_id);
+        $stmt_follow->execute();
+        $result = $stmt_follow->get_result();
+
+        if($result->num_rows <= 0) {
+            $error = "User account is not suspended";
+            return [
+                'success' => false,
+                'message' => $error,
+                'title' => $error_title
+            ];
+        } else {
+            $sus_row_id = $result->fetch_assoc()['id'];
+        }
+
+        if(!isset($error)) {
+            $queries = [["DELETE FROM user_bans WHERE id = ? LIMIT 1", "i", [$sus_row_id]], ["UPDATE users SET deactive = NULL, suspended = 0 WHERE id = ?", "i", [$profile_id]]];
+
+            foreach ($queries as [$sql, $type, $vals]) {
+                $stmt = $this->conn->prepare($sql);
+                $stmt->bind_param($type, ...$vals);
+
+                if (!$stmt->execute()) {
+                    $stmt->close();
+
+                    return [
+                        'success' => false,
+                        'message' => "An error occurred while unsuspending this user",
+                        'title' => $error_title
+                    ];
+                }
+
+                $stmt->close();
+            }
+
+            $message = "Unsuspended this user with success";
+            return [
+                'success' => true,
+                'message' => $message,
+                'title' => 'Success!'
+            ];
+        }
+    }
+
+    /**
      * Blacklists a user's details, preventing them from using the platform
      */
     public function removeUser(int $profile_id, bool $ignore, bool $use_email, ?string $until, ?string $reason, ?string $email) {
         $error_title = 'Remove user';
-        $reason = isset($reason) ? trim($reason) : 'banned by admin request';
+        $reason = isset($reason) ? htmlentities($reason) : 'banned by admin request';
         $until = isset($until) ? $until : null;
 
         if(!loggedin()) {

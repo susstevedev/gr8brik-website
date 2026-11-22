@@ -4,7 +4,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/svgs.php';
 
 if(!loggedin() && !isset($_COOKIE['hide_login_ad'])) {
     ?>
-    <div id="loginAd" class="w3-hide-small w3-show-medium w3-padding w3-card-2 w3-bottom w3-blue w3-text-white w3-col m8">
+    <div id="loginAd" class="w3-hide-small w3-show-medium w3-padding-small w3-border w3-border-grey w3-card-2 w3-bottom w3-blue w3-text-white w3-col m8">
         <span id="hideLoginAd" class="w3-display-topright w3-red w3-button">&times;</span>
         <span class="w3-left w3-padding">
             <span><a href="/acc/login">Login</a> or <a href="/acc/register">Register</a> to share & save your own Lego-like creations online.</span>

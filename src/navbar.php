@@ -3,7 +3,10 @@
     <a href="/modeler" class="w3-bar-item w3-button"><i class="fa fa-cubes" aria-hidden="true"></i>Modeler</a>
     <a href="/list?sort=all" class="w3-bar-item w3-button"><i class="fa fa-building-o" aria-hidden="true"></i>Creations</a>
     <a href="/com" class="w3-bar-item w3-button"><i class="fa fa-commenting-o" aria-hidden="true"></i>Community</a>
-    <a href="http://blog.gr8brik.rf.gd/" class="w3-bar-item w3-button" target="_blank"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>Blog</a>
+
+    <?php if(APP_FEATURES['BLOG_ENABLE']) { ?>
+        <a href="http://blog.gr8brik.rf.gd/" class="w3-bar-item w3-button" target="_blank"><i class="fa fa-pencil-square-o" aria-hidden="true"></i>Blog</a>
+    <?php } ?>
 
     <div class="gr8-navbarsearch-parent">
         <a class="fa fa-search gr8-navbarsearch" id="search-button"></a>
