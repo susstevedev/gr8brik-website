@@ -33,23 +33,23 @@ if(!loggedin() && !isset($_COOKIE['hide_login_ad'])) {
             <?php GenerateSVGs::get('bi-envelope-at'); ?>
         </a>
 
-        <a href="<?php echo APP_URLS['socials']['twitterinc']['twitter'] ?>" target="_blank" class="w3-hover-text-blue" alt="Twitter">
+        <a href="<?php echo appSpace->__urls->__socials->twitter ?>" target="_blank" class="w3-hover-text-blue" alt="Twitter">
             <?php GenerateSVGs::get('bi-twitter-x'); ?>
         </a>
 
-        <a href="<?php echo APP_URLS['socials']['google']['youtube'] ?>" target="_blank" class="w3-hover-text-red" alt="YouTube">
+        <a href="<?php echo appSpace->__urls->__socials->youtube ?>" target="_blank" class="w3-hover-text-red" alt="YouTube">
             <?php GenerateSVGs::get('bi-youtube'); ?>
         </a>
 
-        <a href="<?php echo APP_URLS['socials']['microsoft']['github'] ?>" target="_blank" class="w3-hover-text-white" alt="Github">
+        <a href="<?php echo appSpace->__urls->__socials->github ?>" target="_blank" class="w3-hover-text-white" alt="Github">
             <?php GenerateSVGs::get('bi-github'); ?>
         </a>
 
-        <a href="<?php echo APP_URLS['socials']['reddit']['reddit'] ?>" target="_blank" class="w3-hover-text-orange" alt="Reddit">
+        <a href="<?php echo appSpace->__urls->__socials->reddit ?>" target="_blank" class="w3-hover-text-orange" alt="Reddit">
             <?php GenerateSVGs::get('bi-reddit'); ?>
         </a>
 
-        <a href="<?php echo APP_URLS['socials']['discordinc']['discord'] ?>" target="_blank" alt="Discord">
+        <a href="<?php echo appSpace->__urls->__socials->discord ?>" target="_blank" alt="Discord">
             <?php GenerateSVGs::get('bi-discord'); ?>
         </a>
     </p>

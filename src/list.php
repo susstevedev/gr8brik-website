@@ -7,10 +7,18 @@ $conn = Database::get(DB_NAME);
 $conn2 = Database::get(DB_NAME2);
 
 if (isset($_GET['feature_v3'])) {
-    $stmt = $conn2->prepare("SELECT * FROM model WHERE feature = 1 ORDER BY date DESC LIMIT 6");
+    $sql = "SELECT m.*, u.username
+    FROM model m
+    INNER JOIN users u
+    ON u.id = m.user
+    WHERE m.feature = 1 AND u.deactive IS NULL
+    ORDER BY date
+    DESC LIMIT 6";
+
+    $stmt = $conn2->prepare($sql);
     $stmt->execute();
     $result2 = $stmt->get_result();
-    $build_count = 0;
+    $creation_count = 0;
     $creations = [];
 
     while ($row2 = $result2->fetch_assoc()) {
@@ -19,52 +27,40 @@ if (isset($_GET['feature_v3'])) {
             $truncated_name .= "...";
         }
 
-        $userid = $row2['user'];
-        $usero = User::getUser($userid);
-
-        if ($usero) {
-            $username = $usero->username ?: '';
-            $truncated_username = substr($username, 0, 15);
-            if (strlen($username) >= 15) {
-                $truncated_username .= "...";
-            }
-
-            $build_count++;
-            $creations[] = [
-                'model_id' => $row2['id'],
-                'user' => $userid,
-                'username' => $truncated_username,
-                'pfp' => $usero->profile->picture ?? null,
-                'title' => $truncated_name,
-                'views' => $row2['views'],
-                'likes' => $row2['likes'],
-                'thumb' => $row2['screenshot'],
-                'comments' => $row2['replies'],
-                'date' => time_ago($row2['date']),
-            ];
+        $username = $row2['username'] ?? 'User';
+        $truncated_username = substr($username, 0, 15);
+        if (strlen($username) >= 15) {
+            $truncated_username .= "...";
         }
+
+        $creation_count++;
+        $creations[] = [
+            'model_id' => $row2['id'],
+            'user' => $row2['user'],
+            'username' => $truncated_username,
+            'pfp' => $usero->profile->picture ?? null,
+            'title' => $truncated_name,
+            'views' => $row2['views'],
+            'likes' => $row2['likes'],
+            'thumb' => $row2['screenshot'],
+            'comments' => $row2['replies'],
+            'date' => time_ago($row2['date']),
+        ];
     }
 
     echo json_encode([
-        'build_count' => $build_count,
+        'build_count' => $creation_count,
+        'count' => $creation_count,
         'creations' => $creations
     ]);
     exit;
 }
 ?>
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <title>Creations</title>
-    <?php include 'header.php' ?>
-</head>
-
-<body class="w3-container">
-    <?php
-        include 'ajax/bbcode.php';
+<?php
+        $pageTitle = 'Creations';
+        $pageDesc = 'Creations Page';
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/header.php';
         include 'navbar.php';
-        $bbcode = new BBCode;
     ?>
 
     <div class="w3-container">
@@ -80,7 +76,6 @@ if (isset($_GET['feature_v3'])) {
     </div>
 
     <?php
-    // Foward back buttons
     $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
     $offset = ($page - 1) * 12;
     $sorting = isset($_GET['sort']) ? $_GET['sort'] : "following";
@@ -306,7 +301,5 @@ if (isset($_GET['feature_v3'])) {
         }
         ?>
     </div>
-    <?php include 'linkbar.php' ?>
-</body>
 
-</html>
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/linkbar.php'; ?>

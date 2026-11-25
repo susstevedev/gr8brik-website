@@ -182,22 +182,19 @@ if(isset($_POST['unban-submit'])) {
     }
 }
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <title><?php echo isset($data['username']) ? '@' . $data['username'] . '\'s profile' : 'Unknown profile' ?></title>
-    <?php include 'header.php' ?>
+
+<?php
+    $pageTitle = (isset($data['username']) ? $data['username'] : 'Profile') . '\'s profile';
+    $pageDesc = 'View ' . (isset($data['username']) ? $data['username'] : 'Profile') . '\'s Creations and more on Gr8Brik';
+    $pageCanonical = appSpace->__urls->app . '/users/' . ($data['userid'] ?? null);
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/header.php';
+    include 'navbar.php';
+?>
 
     <script type="text/javascript">
-        $(document).ready(function() {
-            window.userid = '<?php echo (int)$data['userid'] ?>';
-        });
+        window.userid = '<?php echo (int)$data['userid'] ?>';
     </script>
     <script type="text/javascript" src="/lib/profile.js"></script>
-</head>
-<body class="w3-container">
-
-    <?php include 'navbar.php' ?>
 
     <?php if(isset($error) && isset($error_title)) { ?>
         <div class="message-wrapper gr8-theme w3-light-grey w3-card-2 w3-padding w3-round-small w3-center">
@@ -285,7 +282,7 @@ if(isset($_POST['unban-submit'])) {
                 </a>
             </span>
         <?php } ?>
-        
+
         <?php if(!empty($data['bsky'])) { ?>
             <b>-</b>
             <span id="bsky-wrapper">
@@ -443,17 +440,6 @@ if(isset($_POST['unban-submit'])) {
                         <label for="ignore">Permanent ban</label><br />
 
                         <label for="reason">Reason<label>
-                        <!--<div name="reasons" class="w3-border w3-margin-bottom w3-border-grey">
-                            <input type="radio" name="reason" value="violent" class="w3-check"> <label>Violent or extreme content</label><br />
-                            <input type="radio" name="reason" value="misinformation" class="w3-check"> <label>Misinformation/disinformation</label><br />
-                            <input type="radio" name="reason" value="inappropriate" class="w3-check"> <label>Inappropriate content</label><br />
-                            <input type="radio" name="reason" value="harrasing-me" class="w3-check"> <label>Harassing me or others</label><br />
-                            <input type="radio" name="reason" value="spam" class="w3-check"> <label>Spam</label><br />
-                            <input type="radio" name="reason" value="underage" class="w3-check"> <label>User is under 13</label><br />
-                            <input type="radio" name="reason" value="copyright" class="w3-check"> <label>Copyrighted content</label><br />
-                            <input type="radio" name="reason" value="other" class="w3-check"> <label>Something else</label><br />
-                        </div>-->
-
                         <select name="reason" class="w3-input w3-round w3-hover-opacity w3-margin-bottom">
                             <option value="violent"><label>Violent or extreme content</label></option>
                             <option value="misinformation"><label>Misinformation/disinformation</label></option>
