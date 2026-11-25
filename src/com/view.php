@@ -3,7 +3,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/const/forum.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . "/const/toMarkdown.php";
 require_once $_SERVER['DOCUMENT_ROOT'] . "/const/utils/time.php";
 
 if (loggedin()) {
@@ -11,6 +11,7 @@ if (loggedin()) {
 }
 
 $conn = Database::get(DB_NAME3);
+$conn2 = Database::get(DB_NAME);
 $post_id = htmlspecialchars($_GET['id']);
 
 $post_row = gettopic($conn, $post_id);
@@ -208,18 +209,16 @@ if(isset($post_row['success']) && $post_row['success'] === true) {
 		exit;
 	}
 }
+
+	$pageTitle = $title;
+	$pageDesc = 'Talk on the Gr8Brik community forums';
+	$pageCanonical = appSpace->__urls->app . '/topic/' . ($post_id ?? null);
+	require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
 
-<head>
-    <title><?php echo $title ?? 'topic' ?></title>
-    <?php include $_SERVER['DOCUMENT_ROOT'] . '/header.php' ?>
-	<script type="text/javascript" src="/lib/forum.js"></script>
-</head>
+		<script type="text/javascript" src="/lib/forum.js"></script>
 
-<body class="w3-light-blue w3-container">
-    <?php
+<?php
     include $_SERVER['DOCUMENT_ROOT'] . '/navbar.php';
 
     $page = isset($_GET['p']) ? (int)$_GET['p'] : 1;
@@ -231,182 +230,146 @@ if(isset($post_row['success']) && $post_row['success'] === true) {
 	$reply_count = $counts['replies'];
 	$total_pages = $counts['total_pages'];
 
-    if (isset($post_row['error'])) {
-        echo '<div class="message w3-padding w3-round w3-red">' . $post_row['error'] . '</div><br /><br />';
-        exit;
-    }
+    $randomWord = RandomWord();
+?>
 
-    if ($category === "nolist") {
-        echo "<p id='unlistedwarning'>This forum is unlisted, only people with the link can view it.</p><br />";
-    }
-    ?>
+    <?php if (isset($post_row['error'])) : ?>
+        <div class="message w3-padding w3-round w3-red"><?= $post_row['error'] ?></div><br /><br />
+        <?php exit; ?>
+    <?php endif; ?>
+
+	<?php if ($category === "nolist") : ?>
+       	<p id='unlistedwarning'>This forum is unlisted, only people with the link can view it.</p><br />
+    <?php endif; ?>
 
     <div class='gr8-theme w3-container w3-light-grey w3-card-4 w3-round-small'>
-        <h2><?php echo $title ?></h2>
-        <h4>By <a href='/@<?php echo urlencode($username) ?>'>@<?php echo $username ?></a> on <?php echo $date ?><?php echo $edit_date ? ", edited {$edit_date}" : null ?>. <?php echo $views ?> total views.</h4>
-        <h4><?php echo $reply_count ?> replies, <?php echo $total_pages ?> pages, on page <?php echo $page ?>, in <?php echo $category ?></h4>
+        <h2><?= $title ?></h2>
+        <h4>By <a href='/@<?= urlencode($username) ?>'>@<?= $username ?></a> on <?= $date ?><?= $edit_date ? ", edited {$edit_date}" : null ?>. <?= $views ?> total views.</h4>
+        <h4><?= $reply_count ?> replies, <?= $total_pages ?> pages, on page <?= $page ?>, in <?= $category ?></h4>
     </div><br />
 
     <?php
-    $replies = getreplies($post_id, $page);
-	$rows = $replies['rows'] ?? [];
-	$users = $replies['users'] ?? [];
-	$blocked = $replies['blocked'] ?? [];
+		$replies = getreplies($post_id, $page);
+		$rows = $replies['rows'] ?? [];
+		$blocked = $replies['blocked'] ?? [];
 
-    if (!empty($rows)) {
-        foreach($rows as $row) {
-            $c_comment = $row['content'] ?? '[empty]';
-            $c_date = $row['timestamp'] ?? time();
-            $decoded_comment = htmlspecialchars($c_comment);
-            $c_edited = $row['edited'] ?? null;
+		if (!empty($rows)) {
+			foreach($rows as $row) {
+				$c_comment = $row['content'] ?? '[empty]';
+				$c_date = $row['timestamp'] ?? time();
+				$decoded_comment = htmlspecialchars($c_comment);
+				$c_edited = $row['edited'] ?? null;
 
-			$c_user = (int)$row['userid'] ?? null;
-			$c_user_o = $users[$c_user] ?? null;
-            $c_username = htmlspecialchars($c_user_o->username ?? '[deleted]');
+				$c_user = $row['userid'] ?? null;
+				$c_username = htmlspecialchars($row['username'] ?? '[deleted]');
 
-            $c_user_exists = true;
-            if(!$c_user_o || $c_user_o->deactive || $c_user_o->suspended) {
-                $c_user_exists = false;
-                $isAdmin = false;
-				$hasBadge = false;
-                $pfp = '/img/no_image.png';
-            } else {
-                $isAdmin = $c_user_o->admin ?? false;
-				$hasBadge = $c_user_o->profile->verified_badge ?? false;
-                $pfp = $c_user_o->profile->picture ?? '/img/no_image.png';
-            }
-
-			if ($c_user_exists) {
-				$user_post_count = userreplycount($c_user) ?? 0;
-				$c_user_blocked = isset($blocked[$c_user]['they_blocked']) ? true : false;
-
-				if ($c_user_blocked) {
-					echo "<p>" . ErrorRegistry::get('topic_reply', 'user_blocked') . "</p>";
-					continue;
+				$c_user_exists = true;
+				if(!$c_user) {
+					$c_user_exists = false;
+					$isAdmin = false;
+					$hasBadge = false;
+					$pfp = '/img/no_image.png';
+				} else {
+					$isAdmin = $row['user_admin'] ?? false;
+					$hasBadge = $row['verified_badge'] ?? false;
+					$pfp = $row['picture'] ?? '/img/no_image.png';
 				}
-			}
 
-    ?>
+				if ($c_user_exists) {
+					$user_post_count = userreplycount($c_user) ?? 0;
+					$c_user_blocked = isset($blocked[$c_user]['they_blocked']) ? true : false;
 
-		<div id="comment-<?php echo $row['id'] ?>" class="reply w3-row" style="display:flex;width:100%;">
-			<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-margin-right w3-col m3 l3">
-				<img id="pfp" class="w3-round w3-border w3-border-grey" src="<?php echo $pfp ?>"><br />
-				<?php if ($c_user_exists) { ?>
-					<a href="/@<?php echo urlencode($c_username) ?>">
-				<?php } ?>
-					<span class="<?php echo $isAdmin ? "w3-text-red" : null ?>" style="text-overflow: ellipsis;">
-						<?php echo $c_username ?>
-					</span>
-				<?php if ($c_user_exists) { ?>
-					</a>
-				<?php } ?>
-				<?php echo $hasBadge ? "&check;" : null ?>
-				<br />
-				<time title="<?php echo $c_date ?>" datetime="<?php echo $c_date ?>">Posted <?php echo time_ago($c_date) ?></time><br />
-				<?php if(!empty($c_edited)) { ?>
-					<time title="<?php echo $c_edited ?>" datetime="<?php echo $c_edited ?>">Edited <?php echo time_ago($c_edited) ?></time><br />
-				<?php }
-				if ($c_user_exists) { ?>
-					<span><?php echo $user_post_count ?> total posts</span>
-				<?php } ?>
-			</div>
-			<div class="gr8-theme w3-display-container w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-col m9 l9">
-				<pre class="comment-text"><?php echo Slimdown::render($decoded_comment) ?></pre><br />
-				<form class="edit w3-hide">
-					<textarea class="edit-textarea"><?php echo $decoded_comment ?></textarea><br />
-					<button class="save-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Save</button>
-					<button class="cancel-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
-				</form>
-				<span class="w3-display-bottomleft">
-					<?php
-					if (loggedin() && isset($current_user)) {
-						if ($row['parent'] === (int)$post_id && ($current_user->admin || trim($current_user->id) === trim($c_user))) {
-							?>
-							<div class="delete gr8-theme w3-hide w3-card-2 w3-light-grey w3-round-small w3-padding-small w3-margin-bottom w3-border w3-border-grey">
-								<p>Are you sure you want to delete this reply?</p>
-								<button class="confirm-delete-btn w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" data-id="<?php echo $row['id'] ?>">Yes</button>
-								<button class="cancel-delete-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
-							</div>
-							<button class="delete-btn w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" data-id="<?php echo $row['id'] ?>"><i class="fa fa-trash" aria-hidden="true"></i></button>
-							<?php
-						}
-
-						if (trim($current_user->id) === trim($c_user)) {
-							echo '<button class="edit-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" data-id="' .  $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button>';
-						}
+					if ($c_user_blocked) {
+						echo "<p>" . ErrorRegistry::get('topic_reply', 'user_blocked') . "</p>";
+						continue;
 					}
-					?>
-				</span>
-			</div>
-		</div><br />
-        <?php
-        }
-        ?>
-        <br />
-    <?php
-        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?p=' . ($page - 1) . '">Back</a> <a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?p=' . ($page + 1) . '">Next</a>';
-    } else {
-        echo "<p>No replies yet.</p><br />";
-        echo '<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?p=' . ($page - 1) . '">Back</a>';
-    }
+				}
+    		?>
 
-    $words = [
-        'Spark something about flying cows',
-        'Start a MOC contest',
-        'Pigs! Its all about pigs!',
-        'Undefined!',
-        '~~Don\'t use Javascript on the server side!~~',
-        'Oops, I think I changed the padding on that button by ~0.01% of a pixel!',
-        'Moderation! Amazing!',
-        '*Did you ever hear the tragedy of Darth Plagueis "the wise"? I thought not. It\'s not a story the Jedi would tell you. It\'s a Sith legend. Darth Plagueis was a Dark Lord of the Sith, so powerful and so wise he could use the Force to influence the midichlorians to create life... He had such a knowledge of the dark side that he could even keep the ones he cared about from dying. The dark side of the Force is a pathway to many abilities some consider to be unnatural. He became so powerful... the only thing he was afraid of was losing his power, which eventually, of course, he did. Unfortunately, he taught his apprentice everything he knew, then his apprentice killed him in his sleep. It\'s ironic he could save others from death, but not himself.*',
-        'Woaw!',
-        'Obviously',
-        'Sixty five, sixty six, sixty... why do I bother. You already get it.',
-        'Dislike 👎😒',
-        'Big fan of The-An0nym\'s models on Mecabricks!',
-        '[object Object] said the console!',
-        'Rahhhh',
-        'TERFs suck',
-        'Don\'t tell 15 year olds to end their lives because they said "me when... (something about getting a bf).',
-        '"*Gr8 b8, m8. I rel8, str8 appreci8, and congratul8. I r8 this b8 an 8/8. Plz no h8, I\'m str8 ir8. Cre8 more, can\'t w8. We should convers8, I won\'t ber8, my number is 8888888, ask for N8. No calls l8 or out of st8. If on a d8, ask K8 to loc8. Even with a full pl8, I always have time to communic8 so don\'t hesit8*"'
-    ];
+			<div id="comment-<?php echo $row['id'] ?>" class="reply w3-row" style="display:flex;width:100%;">
+				<div class="gr8-theme w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-margin-right w3-col m3 l3">
+					<img id="pfp" class="w3-round w3-border w3-border-grey" src="<?php echo $pfp ?>"><br />
+					<?php if ($c_user_exists) { ?>
+						<a href="/@<?php echo urlencode($c_username) ?>">
+					<?php } ?>
+						<span class="<?php echo $isAdmin ? "w3-text-red" : null ?>" style="text-overflow: ellipsis;">
+							<?php echo $c_username ?>
+						</span>
+					<?php if ($c_user_exists) { ?>
+						</a>
+					<?php } ?>
+					<?php echo $hasBadge ? "&check;" : null ?>
+					<br />
+					<time title="<?php echo $c_date ?>" datetime="<?php echo $c_date ?>">Posted <?php echo time_ago($c_date) ?></time><br />
+					<?php if(!empty($c_edited)) { ?>
+						<time title="<?php echo $c_edited ?>" datetime="<?php echo $c_edited ?>">Edited <?php echo time_ago($c_edited) ?></time><br />
+					<?php }
+					if ($c_user_exists) { ?>
+						<span><?php echo $user_post_count ?> total posts</span>
+					<?php } ?>
+				</div>
+				<div class="gr8-theme w3-display-container w3-card-2 w3-light-grey w3-padding-small w3-round-small w3-col m9 l9">
+					<pre class="comment-text"><?php echo Formatter::render($decoded_comment) ?></pre><br />
+					<form class="edit w3-hide">
+						<textarea class="edit-textarea"><?php echo $decoded_comment ?></textarea><br />
+						<button class="save-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo">Save</button>
+						<button class="cancel-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
+					</form>
+					<span class="w3-display-bottomleft">
+						<?php
+						if (loggedin() && isset($current_user)) {
+							if ($row['parent'] === (int)$post_id && ($current_user->admin || trim($current_user->id) === trim($c_user))) {
+								?>
+								<div class="delete gr8-theme w3-hide w3-card-2 w3-light-grey w3-round-small w3-padding-small w3-margin-bottom w3-border w3-border-grey">
+									<p>Are you sure you want to delete this reply?</p>
+									<button class="confirm-delete-btn w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" data-id="<?php echo $row['id'] ?>">Yes</button>
+									<button class="cancel-delete-btn w3-btn w3-white w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-grey">Cancel</button>
+								</div>
+								<button class="delete-btn w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink" data-id="<?php echo $row['id'] ?>"><i class="fa fa-trash" aria-hidden="true"></i></button>
+								<?php
+							}
 
-    $randomWord = $words[array_rand($words)];
-    $randomWordDisplay = htmlentities($randomWord);
-    $randomWordBB = Slimdown::render($randomWord);
+							if (trim($current_user->id) === trim($c_user)) {
+								echo '<button class="edit-btn w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" data-id="' .  $row['id'] . '"><i class="fa fa-pencil" aria-hidden="true"></i></button>';
+							}
+						}
+						?>
+					</span>
+				</div>
+			</div><br />
 
-    echo "<br /><hr />";
-    echo "<p title='" . $randomWordDisplay . "'>Word of the refresh: " . $randomWordBB . "</p>";
+        <?php } ?>
+			<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?p=<?= $page - 1 ?>">Back</a>
+			<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?p=<?= $page + 1 ?>">Next</a>
+	<?php } else { ?>
+		<p>No replies yet.</p><br />
+		<a class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo" href="?p=<?= $page - 1 ?>">Back</a>
+	<?php } ?>
 
-    if ($category === "pinnedLocked" || $category === "locked") {
-        echo "<b id='commentboxcontainer'>This conversation is locked. New replies cannot be posted.</b><br />";
-	} else if (loggedin()) {
-		?>
-			<a href='#commentboxlink'>permalink to replybox</a><br />
-			<a id='commentboxlink'>
-				<form id='commentboxcontainer' method='post' action=''>
-					<textarea name='commentbox' placeholder='<?php echo $randomWordDisplay ?>' rows='4' cols='50'></textarea><br />
-				</form>
+    <hr />
 
-				<button id="post-reply" name='comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo'>
-					<span id="post-reply-text"><i class="fa fa-comment-o" aria-hidden="true"></i> Reply</span>
-				</button>
+    <?php if ($category === "pinnedLocked" || $category === "locked") : ?>
+        <b id='commentboxcontainer'>This conversation is locked. New replies cannot be posted.</b><br />
+	<?php elseif (loggedin()) : ?>
+		<a href='#commentboxcontainer'>permalink to replybox</a><br />
+		<form id='commentboxcontainer' method='post' action=''>
+			<textarea name='commentbox' placeholder='<?php echo $randomWord->Display ?>' rows='4' cols='50'></textarea><br />
+		</form>
 
-				<button id="attach-image" class="w3-btn w3-white w3-hover-opacity w3-round-small w3-border w3-border-grey">
-					<span id="attach-image-btn-text"><i class="fa fa-image" aria-hidden="true"></i> Attach image</span>
-				</button>
-			</a><br />
+		<button id="post-reply" name='comment' class='w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo'>
+			<span id="post-reply-text"><i class="fa fa-comment-o" aria-hidden="true"></i> Reply</span>
+		</button>
 
-			<form id="attach-upload" method="post" action="">
-				<input type="file" name="imagefile" id="imagefile">
-			</form>
-		<?php
-	} else {
-		echo "<b id='commentboxcontainer'>Please <a href='../acc/login'>login</a> to post a reply.</b><br />";
-	}
+		<button id="attach-image" class="w3-btn w3-white w3-hover-opacity w3-round-small w3-border w3-border-grey">
+			<span id="attach-image-btn-text"><i class="fa fa-image" aria-hidden="true"></i> Attach image</span>
+		</button>
+		<br />
 
-    include $_SERVER['DOCUMENT_ROOT'] . '/linkbar.php';
-    ?>
-</body>
+		<form id="attach-upload" method="post" action="">
+			<input type="file" name="imagefile" id="imagefile">
+		</form>
+	<?php else : ?>
+		<b id='commentboxcontainer'>Please <a href='../acc/login'>login</a> to post a reply.</b><br />
+	<?php endif; ?>
 
-</html>
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/linkbar.php' ?>

@@ -28,6 +28,7 @@ RewriteRule ^u/([^/]+)$ /profile.php?name=$1 [QSA,L]
 
 RewriteRule ^build/([0-9]+)/?$ /creation.php?id=$1 [QSA,L]
 RewriteRule ^creation/([0-9]+)/?$ /creation.php?id=$1 [QSA,L]
+RewriteRule ^creations/([0-9]+)/?$ /creation.php?id=$1 [QSA,L]
 RewriteRule ^c/([0-9]+)/?$ /creation.php?id=$1 [QSA,L]
 
 RewriteRule ^topic/([0-9]+)/?$ /com/view.php?id=$1 [QSA,L]

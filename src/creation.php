@@ -1,134 +1,133 @@
 <?php
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/time.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/const/creation.php';
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/utils/time.php';
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/creation.php';
 
-if (isset($_POST['reportv2'])) {
-    require_once __DIR__ . '/ajax/report.php';
-    exit;
-}
-
-$conn = Database::get(DB_NAME2);
-
-$model_id = $conn->real_escape_string($_GET['id']);
-$data = json_decode(fetch_build($model_id, $_SESSION['csrf']), true);
-
-$message = null;
-$error = null;
-$is_admin = false;
-$loggedin = false;
-
-if(loggedin() && isset($current_user)) {
-    $is_admin = $current_user->admin ? true : false;
-    $loggedin = true;
-    $id = $current_user->id ?? 0;
-}
-
-if (isset($data['message'])) {
-    $error = $data['message'];
-} else {
-    if(isset($data['soft_message']) && !empty($data['soft_message'])) {
-        $message = $data['soft_message'];
+    if (isset($_POST['reportv2'])) {
+        require_once __DIR__ . '/ajax/report.php';
+        exit;
     }
-}
 
-if (isset($_POST['delete_model'])) {
-    header('Content-Type: application/json');
-    $model_id = (int)$_POST['model_id'];
+    $conn = Database::get(DB_NAME2);
 
-    if ($_SESSION['csrf'] === $_POST['csrf_token']) {
-        if ($loggedin && $is_admin) {
-            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+    $model_id = $conn->real_escape_string($_GET['id']);
+    $data = json_decode(fetch_build($model_id, $_SESSION['csrf']), true);
 
-            $sql = "SELECT id, removed FROM model WHERE id = ?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("i", $model_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
+    $message = null;
+    $error = null;
+    $is_admin = false;
+    $loggedin = false;
 
-            if ($row = $result->fetch_assoc()) {
-                $sql2 = "UPDATE model SET removed = 1 WHERE id = ?";
+    if(loggedin() && isset($current_user)) {
+        $is_admin = $current_user->admin ? true : false;
+        $loggedin = true;
+        $id = $current_user->id ?? 0;
+    }
 
-                if($row['removed']) {
-                    $sql2 = "UPDATE model SET removed = 0 WHERE id = ?";
-                }
-
-                $stmt2 = $conn->prepare($sql2);
-                $stmt2->bind_param("i", $model_id);
-
-                if ($stmt2->execute()) {
-                    echo json_encode(['success' => 'Creation updated']);
-                } else {
-                    echo json_encode(['error' => 'Error deleting model listing']);
-                }
-            } else {
-                echo json_encode(['error' => 'Creation not found']);
-            }
-        } else {
-            echo json_encode(['error' => 'An authentication error has occured']);
-        }
+    if (isset($data['message'])) {
+        $error = $data['message'];
     } else {
-        echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
+        if(isset($data['soft_message']) && !empty($data['soft_message'])) {
+            $message = $data['soft_message'];
+        }
     }
-    exit;
-}
 
-if (isset($_POST['delete_comment'])) {
-    header('Content-Type: application/json');
-    $comment_id = (int)$_POST['id'];
+    if (isset($_POST['delete_model'])) {
+        header('Content-Type: application/json');
+        $model_id = (int)$_POST['model_id'];
 
-    if ($_SESSION['csrf'] === $_POST['csrf_token']) {
-        if ($loggedin) {
-            $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+        if ($_SESSION['csrf'] === $_POST['csrf_token']) {
+            if ($loggedin && $is_admin) {
+                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
 
-            $sql = "SELECT id, hidden, user, model FROM comments WHERE id = ?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("i", $comment_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
+                $sql = "SELECT id, removed FROM model WHERE id = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("i", $model_id);
+                $stmt->execute();
+                $result = $stmt->get_result();
 
-            if ($row = $result->fetch_assoc()) {
-                if(trim($row['user']) === trim($id) || $is_admin) {
-                    $sql2 = "UPDATE comments SET hidden = 1 WHERE id = ?";
-					$type = 'delete';
-                    $model_id = $row['model'];
+                if ($row = $result->fetch_assoc()) {
+                    $sql2 = "UPDATE model SET removed = 1 WHERE id = ?";
 
-                    if($row['hidden']) {
-                        $sql2 = "UPDATE comments SET hidden = 0 WHERE id = ?";
-						$type = 'restore';
+                    if($row['removed']) {
+                        $sql2 = "UPDATE model SET removed = 0 WHERE id = ?";
                     }
 
                     $stmt2 = $conn->prepare($sql2);
-                    $stmt2->bind_param("i", $comment_id);
+                    $stmt2->bind_param("i", $model_id);
 
                     if ($stmt2->execute()) {
-                        echo json_encode(['success' => 'Comment updated', 'type' => $type, 'admin' => $is_admin]);
+                        echo json_encode(['success' => 'Creation updated']);
                     } else {
-                        echo json_encode(['error' => 'Error deleting comment']);
+                        echo json_encode(['error' => 'Error deleting model listing']);
                     }
                 } else {
-                    echo json_encode(['error' => 'An authentication error has occured']);
+                    echo json_encode(['error' => 'Creation not found']);
                 }
             } else {
-                echo json_encode(['error' => 'Comment not found']);
+                echo json_encode(['error' => 'An authentication error has occured']);
             }
         } else {
-            echo json_encode(['error' => 'Not logged in']);
+            echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
         }
-    } else {
-        echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
+        exit;
     }
-    exit;
-}
 
-$model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?model=" . urlencode($_GET['id']) . "' id='model_embed' title='model_embed' width='300' height='200'></iframe>");
+    if (isset($_POST['delete_comment'])) {
+        header('Content-Type: application/json');
+        $comment_id = (int)$_POST['id'];
+
+        if ($_SESSION['csrf'] === $_POST['csrf_token']) {
+            if ($loggedin) {
+                $conn = new mysqli(DB_SERVER, DB_USER, DB_PASSWORD, DB_NAME2);
+
+                $sql = "SELECT id, hidden, user, model FROM comments WHERE id = ?";
+                $stmt = $conn->prepare($sql);
+                $stmt->bind_param("i", $comment_id);
+                $stmt->execute();
+                $result = $stmt->get_result();
+
+                if ($row = $result->fetch_assoc()) {
+                    if(trim($row['user']) === trim($id) || $is_admin) {
+                        $sql2 = "UPDATE comments SET hidden = 1 WHERE id = ?";
+                        $type = 'delete';
+                        $model_id = $row['model'];
+
+                        if($row['hidden']) {
+                            $sql2 = "UPDATE comments SET hidden = 0 WHERE id = ?";
+                            $type = 'restore';
+                        }
+
+                        $stmt2 = $conn->prepare($sql2);
+                        $stmt2->bind_param("i", $comment_id);
+
+                        if ($stmt2->execute()) {
+                            echo json_encode(['success' => 'Comment updated', 'type' => $type, 'admin' => $is_admin]);
+                        } else {
+                            echo json_encode(['error' => 'Error deleting comment']);
+                        }
+                    } else {
+                        echo json_encode(['error' => 'An authentication error has occured']);
+                    }
+                } else {
+                    echo json_encode(['error' => 'Comment not found']);
+                }
+            } else {
+                echo json_encode(['error' => 'Not logged in']);
+            }
+        } else {
+            echo json_encode(['error' => 'Oops! Your CSRF token seems to be invalid.']);
+        }
+        exit;
+    }
+
+    $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?model=" . urlencode($_GET['id']) . "' id='model_embed' title='model_embed' width='300' height='200'></iframe>");
+
+    $pageTitle = ($data['name'] ?? "Unnamed Creation") . " by " . ($data['user']['name'] ?? 'A User');
+    $pageDesc = 'View a 3d model of ' . ($data['name'] ?? "") . ' and related on Gr8Brik';
+    $pageCanonical = appSpace->__urls->app . '/creations/' . ($_GET['id'] ?? null);
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/header.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <title><?php echo $data['name'] ?? "Unnamed Creation"?> by <?php echo $data['user']['name'] ?? 'A User' ?></title>
-    <?php include 'header.php' ?>
 
     <script type="text/javascript">
         window.embed_model = <?php echo $_GET['id'] ?>;
@@ -136,9 +135,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
     </script>
     <script type="text/javascript" src="/lib/creation.js"></script>
     <script type="text/javascript" src="/lib/attachment.js"></script>
-</head>
 
-<body class="w3-light-blue w3-container">
     <div id="report-comment" class="w3-modal" style="z-index: 999999">
         <div class="w3-modal-content w3-card-2 w3-light-grey w3-center">
             <div class="w3-container">
@@ -709,10 +706,7 @@ $model_embed = htmlspecialchars("<iframe src='https://gr8brik.rf.gd/viewer.html?
             </div>
         </template>
     </div>
-    <?php
-    echo '<br />';
-    include('linkbar.php');
-    ?>
-</body>
 
-</html>
+<?php
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/linkbar.php';
+?>

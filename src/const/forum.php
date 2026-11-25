@@ -2,21 +2,35 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/profile.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/notifications.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . '/lib/jbroadway/Slimdown.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . "/const/utils/time.php";
 
 $page_limit = 10;
-$crud = new mysqli_crud(DB_NAME3);
-$user_crud = new mysqli_crud(DB_NAME);
+
+$conn = Database::get(DB_NAME3);
+$user_conn = Database::get(DB_NAME);
 
 if (loggedin()) {
     $id = $current_user->id ?? 0;
 }
 
 function gettopic($conn, $post_id) {
-    global $crud;
-
-    $post_row = $crud->readone("messages", "id,userid,username,title,timestamp,edited,views,status", "id = ? and (parent IS NULL OR parent = 0) and deleted_at is null", [$post_id]);
+    $stmt = $conn->prepare(
+        "SELECT t.id, t.userid, u.username, p.picture, t.title, t.timestamp, t.edited, t.views, t.status
+        FROM messages t
+        INNER JOIN users u
+        ON u.id = t.userid
+        LEFT JOIN user_profiles p
+        ON p.userid = t.userid
+        WHERE t.id = ?
+        AND (t.parent IS NULL OR t.parent = 0)
+        AND t.deleted_at IS NULL
+        AND u.deactive IS NULL
+        AND u.suspended = 0"
+    );
+    $stmt->bind_param("i", $post_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $post_row = $result->fetch_assoc();
 
     if (!$post_row) {
         http_response_code(404);
@@ -24,20 +38,14 @@ function gettopic($conn, $post_id) {
     }
 
     $title = $post_row['title'];
-    $userid = $post_row['userid'];
+    $user_id = $post_row['userid'];
     $date = $post_row['timestamp'];
     $views = $post_row['views'];
     $category = $post_row['status'];
     $edit_date = $post_row['edited'] ?? null;
-    $user = User::getUser($userid);
 
-    if(!$user || $user->deactive || $user->suspended) {
-        http_response_code(404);
-        return ['success' => false, 'error' => "The user that created this thread does not exist"];
-    }
-
-    $user_name = $user->username ?? null;
-    $user_picture = $user->picture ?? null;
+    $user_name = $post_row['username'] ?? null;
+    $user_picture = $post_row['picture'] ?? null;
 
     if (!isset($_SESSION['viewed_post_ids'])) {
         $_SESSION['viewed_post_ids'] = [];
@@ -69,7 +77,7 @@ function gettopic($conn, $post_id) {
         'success' => true,
         'id' => $post_id,
         'user' => [
-            'id' => $userid,
+            'id' => $user_id,
             'name' => $user_name,
             'picture' => $user_picture,
         ],
@@ -84,65 +92,135 @@ function gettopic($conn, $post_id) {
 }
 
 function getreplies($post_id, $page) {
-    global $page_limit, $crud, $user_crud;
+    global $page_limit, $conn, $user_conn;
 
     $offset = ($page - 1) * $page_limit;
-    $rows = $crud->readall("messages", "*", "(parent = ? OR id = ?) and deleted_at is null", [$post_id, $post_id], "timestamp asc", $page_limit, $offset);
+    $rows = [];
     $blocked = [];
-    $users = [];
+
+    $stmt = $conn->prepare(
+        "SELECT t.id, t.parent, t.content, t.timestamp, t.edited, u.id AS userid, u.username, u.admin AS user_admin, p.picture, p.verified_badge
+        FROM messages t
+        LEFT JOIN users u
+        ON u.id = t.userid
+        LEFT JOIN user_profiles p
+        ON p.userid = t.userid
+        WHERE (t.parent = ? OR t.id = ?)
+        AND t.deleted_at IS NULL
+        AND u.deactive IS NULL
+        AND u.suspended = 0
+        ORDER BY timestamp ASC
+        LIMIT ? OFFSET ?"
+    );
+    $stmt->bind_param("iiii", $post_id, $post_id, $page_limit, $offset);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    while ($row = $result->fetch_assoc()) {
+        $rows[$row['id']] = $row;
+    }
 
     if (!empty($rows)) {
         $userIds = array_column($rows, 'userid');
-        $users = User::getUsers($userIds);
 
         if (loggedin()) {
             $placeholders = implode(',', array_fill(0, count($userIds), '?'));
             $params = array_merge($userIds, $userIds);
-            $blocked = $user_crud->readall('user_blocks', 'userid, profileid', "userid IN ($placeholders) OR profileid IN ($placeholders)", $params);
+            $types = str_repeat('i', count($params));
 
-            foreach ($blocked as $row) {
+            $stmt = $user_conn->prepare(
+                "SELECT userid, profileid
+                FROM user_blocks
+                WHERE userid IN ($placeholders)
+                OR profileid IN ($placeholders)"
+            );
+            $stmt->bind_param($types, ...$params);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            while ($row = $result->fetch_assoc()) {
                 $block_userid = (int)$row['userid'];
                 $block_profileid = (int)$row['profileid'];
 
                 //A user in our list blocked someone else
-                if (isset($users[$block_userid]) && $block_userid !== $block_profileid) {
+                if (isset($userIds[$block_userid]) && $block_userid !== $block_profileid) {
                     $blocked[$block_profileid]['you_blocked'] = true;
                 }
 
                 //Someone else blocked a user in our list
-                if (isset($users[$block_profileid]) && $block_profileid !== $block_userid) {
+                if (isset($userIds[$block_profileid]) && $block_profileid !== $block_userid) {
                     $blocked[$block_profileid]['they_blocked'] = true;
                 }
             }
         }
+    } else {
+        http_response_code(404);
+        return [];
     }
 
     return [
-        'users' => $users,
         'blocked' => $blocked,
         'rows' => $rows,
     ];
 }
 
 function getreplycount($post_id) {
-    global $page_limit, $crud;
+    global $page_limit, $conn;
 
-    $count_result = $crud->readone('messages', 'COUNT(*) as reply_count', 'parent = ? OR id = ?', [$post_id, $post_id]);
-    //$count_result = $crud->query("SELECT COUNT(*) as reply_count FROM messages WHERE parent = '$post_id' OR id = '$post_id'");
-    $reply_count = $count_result['reply_count'] ?? 0;
+    $stmt = $conn->prepare("SELECT COUNT(*) as reply_count FROM messages WHERE parent = ? OR id = ?");
+    $stmt->execute([$post_id, $post_id]);
+    $result = $stmt->get_result();
+
+    $reply_count = $result->fetch_assoc()['reply_count'] ?? 0;
     $total_pages = ceil($reply_count / $page_limit);
 
     return [
-        'raw' => $count_result,
         'replies' => $reply_count,
         'total_pages' => $total_pages,
     ];
 }
 
 function userreplycount($userid) {
-    global $crud;
+    global $conn;
 
-    $count_result = $crud->readone('messages', 'COUNT(*) as reply_count', 'userid = ? and deleted_at is null', [$userid]);
-    return $count_result['reply_count'] ?? 0;
+    $stmt = $conn->prepare("SELECT COUNT(*) as reply_count FROM messages WHERE userid = ? AND deleted_at IS NULL");
+    $stmt->execute([$userid]);
+    $result = $stmt->get_result();
+
+    return $result->fetch_assoc()['reply_count'] ?? 0;
+}
+
+/**
+ * Return object that includes a random bullshit sentence (raw and markdown)
+ */
+function RandomWord() {
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/Autoloader.php';
+
+    try {
+        $file = $_SERVER['DOCUMENT_ROOT'] . '/lib/static/forum/randomwords.json';
+
+        if (!file_exists($file)) {
+            throw new Exception($file . ' Not Found');
+        }
+
+        $jsonstr = file_get_contents($file);
+
+        try {
+            $jsonobj = json_decode($jsonstr, false, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            exit('JSON ERROR: ' . $e->getMessage());
+        }
+
+        $words = $jsonobj->__Words->__Markdown;
+        $random = $words[array_rand($words)];
+
+        $Word = new stdClass();
+        $Word->Display = htmlentities($random);
+        $Word->Markdown = Slimdown::render($random);
+
+        return $Word;
+    } catch (Exception $e) {
+        exit($e->getMessage());
+    }
 }
 ?>

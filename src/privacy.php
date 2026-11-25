@@ -1,58 +1,34 @@
-<!DOCTYPE html>
 <?php
     require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/Autoloader.php';
 
+    $pageTitle = "Privacy Policy";
+    $pageDesc = 'Read the privacy policy of Gr8Brik';
+    $pageCanonical = appSpace->__urls->app . '/privacy';
+
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/header.php';
+    include 'navbar.php';
 ?>
-<head>
-    <title>Privacy Policy</title>
-    <?php include 'header.php' ?>
-</head>
-<body class="w3-light-blue w3-container">
-<?php include('navbar.php') ?>
 <br /><br /><div class="w3-center">
 
-<h4>Last updated <?php echo gmdate("M d, Y",filemtime('privacy.php')); ?></h4>
+<?php
+$filen = $_SERVER['DOCUMENT_ROOT'] . "/lib/static/legal/privacy.md";
 
-<p>At Gr8brik, accessible from <a href="http://<?php echo $_SERVER['HTTP_HOST'] ?>"><?php echo $_SERVER['HTTP_HOST'] ?></a>, one of our main priorities is the privacy of our visitors. This Privacy Policy document contains types of information that is collected and recorded by Gr8brik and how we use it.</p>
+if (file_exists($filen)) {
+    $content = file_get_contents($filen);
 
-<p>If you have additional questions or require more information about our Privacy Policy, do not hesitate to <a href="mailto:<?php echo DB_MAIL ?>">contact us</a>. Our Privacy Policy was created with the help of the <a href="http://www.generateprivacypolicy.com/">Privacy Policy Generator</a>.</p>
+    $vars = [
+        ':date'  => "Nov 25, 2026",
+        ':url' => "http://gr8brik.rf.gd",
+        ':url_acc' => "http://gr8brik.rf.gd/acc/",
+        ':mailto' => "mailto:" . DB_MAIL
+    ];
 
-<h2>1. Log Files</h2>
+    echo Slimdown::render(strtr($content, $vars));
+} else {
+    echo "Privacy policy file not found.";
+}
+?>
 
-<p>Gr8brik follows a standard procedure of using log files. These files log visitors when they visit websites. All hosting companies do this and a part of hosting services' analytics. The information collected by log files include internet protocol (IP) addresses, browser type, Internet Service Provider (ISP), date and time stamp, referring/exit pages, and possibly the number of clicks. These are not linked to any information that is personally identifiable. The purpose of the information is for analyzing trends, administering the site, tracking users' movement on the website, and gathering demographic information.</p>
-
-<p>In addition, we also store IP addresses in our database when users Login or Register an account on our services.</p>
-
-<h2>2. Cookies</h2>
-
-<p>Like any other website, Gr8brik uses "cookies". These cookies are used to store information including visitors' preferences, and the pages on the website that the visitor accessed or visited. The information is used to optimize the users' experience by customizing our web page content based on visitors' browser type and/or other information.</p>
-
-<h2>3. Children's Information</h2>
-
-<p>Another priority of ours is protection of children on the internet. We encourage parents and guardians to observe, participate in, and/or monitor and guide their online activity.</p>
-
-<p>Gr8brik does not knowingly collect any Personal Identifiable Information from children under the age of 13. If you think that your child provided this kind of information on our website, we strongly encourage you to contact us immediately and we will do our best efforts to promptly remove such information from our records.</p>
-    
-<h2>4. Data Removal and Account Deletion</h2>
-
-<p>If you have registered an account on Gr8brik, you have the right to request the erasure of your personal data and the anonymization of your public contributions (such as creations, comments, or forum posts).</p>
-
-<p>To initiate this process, navigate to <a href="http://<?php echo $_SERVER['HTTP_HOST'] ?>/acc">http://<?php echo $_SERVER['HTTP_HOST'] ?>/acc</a>, click "Delete Account," and follow the instructions provided there. Alternatively, you may <a href="mailto:<?php echo DB_MAIL ?>">contact us</a> directly to request a deletion.</p>
-
-Please be aware of the following conditions upon account deletion:
-<ul>
-    <li>Your account can be recovered until 14 days after you initiate the process.</li>
-    <li>Analytics are deleted around once every month.</li>
-    <li>Your username will be permanently blacklisted to prevent impersonation and platform abuse.</li>
-    <li>Publicly available community contributions, including forum threads, comment layouts, and creations, will be permanently reassigned to a system-controlled guest profile (ID 0). The text content of these posts will remain visible to preserve the context of public discussions.</li>
-    <li>If you accidentally included personally identifying information (such as your real name, address, or phone number) within the text of a public post or comment, you must email us directly and specify exactly which content blocks you need manually modified or removed.</li>
-</ul>
-
-<h2>5. Consent</h2>
-
-<p>By using our website, you hereby consent to our Privacy Policy and agree to its <a href="http://<?php echo $_SERVER['HTTP_HOST'] ?>/terms.php">Terms and Conditions.</a></p>
-<hr />
 </div><br /><br />
-<?php include('linkbar.php') ?>
-</body>
-</html>
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/linkbar.php'; ?>

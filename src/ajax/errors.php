@@ -165,29 +165,31 @@ class ErrorRegistry {
                     <a href="/terms.php">Terms and Conditions</a>.
                     <a href="/privacy.php">Privacy Policy</a>.
 
-                    <a href="mailto:<?php echo DB_MAIL ?>" target="_blank" class="w3-hover-text-red" alt="Email">
-                        <?php GenerateSVGs::get('bi-envelope-at'); ?>
-                    </a>
+                    <?php if(isset(appSpace->__urls->__socials)) { ?>
+                        <a href="mailto:<?php echo DB_MAIL ?>" target="_blank" class="w3-hover-text-red" alt="Email">
+                            <?php GenerateSVGs::get('bi-envelope-at'); ?>
+                        </a>
 
-                    <a href="<?php echo APP_URLS['socials']['twitterinc']['twitter'] ?>" target="_blank" class="w3-hover-text-blue" alt="Twitter">
-                        <?php GenerateSVGs::get('bi-twitter-x'); ?>
-                    </a>
+                        <a href="<?php echo appSpace->__urls->__socials['twitter'] ?>" target="_blank" class="w3-hover-text-blue" alt="Twitter">
+                            <?php GenerateSVGs::get('bi-twitter-x'); ?>
+                        </a>
 
-                    <a href="<?php echo APP_URLS['socials']['google']['youtube'] ?>" target="_blank" class="w3-hover-text-red" alt="YouTube">
-                        <?php GenerateSVGs::get('bi-youtube'); ?>
-                    </a>
+                        <a href="<?php echo appSpace->__urls->__socials['youtube'] ?>" target="_blank" class="w3-hover-text-red" alt="YouTube">
+                            <?php GenerateSVGs::get('bi-youtube'); ?>
+                        </a>
 
-                    <a href="<?php echo APP_URLS['socials']['microsoft']['github'] ?>" target="_blank" class="w3-hover-text-white" alt="Github">
-                        <?php GenerateSVGs::get('bi-github'); ?>
-                    </a>
+                        <a href="<?php echo appSpace->__urls->__socials['github'] ?>" target="_blank" class="w3-hover-text-white" alt="Github">
+                            <?php GenerateSVGs::get('bi-github'); ?>
+                        </a>
 
-                    <a href="<?php echo APP_URLS['socials']['reddit']['reddit'] ?>" target="_blank" class="w3-hover-text-orange" alt="Reddit">
-                        <?php GenerateSVGs::get('bi-reddit'); ?>
-                    </a>
+                        <a href="<?php echo appSpace->__urls->__socials['reddit'] ?>" target="_blank" class="w3-hover-text-orange" alt="Reddit">
+                            <?php GenerateSVGs::get('bi-reddit'); ?>
+                        </a>
 
-                    <a href="<?php echo APP_URLS['socials']['discordinc']['discord'] ?>" target="_blank" alt="Discord">
-                        <?php GenerateSVGs::get('bi-discord'); ?>
-                    </a>
+                        <a href="<?php echo appSpace->__urls->__socials['discord'] ?>" target="_blank" alt="Discord">
+                            <?php GenerateSVGs::get('bi-discord'); ?>
+                        </a>
+                    <?php } ?>
                     <p class="w3-small">Lego&#174;, the Lego&#174; logo, the Minifigure&#8482;, and the Brick&#8482; and Knob&#8482; configurations are trademarks of the Lego&#174; company, which does not sponsor, authorize, or endorse this site.</p>
                 </footer><br />
             </body>

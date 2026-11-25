@@ -65,13 +65,12 @@ class Formatter
             case 'id':
                 $regex = '/userid:([0-9]+)/';
                 $sql = 'SELECT id, username FROM users WHERE id';
-                //$formatted_str = '[**@%s**](/user/%s)';
-                $formatted_str = '<a href="/@%s" class="user-mention" data-userid="%s">@%s</a>';
+                $formatted_str = '<a href="/@:username" class="user-mention" data-userid=":userid">@:username</a>';
                 break;
             case 'name':
                 $regex = '/@([a-zA-Z0-9_]+)/';
                 $sql = 'SELECT id, username FROM users WHERE username';
-                $formatted_str = 'userid:%s';
+                $formatted_str = 'userid::userid';
                 break;
             default:
                 return $str;
@@ -90,13 +89,15 @@ class Formatter
                     $map[$key] = $row;
                 }
 
-                return preg_replace_callback($regex, function($match) use ($map, $formatted_str, $type) {
+                return preg_replace_callback($regex, function($match) use ($map, $formatted_str) {
                     if (isset($map[$match[1]])) {
                         $row = $map[$match[1]];
-                        //$fill = ($type === 'id') ? [$row['username'], $row['id']] : [$row['id']];
-                        $fill = ($type === 'id') ? [urlencode($row['username']), $row['id'], $row['username']] : [$row['id']];
+                        $vars = [
+                            ':username' => urlencode($row['username']),
+                            ':userid' => $row['id'],
+                        ];
 
-                        return vsprintf($formatted_str, $fill);
+                        return strtr($formatted_str, $vars);
                     }
 
                     return $match[0];
