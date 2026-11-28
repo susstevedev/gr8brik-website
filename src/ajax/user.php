@@ -146,11 +146,11 @@ class User {
         }
 
         $this->profile = new ProfileUser($data);
-        $this->picture ??= $this->email ? $this->userGravatar($this->email, 200) : '/img/no_image.png';
+        $this->picture ??= $this->email ? $this->gravatar($this->email, 200) : '/img/no_image.png';
         $this->picture_small ??= $this->picture;
 
-        $this->profile->picture ??= $this->userGravatar($this->email, 200);
-        $this->profile->picture_small ??= $this->userGravatar($this->email, 50);
+        $this->profile->picture ??= $this->gravatar($this->email, 200);
+        $this->profile->picture_small ??= $this->gravatar($this->email, 50);
     }
 
     /**
@@ -605,13 +605,13 @@ class User {
     /**
      * Constucts a Gravatar image URL from an email
      */
-    private function userGravatar(?string $email, ?int $size = 50) {
+    public static function gravatar(?string $email, ?int $size = 50) {
         if(empty($email)) {
             return null;
         }
 
         $hash = hash('sha256', strtolower(trim($email)));
-        $params = ['s' => $size,'d' => 'identicon','r' => 'pg'];
+        $params = ['s' => $size, 'd' => 'identicon', 'r' => 'pg'];
 
         return "https://www.gravatar.com/avatar/" . $hash . "?" . http_build_query($params);
     }

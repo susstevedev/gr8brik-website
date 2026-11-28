@@ -12,7 +12,8 @@ $pageURL = $__url['protocol'] . '://' . $__url['host'] . $__url['path'];
 $__page = [
     'title' => $pageTitle ?? '[unknown page]',
     'description' => $pageDesc ?? null,
-    'canonical' => $pageCanonical ?? $pageURL
+    'canonical' => $pageCanonical ?? $pageURL,
+    'scripts' => $pageScripts ?? [],
 ];
 
 $og = array_merge([
@@ -63,5 +64,13 @@ $og = array_merge([
         <link rel="apple-touch-icon" href="/img/logo.jpg" />
         <meta name="apple-mobile-web-app-status-bar" content="#f1f1f1" />
         <meta name="theme-color" content="#f1f1f1" />
+
+        <?php
+            if(is_array($__page['scripts'])) {
+                foreach ($__page['scripts'] as $scr) {
+                    echo "<script src='{$scr}' type='text/javascript' data-type='pageExtraScript'></script> \n";
+                }
+            }
+        ?>
     </head>
     <body class="w3-light-blue w3-container">

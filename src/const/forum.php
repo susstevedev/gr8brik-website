@@ -14,12 +14,15 @@ if (loggedin()) {
 }
 
 function gettopic($conn, $post_id) {
+    $dbf = DB_NAME3;
+    $dbu = DB_NAME;
+
     $stmt = $conn->prepare(
         "SELECT t.id, t.userid, u.username, p.picture, t.title, t.timestamp, t.edited, t.views, t.status
-        FROM messages t
-        INNER JOIN users u
+        FROM {$dbf}.messages t
+        INNER JOIN {$dbu}.users u
         ON u.id = t.userid
-        LEFT JOIN user_profiles p
+        LEFT JOIN {$dbu}.user_profiles p
         ON p.userid = t.userid
         WHERE t.id = ?
         AND (t.parent IS NULL OR t.parent = 0)
@@ -94,16 +97,19 @@ function gettopic($conn, $post_id) {
 function getreplies($post_id, $page) {
     global $page_limit, $conn, $user_conn;
 
+    $dbf = DB_NAME3;
+    $dbu = DB_NAME;
+
     $offset = ($page - 1) * $page_limit;
     $rows = [];
     $blocked = [];
 
     $stmt = $conn->prepare(
         "SELECT t.id, t.parent, t.content, t.timestamp, t.edited, u.id AS userid, u.username, u.admin AS user_admin, p.picture, p.verified_badge
-        FROM messages t
-        LEFT JOIN users u
+        FROM {$dbf}.messages t
+        LEFT JOIN {$dbu}.users u
         ON u.id = t.userid
-        LEFT JOIN user_profiles p
+        LEFT JOIN {$dbu}.user_profiles p
         ON p.userid = t.userid
         WHERE (t.parent = ? OR t.id = ?)
         AND t.deleted_at IS NULL
@@ -167,8 +173,24 @@ function getreplies($post_id, $page) {
 function getreplycount($post_id) {
     global $page_limit, $conn;
 
-    $stmt = $conn->prepare("SELECT COUNT(*) as reply_count FROM messages WHERE parent = ? OR id = ?");
-    $stmt->execute([$post_id, $post_id]);
+    $dbf = DB_NAME3;
+    $dbu = DB_NAME;
+
+    $sql =
+    "SELECT COUNT(*) as reply_count
+    FROM {$dbf}.messages m
+    INNER JOIN {$dbf}.messages t
+    ON t.id = ?
+    INNER JOIN {$dbu}.users u
+    ON u.id = t.userid
+    WHERE (m.parent = ? OR m.id = ?)
+    AND t.deleted_at IS NULL
+    AND m.deleted_at IS NULL
+    AND u.deactive IS NULL
+    AND u.suspended = 0";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$post_id, $post_id, $post_id]);
     $result = $stmt->get_result();
 
     $reply_count = $result->fetch_assoc()['reply_count'] ?? 0;
@@ -180,10 +202,13 @@ function getreplycount($post_id) {
     ];
 }
 
-function userreplycount($userid) {
+function userreplycount(int $userid) : int {
     global $conn;
 
-    $stmt = $conn->prepare("SELECT COUNT(*) as reply_count FROM messages WHERE userid = ? AND deleted_at IS NULL");
+    $dbf = DB_NAME3;
+    $dbu = DB_NAME;
+
+    $stmt = $conn->prepare("SELECT COUNT(*) as reply_count FROM {$dbf}.messages m INNER JOIN {$dbu}.users u ON u.id = m.userid WHERE u.id = ? AND m.deleted_at IS NULL AND u.deactive IS NULL");
     $stmt->execute([$userid]);
     $result = $stmt->get_result();
 

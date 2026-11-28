@@ -81,9 +81,6 @@ if (isset($_GET['feature_v3'])) {
         $sorting = isset($_GET['sort']) ? $_GET['sort'] : "following";
         $searching = isset($_GET['q']) ? $_GET['q'] : "";
 
-        echo '<a href="?p=' . ($page - 1) . '&sort=' . $sorting . '&q=' . $searching . '"><button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button></a>&nbsp;';
-        echo '<a href="?p=' . ($page + 1) . '&sort=' . $sorting . '&q=' . $searching . '"><button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Forward</button></a>';
-
         $sort_options = [
             'follow' => ['sql' => null, 'label' => 'Following'],
             'feature' => ['sql' => 'AND feature = 1 ORDER BY date DESC', 'label' => 'Featured'],
@@ -97,6 +94,9 @@ if (isset($_GET['feature_v3'])) {
             'newest' => ['sql' => 'ORDER BY date DESC', 'label' => 'Newest'],
         ];
     ?>
+
+    <a href="?p=<?= $page - 1 ?>&sort=<?= $sorting ?>&q=<?= $searching ?>"><button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Back</button></a>&nbsp;
+    <a href="?p=<?= $page + 1 ?>&sort=<?= $sorting ?>&q=<?= $searching ?>"><button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Forward</button></a>
 
     <div class="w3-right" id="sorting-options" style="display: flex; align-items: center; gap: 15px;">
         <form id="list-search-cre" name="list-search-cre" class="w3-white" method="get" action="" style="display: inline-flex; align-items: center; border: 1px solid #ccc;">
@@ -139,11 +139,12 @@ if (isset($_GET['feature_v3'])) {
         <?php
         $is_search = false;
         $sql = $sort_options['all']['sql'];
-        $sql_begin = "SELECT m.id, m.name, m.screenshot, m.date, m.views, m.replies, m.likes, m.size, u.username, u.id AS userid, u.admin AS useradmin, p.picture_small AS profile_picture
-                    FROM model m
-                    LEFT JOIN users u
+        $sql_begin = "SELECT
+                    m.id, m.name, m.screenshot, m.date, m.views, m.replies, m.likes, m.size, u.username, u.email, u.id AS userid, u.admin AS useradmin, p.picture_small AS profile_picture
+                    FROM " . DB_NAME2 . ".model m
+                    LEFT JOIN " . DB_NAME . ".users u
                     ON u.id = m.user
-                    LEFT JOIN user_profiles p
+                    LEFT JOIN " . DB_NAME . ".user_profiles p
                     ON p.userid = m.user";
 
         if (loggedin() && isset($current_user)) {
@@ -268,7 +269,7 @@ if (isset($_GET['feature_v3'])) {
                                 <?php if (!$row['userid']) { ?>
                                     By <i>Deleted User</i>
                                 <?php } else { ?>
-                                    By <a class="<?= $row['useradmin'] ? 'w3-text-red' : null ?>" href="/@<?= rawurlencode($row['username']); ?>"><img src="<?= $row['profile_picture'] ?? '/img/no_image.png' ?>" width="20px" height="20px" alt="Profile Picture" loading="lazy" /><i class="fa fa-at" aria-hidden="true"></i><?= $row['username'] ?></a>
+                                    By <a class="<?= $row['useradmin'] ? 'w3-text-red' : null ?>" href="/@<?= rawurlencode($row['username']); ?>"><img src="<?= $row['profile_picture'] ?? User::gravatar($row['email'], 25) ?>" class="w3-circle" width="20px" height="20px" alt="Profile Picture" loading="lazy" /><i class="fa fa-at" aria-hidden="true"></i><?= $row['username'] ?></a>
                                 <?php } ?>
                                 on <?= date("d M Y", strtotime($row['date'])) ?>
                             </span>

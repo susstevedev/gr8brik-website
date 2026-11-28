@@ -101,7 +101,7 @@ import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawCondit
                 })
 
                 loading.innerText = "Loading perms...";
-                await fetch(`/ajax/creationFile?get_viewer_auth=true`, {
+                await fetch(`/ajax/creationFile?auth=true&creId=${model_file}`, {
                     "credentials": "include",
                     "method": "GET",
                 })
@@ -123,7 +123,7 @@ import { LDrawConditionalLineMaterial } from 'three/addons/materials/LDrawCondit
                 await fetch(`/ajax/creationFile`, {
                     "credentials": "include",
                     "method": "POST",
-                    "body": new URLSearchParams({queryFile: true, type: 'json', id: model_file, auth: viewer_sess}),
+                    "body": new URLSearchParams({queryFile: true, id: model_file, auth: viewer_sess}),
                 })
                 .then(response => {
                     if (!response.ok) {

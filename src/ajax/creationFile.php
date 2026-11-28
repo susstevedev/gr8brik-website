@@ -9,6 +9,9 @@ if(isset($_POST['queryFile']) && isset($_POST['id'])) {
     header('Content-Type: application/json');
 
     $conn = Database::get(DB_NAME2);
+    $dbu = DB_NAME;
+    $dbc = DB_NAME2;
+
     $public_edit = false;
     $model_id = $_POST['id'];
 
@@ -18,11 +21,11 @@ if(isset($_POST['queryFile']) && isset($_POST['id'])) {
 
     $stmt = $conn->prepare
     ("SELECT m.model, m.name, m.description, m.can_edit, m.visibility, m.removed, u.id AS user_id, u.username, p.picture AS user_pic
-    FROM model m
-    INNER JOIN users u ON u.id = m.user AND u.deactive IS NULL
-    LEFT JOIN user_profiles p ON p.userid = m.user
+    FROM {$dbc}.model m
+    INNER JOIN {$dbu}.users u ON u.id = m.user AND u.deactive IS NULL
+    LEFT JOIN {$dbu}.user_profiles p ON p.userid = m.user
     WHERE m.id = ?
-    AND removed = 0");
+    AND m.removed = 0");
 
     $stmt->execute([$model_id]);
     $row = $stmt->get_result()->fetch_assoc();
@@ -96,6 +99,28 @@ if(isset($_GET['auth']) && isset($_GET['creId'])) {
     echo json_encode([
         'auth' => $_SESSION['viewer']['auth'],
         'creId' => $_GET['creId']
+    ]);
+    exit;
+}
+
+if(isset($_GET['get_viewer_auth'])) {
+    $oldid = isset($_GET['id']) ? $_GET['id'] : null;
+    $id = isset($_GET['creId']) ? $_GET['creId'] : $oldid;
+
+    http_response_code(400);
+    echo json_encode([
+        '__Viewer' => [
+            '__Errors' => [
+                0 => http_response_code(),
+                1 => 'Use New Api',
+            ],
+        ],
+        '__Modeler' => [
+            '__Errors' => [
+                0 => http_response_code(),
+                1 => 'Use New Api'
+            ],
+        ],
     ]);
     exit;
 }

@@ -1,45 +1,46 @@
 <?php
-require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
-if (loggedin()) {
-    header('Location:list.php');
-}
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/ajax/user.php';
+    if (loggedin()) {
+        header("Location:list.php?status=loggedin&sid={$_SESSION['tokenid']}");
+    }
+
+    $pageTitle = "LDraw and WebGL based LEGO&reg; building webapp with social features in your web browser";
+    $pageDesc = "Gr8brik is an LDraw and WebGL based LEGO building webapp with social features in running completly your web browser. No download or installation needed, optionally store your creations in your account.";
+    $pageCanonical = '/';
+    $pageScripts = ['/lib/homepage.js'];
+
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/header.php';
+
+    include 'navbar.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
 
-<head>
-    <title>LDraw and WebGL based LEGO&reg; building webapp with social features in your web browser.</title>
-    <?php include 'header.php' ?>
-    <script src="/lib/homepage.js" type="text/javascript"></script>
-</head>
-
-<body class="w3-container w3-light-blue">
-    <?php include 'navbar.php' ?>
-
-    <div class="w3-container w3-light-grey w3-card-2 w3-text-grey">
-        <h2>GR8BRIK<span class="w3-opacity">.rf.gd</span></h2>
+    <div class="w3-container w3-panel w3-round w3-light-grey w3-card-2">
+        <div class="w3-text-grey">
+            <span class="w3-xxlarge">GR8BRIK</span>
+            <span class="w3-large">.rf.gd</span>
+        </div>
     </div><br />
-    <center>
-        <article class="main-text w3-container">
-            <div class="img-cell w3-content w3-card-2 w3-light-grey w3-padding-small w3-left w3-round" style="max-width:525px;position:relative;">
-                <a href="#feed"><img class="slides" src="img/feed.jpg"></a>
-                <a href="#community"><img class="slides" src="img/com.jpg"></a>
-                <a href="#creations"><img class="slides" src="img/creations.jpg"></a>
-                <a href="#uploads"><img class="slides" src="img/upload.jpg"></a>
 
-                <a style="position:absolute;top:45%; left:10px;" onclick="plusDivs(-1)"><button class="w3-btn w3-blue w3-round w3-padding w3-large w3-hover-white"><i class="fa fa-arrow-left"></i></button></a>
-                <a style="position:absolute; top:45%; right:10px;" onclick="plusDivs(1)"><button class="w3-btn w3-blue w3-round w3-padding w3-large w3-hover-white"><i class="fa fa-arrow-right"></i></button></a>
-            </div>
+    <article class="main-text w3-center w3-container">
+        <div class="img-cell w3-content w3-card-2 w3-light-grey w3-padding-small w3-left w3-round" style="max-width:525px;position:relative;">
+            <a href="#feed"><img class="slides" src="img/feed.jpg"></a>
+            <a href="#community"><img class="slides" src="img/com.jpg"></a>
+            <a href="#creations"><img class="slides" src="img/creations.jpg"></a>
+            <a href="#uploads"><img class="slides" src="img/upload.jpg"></a>
 
-            <p style="word-wrap: break-word;">Gr8brik is an LDraw and WebGL based LEGO building webapp with social features in running completly your web browser. No download or installation needed, optionally store your creations in your account.</p>
-            <a href="/modeler" target="_blank"><button class="w3-btn w3-large w3-light-grey w3-hover-opacity w3-round-small w3-border w3-border-grey">Start Building!</button></a> <a href="/acc/login?goto=/acc/creations" target="_blank">
-                <button class="w3-btn w3-large w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Login or register</button>
-            </a><br />
-            <p>
-                <a href="/com/view?id=17">Community Guidelines</a> • <a href="/terms">Terms and Conditions</a> • <a href="/privacy">Privacy Policy</a><br />
-            </p>
-        </article>
-    </center>
+            <a style="position:absolute;top:45%; left:10px;" onclick="plusDivs(-1)"><button class="w3-btn w3-blue w3-round w3-padding w3-large w3-hover-white"><i class="fa fa-arrow-left"></i></button></a>
+            <a style="position:absolute; top:45%; right:10px;" onclick="plusDivs(1)"><button class="w3-btn w3-blue w3-round w3-padding w3-large w3-hover-white"><i class="fa fa-arrow-right"></i></button></a>
+        </div>
+
+        <p style="word-wrap: break-word;">Gr8brik is an LDraw and WebGL based LEGO building webapp with social features in running completly your web browser. No download or installation needed, optionally store your creations in your account.</p>
+        <a href="/modeler" target="_blank"><button class="w3-btn w3-large w3-light-grey w3-hover-opacity w3-round-small w3-border w3-border-grey">Start Building!</button></a>
+        <a href="/acc/login?goto=/acc/creations" target="_blank">
+            <button class="w3-btn w3-large w3-blue w3-hover-opacity w3-round-small w3-border w3-border-indigo">Login or register</button>
+        </a><br />
+        <p>
+            <a href="/rules">Community Guidelines</a> • <a href="/terms">Terms and Conditions</a> • <a href="/privacy">Privacy Policy</a><br />
+        </p>
+    </article>
 
     <hr />
     <div class="w3-container grid">
@@ -93,8 +94,4 @@ if (loggedin()) {
         </span>
     </div>
 
-    <?php include('linkbar.php'); ?>
-
-</body>
-
-</html>
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/linkbar.php'; ?>

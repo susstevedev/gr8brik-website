@@ -54,22 +54,32 @@ if (!loggedin() || !isset($current_user)) {
 }
 ?>
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+<?php
+    $pageTitle = "Account Settings";
+    $pageCanonical = '/acc/';
+    $pageScripts = ['/lib/account_settings.js'];
+    require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/header.php';
 
-<head>
-    <title>Settings</title>
-    <?php include '../header.php' ?>
-</head>
+    include '../navbar.php';
+    include 'panel.php';
 
-<body class="w3-light-blue w3-container">
-    <?php
-        include '../navbar.php';
-        include 'panel.php';
+    $utils = new ScreenNameUtils();
+    $combinedString = $utils->generateRandomScreenName();
 
-        $utils = new ScreenNameUtils();
-        $combinedString = $utils->generateRandomScreenName();
-    ?>
+    if($current_user->banner && strpos($current_user->banner, '/acc/users/banners/') !== false && file_exists($_SERVER['DOCUMENT_ROOT'] . $current_user->banner)) {
+        $hasbanner = true;
+        $userBanner = $current_user->banner;
+    } else {
+        $hasbanner = false;
+        $userBanner = "/img/no_image.png";
+    }
+
+    if($current_user->picture && strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($_SERVER['DOCUMENT_ROOT'] . $current_user->picture)) {
+        $haspfp = true;
+    } else {
+        $haspfp = false;
+    }
+?>
 
     <div id="deactive" class="w3-modal">
         <div class="w3-modal-content w3-card-2 w3-light-grey w3-center w3-animate-bottom">
@@ -86,348 +96,13 @@ if (!loggedin() || !isset($current_user)) {
         </div>
     </div>
 
-    <script>
-        $(document).ready(function() {
-            $("#username-input").on("input", function() {
-                var newUsername = $(this).val();
-                $("#u_change").attr('disabled', true);
-                $("#data-username-available").text('');
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    method: "GET",
-                    dataType: 'json',
-                    data: { check_username_available: true, username: newUsername },
-                    success: function(response) {
-                        if (response.available == true) {
-                            $("#u_change").attr('disabled', false);
-                            $("#data-username-available").removeClass('w3-red').addClass('w3-green');
-                        } else if (response.available == false) {
-                            $("#data-username-available").removeClass('w3-green').addClass('w3-red');
-                        }
-
-                        $("#data-username-available").show().text(response.reason).delay(5000).hide(0);
-                    },
-
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        console.error(jqXHR, textStatus, errorThrown);
-                        DOMerror("An error occurred. Please try again later.");
-                    }
-                });
-            });
-
-            $("#u_change").click(function(event) {
-                event.preventDefault();
-
-                var username = $("#username input[name='username']").val();
-                var token = $.cookie('token');
-                if ($("#username input[name='username']").val().trim() === '') {
-                    var username = $("#username input[name='username']").attr('placeholder');
-                }
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    method: "GET",
-                    dataType: 'json',
-                    data: {
-                        username_change: true,
-                        username: username,
-                        token: token
-                    },
-                    success: function(response) {
-                        DOMsuccess(response.success || "Unknown response");
-                        $(".usertext").text(username);
-                    },
-
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        DOMerror(response.error || "An error occurred. Please try again later.");
-                    }
-                });
-            });
-
-            $("#password").submit(function(event) {
-                event.preventDefault();
-                var formData = $("#password").serialize() + "&change=true";
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    method: "POST",
-                    dataType: 'json',
-                    data: formData,
-                    success: function(response) {
-                        if(response.success) {
-                            DOMsuccess(response.success);
-                        } else if(response.error) {
-                            DOMerror(response.error || "An error occurred. Please try again later.");
-                        }
-                    },
-
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        DOMerror(response.error || "An error occurred. Please try again later.");
-                    }
-                });
-            });
-
-            $("#email").submit(function(event) {
-                event.preventDefault();
-                var formData = $("#email").serialize() + "&mail_change=true";
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    method: "POST",
-                    dataType: 'json',
-                    data: formData,
-                    success: function(response) {
-                        if(response.success) {
-                            DOMsuccess(response.success);
-                        } else if(response.error) {
-                            DOMerror(response.error || "An error occurred. Please try again later.");
-                        }
-                    },
-
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        DOMerror(response.error || "An error occurred. Please try again later.");
-                    }
-                });
-            });
-
-            $("#blog_user_change").click(function(event) {
-                event.preventDefault();
-
-                let blog_user = $("#blog_user_change input[name='user']").val();
-                var token = $.cookie('token');
-                if ($("#blog_user_change input[name='user']").val().trim() === '') {
-                    let blog_user = null;
-                }
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    method: "GET",
-                    dataType: 'json',
-                    data: {
-                        blog_user_change: true,
-                        blog_user: blog_user,
-                        token: token
-                    },
-                    success: function(response) {
-                        DOMsuccess(response.success || "Unknown response");
-                    },
-
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        DOMerror(response.error || "An error occurred. Please try again later.");
-                    }
-                });
-            });
-
-            $("#a_change").click(function(event) {
-                event.preventDefault();
-
-                var description = $("#about textarea[name='description']").val();
-                var token = $.cookie('token');
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    method: "GET",
-                    dataType: 'json',
-                    data: {
-                        about_change: true,
-                        description: encodeURIComponent(description),
-                        token: token
-                    },
-                    success: function(response) {
-                        DOMsuccess(response.success || "Unknown response");
-                    },
-
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        DOMerror(response.error || "An error occurred. Please try again later.");
-                    }
-                });
-            });
-
-            $("#twitter_change").click(function(event) {
-                event.preventDefault();
-
-                var handle = $("#twitter input[name='handle']").val();
-                var token = $.cookie('token');
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    method: "GET",
-                    dataType: 'json',
-                    data: {
-                        twitter_change: true,
-                        handle: handle,
-                        token: token
-                    },
-                    success: function(response) {
-                        DOMsuccess(response.success || "Unknown response");
-                    },
-
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        DOMerror(response.error || "An error occurred. Please try again later.");
-                    }
-                });
-            });
-
-            $("#bsky_change").click(function(event) {
-                event.preventDefault();
-
-                var handle = $("#bsky input[name='handle']").val();
-                var token = $.cookie('token');
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    method: "GET",
-                    dataType: 'json',
-                    data: {
-                        bsky_change: true,
-                        handle: handle,
-                        token: token
-                    },
-                    success: function(response) {
-                        if(response.success) {
-                            DOMsuccess(response.success);
-                        } else if(response.error) {
-                            DOMerror(response.error || "An error occurred. Please try again later.");
-                        }
-                    },
-
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        var response = JSON.parse(jqXHR.responseText);
-                        DOMerror(response.error || "An error occurred. Please try again later.");
-                    }
-                });
-            });
-
-            // Source - https://stackoverflow.com/a/23981045
-            // Posted by bloodyKnuckles, modified by community. See post 'Timeline' for change history
-            // Retrieved 2026-08-02, License - CC BY-SA 4.0
-
-            $('#pictureForm #picture').on('click', function(event) {
-                event.preventDefault();
-
-                var file_data = $('#pictureForm #fileToUpload').prop('files')[0];
-                var form_data = new FormData();
-                form_data.append('fileToUpload', file_data);
-                form_data.append('picture', 'true');
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    dataType: 'json',
-                    contentType: false,
-                    processData: false,
-                    data: form_data,
-                    type: 'POST',
-                    success: function(res) {
-                        if (res && res.success && res.image) {
-                            $('#pictureForm #fileToUpload').css('background-image', 'url(' + res.image + ')');
-                        } else if (res && res.error) {
-                            DOMerror(res.error);
-                        } else {
-                            DOMerror('An error occured while uploading the image');
-                        }
-                    },
-                    error: function(xhr, text, error) {
-                        var response = JSON.parse(xhr.responseText);
-                        DOMerror(response.error || "An error occured while uploading the image");
-                    }
-                });
-            });
-
-            $('#pictureForm #remove_picture').on('click', function(event) {
-                event.preventDefault();
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    dataType: 'json',
-                    data: {
-                        remove_picture: true
-                    },
-                    type: 'POST',
-                    success: function(res) {
-                        if (res && res.success && res.image) {
-                            $('#pictureForm #fileToUpload').css('background-image', 'url(' + res.image + ')');
-                            $('#pictureForm #remove_picture').remove();
-                        } else if (res && res.error) {
-                            DOMerror(res.error);
-                        } else {
-                            DOMerror('An error occured while removing the image');
-                        }
-                    },
-                    error: function(xhr, text, error) {
-                        var response = JSON.parse(xhr.responseText);
-                        DOMerror(response.error || "An error occured while removing the image");
-                    }
-                });
-            });
-
-            $('#update_private_page').on('click', function(event) {
-                event.preventDefault();
-                var btn = $(this);
-
-                $.ajax({
-                    url: "../ajax/account_settings",
-                    dataType: 'json',
-                    data: { private_profile: true },
-                    type: 'POST',
-                    success: function(res) {
-                        if (res && res.success && res.message) {
-                            DOMsuccess(res.message);
-
-                            if(res.text) {
-                                btn.text(res.text);
-                            }
-                        }
-                    },
-                    error: function(xhr, text, error) {
-                        var response = JSON.parse(xhr.responseText);
-                        DOMerror(response.message || 'Error privating or unprivating page.');
-                    }
-                });
-            });
-        });
-
-        function DOMerror(error) {
-            $(".error").show();
-            if (error) {
-                $(".error").text(error);
-            }
-            $('html, body').animate({
-                scrollTop: 0
-            }, 'slow');
-        }
-
-        function DOMsuccess(message) {
-            $(".success").show();
-            if (message) {
-                $(".success").text(message);
-            }
-            $('html, body').animate({
-                scrollTop: 0
-            }, 'slow');
-        }
-    </script>
-
     <style>
         .file-pfp {
             background-image: url('<?php echo $current_user->picture ?: "../acc/users/pfps/" . $current_user->id . ".jpg?" ?>');
         }
 
         .file-banner {
-            background-image: url('<?php
-                                    if (file_exists("users/banners/" . $current_user->id . "..jpg")) {
-                                        echo "users/banners/" . $current_user->id . "..jpg";
-                                    } else {
-                                        echo "/img/no_image.png";
-                                    }
-                                    ?>');
+            background-image: url('<?= $userBanner ?>');
         }
     </style>
 
@@ -442,7 +117,7 @@ if (!loggedin() || !isset($current_user)) {
             <p>We recommend your banner be 1200x400</p>
             <p><input type="file" name="fileToupload" id="fileToupload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-banner"></p>
             <?php
-            if ($current_user->banner && strpos($current_user->banner, '/acc/users/banners/') !== false && file_exists($_SERVER['DOCUMENT_ROOT'] . $current_user->banner)) {
+            if ($hasbanner) {
                 echo '<input type="checkbox" class="w3-check" id="deleteBanner" name="deleteBanner" value="1">';
                 echo '<label for="deleteBanner">Remove banner</label>';
             }
@@ -459,10 +134,10 @@ if (!loggedin() || !isset($current_user)) {
                 <p><input type="file" name="fileToUpload" id="fileToUpload" style="color:transparent;" onchange="this.style.color = 'black';" title=" " class="file-pfp"></p>
                 <input type="submit" value="Upload picture" id="picture" name="picture" class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo w3-col m4">
                 <?php
-                if ($current_user->picture && strpos($current_user->picture, '/acc/users/pfps/') !== false && file_exists($_SERVER['DOCUMENT_ROOT'] . $current_user->picture)) {
-                    echo '<span class="w3-col m1">&nbsp;</span>';
-                    echo '<input type="submit" value="Remove picture" id="remove_picture" name="remove_picture" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink w3-col m4">';
-                }
+                    if ($haspfp) {
+                        echo '<span class="w3-col m1">&nbsp;</span>';
+                        echo '<input type="submit" value="Remove picture" id="remove_picture" name="remove_picture" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-pink w3-col m4">';
+                    }
                 ?>
             </form>
         </div><br /><br />
@@ -478,15 +153,15 @@ if (!loggedin() || !isset($current_user)) {
 
             <form id="twitter" name="twitter">
                 <b><legend>Twitter</legend></b>
-                <p>To link your X/Twitter account, you will need to provide your handle.</p>
-                <input class="w3-input w3-border w3-mobile w3-third" placeholder="@me" value="<?php echo $current_user->twitter ?>" type="text" name="handle">
+                <p>To link your Twitter account, you will need to provide your handle.</p>
+                <input class="w3-input w3-border w3-mobile w3-third" placeholder="@jack" value="<?= $current_user->twitter ?>" type="text" name="handle">
                 <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="twitter_change" name="twitter_change">Update Twitter</button>
             </form><br />
 
             <form id="bsky" name="bsky">
                 <b><legend>Bluesky</legend></b>
                 <p>To link your Bluesky account, you will need to provide your handle (without the at part!). Note that some handles may not be seen as valid internally. If so, contact us so we can update it for you.</p>
-                <input class="w3-input w3-border w3-mobile w3-third" placeholder="user.bsky.social" value="<?php echo $current_user->bsky ?>" type="text" name="handle">
+                <input class="w3-input w3-border w3-mobile w3-third" placeholder="user.bsky.social" value="<?= $current_user->bsky ?>" type="text" name="handle">
                 <button class="w3-btn w3-blue w3-hover-opacity w3-round-small w3-padding-small w3-border w3-border-indigo" id="bsky_change" name="bsky_change">Update Bluesky</button>
             </form><br />
 
@@ -501,10 +176,15 @@ if (!loggedin() || !isset($current_user)) {
 
     <h2>Account</h2>
     <form id="github-link" action="/ajax/auth.php" method="GET">
+        <?php 
+            $linked = empty($current_user->github_id) ? false : true;
+            $linked_text = $linked ? 'Unlink' : 'Link';
+        ?>
+
         <b><legend>Github oauth</legend></b>
-        <p>Link (or unlink) your github account as a method to access your account.</p>
+        <p><?= $linked_text ?> your github account as a method to access your account.</p>
         <input type="hidden" name="authtype" value="github" />
-        <?php if(empty($current_user->github_id)) { ?>
+        <?php if(!$linked) { ?>
             <button type="submit" name="github_link" class="w3-btn w3-round w3-padding-small w3-white w3-hover-light-grey w3-border w3-border-grey">
                 <i class="fa fa-github-square" aria-hidden="true"></i> 
                 Link github
@@ -555,7 +235,4 @@ if (!loggedin() || !isset($current_user)) {
         <span class="w3-tag w3-round w3-blue w3-padding-small tooltiptext"><i class="fa fa-info-circle" aria-hidden="true"></i> Begin the process of deleting your account and data</span>
     </div>
 
-    <?php include('../linkbar.php') ?>
-</body>
-
-</html>
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/linkbar.php'; ?>
