@@ -290,9 +290,9 @@
                     </div>
 
                     <p class="creation-page-meta" id="stats">
-                        <span title="<?php echo $data['date'] ?>">Published <?php echo time_ago($data['date']) ?></span> • <span><?php echo $data['views'] ?> views • <span><?php echo $data['likes'] ?> favorites</span>
+                        <span title="<?php echo $data['date'] ?>">Published <?php echo time_ago($data['date']) ?></span> • <span><?php echo $data['views'] ?> views</span>
                     </p>
-                    
+
                     <?php if($data['user']['exists']) { ?>
                         <p class="creation-page-meta">By 
                             <b class="meta-author">

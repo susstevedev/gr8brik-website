@@ -213,7 +213,7 @@ if(isset($_POST['unban-submit'])) {
                 <input name="unsuspend" form="unsuspendUser" class="w3-btn w3-red w3-hover-opacity w3-round-small w3-border w3-border-pink" type="submit" value="Unsuspend user">
             <?php } ?>
         </div>
-        <?php include('linkbar.php') ?>
+        <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/linkbar.php'; ?>
         <?php exit; ?>
     <?php } ?>
 
@@ -559,7 +559,7 @@ if(isset($_POST['unban-submit'])) {
         </div>
     </span>
 
-    <?php include('linkbar.php') ?>
+    <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/const/includes/linkbar.php'; ?>
 
 </div>
 

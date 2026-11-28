@@ -1,5 +1,5 @@
     <nav id="navbar" class="w3-sidebar w3-bar-block w3-hide-small w3-large w3-card-2 w3-light-grey">
-        <a href="/" class="w3-bar-item w3-button"><img src="/img/logo/192.png" style="width: 25px; height: 25px; border-radius: 15px;">Gr8Brik </b><span class="w3-green w3-tag w3-round">BETA</span></a>
+        <a href="/" class="w3-bar-item w3-button"><img src="/img/logo/192.png" alt="Logo" style="width: 25px; height: 25px; border-radius: 15px;">Gr8Brik <span class="w3-green w3-tag w3-round">BETA</span></a>
         <a href="/modeler" class="w3-bar-item w3-button"><i class="fa fa-cubes" aria-hidden="true"></i>Modeler</a>
         <a href="/list?sort=all" class="w3-bar-item w3-button"><i class="fa fa-building-o" aria-hidden="true"></i>Creations</a>
         <a href="/com" class="w3-bar-item w3-button"><i class="fa fa-commenting-o" aria-hidden="true"></i>Community</a>
